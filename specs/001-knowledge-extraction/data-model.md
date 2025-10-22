@@ -244,6 +244,7 @@ class LogseqBlock:
     """Single bullet in outline with children.
 
     IMPORTANT: Preserves exact structure and order from source.
+
     - Properties must never be reordered (insertion order preserved)
     - Children can be inserted where appropriate (targeted, minimal changes)
     """
@@ -282,6 +283,7 @@ class LogseqOutline:
         """Parse Logseq markdown into outline structure.
 
         IMPORTANT: Preserves exact order of properties:
+
         - Blocks appear in same order as source
         - Properties MUST maintain insertion order (dict preserves order in Python 3.7+)
         - Children preserve their original sequence (can be modified with targeted inserts)
@@ -308,6 +310,7 @@ class LogseqOutline:
         """Render outline back to Logseq markdown.
 
         IMPORTANT: Minimal changes guarantee (FR-008):
+
         - Preserves exact order of all blocks
         - Maintains original indentation (2 spaces per level)
         - NEVER reorders properties (insertion order sacred)
@@ -350,6 +353,7 @@ Summary of proposed changes shown to user before applying (FR-002 dry-run mode).
 
 ```
 Found 3 knowledge blocks in journals/2025_01_15.md:
+
   1. "Project X deadline moved to May"
      → Target: Project X
      → Section: Projects > Active > Timeline
@@ -552,6 +556,7 @@ class PageIndex:
         This captures page title and substantial initial content.
 
         Uses per-page caching:
+
         - Cache file: ~/.cache/logsqueak/embeddings/{page_name}.pkl
         - Contains: {'embedding': ndarray, 'mtime': float, 'text': str}
         - Invalidate: if page file mtime > cached mtime
@@ -736,6 +741,7 @@ Pick the most appropriate page and section.
 
 # After integrating knowledge to a page, update its embedding
 page_index.refresh("Project X")
+
 ```
 
 ---
@@ -746,10 +752,13 @@ page_index.refresh("Project X")
 0. At startup:
    Build PageIndex from all pages in graph (embed all pages)
    ↓
+
 1. Load JournalEntry from file
    ↓
+
 2. Extract KnowledgeBlocks via LLM (initial extraction - no page targeting yet)
    ↓
+
 3. For each KnowledgeBlock:
    a. Find candidate pages via PageIndex.find_similar(content, top_k=5)
    b. Pass candidates to LLM for final page + section selection
@@ -758,12 +767,16 @@ page_index.refresh("Project X")
    e. Find target section in outline
    f. Create ProposedAction
    ↓
+
 4. Build ExtractionPreview
    ↓
+
 5. Display preview to user
    ↓
+
 6. On approval (y):
    For each ProposedAction (status=READY):
+
      - Add knowledge with provenance to TargetPage.outline
      - Write modified outline back to file
 
@@ -822,22 +835,27 @@ block.properties = {k: block.properties[k] for k in sorted(block.properties)}  #
 
 # Bad: Sorting children arbitrarily
 parent_block.children.sort(key=lambda x: x.content)  # ❌ Avoid unless intentional
+
 ```
 
 ### Round-Trip Guarantee
 
 For unchanged blocks:
+
 ```
 Original: "  - Timeline"
 Parsed:   LogseqBlock(content="Timeline", indent_level=1, _original_line="  - Timeline")
 Rendered: "  - Timeline"  # Exact match (byte-for-byte)
+
 ```
 
 For modified blocks (new child added):
+
 ```
 Original: "- Projects"
 After:    "- Projects\n  - New project [[2025-01-15]]"
          # New child added where appropriate, original "- Projects" preserved
+
 ```
 
 ## Implementation Notes

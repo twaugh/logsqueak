@@ -179,6 +179,7 @@ Use stdlib `dataclasses` (not `attrs`) for outline structure to avoid extra depe
 - Journal entry: "Discovered deadline slipping to May"
 - Pages in graph: "Project Alpha", "Q1 Planning", "Vendor Relations"
 - RAG workflow:
+
   1. Embed knowledge block content
   2. Embed all page names + first 200 chars of content
   3. Find top-K most similar pages (cosine similarity)
@@ -236,9 +237,11 @@ similarities = np.dot(page_embeddings, knowledge_embedding)
 top_k_indices = np.argsort(similarities)[-5:][::-1]  # Top 5
 
 # Pass to LLM for final decision
+
 ```
 
 **Performance** (tested scale: 566 pages, 2.3MB):
+
 - First run: ~20 seconds (embed all pages)
 - Subsequent runs: <1 second (load from cache)
 - After modifying 5 pages: ~1.5 seconds (561 cached + 5 new)

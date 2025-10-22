@@ -187,6 +187,7 @@ python -m logsqueak.cli.main extract --model gpt-4 2025-01-15
 
    ```
    Found 3 knowledge blocks in journals/2025_01_15.md:
+
      1. "Project X deadline moved to May"
         → Target: Project X
         → Section: Timeline
@@ -245,6 +246,7 @@ Create sample journal entries in `tests/fixtures/journals/`:
 **tests/fixtures/journals/2025_01_15.md**:
 
 ```markdown
+
 - worked on [[Project X]]
 - met with team
 - Discovered the deadline for [[Project X]] slipping to May
@@ -261,6 +263,7 @@ Create sample pages in `tests/fixtures/pages/`:
 **tests/fixtures/pages/Project X.md**:
 
 ```markdown
+
 - ## Timeline
   - Kickoff: January 2025
   - MVP: March 2025 (original)
@@ -285,6 +288,7 @@ Create sample pages in `tests/fixtures/pages/`:
 2. **Add sample journal** (`~/test-logseq-graph/journals/2025_01_15.md`):
 
    ```markdown
+
    - worked on [[Test Project]]
    - The [[Test Project]] deadline moved to June
    - attended meeting
@@ -294,6 +298,7 @@ Create sample pages in `tests/fixtures/pages/`:
 3. **Add target page** (`~/test-logseq-graph/pages/Test Project.md`):
 
    ```markdown
+
    - ## Timeline
      - Start: January 2025
    - ## Status

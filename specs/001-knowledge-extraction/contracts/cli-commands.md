@@ -114,6 +114,7 @@ Preview of proposed changes:
    ⚠ SKIPPED: Activity log (not lasting knowledge)
 
 Summary:
+
   - Knowledge blocks found: 3
   - Will integrate: 2
   - Skipped: 1
@@ -215,6 +216,7 @@ logsqueak summarize [OPTIONS] [DATE_RANGE]
 While not exposed to users, documenting the LLM API contract for internal consistency.
 
 The extraction workflow uses LLM in two stages:
+
 1. **Initial extraction**: Extract knowledge blocks from journal (no page targeting)
 2. **Page selection**: Match knowledge to target pages using RAG candidates
 
@@ -286,6 +288,7 @@ candidates = page_index.find_similar(knowledge.content, top_k=5)
 # ]
 
 # 4. Pass to LLM for final selection
+
 ```
 
 **Request Body**:
@@ -340,6 +343,7 @@ candidates = page_index.find_similar(knowledge.content, top_k=5)
 **Example**: `~/logseq-graph/journals/2025_01_15.md`
 
 ```markdown
+
 - worked on [[Project X]]
 - Discovered [[Project X]] deadline slipping to May
   - Original deadline was March
@@ -359,6 +363,7 @@ candidates = page_index.find_similar(knowledge.content, top_k=5)
 **Example**: `~/logseq-graph/pages/Project X.md` (after integration)
 
 ```markdown
+
 - ## Timeline
   - Kickoff: January 2025
   - MVP: March 2025 (original)
