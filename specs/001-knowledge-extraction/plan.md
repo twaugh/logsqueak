@@ -7,7 +7,7 @@
 
 ## Summary
 
-Extract lasting knowledge from Logseq journal entries and intelligently integrate into relevant pages using LLM-powered analysis. The system will distinguish between temporary activity logs and knowledge blocks, present changes in dry-run mode for user approval, and add extracted knowledge as new child bullets with provenance links. Focus on non-destructive operations with simple additive integration (new child blocks, new organizational bullets) while deferring semantic merging to future versions.
+Extract lasting knowledge from Logseq journal entries and intelligently integrate into relevant pages using LLM-powered analysis with RAG-based semantic search. The system will distinguish between temporary activity logs and knowledge blocks, present changes in dry-run mode for user approval, and add extracted knowledge as new child bullets with provenance links. Focus on non-destructive operations with targeted additive integration (new child blocks at appropriate locations, new organizational bullets) while strictly preserving property order and deferring semantic merging to future versions.
 
 ## Technical Context
 
@@ -76,6 +76,8 @@ Extract lasting knowledge from Logseq journal entries and intelligently integrat
 - `ProposedAction.status` tracks READY/SKIPPED/WARNING
 - Duplicate detection (FR-017) via `content_hash()`
 - File operations through `LogseqOutline.render()` preserve structure
+- **Property order preservation**: NEVER reorder block properties (insertion order sacred)
+- Children can be inserted at appropriate locations (targeted, minimal changes)
 - CLI contract specifies dry-run as default mode
 
 ### Principle III: Simplicity and Transparency
