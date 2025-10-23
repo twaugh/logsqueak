@@ -87,8 +87,10 @@ class Extractor:
         # Convert to PageCandidate format for LLM
         candidates = []
         for page, similarity_score in similar_pages:
-            # Get first 200 characters of page content as preview
-            preview = page.outline.render()[:200]
+            # Get first 1000 characters of page content as preview
+            # This matches the preview length used for RAG embeddings and gives
+            # the LLM enough context to identify existing sections
+            preview = page.outline.render()[:1000]
             candidates.append(
                 PageCandidate(
                     page_name=page.name,
