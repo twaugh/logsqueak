@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from datetime import date
 from enum import Enum
+from pathlib import Path
 from typing import Optional
 
 from logsqueak.models.knowledge import KnowledgeBlock
@@ -71,15 +72,20 @@ class ExtractionPreview:
         knowledge_blocks: All extracted knowledge
         proposed_actions: What will happen to each block
         warnings: Issues found (missing pages, duplicates, etc.)
+        graph_path: Path to Logseq graph (optional, for diff generation)
     """
 
     journal_date: date
     knowledge_blocks: list[KnowledgeBlock]
     proposed_actions: list[ProposedAction]
     warnings: list[str]
+    graph_path: Optional[Path] = None
 
-    def display(self) -> str:
+    def display(self, show_diffs: bool = False) -> str:
         """Render preview for terminal display.
+
+        Args:
+            show_diffs: If True and graph_path is set, show diffs for each action
 
         Returns:
             Formatted preview text
@@ -92,6 +98,32 @@ class ExtractionPreview:
 
         for i, action in enumerate(self.proposed_actions, 1):
             lines.append(f"{i}. {action.describe()}")
+
+            # Show diff if requested and action is READY
+            if show_diffs and self.graph_path and action.status == ActionStatus.READY:
+                try:
+                    from logsqueak.models.diff import generate_page_diff
+
+                    diff = generate_page_diff(
+                        self.graph_path,
+                        action.knowledge.target_page,
+                        action.knowledge,
+                    )
+
+                    if diff:
+                        lines.append("")
+                        lines.append("  Diff:")
+                        # Indent each diff line - rstrip to remove any trailing newlines,
+                        # since lines.append will add them back
+                        for diff_line in diff.splitlines():
+                            lines.append(f"  {diff_line.rstrip()}")
+                    else:
+                        lines.append("")
+                        lines.append("  (No diff generated - page may not exist or no changes)")
+                except Exception as e:
+                    lines.append("")
+                    lines.append(f"  Error generating diff: {e}")
+
             lines.append("")
 
         if self.warnings:

@@ -190,6 +190,7 @@ def process_journal_date(
     graph_path: Path,
     model: str,
     verbose: bool,
+    show_diffs: bool = False,
 ) -> None:
     """Process a single journal date.
 
@@ -244,10 +245,11 @@ def process_journal_date(
             knowledge_blocks=[action.knowledge for action in proposed_actions],
             proposed_actions=proposed_actions,
             warnings=warnings,
+            graph_path=graph_path,
         )
 
         progress.show_preview_header()
-        click.echo(preview.display())
+        click.echo(preview.display(show_diffs=show_diffs))
 
         # T029: Exit without modifying files (dry-run mode)
         progress.show_dry_run_complete()
@@ -265,7 +267,12 @@ def process_journal_date(
 @click.option(
     "--dry-run",
     is_flag=True,
-    help="Dry-run mode: show diffs instead of writing files",
+    help="Dry-run mode: show preview without writing files",
+)
+@click.option(
+    "--show-diffs",
+    is_flag=True,
+    help="Show diffs of proposed changes in preview",
 )
 @click.option(
     "--model",
@@ -282,6 +289,7 @@ def extract(
     ctx: click.Context,
     date_or_range: str,
     dry_run: bool,
+    show_diffs: bool,
     model: Optional[str],
     graph: Optional[Path],
 ):
@@ -359,6 +367,7 @@ def extract(
             config.logseq.graph_path,
             config.llm.model,
             verbose,
+            show_diffs,
         )
 
 
