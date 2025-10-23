@@ -24,11 +24,13 @@ class ProposedAction:
         knowledge: Knowledge block to integrate
         status: Action status (READY/SKIPPED/WARNING)
         reason: Why skipped/warned (if applicable)
+        similarity_score: Semantic similarity score from RAG (0.0-1.0)
     """
 
     knowledge: KnowledgeBlock
     status: ActionStatus
     reason: Optional[str] = None
+    similarity_score: Optional[float] = None
 
     def describe(self) -> str:
         """Generate human-readable description of action.
@@ -39,10 +41,18 @@ class ProposedAction:
         kb = self.knowledge
         parts = [
             f'  "{kb.content[:60]}..."' if len(kb.content) > 60 else f'  "{kb.content}"',
-            f"  → Target: {kb.target_page}",
+        ]
+
+        # Show target with similarity score if available
+        if self.similarity_score is not None:
+            parts.append(f"  → Target: {kb.target_page} (similarity: {self.similarity_score:.2f})")
+        else:
+            parts.append(f"  → Target: {kb.target_page}")
+
+        parts.extend([
             f"  → Section: {kb.section_path()}",
             f"  → Action: {kb.suggested_action.value}",
-        ]
+        ])
 
         if self.status == ActionStatus.SKIPPED:
             parts.append(f"  ⚠ SKIPPED: {self.reason}")
