@@ -390,9 +390,9 @@ logsqueak extract 2025-01-15  # Shows preview, no changes
 
 #### Interactive Approval (Parallel Group 1)
 
-- [ ] T033 [P] [US2] Implement interactive prompt in src/logsqueak/cli/interactive.py with y/n/e options per FR-012
+- [X] T033 [P] [US2] Implement interactive prompt in src/logsqueak/cli/interactive.py with y/n/e options per FR-012
 
-- [ ] T034 [P] [US2] Implement edit mode (e option) in src/logsqueak/cli/interactive.py to allow preview modification before applying (basic implementation - can enhance later)
+- [X] T034 [P] [US2] Implement edit mode (e option) in src/logsqueak/cli/interactive.py to allow preview modification before applying (basic implementation - can enhance later)
 
 #### Integration Logic (Sequential Group - T035 must complete before T036-T039)
 
