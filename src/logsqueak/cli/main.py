@@ -134,13 +134,13 @@ def match_knowledge_to_pages(
                 )
             )
             progress.show_matching_progress(
-                i, len(knowledge_extractions), selection.target_page, similarity_score
+                i, len(knowledge_extractions), selection.target_page, similarity_score, extraction.content
             )
             continue
 
         # Check for duplicates (FR-017, T024)
         if extractor.is_duplicate(extraction.content, target_page):
-            progress.show_duplicate_skipped(i, len(knowledge_extractions), selection.target_page)
+            progress.show_duplicate_skipped(i, len(knowledge_extractions), selection.target_page, extraction.content)
             proposed_actions.append(
                 ProposedAction(
                     knowledge=create_knowledge_block(
@@ -159,7 +159,7 @@ def match_knowledge_to_pages(
 
         # Ready to integrate
         progress.show_matching_progress(
-            i, len(knowledge_extractions), selection.target_page, similarity_score
+            i, len(knowledge_extractions), selection.target_page, similarity_score, extraction.content
         )
 
         proposed_actions.append(

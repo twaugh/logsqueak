@@ -69,4 +69,8 @@ class KnowledgeBlock:
         """
         if not self.target_section:
             return "(page root)"
-        return " > ".join(self.target_section)
+        # Filter out None values in case LLM returns them
+        valid_sections = [s for s in self.target_section if s is not None]
+        if not valid_sections:
+            return "(page root)"
+        return " > ".join(valid_sections)

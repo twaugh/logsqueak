@@ -54,7 +54,9 @@ def show_extraction_complete(count: int) -> None:
     click.echo(f"✓ Found {count} knowledge blocks")
 
 
-def show_matching_progress(current: int, total: int, page_name: str, similarity: float) -> None:
+def show_matching_progress(
+    current: int, total: int, page_name: str, similarity: float, content: str = None
+) -> None:
     """Show page matching progress.
 
     Args:
@@ -62,8 +64,18 @@ def show_matching_progress(current: int, total: int, page_name: str, similarity:
         total: Total blocks to match
         page_name: Matched page name
         similarity: Similarity score
+        content: Optional knowledge content to display
     """
-    click.echo(f"  {current}/{total}: Finding candidates... ✓ Matched to \"{page_name}\" (similarity: {similarity:.2f})")
+    if content:
+        # Show truncated content (first 50 chars)
+        truncated = content[:50] + "..." if len(content) > 50 else content
+        click.echo(
+            f"  {current}/{total}: \"{truncated}\" → \"{page_name}\" (similarity: {similarity:.2f})"
+        )
+    else:
+        click.echo(
+            f"  {current}/{total}: Finding candidates... ✓ Matched to \"{page_name}\" (similarity: {similarity:.2f})"
+        )
 
 
 def show_activity_skipped(current: int, total: int) -> None:
@@ -76,15 +88,20 @@ def show_activity_skipped(current: int, total: int) -> None:
     click.echo(f"  {current}/{total}: Activity log detected, skipping")
 
 
-def show_duplicate_skipped(current: int, total: int, page_name: str) -> None:
+def show_duplicate_skipped(current: int, total: int, page_name: str, content: str = None) -> None:
     """Show duplicate being skipped.
 
     Args:
         current: Current block number (1-indexed)
         total: Total blocks
         page_name: Page where duplicate was found
+        content: Optional knowledge content to display
     """
-    click.echo(f"  {current}/{total}: Duplicate found on \"{page_name}\", skipping")
+    if content:
+        truncated = content[:50] + "..." if len(content) > 50 else content
+        click.echo(f"  {current}/{total}: \"{truncated}\" → Duplicate on \"{page_name}\", skipping")
+    else:
+        click.echo(f"  {current}/{total}: Duplicate found on \"{page_name}\", skipping")
 
 
 def show_preview_header() -> None:
