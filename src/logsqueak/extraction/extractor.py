@@ -92,7 +92,7 @@ class Extractor:
             # Get first 1000 characters of page content as preview
             # This matches the preview length used for RAG embeddings and gives
             # the LLM enough context to identify existing sections
-            preview = page.outline.render()[:1000]
+            preview = _format_preview_with_frontmatter(page.outline)[:1000]
             candidates.append(
                 PageCandidate(
                     page_name=page.name,
@@ -131,6 +131,58 @@ class Extractor:
             False
         """
         return target_page.has_duplicate(knowledge_content)
+
+
+def _format_preview_with_frontmatter(outline) -> str:
+    """Format page preview with frontmatter clearly marked.
+
+    This wraps any frontmatter in XML tags to help the LLM distinguish
+    between page-level properties (which provide context) and actual
+    sections (which are valid placement targets).
+
+    Args:
+        outline: LogseqOutline to format
+
+    Returns:
+        Formatted preview with frontmatter in <frontmatter> tags
+    """
+    if not outline.frontmatter:
+        return outline.render()
+
+    # Separate frontmatter from blocks
+    frontmatter_text = "\n".join(outline.frontmatter)
+
+    # Render just the blocks (without frontmatter)
+    lines = []
+    for block in outline.blocks:
+        lines.extend(_render_block(block, outline.indent_str))
+    blocks_text = "\n".join(lines)
+
+    # Combine with frontmatter wrapped in XML tags
+    return f"<frontmatter>\n{frontmatter_text}\n</frontmatter>\n{blocks_text}"
+
+
+def _render_block(block, indent_str: str) -> list[str]:
+    """Helper to render a block and its children.
+
+    Args:
+        block: LogseqBlock to render
+        indent_str: Indentation string
+
+    Returns:
+        List of rendered lines
+    """
+    lines = []
+    indent = indent_str * block.indent_level
+    lines.append(f"{indent}- {block.content}")
+
+    if block.continuation_lines:
+        lines.extend(block.continuation_lines)
+
+    for child in block.children:
+        lines.extend(_render_block(child, indent_str))
+
+    return lines
 
 
 def create_knowledge_block(

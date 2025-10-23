@@ -243,6 +243,13 @@ class OpenAICompatibleProvider(LLMClient):
             - Headings can appear as bullets (e.g., "- ## Section Name")
             - Indentation uses {indent_desc} per level to indicate hierarchy
 
+            FRONTMATTER vs SECTIONS (IMPORTANT):
+            - Page previews may include <frontmatter> tags containing page-level properties
+            - Frontmatter properties (like "type::", "area::", "tags::") are NOT sections
+            - Frontmatter provides CONTEXT about the page but CANNOT be used as target_section
+            - Only BULLET BLOCKS (lines starting with "- ") are valid sections
+            - When frontmatter appears, use it to understand the page's purpose, but select actual bullet content as target_section
+
             You will receive:
             1. Knowledge to organize (in <knowledge_to_organize> tags)
             2. Top candidate pages from semantic search (in <candidate_pages> tags)
@@ -250,7 +257,7 @@ class OpenAICompatibleProvider(LLMClient):
             Each candidate includes:
             - page_name: The name of the page
             - similarity_score: How semantically similar it is (0.0-1.0)
-            - preview: A preview of the page content
+            - preview: A preview of the page content (may include <frontmatter> tags)
             - rank: Ranking by similarity (1 = most similar)
 
             You must select:
@@ -268,6 +275,7 @@ class OpenAICompatibleProvider(LLMClient):
 
             Notes:
             - target_section can be null if knowledge should go at page root
+            - target_section MUST ONLY contain bullet block content, NEVER frontmatter properties
             - suggested_action must be either "add_child" or "create_section"
             - Use "add_child" when a suitable section exists
             - Use "create_section" when a new organizational section is needed

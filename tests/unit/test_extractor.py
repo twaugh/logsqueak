@@ -72,11 +72,17 @@ def mock_page_index():
     mock_page1.name = "Project Architecture"
     mock_page1.outline = Mock(spec=LogseqOutline)
     mock_page1.outline.render.return_value = "- ## Tech Stack\n  - Using Python\n- ## Database\n  - TBD"
+    mock_page1.outline.frontmatter = []  # No frontmatter
+    mock_page1.outline.blocks = []  # Mock blocks (not used in preview generation anymore)
+    mock_page1.outline.indent_str = "  "
 
     mock_page2 = Mock(spec=TargetPage)
     mock_page2.name = "Engineering Decisions"
     mock_page2.outline = Mock(spec=LogseqOutline)
     mock_page2.outline.render.return_value = "- ## 2025 Q1\n  - Various decisions"
+    mock_page2.outline.frontmatter = []  # No frontmatter
+    mock_page2.outline.blocks = []  # Mock blocks
+    mock_page2.outline.indent_str = "  "
 
     # find_similar returns (page, similarity_score) tuples
     index.find_similar.return_value = [
@@ -264,6 +270,49 @@ def test_select_target_page_propagates_llm_error(extractor, mock_llm_client, moc
 
     with pytest.raises(Exception, match="LLM selection error"):
         extractor.select_target_page("Test content", mock_page_index)
+
+
+def test_select_target_page_with_frontmatter_in_preview(extractor, mock_llm_client):
+    """Test that page previews with frontmatter are formatted with XML tags."""
+    index = Mock(spec=PageIndex)
+
+    # Create a page with frontmatter
+    mock_page = Mock(spec=TargetPage)
+    mock_page.name = "syft"
+    mock_outline = Mock(spec=LogseqOutline)
+    mock_outline.frontmatter = ["type:: software", "upstream-url:: https://github.com/anchore/syft", "area:: [[SBOM]]"]
+    mock_outline.indent_str = "  "
+    # Create actual blocks to test rendering
+    block1 = LogseqBlock(content="## Overview", indent_level=0)
+    block2 = LogseqBlock(content="SBOM generation tool", indent_level=1)
+    block1.children = [block2]
+    mock_outline.blocks = [block1]
+    mock_page.outline = mock_outline
+
+    index.find_similar.return_value = [(mock_page, 0.85)]
+
+    mock_llm_client.select_target_page.return_value = PageSelectionResult(
+        target_page="syft",
+        target_section=["Overview"],  # Should select a bullet block, not frontmatter
+        suggested_action=ActionType.ADD_CHILD,
+        reasoning="Related to SBOM tools",
+    )
+
+    extractor.select_target_page("SBOM analysis", index)
+
+    # Verify the preview passed to LLM contains frontmatter in XML tags
+    call_args = mock_llm_client.select_target_page.call_args
+    candidates = call_args.kwargs["candidates"]
+
+    preview = candidates[0].preview
+    # Preview should contain frontmatter wrapped in tags
+    assert "<frontmatter>" in preview
+    assert "</frontmatter>" in preview
+    assert "type:: software" in preview
+    assert "area:: [[SBOM]]" in preview
+    # Preview should also contain the bullet blocks
+    assert "- ## Overview" in preview
+    assert "  - SBOM generation tool" in preview
 
 
 # Duplicate Detection Tests
