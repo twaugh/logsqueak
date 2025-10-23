@@ -315,6 +315,25 @@ def test_select_target_page_with_frontmatter_in_preview(extractor, mock_llm_clie
     assert "  - SBOM generation tool" in preview
 
 
+def test_select_target_page_passes_indent_str(extractor, mock_llm_client, mock_page_index):
+    """Test that select_target_page passes indent_str to LLM."""
+    knowledge_content = "Test knowledge"
+    custom_indent = "\t"  # Tab-based indentation
+
+    mock_llm_client.select_target_page.return_value = PageSelectionResult(
+        target_page="Test Page",
+        target_section=None,
+        suggested_action=ActionType.ADD_CHILD,
+        reasoning="Test",
+    )
+
+    extractor.select_target_page(knowledge_content, mock_page_index, indent_str=custom_indent)
+
+    # Verify indent_str was passed to LLM
+    call_args = mock_llm_client.select_target_page.call_args
+    assert call_args.kwargs["indent_str"] == custom_indent
+
+
 # Duplicate Detection Tests
 
 
