@@ -1,8 +1,8 @@
 # Logsqueak
 
-Extract lasting knowledge from Logseq journal entries using LLM-powered analysis with RAG-based semantic search.
+Turn your Logseq journal chaos into organized knowledge. LLM + RAG automatically extracts insights and files them where they belong. Zero risk, full control.
 
-**Status**: 🚧 Work in Progress - Phase 2 Complete (Foundational Components)
+**Status**: 🚧 Work in Progress - Phase 4 Complete (Integration with Approval) - 69% Complete
 
 ## Overview
 
@@ -179,8 +179,9 @@ mypy src/
 
 ## Implementation Status
 
-### ✅ Completed (Phase 1 & 2)
+### ✅ Completed (Phases 1-4) - 69%
 
+**Foundational (Phases 1-2.5)**
 - [x] Project structure and dependencies
 - [x] Configuration model with Pydantic validation
 - [x] JournalEntry model with 2000-line limit enforcement
@@ -191,22 +192,44 @@ mypy src/
 - [x] Logseq markdown parser and renderer
 - [x] Graph path operations
 - [x] RAG index with per-page embedding cache
-- [x] Comprehensive unit and integration tests
+- [x] Comprehensive unit tests (111 tests passing)
+
+**Extraction & Preview (Phases 3-3.5)**
+- [x] Configuration loader with YAML support
+- [x] LLM client (OpenAI-compatible)
+- [x] Two-stage extraction (extract → RAG match → LLM select)
+- [x] Activity vs knowledge classification
+- [x] Duplicate detection
+- [x] Preview display with diffs
+- [x] Error handling and progress feedback
+- [x] Prompt inspection system
+- [x] LLM integration tests
+
+**Integration & Approval (Phase 4)**
+- [x] Interactive approval workflow (y/n/e)
+- [x] Integration orchestrator
+- [x] Section finding and knowledge placement
+- [x] Provenance link generation (100% coverage)
+- [x] Safe file writing with atomic operations
+- [x] PageIndex refresh after modifications
+- [x] Per-change approval with diff preview
 
 ### 🚧 In Progress
 
-- [ ] Phase 3: User Story 1 - Extract and Preview Knowledge (T017-T032)
-  - Configuration loader
-  - LLM client (OpenAI-compatible)
-  - Two-stage extraction (extract → RAG match → LLM select)
-  - Preview display
-  - Error handling
+- [ ] Phase 4.5: Integration Safety Testing (3/9 tasks complete)
+  - [x] Writer unit tests (26 tests)
+  - [x] Integrator unit tests (15 tests)
+  - [x] Interactive unit tests (19 tests)
+  - [ ] File safety integration tests
+  - [ ] Provenance integration tests
+  - [ ] Error recovery tests
 
 ### 📋 Planned
 
-- [ ] Phase 4: User Story 2 - Integration (T033-T043)
-- [ ] Phase 5: User Story 3 - Section Creation (T044-T049)
+- [ ] Phase 5: Section Creation (T044-T049)
+- [ ] Phase 5.5: Section Creation Testing
 - [ ] Phase 6: Polish & Logging (T050-T051)
+- [ ] Phase 6.5: End-to-End Testing
 
 ## Architecture
 
