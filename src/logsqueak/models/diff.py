@@ -97,16 +97,24 @@ def generate_unified_diff(
     original_lines = original.splitlines(keepends=True)
     modified_lines = modified.splitlines(keepends=True)
 
-    diff = difflib.unified_diff(
+    diff_lines = list(difflib.unified_diff(
         original_lines,
         modified_lines,
         fromfile=fromfile,
         tofile=tofile,
         n=context_lines,
-    )
+    ))
 
-    # Join lines - they already have newlines from keepends=True
-    return "".join(diff)
+    # Ensure each line ends with newline for consistent splitting later
+    # Some lines from unified_diff may not have trailing newlines
+    result_lines = []
+    for line in diff_lines:
+        if line.endswith('\n'):
+            result_lines.append(line)
+        else:
+            result_lines.append(line + '\n')
+
+    return "".join(result_lines)
 
 
 def generate_page_diff(
