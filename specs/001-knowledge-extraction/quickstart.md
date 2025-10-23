@@ -176,8 +176,8 @@ python -m logsqueak.cli.main extract 2025-01-10..2025-01-15
 python -m logsqueak.cli.main extract yesterday
 python -m logsqueak.cli.main extract last-week
 
-# Apply changes (skip dry-run preview)
-python -m logsqueak.cli.main extract --apply 2025-01-15
+# Dry-run mode (preview only, no approval prompt, no writes)
+python -m logsqueak.cli.main extract --dry-run 2025-01-15
 
 # Override model
 python -m logsqueak.cli.main extract --model gpt-4 2025-01-15
@@ -186,14 +186,14 @@ python -m logsqueak.cli.main extract --model gpt-4 2025-01-15
 
 ### Interactive Workflow
 
-1. **Run extraction** (dry-run mode shows preview):
+1. **Run extraction** (normal mode shows preview and prompts for approval):
 
    ```bash
    python -m logsqueak.cli.main extract 2025-01-15
 
    ```
 
-2. **Review preview**:
+2. **Review preview and approve**:
 
    ```
    Found 3 knowledge blocks in journals/2025_01_15.md:

@@ -96,18 +96,18 @@ logseq:
 ## Usage
 
 ```bash
-# Extract knowledge from today's journal (dry-run mode)
-logsqueak extract
+# Preview only (dry-run mode - no writes)
+logsqueak extract 2025-01-15 --dry-run
 
-# Extract from specific date
+# Extract and apply with approval (normal mode)
 logsqueak extract 2025-01-15
+# Shows preview, then prompts: Apply changes? [y/n/e]
 
 # Extract from date range
 logsqueak extract 2025-01-10..2025-01-15
 
-# Preview and apply changes
-logsqueak extract --apply 2025-01-15
-# User prompted: Apply changes? [y/N/e]
+# Extract from today's journal
+logsqueak extract
 ```
 
 ## Project Structure
