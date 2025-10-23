@@ -55,31 +55,31 @@ logsqueak extract [OPTIONS] [DATE_OR_RANGE]
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `--dry-run` / `--apply` | Flag | `--dry-run` | Show preview (dry-run) or apply changes |
+| `--dry-run` | Flag | False (apply mode) | Dry-run mode: show diffs instead of writing files |
 | `--model` | String | From config | Override LLM model |
 | `--graph` | Path | From config | Override Logseq graph path |
 
 **Examples**:
 
 ```bash
-# Extract from today (dry-run mode)
+# Extract from today (apply mode - prompts for confirmation)
 logsqueak extract
 
-# Extract from specific date
+# Extract from specific date (apply mode)
 logsqueak extract 2025-01-15
 
 # Extract from date range
 logsqueak extract 2025-01-10..2025-01-15
 
-# Extract and apply immediately (skip dry-run)
-logsqueak extract --apply 2025-01-15
+# Dry-run mode: show diffs but never write files
+logsqueak extract --dry-run 2025-01-15
 
 # Use different model
 logsqueak extract --model gpt-4 yesterday
 
 ```
 
-**Output** (dry-run mode):
+**Output** (normal/apply mode):
 
 ```
 Loading configuration from ~/.config/logsqueak/config.yaml
@@ -123,19 +123,44 @@ Apply these changes? [y/N/e]:
 
 ```
 
-**Interactive Prompt Responses**:
+**Interactive Prompt Responses** (normal/apply mode):
 
-- `y` or `yes` - Apply all proposed changes
+- `y` or `yes` - Apply all proposed changes to files
 - `n` or `no` - Cancel without applying (default)
 - `e` or `edit` - Edit preview before applying (v2 feature)
 
-**Output** (after applying):
+**Interactive Prompt Responses** (--dry-run mode):
+
+- `y` or `yes` - Show unified diff of what would be written (but don't write)
+- `n` or `no` - Exit without showing diff (default)
+- `e` or `edit` - Not applicable in dry-run mode
+
+**Output** (after applying in normal mode):
 
 ```
 Applying changes...
 ✓ Updated: pages/Project X.md (2 additions)
 
 Complete! Processed 3 blocks, integrated 2, skipped 1.
+
+```
+
+**Output** (after 'y' in --dry-run mode):
+
+```
+--- pages/Project X.md (original)
++++ pages/Project X.md (proposed)
+@@ -1,5 +1,7 @@
+
+ - ## Timeline
+   - Kickoff: January 2025
+   - MVP: March 2025 (original)
++  - Project X deadline moved to May [[2025-01-15]]
+ - ## Team
+   - Alice (PM)
++- Main competitor is Product Y [[2025-01-15]]
+
+Dry-run complete. No files were modified.
 
 ```
 
@@ -432,11 +457,18 @@ def test_extract_with_valid_date():
     result = run_cli(["extract", "2025-01-15"])
     assert result.exit_code == 0
 
-def test_extract_dry_run_default():
-    """Contract: dry-run is default mode"""
+def test_extract_apply_mode_default():
+    """Contract: apply mode is default (prompts for confirmation)"""
     result = run_cli(["extract", "2025-01-15"])
-    assert "--dry-run" in result.output or "Apply changes?" in result.output
-    # Should NOT modify files in dry-run
+    assert "Apply these changes?" in result.output
+
+def test_extract_dry_run_shows_diff():
+    """Contract: --dry-run shows diff on 'y', never writes"""
+    result = run_cli(["extract", "--dry-run", "2025-01-15"], input="y\n")
+    assert "---" in result.output  # Diff marker
+    assert "+++" in result.output
+    assert "Dry-run complete. No files were modified" in result.output
+    # Verify no files were actually modified
 
 def test_extract_invalid_date_format():
     """Contract: invalid date returns exit code 1"""
@@ -458,15 +490,16 @@ def test_duplicate_detection_skip():
 
 All commands must satisfy:
 
-- ✅ **FR-002**: Dry-run mode is default
+- ✅ **FR-002**: Dry-run mode available via --dry-run flag (shows diffs, never writes)
 - ✅ **FR-011**: LLM errors exit gracefully (code 2)
-- ✅ **FR-012**: Interactive y/n/e prompt in dry-run
+- ✅ **FR-012**: Interactive y/n/e prompt for apply confirmation
 - ✅ **FR-013**: Accept date or date range
 - ✅ **FR-016**: Load config from XDG location
 - ✅ **FR-018**: Malformed entries logged, skipped, continue
 - ✅ **FR-019**: 2000-line limit enforced with warning
 - ✅ **SC-001**: Clear progress feedback throughout
 - ✅ **SC-005**: 100% graceful error handling
+- ✅ **SC-007**: Dry-run shows all proposed changes (via diff) before any modifications
 
 ---
 
