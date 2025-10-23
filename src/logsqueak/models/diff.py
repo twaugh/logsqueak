@@ -88,6 +88,9 @@ def generate_unified_diff(
 ) -> str:
     """Generate unified diff between original and modified content.
 
+    Lines that differ only by the presence/absence of a trailing newline
+    are treated as identical to avoid showing spurious differences.
+
     Args:
         original: Original content
         modified: Modified content
@@ -98,8 +101,14 @@ def generate_unified_diff(
     Returns:
         Unified diff as string
     """
+    # Normalize: ensure all lines end with newline for consistent comparison
+    # This prevents differences that are only about trailing newlines
     original_lines = original.splitlines(keepends=True)
     modified_lines = modified.splitlines(keepends=True)
+
+    # Ensure every line ends with newline (normalize trailing newlines)
+    original_lines = [line if line.endswith('\n') else line + '\n' for line in original_lines]
+    modified_lines = [line if line.endswith('\n') else line + '\n' for line in modified_lines]
 
     diff_lines = list(difflib.unified_diff(
         original_lines,
