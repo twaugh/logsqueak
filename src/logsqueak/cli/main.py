@@ -12,10 +12,11 @@ from typing import Optional
 
 import click
 
-from logsqueak.cli import progress
+from logsqueak.cli import interactive, progress
 from logsqueak.config.loader import load_config
 from logsqueak.extraction.classifier import classify_extractions
 from logsqueak.extraction.extractor import Extractor, create_knowledge_block
+from logsqueak.integration.integrator import Integrator
 from logsqueak.llm.prompt_logger import PromptLogger
 from logsqueak.llm.providers.openai_compat import OpenAICompatibleProvider
 from logsqueak.logseq.graph import GraphPaths
@@ -228,6 +229,7 @@ def process_journal_date(
     model: str,
     verbose: bool,
     show_diffs: bool = False,
+    dry_run: bool = True,
 ) -> None:
     """Process a single journal date.
 
@@ -238,6 +240,8 @@ def process_journal_date(
         graph_path: Path to Logseq graph
         model: LLM model name (for progress display)
         verbose: Verbose output flag
+        show_diffs: Show diffs in preview
+        dry_run: If True, skip approval and file writes
     """
     try:
         # Load journal entry
@@ -289,8 +293,45 @@ def process_journal_date(
         progress.show_preview_header()
         click.echo(preview.display(show_diffs=show_diffs))
 
-        # T029: Exit without modifying files (dry-run mode)
-        progress.show_dry_run_complete()
+        # Handle approval workflow
+        if dry_run:
+            # Dry-run mode: just show preview and exit
+            progress.show_dry_run_complete()
+        else:
+            # Normal mode: prompt for approval and integrate if approved
+            ready_actions = [a for a in proposed_actions if a.status == ActionStatus.READY]
+
+            if not ready_actions:
+                click.echo("\nNo actions to apply (all skipped or warnings).")
+                return
+
+            # Prompt for approval (y/n/e)
+            choice = interactive.prompt_for_approval()
+
+            if choice == 'n':
+                interactive.show_warning("Integration cancelled by user")
+                return
+            elif choice == 'e':
+                # Edit mode - not fully implemented yet, treat as cancel for now
+                interactive.show_warning("Edit mode not yet implemented - cancelling")
+                return
+            elif choice == 'y':
+                # Approved - integrate changes
+                interactive.show_progress("Integrating changes...")
+
+                integrator = Integrator(graph_path, page_index=page_index)
+                result = integrator.integrate(proposed_actions, dry_run=False)
+
+                if result.success:
+                    interactive.show_success(
+                        f"Successfully integrated {result.actions_applied} knowledge blocks into {len(result.modified_pages)} pages"
+                    )
+                    if verbose:
+                        click.echo(f"Modified pages: {', '.join(result.modified_pages)}")
+                else:
+                    interactive.show_error("Integration failed")
+                    for error in result.errors:
+                        click.echo(f"  - {error}", err=True)
 
     except Exception as e:
         progress.show_error(f"Failed to process {journal_date.isoformat()}: {e}")
@@ -440,6 +481,7 @@ def extract(
             config.llm.model,
             verbose,
             show_diffs,
+            dry_run,
         )
 
     # Log summary if prompt inspection was enabled

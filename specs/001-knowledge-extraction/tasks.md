@@ -412,7 +412,7 @@ logsqueak extract 2025-01-15  # Shows preview, no changes
 
 - [X] T041 [US2] Implement PageIndex refresh in src/logsqueak/integration/integrator.py to call refresh() method after modifying pages to update embeddings
 
-- [ ] T042 [US2] Wire up normal (non-dry-run) mode in src/logsqueak/cli/main.py to show preview, wait for approval, then call integrator to write changes (--dry-run flag skips approval and writing)
+- [X] T042 [US2] Wire up normal (non-dry-run) mode in src/logsqueak/cli/main.py to show preview, wait for approval, then call integrator to write changes (--dry-run flag skips approval and writing)
 
 - [ ] T043 [US2] Verify provenance links in src/logsqueak/integration/writer.py - ensure 100% of integrated blocks include valid [[date]] link per SC-003
 
