@@ -624,3 +624,97 @@ def test_workflow_confidence_preservation(sample_journal_entry, mock_llm_client,
 
     # Confidence should still be preserved in final knowledge block
     assert kb.confidence == 0.9
+
+
+def test_workflow_with_all_activity_logs(mock_llm_client, mock_page_index):
+    """Test workflow when all extractions are classified as activity logs."""
+    # Journal with only activity logs
+    journal = JournalEntry(
+        date=date(2025, 1, 15),
+        file_path=Path("/test/journals/2025_01_15.md"),
+        raw_content="- Morning standup\n- Responded to emails",
+        outline=LogseqOutline(
+            blocks=[
+                LogseqBlock(content="Morning standup", indent_level=0),
+                LogseqBlock(content="Responded to emails", indent_level=0),
+            ],
+            source_text="- Morning standup\n- Responded to emails",
+        ),
+        line_count=2,
+    )
+
+    # Mock LLM returns low confidence (activity logs)
+    mock_llm_client.extract_knowledge.return_value = [
+        ExtractionResult(content="Morning standup", confidence=0.2),
+        ExtractionResult(content="Responded to emails", confidence=0.15),
+    ]
+
+    extractor = Extractor(mock_llm_client)
+    extractions = extractor.extract_knowledge(journal)
+    knowledge_blocks, activities = classify_extractions(extractions)
+
+    # All should be classified as activities
+    assert len(knowledge_blocks) == 0
+    assert len(activities) == 2
+
+    # Preview should show no knowledge blocks to integrate
+    proposed_actions = []
+    for activity in activities:
+        # Activities get skipped
+        kb = create_knowledge_block(
+            activity,
+            journal.date,
+            "None",
+            None,
+            ActionType.ADD_CHILD,
+        )
+        proposed_actions.append(
+            ProposedAction(knowledge=kb, status=ActionStatus.SKIPPED, reason="Activity log")
+        )
+
+    preview = ExtractionPreview(
+        journal_date=journal.date,
+        knowledge_blocks=[],
+        proposed_actions=proposed_actions,
+        warnings=[],
+    )
+
+    output = preview.display()
+    assert "Activity log" in output or "SKIPPED" in output
+
+
+def test_workflow_with_indent_str_propagation(sample_journal_entry, mock_llm_client, mock_page_index):
+    """Test that indent_str is propagated through the workflow correctly."""
+    # Create journal with tab indentation
+    journal = JournalEntry(
+        date=date(2025, 1, 15),
+        file_path=Path("/test/journals/2025_01_15.md"),
+        raw_content="- Test content",
+        outline=LogseqOutline(
+            blocks=[LogseqBlock(content="Test content", indent_level=0)],
+            source_text="- Test content",
+            indent_str="\t",  # Tab indentation
+        ),
+        line_count=1,
+    )
+
+    mock_llm_client.extract_knowledge.return_value = [
+        ExtractionResult(content="Test knowledge", confidence=0.9),
+    ]
+
+    extractor = Extractor(mock_llm_client)
+    extractions = extractor.extract_knowledge(journal)
+
+    # Verify indent_str was passed to LLM during extraction
+    call_args = mock_llm_client.extract_knowledge.call_args
+    assert call_args.kwargs["indent_str"] == "\t"
+
+    # Test that indent_str is also passed during page selection
+    knowledge_blocks, _ = classify_extractions(extractions)
+    selection = extractor.select_target_page(
+        knowledge_blocks[0].content, mock_page_index, indent_str="\t"
+    )
+
+    # Verify it was passed to page selection
+    select_call_args = mock_llm_client.select_target_page.call_args
+    assert select_call_args.kwargs["indent_str"] == "\t"
