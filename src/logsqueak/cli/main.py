@@ -114,40 +114,40 @@ def match_knowledge_to_pages(
         similarity_score = similar_pages[0][1] if similar_pages else 0.0
 
         # Load target page
-        target_page = TargetPage.load(graph_path, selection.page_name)
+        target_page = TargetPage.load(graph_path, selection.target_page)
 
         if not target_page:
             # Missing page (FR-009, T031)
-            warnings.append(f"Target page '{selection.page_name}' does not exist")
+            warnings.append(f"Target page '{selection.target_page}' does not exist")
             proposed_actions.append(
                 ProposedAction(
                     knowledge=create_knowledge_block(
                         extraction,
                         journal_date,
-                        selection.page_name,
-                        selection.section_path,
+                        selection.target_page,
+                        selection.target_section,
                         selection.suggested_action,
                     ),
                     status=ActionStatus.SKIPPED,
-                    reason=f"Target page '{selection.page_name}' does not exist",
+                    reason=f"Target page '{selection.target_page}' does not exist",
                     similarity_score=similarity_score,
                 )
             )
             progress.show_matching_progress(
-                i, len(knowledge_extractions), selection.page_name, similarity_score
+                i, len(knowledge_extractions), selection.target_page, similarity_score
             )
             continue
 
         # Check for duplicates (FR-017, T024)
         if extractor.is_duplicate(extraction.content, target_page):
-            progress.show_duplicate_skipped(i, len(knowledge_extractions), selection.page_name)
+            progress.show_duplicate_skipped(i, len(knowledge_extractions), selection.target_page)
             proposed_actions.append(
                 ProposedAction(
                     knowledge=create_knowledge_block(
                         extraction,
                         journal_date,
-                        selection.page_name,
-                        selection.section_path,
+                        selection.target_page,
+                        selection.target_section,
                         selection.suggested_action,
                     ),
                     status=ActionStatus.SKIPPED,
@@ -159,7 +159,7 @@ def match_knowledge_to_pages(
 
         # Ready to integrate
         progress.show_matching_progress(
-            i, len(knowledge_extractions), selection.page_name, similarity_score
+            i, len(knowledge_extractions), selection.target_page, similarity_score
         )
 
         proposed_actions.append(
@@ -167,8 +167,8 @@ def match_knowledge_to_pages(
                 knowledge=create_knowledge_block(
                     extraction,
                     journal_date,
-                    selection.page_name,
-                    selection.section_path,
+                    selection.target_page,
+                    selection.target_section,
                     selection.suggested_action,
                 ),
                 status=ActionStatus.READY,
