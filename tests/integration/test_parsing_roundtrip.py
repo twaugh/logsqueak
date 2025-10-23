@@ -226,7 +226,6 @@ class TestParsingRoundTrip:
         assert outline.blocks[0].content == "Bullet 1"
         assert outline.blocks[1].content == "Bullet 2"
 
-    @pytest.mark.xfail(reason="Multi-line content not yet implemented", strict=True)
     def test_multiline_content_roundtrip(self):
         """Test that multi-line bullet content is preserved."""
         original = dedent(
@@ -242,7 +241,6 @@ class TestParsingRoundTrip:
 
         assert rendered == original
 
-    @pytest.mark.xfail(reason="Multi-line content not yet implemented", strict=True)
     def test_code_block_roundtrip(self):
         """Test that code blocks within bullets are preserved."""
         original = dedent(
@@ -260,7 +258,6 @@ class TestParsingRoundTrip:
 
         assert rendered == original
 
-    @pytest.mark.xfail(reason="Multi-line content not yet implemented", strict=True)
     def test_nested_code_block_with_tabs(self):
         """Test code blocks with tab indentation (real Logseq format)."""
         # Using actual tab characters like in quay-access-management.md
@@ -271,7 +268,6 @@ class TestParsingRoundTrip:
 
         assert rendered == original
 
-    @pytest.mark.xfail(reason="Multi-line content not yet implemented", strict=True)
     def test_properties_on_continuation_lines(self):
         """Test that properties on continuation lines are preserved."""
         original = dedent(
@@ -287,7 +283,6 @@ class TestParsingRoundTrip:
 
         assert rendered == original
 
-    @pytest.mark.xfail(reason="Multi-line content not yet implemented", strict=True)
     def test_complex_nested_multiline(self):
         """Test complex nested structure with multi-line content."""
         original = dedent(

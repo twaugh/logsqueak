@@ -248,12 +248,12 @@ class TestLogseqOutline:
         assert found is not None
         assert found.content == "## Timeline"
 
-    def test_preserve_original_line(self):
-        """Test that _original_line is preserved for round-trip."""
+    def test_preserve_original_lines(self):
+        """Test that _original_lines is preserved for round-trip."""
         markdown = "- Original line with specific formatting"
         outline = LogseqOutline.parse(markdown)
 
-        assert outline.blocks[0]._original_line == markdown
+        assert outline.blocks[0]._original_lines == [markdown]
 
     def test_skip_non_bullet_lines(self):
         """Test that non-bullet lines are skipped."""

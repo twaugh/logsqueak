@@ -16,20 +16,23 @@ class LogseqBlock:
 
     - Properties must never be reordered (insertion order preserved)
     - Children can be inserted where appropriate (targeted, minimal changes)
+    - Continuation lines are preserved exactly for round-trip
 
     Attributes:
-        content: Block text content
+        content: Block text content (first line after "- ")
         indent_level: Indentation level (0 = root)
         properties: Block properties (preserves insertion order)
         children: Child blocks
-        _original_line: Original line for exact round-trip
+        continuation_lines: Lines that continue this block's content (preserves exact formatting)
+        _original_lines: All original lines for exact round-trip (bullet + continuations)
     """
 
     content: str
     indent_level: int
     properties: dict = field(default_factory=dict)  # Preserves insertion order (Python 3.7+)
     children: list["LogseqBlock"] = field(default_factory=list)
-    _original_line: Optional[str] = field(default=None, repr=False)  # For exact round-trip
+    continuation_lines: list[str] = field(default_factory=list)  # Multi-line content
+    _original_lines: list[str] = field(default_factory=list, repr=False)  # For exact round-trip
 
     def add_child(
         self, content: str, position: Optional[int] = None
@@ -61,11 +64,13 @@ class LogseqOutline:
         blocks: Top-level blocks in document
         source_text: Original markdown for debugging
         indent_str: Indentation string (detected from source, default "  ")
+        frontmatter: Lines before first bullet (page-level properties, etc.)
     """
 
     blocks: list[LogseqBlock]
     source_text: str
     indent_str: str = "  "  # Default to 2 spaces
+    frontmatter: list[str] = field(default_factory=list)  # Page-level content
 
     @classmethod
     def parse(cls, markdown: str) -> "LogseqOutline":
@@ -95,10 +100,10 @@ class LogseqOutline:
         # Detect indentation style from source first
         indent_str = _detect_indentation(lines)
 
-        # Parse blocks using the detected indentation
-        blocks = _parse_blocks(lines, indent_str)
+        # Parse blocks and frontmatter using the detected indentation
+        frontmatter, blocks = _parse_blocks(lines, indent_str)
 
-        return cls(blocks=blocks, source_text=markdown, indent_str=indent_str)
+        return cls(blocks=blocks, source_text=markdown, indent_str=indent_str, frontmatter=frontmatter)
 
     def find_heading(self, text: str) -> Optional[LogseqBlock]:
         """Recursively search for heading containing text.
@@ -129,22 +134,32 @@ class LogseqOutline:
         - Maintains original indentation (2 spaces per level)
         - NEVER reorders properties (insertion order sacred)
         - Children modifications are targeted and minimal
-        - Uses _original_line when available for perfect round-trip
+        - Uses _original_lines when available for perfect round-trip
+        - Preserves continuation lines exactly (code blocks, properties, etc.)
+        - Preserves frontmatter (page-level properties)
 
         Returns:
             Rendered markdown
         """
         lines = []
 
+        # Render frontmatter first (page-level properties)
+        if self.frontmatter:
+            lines.extend(self.frontmatter)
+
         def render_block(block: LogseqBlock) -> None:
-            # Use original line if available (unchanged blocks)
-            if block._original_line and not block.children:
-                lines.append(block._original_line)
+            # Use original lines if available and no children added (perfect round-trip)
+            if block._original_lines and not block.children:
+                lines.extend(block._original_lines)
             else:
                 # Render block (possibly with new children appended)
                 # Use detected indentation style
                 indent = self.indent_str * block.indent_level
                 lines.append(f"{indent}- {block.content}")
+
+                # Render continuation lines exactly as they were
+                if block.continuation_lines:
+                    lines.extend(block.continuation_lines)
 
                 # Render children in exact order (new ones at end)
                 for child in block.children:
@@ -156,62 +171,105 @@ class LogseqOutline:
         return "\n".join(lines)
 
 
-def _parse_blocks(lines: list[str], indent_str: str = "  ") -> list[LogseqBlock]:
-    """Parse lines into hierarchical blocks.
+def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], list[LogseqBlock]]:
+    """Parse lines into hierarchical blocks with continuation lines.
+
+    A block consists of:
+    - A bullet line (starts with "- " after leading whitespace)
+    - All continuation lines until the next bullet (or end of file)
+
+    Continuation lines are any non-bullet lines that follow a bullet.
+    They are preserved exactly to maintain formatting of code blocks,
+    properties, and multi-line content.
+
+    Lines before the first bullet are captured as frontmatter (page-level properties).
 
     Args:
         lines: Markdown lines
         indent_str: Indentation string (e.g., "  ", "\t", "    ")
 
     Returns:
-        List of root-level blocks
+        Tuple of (frontmatter_lines, root_blocks)
     """
+    frontmatter = []
     root_blocks = []
     stack: list[LogseqBlock] = []  # Stack of parent blocks by indent level
+    found_first_bullet = False
 
-    for line in lines:
-        if not line.strip():
-            continue
+    i = 0
+    while i < len(lines):
+        line = lines[i]
 
-        # Skip non-bullet lines
-        if not line.lstrip().startswith("- "):
-            continue
+        # Check if this is a bullet line
+        is_bullet = line.lstrip().startswith("- ")
 
-        # Calculate indent level based on indent_str
-        leading_whitespace = line[: len(line) - len(line.lstrip())]
-        indent_level = leading_whitespace.count(indent_str)
+        if is_bullet:
+            found_first_bullet = True
+            # Calculate indent level based on indent_str
+            leading_whitespace = line[: len(line) - len(line.lstrip())]
+            indent_level = leading_whitespace.count(indent_str)
 
-        # Extract content (after "- ")
-        content = line.lstrip()[2:]  # Skip "- "
+            # Extract content (after "- ")
+            content = line.lstrip()[2:]  # Skip "- "
 
-        # Create block
-        block = LogseqBlock(
-            content=content,
-            indent_level=indent_level,
-            _original_line=line,
-        )
+            # Collect all original lines for this block (bullet + continuations)
+            original_lines = [line]
+            continuation_lines = []
 
-        # Determine parent
-        if indent_level == 0:
-            # Root level
-            root_blocks.append(block)
-            stack = [block]
-        else:
-            # Find parent (closest block with indent_level - 1)
-            while len(stack) > indent_level:
-                stack.pop()
+            # Look ahead for continuation lines
+            j = i + 1
+            while j < len(lines):
+                next_line = lines[j]
 
-            if stack and stack[-1].indent_level == indent_level - 1:
-                # Add as child to parent
-                parent = stack[-1]
-                parent.children.append(block)
-                stack.append(block)
-            else:
-                # Malformed indentation - treat as root
+                # Check if next line is a bullet
+                if next_line.lstrip().startswith("- "):
+                    # This is the next bullet, stop collecting
+                    break
+
+                # This is a continuation line
+                original_lines.append(next_line)
+                continuation_lines.append(next_line)
+                j += 1
+
+            # Create block with continuation lines
+            block = LogseqBlock(
+                content=content,
+                indent_level=indent_level,
+                continuation_lines=continuation_lines,
+                _original_lines=original_lines,
+            )
+
+            # Determine parent based on indent level
+            if indent_level == 0:
+                # Root level
                 root_blocks.append(block)
                 stack = [block]
+            else:
+                # Find parent (closest block with indent_level - 1)
+                while len(stack) > indent_level:
+                    stack.pop()
 
-    return root_blocks
+                if stack and stack[-1].indent_level == indent_level - 1:
+                    # Add as child to parent
+                    parent = stack[-1]
+                    parent.children.append(block)
+                    stack.append(block)
+                else:
+                    # Malformed indentation - treat as root
+                    root_blocks.append(block)
+                    stack = [block]
+
+            # Skip past all the lines we just processed
+            i = j
+        else:
+            # Non-bullet line
+            if not found_first_bullet:
+                # Before first bullet - this is frontmatter
+                frontmatter.append(line)
+            # else: orphan line after blocks started - skip it
+            i += 1
+
+    return frontmatter, root_blocks
 
 
 def _detect_indentation(lines: list[str]) -> str:
