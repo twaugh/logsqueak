@@ -21,7 +21,7 @@ This document breaks down the implementation into executable tasks organized by 
 - **Phase 1 (Setup)**: 5 tasks ✅ COMPLETE
 - **Phase 2 (Foundational)**: 11 tasks ✅ COMPLETE
 - **Phase 2.5 (Testing - Foundational)**: 10 tasks ✅ COMPLETE
-- **Phase 3 (User Story 1)**: 12 tasks
+- **Phase 3 (User Story 1)**: 12 tasks (4/12 complete - T017-T020 ✅)
 - **Phase 3.5 (Testing - LLM Integration)**: 7 tasks
 - **Phase 4 (User Story 2)**: 11 tasks
 - **Phase 4.5 (Testing - Integration Safety)**: 9 tasks
@@ -32,7 +32,7 @@ This document breaks down the implementation into executable tasks organized by 
 
 **Parallel Execution Opportunities**: 42 tasks marked [P] can run in parallel within their phase
 
-**Current Progress**: 21/81 tasks complete (26%)
+**Current Progress**: 30/81 tasks complete (37%)
 
 ## Dependencies
 
@@ -45,7 +45,7 @@ Phase 2 (Foundational - models, parsing, RAG index) ✅ COMPLETE
   ↓
 Phase 2.5 (Testing - Foundational) ✅ COMPLETE
   ↓
-Phase 3 (User Story 1 - P1) ← READY TO START
+Phase 3 (User Story 1 - P1) ← IN PROGRESS (4/12 tasks complete)
   ↓
 Phase 3.5 (Testing - LLM Integration)
   ↓
@@ -272,13 +272,13 @@ pytest tests/ -v
 
 #### Configuration & CLI (Parallel Group 1)
 
-- [ ] T017 [P] [US1] Implement config loader in src/logsqueak/config/loader.py to read ~/.config/logsqueak/config.yaml with Pydantic validation and environment variable support (LOGSQUEAK_*)
+- [X] T017 [P] [US1] Implement config loader in src/logsqueak/config/loader.py to read ~/.config/logsqueak/config.yaml with Pydantic validation and environment variable support (LOGSQUEAK_*)
 
-- [ ] T018 [P] [US1] Implement LLM client interface in src/logsqueak/llm/client.py with methods for extraction and page selection requests
+- [X] T018 [P] [US1] Implement LLM client interface in src/logsqueak/llm/client.py with methods for extraction and page selection requests
 
-- [ ] T019 [P] [US1] Implement OpenAI-compatible provider in src/logsqueak/llm/providers/openai_compat.py using httpx with JSON mode (response_format: {type: "json_object"})
+- [X] T019 [P] [US1] Implement OpenAI-compatible provider in src/logsqueak/llm/providers/openai_compat.py using httpx with JSON mode (response_format: {type: "json_object"})
 
-- [ ] T020 [P] [US1] Implement CLI argument parsing in src/logsqueak/cli/main.py using click with extract command, date/range parsing, --dry-run/--apply flags, --model override
+- [X] T020 [P] [US1] Implement CLI argument parsing in src/logsqueak/cli/main.py using click with extract command, date/range parsing, --dry-run flag, --model override
 
 #### Extraction Logic (Sequential Group - T021 must complete before T022-T026)
 
