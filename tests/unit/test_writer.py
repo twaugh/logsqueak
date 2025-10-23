@@ -257,6 +257,134 @@ class TestKnowledgeAddition:
         assert "General note" in outline.blocks[0].content
 
 
+class TestProvenanceCoverage:
+    """Test 100% provenance link coverage (T043)."""
+
+    def test_all_knowledge_blocks_get_provenance_with_section(self):
+        """Test that knowledge added to section gets provenance."""
+        parent = LogseqBlock(content="## Tech Stack", indent_level=0, children=[])
+        outline = LogseqOutline(blocks=[parent], source_text="")
+
+        target_page = Mock(spec=TargetPage)
+        target_page.outline = outline
+
+        knowledge = KnowledgeBlock(
+            content="Use PostgreSQL",
+            source_date=date(2025, 1, 15),
+            confidence=0.9,
+            target_page="Test",
+            target_section=["Tech Stack"],
+            suggested_action=ActionType.ADD_CHILD,
+        )
+
+        add_knowledge_to_page(target_page, knowledge)
+
+        # Verify provenance link is present
+        added_content = parent.children[0].content
+        assert "[[2025-01-15]]" in added_content
+        assert "Use PostgreSQL" in added_content
+
+    def test_all_knowledge_blocks_get_provenance_without_section(self):
+        """Test that knowledge added to page root gets provenance."""
+        outline = LogseqOutline(blocks=[], source_text="")
+
+        target_page = Mock(spec=TargetPage)
+        target_page.outline = outline
+
+        knowledge = KnowledgeBlock(
+            content="General note",
+            source_date=date(2025, 1, 20),
+            confidence=0.9,
+            target_page="Test",
+            target_section=None,
+            suggested_action=ActionType.ADD_CHILD,
+        )
+
+        add_knowledge_to_page(target_page, knowledge)
+
+        # Verify provenance link is present at page root
+        added_content = outline.blocks[0].content
+        assert "[[2025-01-20]]" in added_content
+        assert "General note" in added_content
+
+    def test_all_knowledge_blocks_get_provenance_fallback(self):
+        """Test that knowledge using fallback (section not found) gets provenance."""
+        outline = LogseqOutline(blocks=[], source_text="")
+
+        target_page = Mock(spec=TargetPage)
+        target_page.outline = outline
+
+        knowledge = KnowledgeBlock(
+            content="Fallback content",
+            source_date=date(2025, 2, 10),
+            confidence=0.9,
+            target_page="Test",
+            target_section=["Nonexistent Section"],
+            suggested_action=ActionType.ADD_CHILD,
+        )
+
+        add_knowledge_to_page(target_page, knowledge)
+
+        # Verify provenance link is present even when falling back to page end
+        added_content = outline.blocks[0].content
+        assert "[[2025-02-10]]" in added_content
+        assert "Fallback content" in added_content
+
+    def test_provenance_format_is_always_valid(self):
+        """Test that provenance links always use correct format."""
+        outline = LogseqOutline(blocks=[], source_text="")
+        target_page = Mock(spec=TargetPage)
+        target_page.outline = outline
+
+        # Test various dates
+        test_dates = [
+            date(2025, 1, 1),   # Single digit day
+            date(2025, 10, 5),  # Single digit day, double digit month
+            date(2025, 12, 31), # End of year
+        ]
+
+        for test_date in test_dates:
+            knowledge = KnowledgeBlock(
+                content=f"Content for {test_date}",
+                source_date=test_date,
+                confidence=0.9,
+                target_page="Test",
+                target_section=None,
+                suggested_action=ActionType.ADD_CHILD,
+            )
+
+            # Clear outline for each test
+            outline.blocks = []
+            add_knowledge_to_page(target_page, knowledge)
+
+            # Verify format: [[YYYY-MM-DD]]
+            added_content = outline.blocks[0].content
+            expected_link = f"[[{test_date.strftime('%Y-%m-%d')}]]"
+            assert expected_link in added_content, f"Expected {expected_link} in {added_content}"
+
+    def test_provenance_never_duplicated(self):
+        """Test that provenance is added exactly once."""
+        outline = LogseqOutline(blocks=[], source_text="")
+        target_page = Mock(spec=TargetPage)
+        target_page.outline = outline
+
+        knowledge = KnowledgeBlock(
+            content="Test content",
+            source_date=date(2025, 1, 15),
+            confidence=0.9,
+            target_page="Test",
+            target_section=None,
+            suggested_action=ActionType.ADD_CHILD,
+        )
+
+        add_knowledge_to_page(target_page, knowledge)
+
+        # Count occurrences of the provenance link
+        added_content = outline.blocks[0].content
+        provenance_count = added_content.count("[[2025-01-15]]")
+        assert provenance_count == 1, f"Provenance link should appear exactly once, found {provenance_count} times"
+
+
 class TestSafeFileWriting:
     """Test safe file writing (T040)."""
 

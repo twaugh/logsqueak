@@ -6,6 +6,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+from logsqueak.logseq.parser import LogseqOutline
 from logsqueak.models.knowledge import KnowledgeBlock
 
 
@@ -61,6 +62,47 @@ class ProposedAction:
             parts.append(f"  ⚠ WARNING: {self.reason}")
 
         return "\n".join(parts)
+
+    def show_diff(self, target_page: "TargetPage") -> Optional[str]:
+        """Generate diff showing what will be added to the page.
+
+        Args:
+            target_page: Target page to show diff for
+
+        Returns:
+            Diff string or None if page doesn't exist
+        """
+        from logsqueak.models.diff import generate_unified_diff
+        from logsqueak.integration import writer
+        from unittest.mock import Mock
+
+        kb = self.knowledge
+
+        # Create a copy of the page outline
+        original_outline = target_page.outline
+
+        # Create temporary page with copied outline
+        temp_page = Mock()
+        temp_page.outline = LogseqOutline(
+            blocks=[b for b in original_outline.blocks],  # shallow copy of blocks
+            source_text=original_outline.source_text,
+            frontmatter=original_outline.frontmatter[:] if original_outline.frontmatter else [],
+            indent_str=original_outline.indent_str,
+        )
+
+        # Add knowledge to temp page
+        writer.add_knowledge_to_page(temp_page, kb)
+
+        # Generate diff between original and modified
+        original_text = original_outline.render()
+        modified_text = temp_page.outline.render()
+
+        return generate_unified_diff(
+            original_text,
+            modified_text,
+            fromfile=f"pages/{kb.target_page}.md (current)",
+            tofile=f"pages/{kb.target_page}.md (with new knowledge)",
+        )
 
 
 @dataclass

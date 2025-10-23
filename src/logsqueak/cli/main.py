@@ -290,48 +290,87 @@ def process_journal_date(
             graph_path=graph_path,
         )
 
-        progress.show_preview_header()
-        click.echo(preview.display(show_diffs=show_diffs))
-
         # Handle approval workflow
         if dry_run:
-            # Dry-run mode: just show preview and exit
+            # Dry-run mode: show full preview and exit
+            progress.show_preview_header()
+            click.echo(preview.display(show_diffs=show_diffs))
             progress.show_dry_run_complete()
         else:
-            # Normal mode: prompt for approval and integrate if approved
+            # Normal mode: show summary, then prompt for each action individually
+            click.echo(f"\nFound {len(proposed_actions)} knowledge blocks in {journal_file.name}:")
+
+            # Show warnings/skipped if any
+            skipped = [a for a in proposed_actions if a.status == ActionStatus.SKIPPED]
+            if skipped:
+                click.echo(f"\n{len(skipped)} blocks will be skipped:")
+                for action in skipped:
+                    click.echo(f"  - {action.knowledge.content[:60]}... ({action.reason})")
+
             ready_actions = [a for a in proposed_actions if a.status == ActionStatus.READY]
 
             if not ready_actions:
                 click.echo("\nNo actions to apply (all skipped or warnings).")
                 return
 
-            # Prompt for approval (y/n/e)
-            choice = interactive.prompt_for_approval()
+            # Prompt for each action individually with its diff
+            approved_actions = []
 
-            if choice == 'n':
-                interactive.show_warning("Integration cancelled by user")
-                return
-            elif choice == 'e':
-                # Edit mode - not fully implemented yet, treat as cancel for now
-                interactive.show_warning("Edit mode not yet implemented - cancelling")
-                return
-            elif choice == 'y':
-                # Approved - integrate changes
-                interactive.show_progress("Integrating changes...")
+            for i, action in enumerate(ready_actions, 1):
+                kb = action.knowledge
 
-                integrator = Integrator(graph_path, page_index=page_index)
-                result = integrator.integrate(proposed_actions, dry_run=False)
+                # Show the block description
+                click.echo(f'\n{i}. "{kb.content[:60]}{"..." if len(kb.content) > 60 else ""}"')
+                click.echo(f"   Target: {kb.target_page}")
+                if kb.target_section:
+                    click.echo(f"   Section: {' > '.join(kb.target_section)}")
+                click.echo(f"   Action: {kb.suggested_action.value}")
+                if action.similarity_score:
+                    click.echo(f"   Similarity: {action.similarity_score:.2f}")
 
-                if result.success:
-                    interactive.show_success(
-                        f"Successfully integrated {result.actions_applied} knowledge blocks into {len(result.modified_pages)} pages"
-                    )
-                    if verbose:
-                        click.echo(f"Modified pages: {', '.join(result.modified_pages)}")
+                # Show the diff for this specific action
+                click.echo("\n   Diff:")
+                target_page = TargetPage.load(graph_path, kb.target_page)
+                if target_page:
+                    diff_text = action.show_diff(target_page)
+                    if diff_text:
+                        # Indent the diff for readability
+                        for line in diff_text.split('\n'):
+                            click.echo(f"   {line}")
                 else:
-                    interactive.show_error("Integration failed")
-                    for error in result.errors:
-                        click.echo(f"  - {error}", err=True)
+                    click.echo(f"   (Target page '{kb.target_page}' does not exist)")
+
+                # Prompt for this specific action
+                click.echo()
+                choice = interactive.prompt_for_approval()
+
+                if choice == 'y':
+                    approved_actions.append(action)
+                elif choice == 'n':
+                    interactive.show_warning(f"Skipped block {i}")
+                elif choice == 'e':
+                    interactive.show_warning("Edit mode not yet implemented - skipping this block")
+
+            if not approved_actions:
+                interactive.show_warning("No blocks approved - nothing to integrate")
+                return
+
+            # Integrate approved actions
+            click.echo(f"\nIntegrating {len(approved_actions)} approved blocks...")
+
+            integrator = Integrator(graph_path, page_index=page_index)
+            result = integrator.integrate(approved_actions, dry_run=False)
+
+            if result.success:
+                interactive.show_success(
+                    f"Successfully integrated {result.actions_applied} knowledge blocks into {len(result.modified_pages)} pages"
+                )
+                if verbose:
+                    click.echo(f"Modified pages: {', '.join(result.modified_pages)}")
+            else:
+                interactive.show_error("Integration failed")
+                for error in result.errors:
+                    click.echo(f"  - {error}", err=True)
 
     except Exception as e:
         progress.show_error(f"Failed to process {journal_date.isoformat()}: {e}")
