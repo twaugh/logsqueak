@@ -21,7 +21,7 @@ This document breaks down the implementation into executable tasks organized by 
 - **Phase 1 (Setup)**: 5 tasks ✅ COMPLETE
 - **Phase 2 (Foundational)**: 11 tasks ✅ COMPLETE
 - **Phase 2.5 (Testing - Foundational)**: 10 tasks ✅ COMPLETE
-- **Phase 3 (User Story 1)**: 12 tasks (4/12 complete - T017-T020 ✅)
+- **Phase 3 (User Story 1)**: 12 tasks (8/12 complete - T017-T024 ✅)
 - **Phase 3.5 (Testing - LLM Integration)**: 7 tasks
 - **Phase 4 (User Story 2)**: 11 tasks
 - **Phase 4.5 (Testing - Integration Safety)**: 9 tasks
@@ -32,7 +32,7 @@ This document breaks down the implementation into executable tasks organized by 
 
 **Parallel Execution Opportunities**: 42 tasks marked [P] can run in parallel within their phase
 
-**Current Progress**: 30/81 tasks complete (37%)
+**Current Progress**: 34/81 tasks complete (42%)
 
 ## Dependencies
 
@@ -45,7 +45,7 @@ Phase 2 (Foundational - models, parsing, RAG index) ✅ COMPLETE
   ↓
 Phase 2.5 (Testing - Foundational) ✅ COMPLETE
   ↓
-Phase 3 (User Story 1 - P1) ← IN PROGRESS (4/12 tasks complete)
+Phase 3 (User Story 1 - P1) ← IN PROGRESS (8/12 tasks complete)
   ↓
 Phase 3.5 (Testing - LLM Integration)
   ↓
@@ -282,13 +282,13 @@ pytest tests/ -v
 
 #### Extraction Logic (Sequential Group - T021 must complete before T022-T026)
 
-- [ ] T021 [US1] Implement Stage 1 extraction in src/logsqueak/extraction/extractor.py to call LLM with journal content and extract knowledge blocks (content + confidence only, no page targeting yet)
+- [X] T021 [US1] Implement Stage 1 extraction in src/logsqueak/extraction/extractor.py to call LLM with journal content and extract knowledge blocks (content + confidence only, no page targeting yet)
 
-- [ ] T022 [P] [US1] Implement Stage 2 page selection in src/logsqueak/extraction/extractor.py to use PageIndex.find_similar() for top-5 candidates, then LLM selects best page + section from candidates
+- [X] T022 [P] [US1] Implement Stage 2 page selection in src/logsqueak/extraction/extractor.py to use PageIndex.find_similar() for top-5 candidates, then LLM selects best page + section from candidates
 
-- [ ] T023 [P] [US1] Implement activity vs knowledge classifier in src/logsqueak/extraction/classifier.py with confidence threshold logic
+- [X] T023 [P] [US1] Implement activity vs knowledge classifier in src/logsqueak/extraction/classifier.py with confidence threshold logic
 
-- [ ] T024 [P] [US1] Implement duplicate detection in src/logsqueak/extraction/extractor.py using content_hash() comparison against target page content
+- [X] T024 [P] [US1] Implement duplicate detection in src/logsqueak/extraction/extractor.py using content_hash() comparison against target page content
 
 - [ ] T025 [P] [US1] Implement 2000-line limit enforcement in src/logsqueak/models/journal.py load() method with truncation warning logging
 

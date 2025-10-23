@@ -16,7 +16,7 @@ from logsqueak.llm.client import (
 )
 from logsqueak.models.journal import JournalEntry
 from logsqueak.models.knowledge import ActionType, KnowledgeBlock
-from logsqueak.models.page import PageIndex
+from logsqueak.models.page import PageIndex, TargetPage
 
 
 class Extractor:
@@ -104,6 +104,28 @@ class Extractor:
         )
 
         return selection
+
+    def is_duplicate(self, knowledge_content: str, target_page: TargetPage) -> bool:
+        """Check if knowledge already exists on target page (FR-017).
+
+        Uses simple content matching to detect duplicates. This prevents
+        re-adding the same knowledge if it was previously integrated.
+
+        Args:
+            knowledge_content: Extracted knowledge text
+            target_page: Target page to check for duplicates
+
+        Returns:
+            True if duplicate found, False otherwise
+
+        Examples:
+            >>> page = TargetPage.load(graph_path, "Project X")
+            >>> extractor.is_duplicate("Already on the page", page)
+            True
+            >>> extractor.is_duplicate("New unique knowledge", page)
+            False
+        """
+        return target_page.has_duplicate(knowledge_content)
 
 
 def create_knowledge_block(
