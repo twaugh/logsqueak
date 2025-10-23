@@ -151,16 +151,47 @@ src/
 
 tests/
 ├── unit/                 # Unit tests for individual modules
+│   ├── test_config.py
+│   ├── test_journal.py
+│   ├── test_knowledge.py
 │   ├── test_parser.py
+│   ├── test_graph.py
+│   ├── test_preview.py
+│   ├── test_page.py
+│   ├── test_llm_client.py
+│   ├── test_openai_provider.py
+│   ├── test_extractor.py
 │   ├── test_classifier.py
 │   ├── test_matcher.py
-│   └── test_embeddings.py # PageIndex and RAG tests
+│   ├── test_writer.py
+│   ├── test_integrator.py
+│   ├── test_interactive.py
+│   ├── test_convention_detector.py
+│   └── test_section_creator.py
 ├── integration/          # Integration tests for workflows
+│   ├── test_parsing_roundtrip.py
 │   ├── test_extraction_workflow.py
-│   └── test_integration_workflow.py
-└── fixtures/             # Test data
-    ├── journals/         # Sample journal entries
-    └── pages/            # Sample Logseq pages
+│   ├── test_file_safety.py
+│   ├── test_provenance.py
+│   ├── test_pageindex_refresh.py
+│   ├── test_error_recovery.py
+│   ├── test_duplicate_prevention.py
+│   ├── test_integration_workflow.py
+│   ├── test_section_creation.py
+│   ├── test_convention_preservation.py
+│   └── test_section_edge_cases.py
+├── e2e/                  # End-to-end tests
+│   ├── test_full_workflow.py
+│   ├── test_multi_entry.py
+│   ├── test_real_world.py
+│   ├── test_error_scenarios.py
+│   └── test_cli_integration.py
+├── performance/          # Performance and scale tests
+│   └── test_scale.py
+├── fixtures/             # Test data
+│   ├── journals/         # Sample journal entries
+│   └── pages/            # Sample Logseq pages
+└── conftest.py           # Shared pytest fixtures
 
 ```
 
@@ -169,7 +200,7 @@ tests/
 - This is a standalone command-line tool (not web/mobile)
 - Clear separation of concerns: CLI → extraction → integration → LLM → Logseq I/O
 - Models directory for data entities from spec
-- Tests organized by type (unit vs. integration) per testing requirements
+- Tests organized by type (unit, integration, e2e, performance) with comprehensive coverage at each level
 
 ## Complexity Tracking
 

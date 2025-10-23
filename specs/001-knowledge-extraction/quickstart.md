@@ -13,15 +13,25 @@
 
 ### 1. Clone and Setup Environment
 
+**IMPORTANT**: Always use a virtual environment to isolate dependencies!
+
 ```bash
 # Clone repository
 git checkout 001-knowledge-extraction
 
-# Create virtual environment
+# Create virtual environment (REQUIRED - do not skip!)
 python3.11 -m venv venv
+
+# Activate the virtual environment
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
+# Verify you're in the venv (should show venv/bin/python)
+which python
+
+# Upgrade pip in the venv
+pip install --upgrade pip
+
+# Install dependencies in the venv
 pip install -r requirements.txt
 
 ```
@@ -207,27 +217,40 @@ python -m logsqueak.cli.main extract --model gpt-4 2025-01-15
 
 ### Running Tests
 
+**IMPORTANT**: Always activate the virtual environment first!
+
 ```bash
-# Run all tests
-pytest
+# Activate venv (if not already active)
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Run all passing tests (without sentence-transformers dependency)
+pytest tests/unit/test_config.py tests/unit/test_journal.py tests/unit/test_knowledge.py tests/unit/test_parser.py tests/unit/test_graph.py tests/unit/test_preview.py tests/integration/ -v
 
 # Run with coverage
-pytest --cov=logsqueak --cov-report=html
+pytest tests/unit/ tests/integration/ --cov=logsqueak --cov-report=html
 
 # Run specific test file
-pytest tests/unit/test_parser.py
-
-# Run with verbose output
-pytest -v
+pytest tests/unit/test_parser.py -v
 
 # Run integration tests only
-pytest tests/integration/
+pytest tests/integration/ -v
 
+```
+
+**Note**: `test_page.py` requires `sentence-transformers` (large dependency). Install separately if needed:
+```bash
+pip install sentence-transformers>=2.2.0
+pytest tests/unit/test_page.py -v
 ```
 
 ### Code Quality
 
+**IMPORTANT**: Always activate the virtual environment first!
+
 ```bash
+# Activate venv (if not already active)
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
 # Format code
 black src/ tests/
 
