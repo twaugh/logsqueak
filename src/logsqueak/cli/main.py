@@ -17,7 +17,7 @@ from logsqueak.config.loader import load_config
 from logsqueak.extraction.classifier import classify_extractions
 from logsqueak.extraction.extractor import Extractor, create_knowledge_block
 from logsqueak.llm.providers.openai_compat import OpenAICompatibleProvider
-from logsqueak.logseq.graph import find_pages_directory
+from logsqueak.logseq.graph import GraphPaths
 from logsqueak.models.journal import JournalEntry
 from logsqueak.models.knowledge import ActionType
 from logsqueak.models.page import PageIndex, TargetPage
@@ -60,8 +60,8 @@ def build_page_index(graph_path: Path, ctx: click.Context) -> PageIndex:
         Built PageIndex
     """
     try:
-        pages_dir = find_pages_directory(graph_path)
-        page_files = list(pages_dir.glob("*.md"))
+        graph_paths = GraphPaths(graph_path)
+        page_files = list(graph_paths.pages_dir.glob("*.md"))
 
         progress.show_building_index(len(page_files))
         start_time = time.time()
