@@ -87,11 +87,32 @@ class OpenAICompatibleProvider(LLMClient):
             - Routine todos without context
             - Temporary status updates
 
+            CRITICAL: Preserve hierarchical context from nested bullets!
+
+            When extracting from NESTED journal entries, INCLUDE parent context and [[Page Links]]:
+
+            EXAMPLE JOURNAL:
+            - Working on [[RHEL Documentation]]
+              - Updated security guidelines
+                - Added section on container scanning
+
+            GOOD EXTRACTION:
+            "[[RHEL Documentation]]: Added section on container scanning to security guidelines"
+
+            BAD EXTRACTION:
+            "Added section on container scanning"
+
+            RULES:
+            1. If a parent bullet contains [[Page Link]], include it in extracted knowledge
+            2. Preserve the page reference even if the knowledge is nested deep
+            3. Add brief parent context for clarity (but keep it concise)
+            4. The extracted knowledge should be self-contained and clear
+
             Return a JSON object with this structure:
             {
               "knowledge_blocks": [
                 {
-                  "content": "The extracted knowledge text",
+                  "content": "The extracted knowledge text with parent context",
                   "confidence": 0.85
                 }
               ]
