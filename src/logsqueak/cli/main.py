@@ -5,13 +5,23 @@ This is the main entry point for the Logsqueak command-line tool.
 """
 
 import sys
+import time
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
 
 import click
 
+from logsqueak.cli import progress
 from logsqueak.config.loader import load_config
+from logsqueak.extraction.classifier import classify_extractions
+from logsqueak.extraction.extractor import Extractor, create_knowledge_block
+from logsqueak.llm.providers.openai_compat import OpenAICompatibleProvider
+from logsqueak.logseq.graph import find_pages_directory
+from logsqueak.models.journal import JournalEntry
+from logsqueak.models.knowledge import ActionType
+from logsqueak.models.page import PageIndex, TargetPage
+from logsqueak.models.preview import ActionStatus, ExtractionPreview, ProposedAction
 
 
 @click.group()
@@ -37,6 +47,210 @@ def cli(ctx: click.Context, config: Optional[Path], verbose: bool, version: bool
     ctx.ensure_object(dict)
     ctx.obj["config_path"] = config
     ctx.obj["verbose"] = verbose
+
+
+def build_page_index(graph_path: Path, ctx: click.Context) -> PageIndex:
+    """Build PageIndex with progress feedback.
+
+    Args:
+        graph_path: Path to Logseq graph
+        ctx: Click context for error handling
+
+    Returns:
+        Built PageIndex
+    """
+    try:
+        pages_dir = find_pages_directory(graph_path)
+        page_files = list(pages_dir.glob("*.md"))
+
+        progress.show_building_index(len(page_files))
+        start_time = time.time()
+
+        page_index = PageIndex.build(graph_path)
+
+        duration = time.time() - start_time
+        # Count cached vs newly embedded (for now, just show totals)
+        progress.show_index_built(len(page_files), duration, 0, len(page_files))
+
+        return page_index
+    except Exception as e:
+        progress.show_error(f"Failed to build page index: {e}")
+        ctx.exit(1)
+
+
+def match_knowledge_to_pages(
+    knowledge_extractions: list,
+    activity_logs: list,
+    extractor: Extractor,
+    page_index: PageIndex,
+    graph_path: Path,
+    journal_date: date,
+) -> tuple[list[ProposedAction], list[str]]:
+    """Match extracted knowledge to target pages using RAG.
+
+    Args:
+        knowledge_extractions: Extracted knowledge blocks
+        activity_logs: Activity logs (for progress display)
+        extractor: Extractor instance
+        page_index: PageIndex for RAG search
+        graph_path: Path to Logseq graph
+        journal_date: Journal date for provenance
+
+    Returns:
+        Tuple of (proposed_actions, warnings)
+    """
+    proposed_actions = []
+    warnings = []
+    total_extractions = len(knowledge_extractions) + len(activity_logs)
+
+    for i, extraction in enumerate(knowledge_extractions, 1):
+        # Find target page using RAG
+        selection = extractor.select_target_page(extraction.content, page_index)
+
+        # Get the top similarity score for progress display
+        similar_pages = page_index.find_similar(extraction.content, top_k=1)
+        similarity_score = similar_pages[0][1] if similar_pages else 0.0
+
+        # Load target page
+        target_page = TargetPage.load(graph_path, selection.page_name)
+
+        if not target_page:
+            # Missing page (FR-009, T031)
+            warnings.append(f"Target page '{selection.page_name}' does not exist")
+            proposed_actions.append(
+                ProposedAction(
+                    knowledge=create_knowledge_block(
+                        extraction,
+                        journal_date,
+                        selection.page_name,
+                        selection.section_path,
+                        selection.suggested_action,
+                    ),
+                    status=ActionStatus.SKIPPED,
+                    reason=f"Target page '{selection.page_name}' does not exist",
+                    similarity_score=similarity_score,
+                )
+            )
+            progress.show_matching_progress(
+                i, len(knowledge_extractions), selection.page_name, similarity_score
+            )
+            continue
+
+        # Check for duplicates (FR-017, T024)
+        if extractor.is_duplicate(extraction.content, target_page):
+            progress.show_duplicate_skipped(i, len(knowledge_extractions), selection.page_name)
+            proposed_actions.append(
+                ProposedAction(
+                    knowledge=create_knowledge_block(
+                        extraction,
+                        journal_date,
+                        selection.page_name,
+                        selection.section_path,
+                        selection.suggested_action,
+                    ),
+                    status=ActionStatus.SKIPPED,
+                    reason="Duplicate content detected",
+                    similarity_score=similarity_score,
+                )
+            )
+            continue
+
+        # Ready to integrate
+        progress.show_matching_progress(
+            i, len(knowledge_extractions), selection.page_name, similarity_score
+        )
+
+        proposed_actions.append(
+            ProposedAction(
+                knowledge=create_knowledge_block(
+                    extraction,
+                    journal_date,
+                    selection.page_name,
+                    selection.section_path,
+                    selection.suggested_action,
+                ),
+                status=ActionStatus.READY,
+                similarity_score=similarity_score,
+            )
+        )
+
+    # Show activity logs that were skipped
+    for i, activity in enumerate(activity_logs, 1):
+        progress.show_activity_skipped(i + len(knowledge_extractions), total_extractions)
+
+    return proposed_actions, warnings
+
+
+def process_journal_date(
+    journal_date: date,
+    extractor: Extractor,
+    page_index: PageIndex,
+    graph_path: Path,
+    model: str,
+    verbose: bool,
+) -> None:
+    """Process a single journal date.
+
+    Args:
+        journal_date: Date to process
+        extractor: Extractor instance
+        page_index: PageIndex for RAG search
+        graph_path: Path to Logseq graph
+        model: LLM model name (for progress display)
+        verbose: Verbose output flag
+    """
+    try:
+        # Load journal entry
+        progress.show_processing_journal(journal_date.isoformat())
+        journal = JournalEntry.load(graph_path, journal_date)
+
+        if not journal:
+            progress.show_warning(f"No journal entry found for {journal_date.isoformat()}")
+            return
+
+        # Stage 1: Extract knowledge blocks
+        progress.show_extracting_knowledge(model)
+        extractions = extractor.extract_knowledge(journal)
+
+        # Classify into knowledge vs activity logs
+        knowledge_extractions, activity_logs = classify_extractions(extractions)
+
+        progress.show_extraction_complete(len(knowledge_extractions))
+
+        if not knowledge_extractions:
+            click.echo(f"No knowledge blocks found in {journal_date.isoformat()}")
+            return
+
+        # Stage 2: Match each knowledge block to target pages
+        proposed_actions, warnings = match_knowledge_to_pages(
+            knowledge_extractions,
+            activity_logs,
+            extractor,
+            page_index,
+            graph_path,
+            journal_date,
+        )
+
+        # Display preview (T027)
+        preview = ExtractionPreview(
+            journal_date=journal_date,
+            knowledge_blocks=[action.knowledge for action in proposed_actions],
+            proposed_actions=proposed_actions,
+            warnings=warnings,
+        )
+
+        progress.show_preview_header()
+        click.echo(preview.display())
+
+        # T029: Exit without modifying files (dry-run mode)
+        progress.show_dry_run_complete()
+
+    except Exception as e:
+        progress.show_error(f"Failed to process {journal_date.isoformat()}: {e}")
+        if verbose:
+            import traceback
+
+            traceback.print_exc()
 
 
 @cli.command()
@@ -118,17 +332,27 @@ def extract(
     if verbose:
         click.echo(f"Processing dates: {[d.isoformat() for d in dates]}")
 
-    # TODO: Implement extraction workflow (T021-T032)
-    # For now, just show what we parsed
-    click.echo(f"\nConfiguration loaded:")
-    click.echo(f"  LLM endpoint: {config.llm.endpoint}")
-    click.echo(f"  LLM model: {config.llm.model}")
-    click.echo(f"  Graph path: {config.logseq.graph_path}")
-    click.echo(f"\nWould process {len(dates)} date(s):")
-    for d in dates:
-        click.echo(f"  - {d.isoformat()}")
-    click.echo(f"\nMode: {'Dry-run (show diffs only)' if dry_run else 'Apply (with confirmation)'}")
-    click.echo("\n[Extraction logic not yet implemented - Phase 3 tasks T021-T032]")
+    # Initialize LLM client and extractor
+    llm_client = OpenAICompatibleProvider(
+        endpoint=config.llm.endpoint,
+        api_key=config.llm.api_key,
+        model=config.llm.model,
+    )
+    extractor = Extractor(llm_client)
+
+    # Build PageIndex (with cache)
+    page_index = build_page_index(config.logseq.graph_path, ctx)
+
+    # Process each date
+    for journal_date in dates:
+        process_journal_date(
+            journal_date,
+            extractor,
+            page_index,
+            config.logseq.graph_path,
+            config.llm.model,
+            verbose,
+        )
 
 
 def parse_date_or_range(date_str: str) -> list[date]:

@@ -21,7 +21,7 @@ This document breaks down the implementation into executable tasks organized by 
 - **Phase 1 (Setup)**: 5 tasks ✅ COMPLETE
 - **Phase 2 (Foundational)**: 11 tasks ✅ COMPLETE
 - **Phase 2.5 (Testing - Foundational)**: 10 tasks ✅ COMPLETE
-- **Phase 3 (User Story 1)**: 16 tasks (12/16 complete - T017-T028 ✅)
+- **Phase 3 (User Story 1)**: 16 tasks ✅ COMPLETE
 - **Phase 3.5 (Testing - LLM Integration)**: 7 tasks
 - **Phase 4 (User Story 2)**: 11 tasks
 - **Phase 4.5 (Testing - Integration Safety)**: 9 tasks
@@ -32,7 +32,7 @@ This document breaks down the implementation into executable tasks organized by 
 
 **Parallel Execution Opportunities**: 42 tasks marked [P] can run in parallel within their phase
 
-**Current Progress**: 38/81 tasks complete (47%)
+**Current Progress**: 42/81 tasks complete (52%)
 
 ## Dependencies
 
@@ -45,7 +45,7 @@ Phase 2 (Foundational - models, parsing, RAG index) ✅ COMPLETE
   ↓
 Phase 2.5 (Testing - Foundational) ✅ COMPLETE
   ↓
-Phase 3 (User Story 1 - P1) ← IN PROGRESS (12/16 tasks complete)
+Phase 3 (User Story 1 - P1) ✅ COMPLETE
   ↓
 Phase 3.5 (Testing - LLM Integration)
   ↓
@@ -300,15 +300,15 @@ pytest tests/ -v
 
 - [X] T028 [US1] Implement progress feedback in src/logsqueak/cli/progress.py to show index building status, extraction progress, and matching progress per SC-001
 
-- [ ] T029 [US1] Wire up extract command in src/logsqueak/cli/main.py to load journal, build PageIndex (with cache), run extraction, display preview, exit without modifying files (dry-run)
+- [X] T029 [US1] Wire up extract command in src/logsqueak/cli/main.py to load journal, build PageIndex (with cache), run extraction, display preview, exit without modifying files (dry-run)
 
 #### Error Handling
 
-- [ ] T030 [P] [US1] Implement LLM API error handling in src/logsqueak/llm/client.py with graceful failures, clear error messages, and no file corruption per FR-011
+- [X] T030 [P] [US1] Implement LLM API error handling in src/logsqueak/llm/client.py with graceful failures, clear error messages, and no file corruption per FR-011
 
-- [ ] T031 [P] [US1] Implement missing target page detection in src/logsqueak/extraction/extractor.py to report when TargetPage.load() returns None per FR-009
+- [X] T031 [P] [US1] Implement missing target page detection in src/logsqueak/extraction/extractor.py to report when TargetPage.load() returns None per FR-009
 
-- [ ] T032 [P] [US1] Add validation for invalid journal file paths in src/logsqueak/cli/main.py with clear error message without crashing
+- [X] T032 [P] [US1] Add validation for invalid journal file paths in src/logsqueak/cli/main.py with clear error message without crashing
 
 **Deliverable**: CLI command that shows extraction preview without modifying files
 
