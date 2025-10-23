@@ -225,3 +225,84 @@ class TestParsingRoundTrip:
         assert len(outline.blocks) == 2
         assert outline.blocks[0].content == "Bullet 1"
         assert outline.blocks[1].content == "Bullet 2"
+
+    @pytest.mark.xfail(reason="Multi-line content not yet implemented", strict=True)
+    def test_multiline_content_roundtrip(self):
+        """Test that multi-line bullet content is preserved."""
+        original = dedent(
+            """\
+            - This is a bullet with continuation
+              that spans multiple lines
+              and includes more text
+            - Another bullet"""
+        )
+
+        outline = LogseqOutline.parse(original)
+        rendered = outline.render()
+
+        assert rendered == original
+
+    @pytest.mark.xfail(reason="Multi-line content not yet implemented", strict=True)
+    def test_code_block_roundtrip(self):
+        """Test that code blocks within bullets are preserved."""
+        original = dedent(
+            """\
+            - Here is a code example:
+              ```python
+              def hello():
+                  print("world")
+              ```
+            - Next item"""
+        )
+
+        outline = LogseqOutline.parse(original)
+        rendered = outline.render()
+
+        assert rendered == original
+
+    @pytest.mark.xfail(reason="Multi-line content not yet implemented", strict=True)
+    def test_nested_code_block_with_tabs(self):
+        """Test code blocks with tab indentation (real Logseq format)."""
+        # Using actual tab characters like in quay-access-management.md
+        original = "- Architecture diagram\n\t- Renderer\n\t\t- ```mermaid\n\t\t  graph LR\n\t\t      Node1\n\t\t  ```"
+
+        outline = LogseqOutline.parse(original)
+        rendered = outline.render()
+
+        assert rendered == original
+
+    @pytest.mark.xfail(reason="Multi-line content not yet implemented", strict=True)
+    def test_properties_on_continuation_lines(self):
+        """Test that properties on continuation lines are preserved."""
+        original = dedent(
+            """\
+            - Item with properties
+              id:: 12345
+              tags:: important, urgent
+            - Next item"""
+        )
+
+        outline = LogseqOutline.parse(original)
+        rendered = outline.render()
+
+        assert rendered == original
+
+    @pytest.mark.xfail(reason="Multi-line content not yet implemented", strict=True)
+    def test_complex_nested_multiline(self):
+        """Test complex nested structure with multi-line content."""
+        original = dedent(
+            """\
+            - Parent item
+              - Child with code:
+                ```bash
+                echo "hello"
+                ```
+              - Another child
+                with continuation text
+            - Root item 2"""
+        )
+
+        outline = LogseqOutline.parse(original)
+        rendered = outline.render()
+
+        assert rendered == original
