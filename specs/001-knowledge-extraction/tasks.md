@@ -396,7 +396,7 @@ logsqueak extract 2025-01-15  # Shows preview, no changes
 
 #### Integration Logic (Sequential Group - T035 must complete before T036-T039)
 
-- [ ] T035 [US2] Implement integration orchestrator in src/logsqueak/integration/integrator.py to coordinate adding knowledge to pages per ProposedAction list
+- [X] T035 [US2] Implement integration orchestrator in src/logsqueak/integration/integrator.py to coordinate adding knowledge to pages per ProposedAction list
 
 - [ ] T036 [P] [US2] Implement page matcher in src/logsqueak/integration/matcher.py to use TargetPage.find_section() for locating target sections in outline hierarchy
 
