@@ -332,3 +332,263 @@ class TestExtractionPreview:
         assert "Knowledge blocks found: 3" in output
         assert "Will integrate: 1" in output  # Only READY
         assert "Skipped: 1" in output  # Only SKIPPED
+
+
+class TestPreviewWithRAGScores:
+    """Tests for preview rendering with RAG similarity scores."""
+
+    def test_display_with_similarity_score(self):
+        """Test that similarity scores are displayed in preview."""
+        kb = KnowledgeBlock(
+            content="PostgreSQL decision",
+            source_date=date(2025, 1, 15),
+            confidence=0.9,
+            target_page="Project Architecture",
+            target_section=["Database"],
+            suggested_action=ActionType.ADD_CHILD,
+        )
+
+        action = ProposedAction(
+            knowledge=kb,
+            status=ActionStatus.READY,
+            similarity_score=0.87,
+        )
+
+        preview = ExtractionPreview(
+            journal_date=date(2025, 1, 15),
+            knowledge_blocks=[kb],
+            proposed_actions=[action],
+            warnings=[],
+        )
+
+        output = preview.display()
+
+        # Similarity score should be displayed
+        assert "0.87" in output or "87%" in output or "similarity" in output.lower()
+
+    def test_display_high_similarity_score(self):
+        """Test display of high similarity score (strong match)."""
+        kb = KnowledgeBlock(
+            content="High confidence match",
+            source_date=date(2025, 1, 15),
+            confidence=0.95,
+            target_page="Exact Match Page",
+            target_section=None,
+            suggested_action=ActionType.ADD_CHILD,
+        )
+
+        action = ProposedAction(
+            knowledge=kb,
+            status=ActionStatus.READY,
+            similarity_score=0.95,
+        )
+
+        preview = ExtractionPreview(
+            journal_date=date(2025, 1, 15),
+            knowledge_blocks=[kb],
+            proposed_actions=[action],
+            warnings=[],
+        )
+
+        output = preview.display()
+
+        assert "Exact Match Page" in output
+        # High similarity score should be visible
+        assert "0.95" in output or "95%" in output
+
+    def test_display_low_similarity_score(self):
+        """Test display of low similarity score (weak match)."""
+        kb = KnowledgeBlock(
+            content="Weak match content",
+            source_date=date(2025, 1, 15),
+            confidence=0.75,
+            target_page="Uncertain Page",
+            target_section=None,
+            suggested_action=ActionType.ADD_CHILD,
+        )
+
+        action = ProposedAction(
+            knowledge=kb,
+            status=ActionStatus.READY,
+            similarity_score=0.42,
+        )
+
+        preview = ExtractionPreview(
+            journal_date=date(2025, 1, 15),
+            knowledge_blocks=[kb],
+            proposed_actions=[action],
+            warnings=[],
+        )
+
+        output = preview.display()
+
+        # Low similarity score should still be displayed
+        assert "0.42" in output or "42%" in output
+
+    def test_display_multiple_blocks_with_scores(self):
+        """Test displaying multiple blocks with different similarity scores."""
+        kb1 = KnowledgeBlock(
+            content="First block",
+            source_date=date(2025, 1, 15),
+            confidence=0.9,
+            target_page="Page A",
+            target_section=None,
+            suggested_action=ActionType.ADD_CHILD,
+        )
+
+        kb2 = KnowledgeBlock(
+            content="Second block",
+            source_date=date(2025, 1, 15),
+            confidence=0.85,
+            target_page="Page B",
+            target_section=None,
+            suggested_action=ActionType.ADD_CHILD,
+        )
+
+        action1 = ProposedAction(
+            knowledge=kb1,
+            status=ActionStatus.READY,
+            similarity_score=0.92,
+        )
+
+        action2 = ProposedAction(
+            knowledge=kb2,
+            status=ActionStatus.READY,
+            similarity_score=0.68,
+        )
+
+        preview = ExtractionPreview(
+            journal_date=date(2025, 1, 15),
+            knowledge_blocks=[kb1, kb2],
+            proposed_actions=[action1, action2],
+            warnings=[],
+        )
+
+        output = preview.display()
+
+        # Both similarity scores should appear
+        assert "0.92" in output or "92%" in output
+        assert "0.68" in output or "68%" in output
+
+    def test_display_skipped_action_with_score(self):
+        """Test that skipped actions still show similarity score."""
+        kb = KnowledgeBlock(
+            content="Duplicate content",
+            source_date=date(2025, 1, 15),
+            confidence=0.8,
+            target_page="Target Page",
+            target_section=None,
+            suggested_action=ActionType.ADD_CHILD,
+        )
+
+        action = ProposedAction(
+            knowledge=kb,
+            status=ActionStatus.SKIPPED,
+            reason="Duplicate detected",
+            similarity_score=0.78,
+        )
+
+        preview = ExtractionPreview(
+            journal_date=date(2025, 1, 15),
+            knowledge_blocks=[kb],
+            proposed_actions=[action],
+            warnings=[],
+        )
+
+        output = preview.display()
+
+        assert "SKIPPED" in output
+        assert "Duplicate detected" in output
+        # Score should still be shown even for skipped
+        assert "0.78" in output or "78%" in output
+
+    def test_display_without_similarity_score(self):
+        """Test that preview works when similarity_score is None."""
+        kb = KnowledgeBlock(
+            content="No RAG score",
+            source_date=date(2025, 1, 15),
+            confidence=0.9,
+            target_page="Page",
+            target_section=None,
+            suggested_action=ActionType.ADD_CHILD,
+        )
+
+        action = ProposedAction(
+            knowledge=kb,
+            status=ActionStatus.READY,
+            similarity_score=None,
+        )
+
+        preview = ExtractionPreview(
+            journal_date=date(2025, 1, 15),
+            knowledge_blocks=[kb],
+            proposed_actions=[action],
+            warnings=[],
+        )
+
+        output = preview.display()
+
+        # Should not crash when similarity_score is None
+        assert "Page" in output
+        assert "No RAG score" in output
+
+    def test_display_with_section_and_score(self):
+        """Test display with both section path and similarity score."""
+        kb = KnowledgeBlock(
+            content="Tech stack decision",
+            source_date=date(2025, 1, 15),
+            confidence=0.88,
+            target_page="Project Docs",
+            target_section=["Architecture", "Backend"],
+            suggested_action=ActionType.ADD_CHILD,
+        )
+
+        action = ProposedAction(
+            knowledge=kb,
+            status=ActionStatus.READY,
+            similarity_score=0.83,
+        )
+
+        preview = ExtractionPreview(
+            journal_date=date(2025, 1, 15),
+            knowledge_blocks=[kb],
+            proposed_actions=[action],
+            warnings=[],
+        )
+
+        output = preview.display()
+
+        assert "Project Docs" in output
+        assert "Architecture" in output
+        assert "Backend" in output
+        assert "0.83" in output or "83%" in output
+
+    def test_display_create_section_with_score(self):
+        """Test display of CREATE_SECTION action with similarity score."""
+        kb = KnowledgeBlock(
+            content="New competitor identified",
+            source_date=date(2025, 1, 15),
+            confidence=0.85,
+            target_page="Market Analysis",
+            target_section=["Competitors"],
+            suggested_action=ActionType.CREATE_SECTION,
+        )
+
+        action = ProposedAction(
+            knowledge=kb,
+            status=ActionStatus.READY,
+            similarity_score=0.71,
+        )
+
+        preview = ExtractionPreview(
+            journal_date=date(2025, 1, 15),
+            knowledge_blocks=[kb],
+            proposed_actions=[action],
+            warnings=[],
+        )
+
+        output = preview.display()
+
+        assert "Market Analysis" in output
+        assert "create_section" in output.lower() or "CREATE_SECTION" in output
+        assert "0.71" in output or "71%" in output
