@@ -21,7 +21,7 @@ This document breaks down the implementation into executable tasks organized by 
 - **Phase 1 (Setup)**: 5 tasks ✅ COMPLETE
 - **Phase 2 (Foundational)**: 11 tasks ✅ COMPLETE
 - **Phase 2.5 (Testing - Foundational)**: 10 tasks ✅ COMPLETE
-- **Phase 3 (User Story 1)**: 12 tasks (8/12 complete - T017-T024 ✅)
+- **Phase 3 (User Story 1)**: 16 tasks (12/16 complete - T017-T028 ✅)
 - **Phase 3.5 (Testing - LLM Integration)**: 7 tasks
 - **Phase 4 (User Story 2)**: 11 tasks
 - **Phase 4.5 (Testing - Integration Safety)**: 9 tasks
@@ -32,7 +32,7 @@ This document breaks down the implementation into executable tasks organized by 
 
 **Parallel Execution Opportunities**: 42 tasks marked [P] can run in parallel within their phase
 
-**Current Progress**: 34/81 tasks complete (42%)
+**Current Progress**: 38/81 tasks complete (47%)
 
 ## Dependencies
 
@@ -45,7 +45,7 @@ Phase 2 (Foundational - models, parsing, RAG index) ✅ COMPLETE
   ↓
 Phase 2.5 (Testing - Foundational) ✅ COMPLETE
   ↓
-Phase 3 (User Story 1 - P1) ← IN PROGRESS (8/12 tasks complete)
+Phase 3 (User Story 1 - P1) ← IN PROGRESS (12/16 tasks complete)
   ↓
 Phase 3.5 (Testing - LLM Integration)
   ↓
@@ -290,15 +290,15 @@ pytest tests/ -v
 
 - [X] T024 [P] [US1] Implement duplicate detection in src/logsqueak/extraction/extractor.py using content_hash() comparison against target page content
 
-- [ ] T025 [P] [US1] Implement 2000-line limit enforcement in src/logsqueak/models/journal.py load() method with truncation warning logging
+- [X] T025 [P] [US1] Implement 2000-line limit enforcement in src/logsqueak/models/journal.py load() method with truncation warning logging
 
-- [ ] T026 [P] [US1] Implement malformed entry handling in src/logsqueak/models/journal.py with try/except, warning log, and graceful skip
+- [X] T026 [P] [US1] Implement malformed entry handling in src/logsqueak/models/journal.py with try/except, warning log, and graceful skip
 
 #### Preview Display (Depends on Extraction Logic)
 
-- [ ] T027 [US1] Implement preview formatter in src/logsqueak/models/preview.py display() method showing knowledge blocks, target pages with similarity scores, actions, and warnings
+- [X] T027 [US1] Implement preview formatter in src/logsqueak/models/preview.py display() method showing knowledge blocks, target pages with similarity scores, actions, and warnings
 
-- [ ] T028 [US1] Implement progress feedback in src/logsqueak/cli/main.py to show index building status, extraction progress, and matching progress per SC-001
+- [X] T028 [US1] Implement progress feedback in src/logsqueak/cli/progress.py to show index building status, extraction progress, and matching progress per SC-001
 
 - [ ] T029 [US1] Wire up extract command in src/logsqueak/cli/main.py to load journal, build PageIndex (with cache), run extraction, display preview, exit without modifying files (dry-run)
 
