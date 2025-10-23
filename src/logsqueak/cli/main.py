@@ -138,6 +138,38 @@ def match_knowledge_to_pages(
             )
             continue
 
+        # Check if target section exists (if specified and action is add_child)
+        if (
+            selection.target_section
+            and selection.suggested_action == ActionType.ADD_CHILD
+        ):
+            # Try to find the first section in the path
+            section = target_page.find_section(selection.target_section[0])
+            if not section:
+                # Section doesn't exist and we're not creating it
+                section_path = " > ".join(selection.target_section)
+                warnings.append(
+                    f"Section '{section_path}' not found on page '{selection.target_page}'"
+                )
+                proposed_actions.append(
+                    ProposedAction(
+                        knowledge=create_knowledge_block(
+                            extraction,
+                            journal_date,
+                            selection.target_page,
+                            selection.target_section,
+                            selection.suggested_action,
+                        ),
+                        status=ActionStatus.SKIPPED,
+                        reason=f"Section '{section_path}' does not exist (consider using CREATE_SECTION)",
+                        similarity_score=similarity_score,
+                    )
+                )
+                progress.show_matching_progress(
+                    i, len(knowledge_extractions), selection.target_page, similarity_score, extraction.content
+                )
+                continue
+
         # Check for duplicates (FR-017, T024)
         if extractor.is_duplicate(extraction.content, target_page):
             progress.show_duplicate_skipped(i, len(knowledge_extractions), selection.target_page, extraction.content)
