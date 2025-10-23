@@ -69,8 +69,10 @@ def build_page_index(graph_path: Path, ctx: click.Context) -> PageIndex:
         page_index = PageIndex.build(graph_path)
 
         duration = time.time() - start_time
-        # Count cached vs newly embedded (for now, just show totals)
-        progress.show_index_built(len(page_files), duration, 0, len(page_files))
+        # Show cache statistics
+        cached_count = getattr(page_index, "cached_count", 0)
+        computed_count = getattr(page_index, "computed_count", len(page_files))
+        progress.show_index_built(len(page_files), duration, cached_count, computed_count)
 
         return page_index
     except Exception as e:
@@ -202,11 +204,16 @@ def process_journal_date(
     try:
         # Load journal entry
         progress.show_processing_journal(journal_date.isoformat())
-        journal = JournalEntry.load(graph_path, journal_date)
 
-        if not journal:
+        # Get journal file path from graph
+        graph_paths = GraphPaths(graph_path)
+        journal_file = graph_paths.get_journal_path(journal_date.strftime("%Y_%m_%d"))
+
+        if not journal_file.exists():
             progress.show_warning(f"No journal entry found for {journal_date.isoformat()}")
             return
+
+        journal = JournalEntry.load(journal_file)
 
         # Stage 1: Extract knowledge blocks
         progress.show_extracting_knowledge(model)

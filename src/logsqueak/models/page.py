@@ -164,6 +164,8 @@ class PageIndex:
         pages = []
         page_texts = []
         embeddings_list = []
+        cached_count = 0
+        computed_count = 0
 
         page_files = list(pages_dir.glob("*.md"))
         logger.info(f"Building page index for {len(page_files)} pages...")
@@ -185,11 +187,13 @@ class PageIndex:
 
             if cached_embedding is not None:
                 embeddings_list.append(cached_embedding)
+                cached_count += 1
             else:
                 # Cache miss - compute and save
                 embedding = model.encode(page_text, convert_to_numpy=True)
                 cls._save_embedding(cache_dir, page_file, embedding, page_text)
                 embeddings_list.append(embedding)
+                computed_count += 1
 
         # Stack into matrix
         if embeddings_list:
@@ -197,15 +201,21 @@ class PageIndex:
         else:
             embeddings = np.array([])
 
-        logger.info(f"✓ Indexed {len(pages)} pages")
+        logger.info(
+            f"✓ Indexed {len(pages)} pages ({cached_count} cached, {computed_count} computed)"
+        )
 
-        return cls(
+        index = cls(
             pages=pages,
             embeddings=embeddings,
             model=model,
             page_texts=page_texts,
             cache_dir=cache_dir,
         )
+        # Store stats as attributes for CLI reporting
+        index.cached_count = cached_count  # type: ignore
+        index.computed_count = computed_count  # type: ignore
+        return index
 
     @staticmethod
     def _load_cached_embedding(
