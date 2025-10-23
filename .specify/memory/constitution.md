@@ -37,13 +37,15 @@ Keep it simple. Prefer file-based I/O over databases. Use JSON for structured LL
 
 ### Commit Messages
 
-All git commit messages created by AI coding assistants MUST include a trailing line:
+AI coding assistants MUST follow this commit workflow:
 
-```
-Assisted-by: Claude Code
-```
+1. **Pre-commit review required**: Before creating any commit, the AI MUST present the proposed commit message to the user for review and approval
+2. **Attribution required**: All git commit messages created by AI coding assistants MUST include a trailing line:
+   ```
+   Assisted-by: Claude Code
+   ```
 
-This ensures clear attribution of AI-assisted work.
+This ensures clear attribution of AI-assisted work and gives the user final control over what enters the git history.
 
 ### User Approval Gates
 
@@ -69,4 +71,4 @@ This constitution defines the architectural and operational principles for Logsq
 
 **Compliance**: All feature specifications and implementation plans should reference these principles. Constitution violations must be explicitly justified in the plan's Complexity Tracking section.
 
-**Version**: 1.0.0 | **Ratified**: 2025-10-22 | **Last Amended**: 2025-10-22
+**Version**: 1.1.0 | **Ratified**: 2025-10-22 | **Last Amended**: 2025-10-23
