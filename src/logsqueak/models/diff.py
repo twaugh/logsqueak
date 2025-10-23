@@ -37,6 +37,10 @@ def simulate_integration(
         # Navigate to the target section
         current_block = None
         for section_name in knowledge.target_section:
+            # Skip None values (LLM may return them)
+            if section_name is None:
+                continue
+
             if current_block is None:
                 # Search at root level
                 current_block = modified_outline.find_heading(section_name)
