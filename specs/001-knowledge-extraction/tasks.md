@@ -398,17 +398,17 @@ logsqueak extract 2025-01-15  # Shows preview, no changes
 
 - [X] T035 [US2] Implement integration orchestrator in src/logsqueak/integration/integrator.py to coordinate adding knowledge to pages per ProposedAction list
 
-- [ ] T036 [P] [US2] Implement page matcher in src/logsqueak/integration/matcher.py to use TargetPage.find_section() for locating target sections in outline hierarchy
+- [X] T036 [P] [US2] Implement page matcher in src/logsqueak/integration/writer.py to use TargetPage.find_section() for locating target sections in outline hierarchy
 
-- [ ] T037 [P] [US2] Implement provenance link writer in src/logsqueak/integration/writer.py using KnowledgeBlock.with_provenance() to append [[date]] links per FR-003
+- [X] T037 [P] [US2] Implement provenance link writer in src/logsqueak/integration/writer.py using KnowledgeBlock.with_provenance() to append [[date]] links per FR-003
 
-- [ ] T038 [P] [US2] Implement child bullet addition in src/logsqueak/integration/writer.py using LogseqBlock.add_child(content, position) with targeted placement logic
+- [X] T038 [P] [US2] Implement child bullet addition in src/logsqueak/integration/writer.py using LogseqBlock.add_child(content, position) with targeted placement logic
 
-- [ ] T039 [P] [US2] Implement fallback logic in src/logsqueak/integration/writer.py to add knowledge at page end when no clear section match exists per acceptance scenario
+- [X] T039 [P] [US2] Implement fallback logic in src/logsqueak/integration/writer.py to add knowledge at page end when no clear section match exists per acceptance scenario
 
 #### File Writing & Safety (Depends on Integration Logic)
 
-- [ ] T040 [US2] Implement safe file writing in src/logsqueak/integration/writer.py using LogseqOutline.render() to preserve property order and structure per FR-008
+- [X] T040 [US2] Implement safe file writing in src/logsqueak/integration/writer.py using LogseqOutline.render() to preserve property order and structure per FR-008
 
 - [ ] T041 [US2] Implement PageIndex refresh in src/logsqueak/integration/integrator.py to call refresh() method after modifying pages to update embeddings
 

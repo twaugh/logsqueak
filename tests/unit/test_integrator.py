@@ -193,13 +193,14 @@ class TestIntegrator:
 
         integrator = Integrator(graph_path)
 
-        # Integration will fail when trying to add knowledge (not yet implemented)
-        # but the orchestration logic should work up to that point
+        # Dry run modifies pages in memory but doesn't write to disk
         result = integrator.integrate([sample_proposed_action], dry_run=True)
 
-        # Should report the action as skipped due to error
-        assert result.actions_skipped == 1
-        assert len(result.errors) > 0
+        # Should successfully apply action in memory
+        assert result.actions_applied == 1
+        assert result.actions_skipped == 0
+        # But file shouldn't be written in dry-run mode
+        assert not result.modified_pages
 
     def test_integrate_skips_non_ready_actions(self, tmp_path):
         """Test that non-READY actions are skipped."""

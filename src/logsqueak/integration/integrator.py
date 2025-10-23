@@ -8,6 +8,7 @@ safe file writing.
 from pathlib import Path
 from typing import List, Optional
 
+from logsqueak.integration import writer
 from logsqueak.models.knowledge import ActionType, KnowledgeBlock
 from logsqueak.models.page import PageIndex, TargetPage
 from logsqueak.models.preview import ActionStatus, ProposedAction
@@ -170,25 +171,17 @@ class Integrator:
     ) -> None:
         """Add knowledge block to target page.
 
-        This is a placeholder that will delegate to the writer module
-        (T037, T038, T039) once those are implemented.
+        Delegates to writer module which handles:
+        - Finding target section (T036)
+        - Adding provenance links (T037)
+        - Adding child bullets (T038)
+        - Fallback to page end (T039)
 
         Args:
             target_page: Page to add knowledge to
             knowledge: Knowledge block to add
-
-        Raises:
-            NotImplementedError: Until writer module is implemented
         """
-        # TODO: Implement in writer module (T037-T039)
-        # Will handle:
-        # - Finding target section (T036)
-        # - Adding provenance links (T037)
-        # - Adding child bullets (T038)
-        # - Fallback to page end (T039)
-        raise NotImplementedError(
-            "Knowledge addition will be implemented in writer module"
-        )
+        writer.add_knowledge_to_page(target_page, knowledge)
 
     def _write_page(self, target_page: TargetPage) -> None:
         """Write modified page to disk safely.
@@ -199,9 +192,7 @@ class Integrator:
         Raises:
             IOError: If write fails
         """
-        # TODO: Implement safe file writing (T040)
-        # Will use LogseqOutline.render() to preserve structure
-        raise NotImplementedError("Safe file writing will be implemented in T040")
+        writer.write_page_safely(target_page)
 
     def _refresh_index(self, page_names: List[str]) -> None:
         """Refresh PageIndex embeddings for modified pages.
