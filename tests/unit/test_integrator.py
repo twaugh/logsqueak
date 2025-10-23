@@ -243,3 +243,63 @@ class TestIntegrator:
         assert result.actions_skipped == 1
         assert len(result.errors) > 0
         assert "not found" in result.errors[0].lower()
+
+    def test_refresh_index_called_after_write(self, tmp_path, sample_proposed_action):
+        """Test that PageIndex is refreshed after writing pages."""
+        graph_path = tmp_path
+        pages_dir = graph_path / "pages"
+        pages_dir.mkdir()
+
+        # Create target page
+        page_file = pages_dir / "Project Architecture.md"
+        page_file.write_text("- ## Tech Stack\n  - Placeholder")
+
+        # Create mock page index
+        mock_index = Mock(spec=PageIndex)
+
+        integrator = Integrator(graph_path, page_index=mock_index)
+
+        # Run integration with dry_run=False to trigger write and refresh
+        result = integrator.integrate([sample_proposed_action], dry_run=False)
+
+        # Verify refresh was called for the modified page
+        mock_index.refresh.assert_called_once_with("Project Architecture")
+
+    def test_refresh_index_not_called_in_dry_run(self, tmp_path, sample_proposed_action):
+        """Test that PageIndex is not refreshed in dry-run mode."""
+        graph_path = tmp_path
+        pages_dir = graph_path / "pages"
+        pages_dir.mkdir()
+
+        page_file = pages_dir / "Project Architecture.md"
+        page_file.write_text("- ## Tech Stack\n  - Placeholder")
+
+        mock_index = Mock(spec=PageIndex)
+        integrator = Integrator(graph_path, page_index=mock_index)
+
+        # Dry run should not refresh index
+        result = integrator.integrate([sample_proposed_action], dry_run=True)
+
+        # Refresh should not be called in dry-run mode
+        mock_index.refresh.assert_not_called()
+
+    def test_refresh_index_handles_errors_gracefully(self, tmp_path, sample_proposed_action):
+        """Test that refresh errors don't fail the integration."""
+        graph_path = tmp_path
+        pages_dir = graph_path / "pages"
+        pages_dir.mkdir()
+
+        page_file = pages_dir / "Project Architecture.md"
+        page_file.write_text("- ## Tech Stack\n  - Placeholder")
+
+        mock_index = Mock(spec=PageIndex)
+        mock_index.refresh.side_effect = Exception("Refresh failed")
+
+        integrator = Integrator(graph_path, page_index=mock_index)
+
+        # Should complete successfully even if refresh fails
+        result = integrator.integrate([sample_proposed_action], dry_run=False)
+
+        # Integration should still succeed
+        assert result.actions_applied == 1
+        assert "Project Architecture" in result.modified_pages

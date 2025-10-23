@@ -197,12 +197,20 @@ class Integrator:
     def _refresh_index(self, page_names: List[str]) -> None:
         """Refresh PageIndex embeddings for modified pages.
 
+        Called after writing pages to keep the index current for
+        subsequent extractions in the same session.
+
         Args:
             page_names: List of page names that were modified
         """
         if not self.page_index:
             return
 
-        # TODO: Implement in T041
-        # Will call page_index.refresh() for each modified page
-        pass
+        # Refresh embedding for each modified page
+        for page_name in page_names:
+            try:
+                self.page_index.refresh(page_name)
+            except Exception as e:
+                # Log error but don't fail the integration
+                # Index will be stale but extraction still succeeded
+                print(f"Warning: Failed to refresh index for {page_name}: {e}")

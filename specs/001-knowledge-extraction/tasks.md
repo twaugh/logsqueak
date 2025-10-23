@@ -410,7 +410,7 @@ logsqueak extract 2025-01-15  # Shows preview, no changes
 
 - [X] T040 [US2] Implement safe file writing in src/logsqueak/integration/writer.py using LogseqOutline.render() to preserve property order and structure per FR-008
 
-- [ ] T041 [US2] Implement PageIndex refresh in src/logsqueak/integration/integrator.py to call refresh() method after modifying pages to update embeddings
+- [X] T041 [US2] Implement PageIndex refresh in src/logsqueak/integration/integrator.py to call refresh() method after modifying pages to update embeddings
 
 - [ ] T042 [US2] Wire up normal (non-dry-run) mode in src/logsqueak/cli/main.py to show preview, wait for approval, then call integrator to write changes (--dry-run flag skips approval and writing)
 
