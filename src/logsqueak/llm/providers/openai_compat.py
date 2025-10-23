@@ -227,8 +227,8 @@ class OpenAICompatibleProvider(LLMClient):
             # Parse JSON response
             data = self._parse_json_response(response)
 
-            # Validate structure
-            required_fields = ["target_page", "suggested_action", "reasoning"]
+            # Validate required structure
+            required_fields = ["target_page", "suggested_action"]
             for field in required_fields:
                 if field not in data:
                     raise LLMResponseError(f"Response missing '{field}' field")
@@ -247,7 +247,7 @@ class OpenAICompatibleProvider(LLMClient):
                 target_page=data["target_page"],
                 target_section=data.get("target_section"),
                 suggested_action=suggested_action,
-                reasoning=data["reasoning"],
+                reasoning=data.get("reasoning", ""),  # Optional for smaller models
             )
 
         except httpx.TimeoutException as e:
