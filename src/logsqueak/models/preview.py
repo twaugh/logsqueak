@@ -75,16 +75,17 @@ class ProposedAction:
         from logsqueak.models.diff import generate_unified_diff
         from logsqueak.integration import writer
         from unittest.mock import Mock
+        import copy
 
         kb = self.knowledge
 
         # Create a copy of the page outline
         original_outline = target_page.outline
 
-        # Create temporary page with copied outline
+        # Create temporary page with deep-copied outline
         temp_page = Mock()
         temp_page.outline = LogseqOutline(
-            blocks=[b for b in original_outline.blocks],  # shallow copy of blocks
+            blocks=copy.deepcopy(original_outline.blocks),  # deep copy to avoid modifying original
             source_text=original_outline.source_text,
             frontmatter=original_outline.frontmatter[:] if original_outline.frontmatter else [],
             indent_str=original_outline.indent_str,
