@@ -60,10 +60,12 @@ class LogseqOutline:
     Attributes:
         blocks: Top-level blocks in document
         source_text: Original markdown for debugging
+        indent_str: Indentation string (detected from source, default "  ")
     """
 
     blocks: list[LogseqBlock]
     source_text: str
+    indent_str: str = "  "  # Default to 2 spaces
 
     @classmethod
     def parse(cls, markdown: str) -> "LogseqOutline":
@@ -89,9 +91,14 @@ class LogseqOutline:
             return cls(blocks=[], source_text=markdown)
 
         lines = markdown.split("\n")
-        blocks = _parse_blocks(lines)
 
-        return cls(blocks=blocks, source_text=markdown)
+        # Detect indentation style from source first
+        indent_str = _detect_indentation(lines)
+
+        # Parse blocks using the detected indentation
+        blocks = _parse_blocks(lines, indent_str)
+
+        return cls(blocks=blocks, source_text=markdown, indent_str=indent_str)
 
     def find_heading(self, text: str) -> Optional[LogseqBlock]:
         """Recursively search for heading containing text.
@@ -135,7 +142,8 @@ class LogseqOutline:
                 lines.append(block._original_line)
             else:
                 # Render block (possibly with new children appended)
-                indent = "  " * block.indent_level
+                # Use detected indentation style
+                indent = self.indent_str * block.indent_level
                 lines.append(f"{indent}- {block.content}")
 
                 # Render children in exact order (new ones at end)
@@ -148,11 +156,12 @@ class LogseqOutline:
         return "\n".join(lines)
 
 
-def _parse_blocks(lines: list[str]) -> list[LogseqBlock]:
+def _parse_blocks(lines: list[str], indent_str: str = "  ") -> list[LogseqBlock]:
     """Parse lines into hierarchical blocks.
 
     Args:
         lines: Markdown lines
+        indent_str: Indentation string (e.g., "  ", "\t", "    ")
 
     Returns:
         List of root-level blocks
@@ -168,9 +177,9 @@ def _parse_blocks(lines: list[str]) -> list[LogseqBlock]:
         if not line.lstrip().startswith("- "):
             continue
 
-        # Calculate indent level (2 spaces = 1 level)
-        leading_spaces = len(line) - len(line.lstrip())
-        indent_level = leading_spaces // 2
+        # Calculate indent level based on indent_str
+        leading_whitespace = line[: len(line) - len(line.lstrip())]
+        indent_level = leading_whitespace.count(indent_str)
 
         # Extract content (after "- ")
         content = line.lstrip()[2:]  # Skip "- "
@@ -203,3 +212,44 @@ def _parse_blocks(lines: list[str]) -> list[LogseqBlock]:
                 stack = [block]
 
     return root_blocks
+
+
+def _detect_indentation(lines: list[str]) -> str:
+    """Detect indentation style from markdown lines.
+
+    Looks for the first level-1 indented bullet (smallest indent).
+    Falls back to 2 spaces if no indented bullets found.
+
+    Args:
+        lines: Lines of markdown
+
+    Returns:
+        Indentation string (e.g., "  ", "    ", "\t")
+    """
+    # Collect all leading whitespace from indented bullets
+    indents = []
+
+    for line in lines:
+        # Skip empty lines
+        if not line or not line.strip():
+            continue
+
+        # Only look at bullet lines
+        if not line.lstrip().startswith("-"):
+            continue
+
+        # Check if line has leading whitespace
+        stripped = line.lstrip()
+        if line != stripped:
+            # Found an indented line - extract leading whitespace
+            leading_whitespace = line[: len(line) - len(stripped)]
+            indents.append(leading_whitespace)
+
+    if not indents:
+        # No indented lines found, default to 2 spaces
+        return "  "
+
+    # Find the shortest indentation (this is our indent unit)
+    # This handles cases where we might have multi-level indents
+    shortest = min(indents, key=len)
+    return shortest
