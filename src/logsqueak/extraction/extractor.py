@@ -8,9 +8,15 @@ This module implements the two-stage extraction process:
 from datetime import date
 from typing import List
 
-from logsqueak.llm.client import ExtractionResult, LLMClient
+from logsqueak.llm.client import (
+    ExtractionResult,
+    LLMClient,
+    PageCandidate,
+    PageSelectionResult,
+)
 from logsqueak.models.journal import JournalEntry
 from logsqueak.models.knowledge import ActionType, KnowledgeBlock
+from logsqueak.models.page import PageIndex
 
 
 class Extractor:
@@ -55,6 +61,49 @@ class Extractor:
         )
 
         return results
+
+    def select_target_page(
+        self, knowledge_content: str, page_index: PageIndex
+    ) -> PageSelectionResult:
+        """Select target page and section for knowledge (Stage 2).
+
+        This is the second stage of the two-stage extraction process.
+        Uses RAG to find top-5 semantically similar pages, then LLM
+        selects the best match with section and action.
+
+        Args:
+            knowledge_content: Extracted knowledge text
+            page_index: PageIndex for RAG search
+
+        Returns:
+            Page selection result with target page, section, and action
+
+        Raises:
+            LLMError: If LLM request fails
+        """
+        # Use PageIndex to find top-5 semantically similar pages
+        similar_pages = page_index.find_similar(knowledge_content, top_k=5)
+
+        # Convert to PageCandidate format for LLM
+        candidates = []
+        for page, similarity_score in similar_pages:
+            # Get first 200 characters of page content as preview
+            preview = page.outline.render()[:200]
+            candidates.append(
+                PageCandidate(
+                    page_name=page.name,
+                    similarity_score=similarity_score,
+                    preview=preview,
+                )
+            )
+
+        # Call LLM to select best page from candidates
+        selection = self.llm_client.select_target_page(
+            knowledge_content=knowledge_content,
+            candidates=candidates,
+        )
+
+        return selection
 
 
 def create_knowledge_block(
