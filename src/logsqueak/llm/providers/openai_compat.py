@@ -21,7 +21,6 @@ from logsqueak.llm.client import (
     PageCandidate,
     PageSelectionResult,
 )
-from logsqueak.models.config import LLMConfig
 from logsqueak.models.knowledge import ActionType
 
 
@@ -34,14 +33,18 @@ class OpenAICompatibleProvider(LLMClient):
     Uses JSON mode (response_format: {type: "json_object"}) for structured outputs.
     """
 
-    def __init__(self, config: LLMConfig, timeout: float = 60.0):
+    def __init__(self, endpoint: str, api_key: str, model: str, timeout: float = 60.0):
         """Initialize the provider.
 
         Args:
-            config: LLM configuration (endpoint, API key, model)
+            endpoint: API endpoint URL
+            api_key: API authentication key
+            model: Model name to use
             timeout: Request timeout in seconds (default: 60s)
         """
-        self.config = config
+        self.endpoint = endpoint
+        self.api_key = api_key
+        self.model = model
         self.timeout = timeout
         self.client = httpx.Client(timeout=timeout)
 
@@ -270,13 +273,13 @@ class OpenAICompatibleProvider(LLMClient):
             httpx exceptions on network/API errors
         """
         # Construct API endpoint URL
-        endpoint = str(self.config.endpoint).rstrip("/")
+        endpoint = str(self.endpoint).rstrip("/")
         if not endpoint.endswith("/chat/completions"):
             endpoint = f"{endpoint}/chat/completions"
 
         # Build request payload
         payload = {
-            "model": self.config.model,
+            "model": self.model,
             "messages": messages,
             "response_format": {"type": "json_object"},
             "temperature": 0.7,
@@ -287,7 +290,7 @@ class OpenAICompatibleProvider(LLMClient):
             endpoint,
             json=payload,
             headers={
-                "Authorization": f"Bearer {self.config.api_key}",
+                "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             },
         )

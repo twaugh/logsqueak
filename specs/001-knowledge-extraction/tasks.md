@@ -333,9 +333,9 @@ logsqueak extract 2025-01-15  # Shows preview, no changes
 
 #### LLM Client Tests (Parallel Group 1)
 
-- [ ] T032a [P] [Test] Create tests/unit/test_llm_client.py (15 tests) - Mock LLM responses, JSON parsing, error handling (network errors, invalid JSON, rate limits, API key validation)
+- [X] T032a [P] [Test] Create tests/unit/test_llm_client.py (15 tests) - Mock LLM responses, JSON parsing, error handling (network errors, invalid JSON, rate limits, API key validation)
 
-- [ ] T032b [P] [Test] Create tests/unit/test_openai_provider.py (12 tests) - OpenAI-compatible provider with mocked httpx responses, JSON mode validation, request formatting
+- [X] T032b [P] [Test] Create tests/unit/test_openai_provider.py (12 tests) - OpenAI-compatible provider with mocked httpx responses, JSON mode validation, request formatting
 
 #### Extraction Workflow Tests (Parallel Group 2)
 
