@@ -58,12 +58,13 @@ class Extractor:
         results = self.llm_client.extract_knowledge(
             journal_content=journal.raw_content,
             journal_date=journal.date,
+            indent_str=journal.outline.indent_str,
         )
 
         return results
 
     def select_target_page(
-        self, knowledge_content: str, page_index: PageIndex
+        self, knowledge_content: str, page_index: PageIndex, indent_str: str = "  "
     ) -> PageSelectionResult:
         """Select target page and section for knowledge (Stage 2).
 
@@ -74,6 +75,7 @@ class Extractor:
         Args:
             knowledge_content: Extracted knowledge text
             page_index: PageIndex for RAG search
+            indent_str: Indentation string from source (e.g., "  ", "\t")
 
         Returns:
             Page selection result with target page, section, and action
@@ -103,6 +105,7 @@ class Extractor:
         selection = self.llm_client.select_target_page(
             knowledge_content=knowledge_content,
             candidates=candidates,
+            indent_str=indent_str,
         )
 
         return selection

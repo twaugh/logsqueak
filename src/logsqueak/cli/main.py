@@ -16,6 +16,7 @@ from logsqueak.cli import progress
 from logsqueak.config.loader import load_config
 from logsqueak.extraction.classifier import classify_extractions
 from logsqueak.extraction.extractor import Extractor, create_knowledge_block
+from logsqueak.llm.prompt_logger import PromptLogger
 from logsqueak.llm.providers.openai_compat import OpenAICompatibleProvider
 from logsqueak.logseq.graph import GraphPaths
 from logsqueak.models.journal import JournalEntry
@@ -87,6 +88,7 @@ def match_knowledge_to_pages(
     page_index: PageIndex,
     graph_path: Path,
     journal_date: date,
+    indent_str: str = "  ",
 ) -> tuple[list[ProposedAction], list[str]]:
     """Match extracted knowledge to target pages using RAG.
 
@@ -97,6 +99,7 @@ def match_knowledge_to_pages(
         page_index: PageIndex for RAG search
         graph_path: Path to Logseq graph
         journal_date: Journal date for provenance
+        indent_str: Indentation string from journal (e.g., "  ", "\t")
 
     Returns:
         Tuple of (proposed_actions, warnings)
@@ -106,8 +109,10 @@ def match_knowledge_to_pages(
     total_extractions = len(knowledge_extractions) + len(activity_logs)
 
     for i, extraction in enumerate(knowledge_extractions, 1):
-        # Find target page using RAG
-        selection = extractor.select_target_page(extraction.content, page_index)
+        # Find target page using RAG (using journal's indentation style)
+        selection = extractor.select_target_page(
+            extraction.content, page_index, indent_str=indent_str
+        )
 
         # Get the top similarity score for progress display
         similar_pages = page_index.find_similar(extraction.content, top_k=1)
@@ -269,6 +274,7 @@ def process_journal_date(
             page_index,
             graph_path,
             journal_date,
+            indent_str=journal.outline.indent_str,
         )
 
         # Display preview (T027)
@@ -307,6 +313,16 @@ def process_journal_date(
     help="Show diffs of proposed changes in preview",
 )
 @click.option(
+    "--inspect-prompts",
+    is_flag=True,
+    help="Inspect all LLM prompts and responses (logs to stderr)",
+)
+@click.option(
+    "--prompt-log-file",
+    type=click.Path(path_type=Path),
+    help="Save prompt inspection logs to file (requires --inspect-prompts)",
+)
+@click.option(
     "--model",
     type=str,
     help="Override LLM model (default: from config)",
@@ -322,6 +338,8 @@ def extract(
     date_or_range: str,
     dry_run: bool,
     show_diffs: bool,
+    inspect_prompts: bool,
+    prompt_log_file: Optional[Path],
     model: Optional[str],
     graph: Optional[Path],
 ):
@@ -339,9 +357,17 @@ def extract(
     """
     verbose = ctx.obj["verbose"]
 
+    # Validate prompt logging options
+    if prompt_log_file and not inspect_prompts:
+        click.echo("Error: --prompt-log-file requires --inspect-prompts", err=True)
+        ctx.exit(1)
+
     if verbose:
         click.echo(f"Date/range: {date_or_range}")
         click.echo(f"Dry-run: {dry_run}")
+        click.echo(f"Inspect prompts: {inspect_prompts}")
+        if prompt_log_file:
+            click.echo(f"Prompt log file: {prompt_log_file}")
         if model:
             click.echo(f"Model override: {model}")
         if graph:
@@ -379,11 +405,25 @@ def extract(
     if verbose:
         click.echo(f"Processing dates: {[d.isoformat() for d in dates]}")
 
+    # Set up prompt logger if requested
+    prompt_logger = None
+    if inspect_prompts:
+        if verbose:
+            click.echo("Prompt inspection enabled - logging to stderr")
+        prompt_logger = PromptLogger(
+            log_file=prompt_log_file,
+            include_timestamps=True,
+            pretty_print=True,
+        )
+        if prompt_log_file:
+            click.echo(f"Prompt logs will be saved to: {prompt_log_file}")
+
     # Initialize LLM client and extractor
     llm_client = OpenAICompatibleProvider(
         endpoint=config.llm.endpoint,
         api_key=config.llm.api_key,
         model=config.llm.model,
+        prompt_logger=prompt_logger,
     )
     extractor = Extractor(llm_client)
 
@@ -401,6 +441,10 @@ def extract(
             verbose,
             show_diffs,
         )
+
+    # Log summary if prompt inspection was enabled
+    if prompt_logger:
+        prompt_logger.log_summary()
 
 
 def parse_date_or_range(date_str: str) -> list[date]:

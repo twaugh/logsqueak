@@ -7,7 +7,7 @@ using httpx for HTTP requests and JSON mode for structured outputs.
 import json
 from datetime import date
 from textwrap import dedent
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -21,6 +21,7 @@ from logsqueak.llm.client import (
     PageCandidate,
     PageSelectionResult,
 )
+from logsqueak.llm.prompt_logger import PromptLogger
 from logsqueak.models.knowledge import ActionType
 
 
@@ -33,7 +34,14 @@ class OpenAICompatibleProvider(LLMClient):
     Uses JSON mode (response_format: {type: "json_object"}) for structured outputs.
     """
 
-    def __init__(self, endpoint: str, api_key: str, model: str, timeout: float = 60.0):
+    def __init__(
+        self,
+        endpoint: str,
+        api_key: str,
+        model: str,
+        timeout: float = 60.0,
+        prompt_logger: Optional[PromptLogger] = None,
+    ):
         """Initialize the provider.
 
         Args:
@@ -41,11 +49,13 @@ class OpenAICompatibleProvider(LLMClient):
             api_key: API authentication key
             model: Model name to use
             timeout: Request timeout in seconds (default: 60s)
+            prompt_logger: Optional logger for prompts and responses
         """
         self.endpoint = endpoint
         self.api_key = api_key
         self.model = model
         self.timeout = timeout
+        self.prompt_logger = prompt_logger
         self.client = httpx.Client(timeout=timeout)
 
     def __del__(self):
@@ -54,13 +64,14 @@ class OpenAICompatibleProvider(LLMClient):
             self.client.close()
 
     def extract_knowledge(
-        self, journal_content: str, journal_date: date
+        self, journal_content: str, journal_date: date, indent_str: str = "  "
     ) -> List[ExtractionResult]:
         """Extract knowledge blocks from journal entry (Stage 1).
 
         Args:
             journal_content: Full text of journal entry
             journal_date: Date of the journal entry
+            indent_str: Indentation string detected from source (e.g., "  ", "\t")
 
         Returns:
             List of extracted knowledge blocks with confidence scores
@@ -68,10 +79,19 @@ class OpenAICompatibleProvider(LLMClient):
         Raises:
             LLMError: If API request fails or returns invalid response
         """
-        system_prompt = dedent("""
+        # Describe the indentation style for the LLM
+        indent_desc = repr(indent_str)  # This will show "\t" for tabs, "  " for 2 spaces, etc.
+
+        system_prompt = dedent(f"""
             You are a knowledge extraction assistant for a personal knowledge management system.
 
             Your task is to identify pieces of information with lasting value from journal entries.
+
+            FORMAT: The journal entries are in Logseq-flavored Markdown with these conventions:
+            - Bullets start with "- " and can be nested with indentation
+            - Page links use [[Page Name]] syntax
+            - Properties use key:: value syntax
+            - Indentation uses {indent_desc} per level to indicate hierarchy
 
             EXTRACT knowledge like:
             - Key decisions and rationale
@@ -109,37 +129,48 @@ class OpenAICompatibleProvider(LLMClient):
             4. The extracted knowledge should be self-contained and clear
 
             Return a JSON object with this structure:
-            {
+            {{
               "knowledge_blocks": [
-                {
+                {{
                   "content": "The extracted knowledge text with parent context",
                   "confidence": 0.85
-                }
+                }}
               ]
-            }
+            }}
 
             Confidence score (0.0-1.0) indicates how certain you are this is lasting knowledge vs. activity log.
             Use confidence < 0.5 for borderline cases.
         """).strip()
 
-        user_prompt = dedent(f"""
-            Journal entry from {journal_date.isoformat()}:
+        user_prompt = f"Journal entry from {journal_date.isoformat()}:\n\n{journal_content}"
 
-            {journal_content}
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
 
-            Extract knowledge blocks with lasting value.
-        """).strip()
+        # Log request if logger is enabled
+        if self.prompt_logger:
+            self.prompt_logger.log_request(
+                stage="extraction",
+                messages=messages,
+                model=self.model,
+                metadata={"journal_date": journal_date.isoformat()},
+            )
 
         try:
-            response = self._make_request(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ]
-            )
+            response = self._make_request(messages=messages)
 
             # Parse JSON response
             data = self._parse_json_response(response)
+
+            # Log successful response
+            if self.prompt_logger:
+                self.prompt_logger.log_response(
+                    stage="extraction",
+                    response=response,
+                    parsed_content=data,
+                )
 
             # Validate structure
             if "knowledge_blocks" not in data:
@@ -164,25 +195,33 @@ class OpenAICompatibleProvider(LLMClient):
             return results
 
         except httpx.TimeoutException as e:
+            if self.prompt_logger:
+                self.prompt_logger.log_response(stage="extraction", response={}, error=e)
             raise LLMTimeoutError(f"Request timeout: {e}") from e
         except httpx.HTTPStatusError as e:
+            if self.prompt_logger:
+                self.prompt_logger.log_response(stage="extraction", response={}, error=e)
             raise LLMAPIError(
                 f"API error: {e.response.status_code} - {e.response.text}",
                 status_code=e.response.status_code,
             ) from e
         except httpx.RequestError as e:
+            if self.prompt_logger:
+                self.prompt_logger.log_response(stage="extraction", response={}, error=e)
             raise LLMError(f"Network error: {e}") from e
 
     def select_target_page(
         self,
         knowledge_content: str,
         candidates: List[PageCandidate],
+        indent_str: str = "  ",
     ) -> PageSelectionResult:
         """Select best target page and section from RAG candidates (Stage 2).
 
         Args:
             knowledge_content: The extracted knowledge text
             candidates: Top-5 candidate pages from RAG search
+            indent_str: Indentation string detected from source (e.g., "  ", "\t")
 
         Returns:
             Selected target page, section path, and suggested action
@@ -190,63 +229,98 @@ class OpenAICompatibleProvider(LLMClient):
         Raises:
             LLMError: If API request fails or returns invalid response
         """
-        system_prompt = dedent("""
+        # Describe the indentation style for the LLM
+        indent_desc = repr(indent_str)
+
+        system_prompt = dedent(f"""
             You are a knowledge organization assistant for a personal knowledge base.
 
             Your task is to determine the best location for a piece of knowledge within existing pages.
 
+            FORMAT: Pages are in Logseq-flavored Markdown with these conventions:
+            - Bullets start with "- " and can be nested with indentation
+            - Page links use [[Page Name]] syntax
+            - Headings can appear as bullets (e.g., "- ## Section Name")
+            - Indentation uses {indent_desc} per level to indicate hierarchy
+
             You will receive:
-            1. A knowledge block to organize
-            2. Top 5 candidate pages (from semantic search)
+            1. Knowledge to organize (in <knowledge_to_organize> tags)
+            2. Top candidate pages from semantic search (in <candidate_pages> tags)
+
+            Each candidate includes:
+            - page_name: The name of the page
+            - similarity_score: How semantically similar it is (0.0-1.0)
+            - preview: A preview of the page content
+            - rank: Ranking by similarity (1 = most similar)
 
             You must select:
-            - Which page is most appropriate
+            - Which page is most appropriate (use the page_name)
             - Which section within that page (if applicable)
             - Whether to add as child bullet or create new section
 
             Return a JSON object with this structure:
-            {
+            {{
               "target_page": "Page Name",
               "target_section": ["Section", "Subsection"],
               "suggested_action": "add_child",
               "reasoning": "Brief explanation of your choice"
-            }
+            }}
 
             Notes:
             - target_section can be null if knowledge should go at page root
             - suggested_action must be either "add_child" or "create_section"
             - Use "add_child" when a suitable section exists
             - Use "create_section" when a new organizational section is needed
+            - Higher similarity scores indicate better semantic matches
         """).strip()
 
-        # Format candidates for prompt
-        candidates_text = []
+        # Format candidates for prompt using XML structure
+        candidates_xml = []
         for i, candidate in enumerate(candidates, 1):
-            candidates_text.append(
-                f"{i}. {candidate.page_name} (similarity: {candidate.similarity_score:.2f})\n"
-                f"   Preview: {candidate.preview}"
+            candidates_xml.append(
+                f"<candidate rank=\"{i}\">\n"
+                f"  <page_name>{candidate.page_name}</page_name>\n"
+                f"  <similarity_score>{candidate.similarity_score:.2f}</similarity_score>\n"
+                f"  <preview>\n{candidate.preview}\n  </preview>\n"
+                f"</candidate>"
             )
 
-        user_prompt = dedent(f"""
-            Knowledge to organize:
-            {knowledge_content}
+        user_prompt = (
+            f"<knowledge_to_organize>\n{knowledge_content}\n</knowledge_to_organize>\n\n"
+            f"<candidate_pages>\n{chr(10).join(candidates_xml)}\n</candidate_pages>\n\n"
+            f"Select the best page and section for this knowledge."
+        )
 
-            Candidate pages:
-            {chr(10).join(candidates_text)}
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
 
-            Select the best page and section for this knowledge.
-        """).strip()
+        # Log request if logger is enabled
+        if self.prompt_logger:
+            self.prompt_logger.log_request(
+                stage="page_selection",
+                messages=messages,
+                model=self.model,
+                metadata={
+                    "knowledge_content": knowledge_content[:200] + "..." if len(knowledge_content) > 200 else knowledge_content,
+                    "num_candidates": len(candidates),
+                },
+            )
 
         try:
-            response = self._make_request(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ]
-            )
+            response = self._make_request(messages=messages)
 
             # Parse JSON response
             data = self._parse_json_response(response)
+
+            # Log successful response
+            if self.prompt_logger:
+                self.prompt_logger.log_response(
+                    stage="page_selection",
+                    response=response,
+                    parsed_content=data,
+                )
 
             # Validate required structure
             required_fields = ["target_page", "suggested_action"]
@@ -272,13 +346,19 @@ class OpenAICompatibleProvider(LLMClient):
             )
 
         except httpx.TimeoutException as e:
+            if self.prompt_logger:
+                self.prompt_logger.log_response(stage="page_selection", response={}, error=e)
             raise LLMTimeoutError(f"Request timeout: {e}") from e
         except httpx.HTTPStatusError as e:
+            if self.prompt_logger:
+                self.prompt_logger.log_response(stage="page_selection", response={}, error=e)
             raise LLMAPIError(
                 f"API error: {e.response.status_code} - {e.response.text}",
                 status_code=e.response.status_code,
             ) from e
         except httpx.RequestError as e:
+            if self.prompt_logger:
+                self.prompt_logger.log_response(stage="page_selection", response={}, error=e)
             raise LLMError(f"Network error: {e}") from e
 
     def _make_request(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:

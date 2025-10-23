@@ -75,7 +75,7 @@ def mock_llm_client():
     ]
 
     # Stage 2: Page selection (called per knowledge block)
-    def mock_select_target_page(knowledge_content, candidates):
+    def mock_select_target_page(knowledge_content, candidates, indent_str="  "):
         if "PostgreSQL" in knowledge_content:
             return PageSelectionResult(
                 target_page="Project Architecture",

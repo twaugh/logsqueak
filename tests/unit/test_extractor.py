@@ -101,10 +101,11 @@ def test_extract_knowledge_calls_llm(extractor, mock_llm_client, sample_journal)
 
     results = extractor.extract_knowledge(sample_journal)
 
-    # Verify LLM was called with journal content and date
+    # Verify LLM was called with journal content, date, and indent string
     mock_llm_client.extract_knowledge.assert_called_once_with(
         journal_content=sample_journal.raw_content,
         journal_date=sample_journal.date,
+        indent_str=sample_journal.outline.indent_str,
     )
 
     assert len(results) == 1

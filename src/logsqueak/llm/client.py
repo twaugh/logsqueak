@@ -74,7 +74,7 @@ class LLMClient(ABC):
 
     @abstractmethod
     def extract_knowledge(
-        self, journal_content: str, journal_date: date
+        self, journal_content: str, journal_date: date, indent_str: str = "  "
     ) -> List[ExtractionResult]:
         """Extract knowledge blocks from journal entry (Stage 1).
 
@@ -84,6 +84,7 @@ class LLMClient(ABC):
         Args:
             journal_content: Full text of journal entry
             journal_date: Date of the journal entry
+            indent_str: Indentation string detected from source (e.g., "  ", "\t")
 
         Returns:
             List of extracted knowledge blocks with confidence scores
@@ -98,6 +99,7 @@ class LLMClient(ABC):
         self,
         knowledge_content: str,
         candidates: List[PageCandidate],
+        indent_str: str = "  ",
     ) -> PageSelectionResult:
         """Select best target page and section from RAG candidates (Stage 2).
 
@@ -107,6 +109,7 @@ class LLMClient(ABC):
         Args:
             knowledge_content: The extracted knowledge text
             candidates: Top-5 candidate pages from RAG search (ordered by similarity)
+            indent_str: Indentation string detected from source (e.g., "  ", "\t")
 
         Returns:
             Selected target page, section path, and suggested action
