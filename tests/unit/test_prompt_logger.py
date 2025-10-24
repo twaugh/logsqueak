@@ -248,7 +248,7 @@ class TestPromptLogger:
         assert "Total interactions: 3" in result
 
     def test_write_to_both_streams(self):
-        """Should write to both output stream and log file."""
+        """Should write to log file only when file is specified."""
         output = StringIO()
 
         with NamedTemporaryFile(mode="w", delete=False, suffix=".log") as f:
@@ -270,9 +270,9 @@ class TestPromptLogger:
             # Clean up to flush file
             del logger
 
-            # Check output stream
+            # Check output stream should be empty (file takes precedence)
             output_content = output.getvalue()
-            assert "Test message" in output_content
+            assert "Test message" not in output_content
 
             # Check log file
             with open(log_file, "r") as f:

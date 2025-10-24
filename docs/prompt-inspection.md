@@ -2,27 +2,29 @@
 
 Logsqueak provides a comprehensive prompt inspection system to help you understand and debug LLM interactions. This feature logs all prompts sent to and responses received from the LLM provider.
 
+**By default, all prompt logs are automatically saved** to timestamped files in `~/.cache/logsqueak/prompts/` for every extraction run.
+
 ## Usage
 
-### Basic Inspection (stderr)
+### Default Behavior
 
-To inspect prompts and responses during extraction, use the `--inspect-prompts` flag:
-
-```bash
-logsqueak extract --inspect-prompts 2025-01-15
-```
-
-This will output all LLM interactions to stderr in a human-readable format.
-
-### Saving to Log File
-
-To save prompt logs to a file for later analysis:
+Every extraction run automatically logs prompts to a timestamped file:
 
 ```bash
-logsqueak extract --inspect-prompts --prompt-log-file prompts.log 2025-01-15
+logsqueak extract 2025-01-15
 ```
 
-The logs will be written to both stderr and the specified file.
+This creates a log file at `~/.cache/logsqueak/prompts/YYYYMMDD_HHMMSS.log`.
+
+### Custom Log File
+
+To specify a custom log file path:
+
+```bash
+logsqueak extract --prompt-log-file /path/to/custom/prompts.log 2025-01-15
+```
+
+The logs will be written to the specified file.
 
 ## Output Format
 
@@ -68,7 +70,6 @@ Journal entry from 2025-01-15:
 Each response is logged with:
 - Interaction number (matching the request)
 - Status (Success or ERROR)
-- Raw API response (full JSON)
 - Parsed content (structured data extracted from response)
 - Error details (if applicable)
 
@@ -77,19 +78,6 @@ Example:
 [1] LLM RESPONSE - extraction
 Timestamp: 2025-10-23T15:30:47.654321
 Status: Success
-
-Raw Response:
---------------------------------------------------------------------------------
-{
-  "choices": [
-    {
-      "message": {
-        "content": "{\"knowledge_blocks\": [{\"content\": \"Insight about Y\", \"confidence\": 0.85}]}"
-      }
-    }
-  ]
-}
---------------------------------------------------------------------------------
 
 Parsed Content:
 --------------------------------------------------------------------------------
@@ -122,13 +110,13 @@ Log file: prompts.log
 
 ### Debugging LLM Behavior
 
-Inspect prompts to understand why the LLM is making certain decisions:
+Inspect prompts to understand why the LLM is making certain decisions. After running extraction:
 
 ```bash
-logsqueak extract --inspect-prompts 2025-01-15 2>/tmp/prompts.txt
+logsqueak extract 2025-01-15
 ```
 
-Then review `/tmp/prompts.txt` to see the exact prompts and responses.
+Check the automatically created log file in `~/.cache/logsqueak/prompts/` to review the exact prompts and responses.
 
 ### Prompt Engineering
 
@@ -141,23 +129,23 @@ Iterate on system prompts by inspecting what works and what doesn't:
 
 ### Auditing
 
-Keep a permanent log of all LLM interactions for audit or reproducibility:
+All LLM interactions are automatically logged for audit and reproducibility. Logs are stored in `~/.cache/logsqueak/prompts/` with timestamps.
+
+To organize logs by date, use a custom file path:
 
 ```bash
-# Append to a dated log file
 logsqueak extract \
-  --inspect-prompts \
-  --prompt-log-file ~/.cache/logsqueak/prompts-$(date +%Y-%m-%d).log \
+  --prompt-log-file ~/.cache/logsqueak/prompts/$(date +%Y-%m-%d).log \
   2025-01-15
 ```
 
 ### Performance Analysis
 
-Analyze LLM response patterns and timing:
+Analyze LLM response patterns and timing by reviewing the automatically generated prompt logs in `~/.cache/logsqueak/prompts/`:
 
 ```bash
-# Enable verbose mode and prompt inspection
-logsqueak extract --verbose --inspect-prompts 2025-01-15 2>&1 | tee analysis.log
+# Enable verbose mode for additional context
+logsqueak extract --verbose 2025-01-15
 ```
 
 ## Privacy Considerations
@@ -193,8 +181,8 @@ The prompt inspection system consists of:
    - Captures errors
 
 3. **CLI Integration** (`src/logsqueak/cli/main.py`)
-   - `--inspect-prompts` flag
-   - `--prompt-log-file` option
+   - `--prompt-log-file` option (defaults to timestamped cache file)
+   - Prompt logging always enabled
    - Automatic summary at session end
 
 ### Extending to Other Providers

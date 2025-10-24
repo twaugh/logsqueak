@@ -142,14 +142,13 @@ class PromptLogger:
         Args:
             text: Text to write
         """
-        # Write to primary output
-        self.output.write(text + "\n")
-        self.output.flush()
-
-        # Write to log file if specified
+        # Write to log file if specified, otherwise to output stream
         if self._file_handle:
             self._file_handle.write(text + "\n")
             self._file_handle.flush()
+        else:
+            self.output.write(text + "\n")
+            self.output.flush()
 
     def log_summary(self) -> None:
         """Log summary of all interactions."""

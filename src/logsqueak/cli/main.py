@@ -393,14 +393,10 @@ def process_journal_date(
     help="Show diffs of proposed changes in preview",
 )
 @click.option(
-    "--inspect-prompts",
-    is_flag=True,
-    help="Inspect all LLM prompts and responses (logs to stderr)",
-)
-@click.option(
     "--prompt-log-file",
     type=click.Path(path_type=Path),
-    help="Save prompt inspection logs to file (requires --inspect-prompts)",
+    default=None,
+    help="Path to save prompt logs (default: ~/.cache/logsqueak/prompts/TIMESTAMP.log)",
 )
 @click.option(
     "--model",
@@ -418,7 +414,6 @@ def extract(
     date_or_range: str,
     dry_run: bool,
     show_diffs: bool,
-    inspect_prompts: bool,
     prompt_log_file: Optional[Path],
     model: Optional[str],
     graph: Optional[Path],
@@ -437,17 +432,18 @@ def extract(
     """
     verbose = ctx.obj["verbose"]
 
-    # Validate prompt logging options
-    if prompt_log_file and not inspect_prompts:
-        click.echo("Error: --prompt-log-file requires --inspect-prompts", err=True)
-        ctx.exit(1)
+    # Set up default prompt log file if not specified
+    if prompt_log_file is None:
+        from datetime import datetime
+        cache_dir = Path.home() / ".cache" / "logsqueak" / "prompts"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        prompt_log_file = cache_dir / f"{timestamp}.log"
 
     if verbose:
         click.echo(f"Date/range: {date_or_range}")
         click.echo(f"Dry-run: {dry_run}")
-        click.echo(f"Inspect prompts: {inspect_prompts}")
-        if prompt_log_file:
-            click.echo(f"Prompt log file: {prompt_log_file}")
+        click.echo(f"Prompt log file: {prompt_log_file}")
         if model:
             click.echo(f"Model override: {model}")
         if graph:
@@ -485,18 +481,13 @@ def extract(
     if verbose:
         click.echo(f"Processing dates: {[d.isoformat() for d in dates]}")
 
-    # Set up prompt logger if requested
-    prompt_logger = None
-    if inspect_prompts:
-        if verbose:
-            click.echo("Prompt inspection enabled - logging to stderr")
-        prompt_logger = PromptLogger(
-            log_file=prompt_log_file,
-            include_timestamps=True,
-            pretty_print=True,
-        )
-        if prompt_log_file:
-            click.echo(f"Prompt logs will be saved to: {prompt_log_file}")
+    # Set up prompt logger (always enabled, logs to file)
+    click.echo(f"Prompt logs will be saved to: {prompt_log_file}")
+    prompt_logger = PromptLogger(
+        log_file=prompt_log_file,
+        include_timestamps=True,
+        pretty_print=True,
+    )
 
     # Initialize LLM client and extractor
     llm_client = OpenAICompatibleProvider(
