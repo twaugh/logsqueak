@@ -30,7 +30,7 @@ def mock_llm_client():
 @pytest.fixture
 def extractor(mock_llm_client):
     """Extractor instance with mocked LLM client."""
-    return Extractor(mock_llm_client)
+    return Extractor(mock_llm_client, model="gpt-4")
 
 
 @pytest.fixture

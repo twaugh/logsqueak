@@ -7,6 +7,7 @@ click>=8.1.0
 python-dateutil>=2.8.0
 sentence-transformers>=2.2.0
 numpy>=1.24.0
+tiktoken>=0.5.0
 
 # Development dependencies
 pytest>=7.4.0

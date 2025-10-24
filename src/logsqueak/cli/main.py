@@ -4,6 +4,7 @@
 This is the main entry point for the Logsqueak command-line tool.
 """
 
+import logging
 import sys
 import time
 from datetime import date, timedelta
@@ -90,6 +91,7 @@ def match_knowledge_to_pages(
     graph_path: Path,
     journal_date: date,
     indent_str: str = "  ",
+    token_budget: Optional[int] = None,
 ) -> tuple[list[ProposedAction], list[str]]:
     """Match extracted knowledge to target pages using RAG.
 
@@ -101,6 +103,7 @@ def match_knowledge_to_pages(
         graph_path: Path to Logseq graph
         journal_date: Journal date for provenance
         indent_str: Indentation string from journal (e.g., "  ", "\t")
+        token_budget: Optional token budget for Stage 2 prompts
 
     Returns:
         Tuple of (proposed_actions, warnings)
@@ -112,7 +115,10 @@ def match_knowledge_to_pages(
     for i, extraction in enumerate(knowledge_extractions, 1):
         # Find target page using RAG (using journal's indentation style)
         selection = extractor.select_target_page(
-            extraction.content, page_index, indent_str=indent_str
+            extraction.content,
+            page_index,
+            indent_str=indent_str,
+            token_budget=token_budget,
         )
 
         # Get the top similarity score for progress display
@@ -230,6 +236,7 @@ def process_journal_date(
     verbose: bool,
     show_diffs: bool = False,
     dry_run: bool = True,
+    token_budget: Optional[int] = None,
 ) -> None:
     """Process a single journal date.
 
@@ -242,6 +249,7 @@ def process_journal_date(
         verbose: Verbose output flag
         show_diffs: Show diffs in preview
         dry_run: If True, skip approval and file writes
+        token_budget: Optional token budget for Stage 2 prompts
     """
     try:
         # Load journal entry
@@ -279,6 +287,7 @@ def process_journal_date(
             graph_path,
             journal_date,
             indent_str=journal.outline.indent_str,
+            token_budget=token_budget,
         )
 
         # Display preview (T027)
@@ -432,6 +441,22 @@ def extract(
     """
     verbose = ctx.obj["verbose"]
 
+    # Configure logging based on verbose flag
+    if verbose:
+        # Verbose mode: Show INFO and DEBUG from logsqueak modules
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(levelname)s [%(name)s] %(message)s",
+            force=True,  # Override any existing config
+        )
+    else:
+        # Normal mode: Only show WARNING and ERROR
+        logging.basicConfig(
+            level=logging.WARNING,
+            format="%(levelname)s: %(message)s",
+            force=True,
+        )
+
     # Set up default prompt log file if not specified
     if prompt_log_file is None:
         from datetime import datetime
@@ -496,7 +521,7 @@ def extract(
         model=config.llm.model,
         prompt_logger=prompt_logger,
     )
-    extractor = Extractor(llm_client)
+    extractor = Extractor(llm_client, model=config.llm.model)
 
     # Build PageIndex (with cache)
     page_index = build_page_index(config.logseq.graph_path, ctx)
@@ -512,6 +537,7 @@ def extract(
             verbose,
             show_diffs,
             dry_run,
+            token_budget=config.rag.token_budget,
         )
 
     # Log summary if prompt inspection was enabled

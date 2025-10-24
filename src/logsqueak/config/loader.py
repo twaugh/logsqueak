@@ -8,6 +8,7 @@ Environment variables:
 - LOGSQUEAK_LLM_API_KEY: Override LLM API key
 - LOGSQUEAK_LLM_MODEL: Override LLM model name
 - LOGSQUEAK_LOGSEQ_GRAPH_PATH: Override Logseq graph path
+- LOGSQUEAK_RAG_TOKEN_BUDGET: Override RAG token budget for Stage 2 prompts
 """
 
 import os
@@ -37,6 +38,7 @@ def load_config(config_path: Optional[Path] = None) -> Configuration:
         LOGSQUEAK_LLM_API_KEY: Override llm.api_key
         LOGSQUEAK_LLM_MODEL: Override llm.model
         LOGSQUEAK_LOGSEQ_GRAPH_PATH: Override logseq.graph_path
+        LOGSQUEAK_RAG_TOKEN_BUDGET: Override rag.token_budget
     """
     if config_path is None:
         config_path = Path.home() / ".config" / "logsqueak" / "config.yaml"
@@ -80,6 +82,8 @@ def _apply_env_overrides(data: Dict[str, Any]) -> Dict[str, Any]:
         data["llm"] = {}
     if "logseq" not in data:
         data["logseq"] = {}
+    if "rag" not in data:
+        data["rag"] = {}
 
     # LLM configuration overrides
     if env_endpoint := os.getenv("LOGSQUEAK_LLM_ENDPOINT"):
@@ -94,5 +98,12 @@ def _apply_env_overrides(data: Dict[str, Any]) -> Dict[str, Any]:
     # Logseq configuration overrides
     if env_graph_path := os.getenv("LOGSQUEAK_LOGSEQ_GRAPH_PATH"):
         data["logseq"]["graph_path"] = env_graph_path
+
+    # RAG configuration overrides
+    if env_token_budget := os.getenv("LOGSQUEAK_RAG_TOKEN_BUDGET"):
+        try:
+            data["rag"]["token_budget"] = int(env_token_budget)
+        except ValueError:
+            pass  # Invalid value, ignore
 
     return data

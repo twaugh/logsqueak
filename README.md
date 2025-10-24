@@ -79,6 +79,10 @@ llm:
 
 logseq:
   graph_path: ~/Documents/logseq-graph
+
+# Optional: Control token usage for RAG search
+rag:
+  token_budget: 3000  # Token budget for page selection (default: null = top 5 candidates)
 ```
 
 **For Ollama (local)**:
@@ -91,7 +95,34 @@ llm:
 
 logseq:
   graph_path: ~/Documents/logseq-graph
+
+rag:
+  token_budget: 2000  # Smaller budget for local models
 ```
+
+#### RAG Token Budget
+
+The `rag.token_budget` setting controls how many candidate pages are sent to the LLM during page selection (Stage 2). The system uses **exact token counting** (tiktoken) to fit as many candidates as possible within your budget.
+
+**How it works:**
+- **null (default)**: Uses top 5 candidates from semantic search (backward compatible)
+- **Set a budget** (e.g., 3000): System calculates tokens for each candidate and includes as many as fit
+
+**Typical budgets:**
+- **1000-1500**: 1-2 candidates (minimal cost)
+- **2000-3000**: 3-5 candidates (recommended)
+- **4000-6000**: 5-10 candidates (thorough)
+- **8000+**: 10-20 candidates (comprehensive)
+
+Each candidate page preview is ~250-350 tokens (1000 chars of page content).
+
+**Viewing token usage:**
+```bash
+# See detailed token budget logs
+logsqueak extract --verbose 2025-01-15
+```
+
+This shows which candidates were selected and exact token counts.
 
 ## Usage
 

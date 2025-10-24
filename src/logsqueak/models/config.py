@@ -32,11 +32,37 @@ class LogseqConfig(BaseModel):
         return v
 
 
+class RAGConfig(BaseModel):
+    """RAG search configuration for tuning semantic search behavior.
+
+    The token budget controls how many candidate pages are sent to the LLM
+    for page selection (Stage 2). The system uses exact token counting (tiktoken)
+    to fit as many candidates as possible within the budget.
+    """
+
+    token_budget: Optional[int] = Field(
+        default=None,
+        ge=500,
+        description="Token budget for Stage 2 prompts (page selection). If None, uses top 5 candidates.",
+    )
+
+    @field_validator("token_budget")
+    @classmethod
+    def validate_token_budget(cls, v: Optional[int]) -> Optional[int]:
+        """Validate that token budget is reasonable."""
+        if v is not None and v < 500:
+            raise ValueError(
+                "token_budget must be at least 500 tokens (minimum for single candidate)"
+            )
+        return v
+
+
 class Configuration(BaseModel):
     """Complete Logsqueak configuration."""
 
     llm: LLMConfig
     logseq: LogseqConfig
+    rag: RAGConfig = Field(default_factory=RAGConfig)
 
     @classmethod
     def load(cls, config_path: Optional[Path] = None) -> "Configuration":
