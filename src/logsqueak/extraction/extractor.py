@@ -15,6 +15,7 @@ from logsqueak.llm.client import (
     PageCandidate,
     PageSelectionResult,
 )
+from logsqueak.llm.prompts import build_page_selection_messages
 from logsqueak.llm.token_counter import TokenCounter
 from logsqueak.models.journal import JournalEntry
 from logsqueak.models.knowledge import ActionType, KnowledgeBlock
@@ -163,7 +164,7 @@ class Extractor:
             return []
 
         # Calculate base prompt tokens (system prompt + knowledge content + response overhead)
-        base_tokens = self._estimate_base_prompt_tokens(knowledge_content, indent_str)
+        base_tokens = self._calculate_base_prompt_tokens(knowledge_content, indent_str)
 
         # Reserve tokens for LLM response (JSON output ~200-300 tokens)
         response_overhead = 300
@@ -215,29 +216,27 @@ class Extractor:
 
         return selected
 
-    def _estimate_base_prompt_tokens(self, knowledge_content: str, indent_str: str) -> int:
-        """Estimate tokens for base Stage 2 prompt (without candidates).
+    def _calculate_base_prompt_tokens(self, knowledge_content: str, indent_str: str) -> int:
+        """Calculate exact tokens for base Stage 2 prompt (without candidates).
+
+        Uses the shared prompt builder to construct the actual prompts and counts
+        their tokens. This ensures token counting matches what the LLM provider sends.
 
         Args:
             knowledge_content: Knowledge block content
             indent_str: Indentation string
 
         Returns:
-            Estimated token count for base prompt
+            Exact token count for base prompt (without candidates)
         """
-        # Rough estimate of system prompt based on actual Stage 2 prompt
-        # (see openai_compat.py select_target_page method)
-        system_prompt_template = """You are a knowledge organization assistant.
-        Task: Select the best page and section for integrating knowledge.
-        Knowledge: {knowledge}
-        Indentation: {indent}
-        Candidates will follow..."""
-
-        base_prompt = system_prompt_template.format(
-            knowledge=knowledge_content, indent=repr(indent_str)
+        # Build messages with empty candidates list to get base prompt tokens
+        messages = build_page_selection_messages(
+            knowledge_content=knowledge_content,
+            candidates=[],  # Empty candidates for base calculation
+            indent_str=indent_str,
         )
 
-        return self.token_counter.count_tokens(base_prompt)
+        return self.token_counter.count_messages_tokens(messages)
 
     def is_duplicate(self, knowledge_content: str, target_page: TargetPage) -> bool:
         """Check if knowledge already exists on target page (FR-017).

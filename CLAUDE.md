@@ -272,16 +272,18 @@ The `rag.token_budget` setting controls Stage 2 prompts (page selection). The sy
 - **4000-6000 tokens**: Typically fits 5-10 candidates (more thorough)
 - **8000+ tokens**: Fits 10-20 candidates (comprehensive but expensive)
 
-**Token calculation:**
-- Base prompt (system + knowledge content): ~200-500 tokens
-- Each candidate page preview (1000 chars): ~250-350 tokens
-- Response overhead: ~300 tokens
+**Token calculation (exact, using tiktoken):**
+- Base prompt (actual Stage 2 system + user prompts): Calculated exactly from real prompts
+- Each candidate page preview (1000 chars): Counted exactly for each candidate
+- Response overhead: 300 tokens (reserved for JSON output)
+
+The system constructs the actual prompts and counts tokens using tiktoken before adding candidates, ensuring the budget is never exceeded.
 
 **Example:** With a 3000 token budget:
-- Base: 400 tokens
-- Response: 300 tokens
-- Available for candidates: 2300 tokens
-- Result: ~6-8 candidates (350 tokens each)
+- Base prompt: ~650 tokens (actual count, varies with knowledge content)
+- Response: 300 tokens (reserved)
+- Available for candidates: ~2050 tokens
+- Result: ~5-7 candidates (each ~300-400 tokens depending on page size)
 
 You can override via environment variable:
 - `LOGSQUEAK_RAG_TOKEN_BUDGET`: Override token_budget

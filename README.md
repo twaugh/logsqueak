@@ -114,7 +114,7 @@ The `rag.token_budget` setting controls how many candidate pages are sent to the
 - **4000-6000**: 5-10 candidates (thorough)
 - **8000+**: 10-20 candidates (comprehensive)
 
-Each candidate page preview is ~250-350 tokens (1000 chars of page content).
+The system uses **exact token counting** with tiktoken - it constructs the actual prompts and counts tokens for each candidate before adding them to the budget.
 
 **Viewing token usage:**
 ```bash
