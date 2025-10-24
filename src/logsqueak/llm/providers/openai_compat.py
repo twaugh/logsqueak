@@ -273,6 +273,20 @@ class OpenAICompatibleProvider(LLMClient):
               "reasoning": "Brief explanation of your choice"
             }}
 
+            CRITICAL - target_section format:
+            - target_section contains the text content after the bullet marker ("- ")
+            - Strip the bullet marker but keep everything else (including "##" if present)
+
+            Example - if the page has this content:
+              - ## People
+              - Projects
+                - ## Active
+
+            Then valid target_section values are:
+              ["## People"] - NOT ["- ## People"] or ["People"]
+              ["Projects"] - NOT ["- Projects"]
+              ["Projects", "## Active"] - NOT ["Projects", "Active"] or ["Projects", "- ## Active"]
+
             Notes:
             - target_section can be null if knowledge should go at page root
             - target_section MUST ONLY contain bullet block content, NEVER frontmatter properties
