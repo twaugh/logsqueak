@@ -677,21 +677,38 @@ def rebuild(ctx: click.Context, graph: Optional[Path], force: bool):
 
     # Build index using VectorStore
     try:
+        from logsqueak.rag.indexer import IndexBuilder
+        from logsqueak.rag.manifest import CacheManifest
+        from logsqueak.rag.vector_store import ChromaDBStore
+
         graph_paths = GraphPaths(config.logseq.graph_path)
         page_files = list(graph_paths.pages_dir.glob("*.md"))
 
-        click.echo(f"Building index for {len(page_files)} pages...")
+        if force:
+            click.echo(f"Force rebuild: rebuilding index for {len(page_files)} pages...")
+        else:
+            click.echo(f"Building index for {len(page_files)} pages...")
         start_time = time.time()
 
-        # Use VectorStore backend (M2.6)
-        page_index = PageIndex.build_with_vector_store(config.logseq.graph_path)
+        # Setup vector store and manifest
+        vector_store_path = Path.home() / ".cache" / "logsqueak" / "chroma"
+        manifest_path = vector_store_path.parent / "manifest.json"
+
+        vector_store = ChromaDBStore(vector_store_path)
+        manifest = CacheManifest(manifest_path)
+
+        # Build index incrementally with force flag
+        builder = IndexBuilder(vector_store, manifest)
+        stats = builder.build_incremental(config.logseq.graph_path, force=force)
 
         duration = time.time() - start_time
-        click.echo(f"✓ Index built in {duration:.1f}s")
+        click.echo(
+            f"✓ Index built in {duration:.1f}s "
+            f"(+{stats['added']} ~{stats['updated']} -{stats['deleted']} ={stats['unchanged']})"
+        )
 
         # Clean up
-        if hasattr(page_index, "_vector_store"):
-            page_index._vector_store.close()
+        vector_store.close()
 
     except Exception as e:
         click.echo(f"Error: Failed to build index: {e}", err=True)

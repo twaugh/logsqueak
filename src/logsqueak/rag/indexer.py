@@ -36,7 +36,7 @@ class IndexBuilder:
         self.manifest = manifest
         self.embedding_model = embedding_model
 
-    def build_incremental(self, graph_path: Path) -> dict:
+    def build_incremental(self, graph_path: Path, force: bool = False) -> dict:
         """Build index incrementally.
 
         Detects:
@@ -46,6 +46,7 @@ class IndexBuilder:
 
         Args:
             graph_path: Path to Logseq graph directory
+            force: If True, clear manifest and rebuild all pages from scratch
 
         Returns:
             Dict with stats: {
@@ -60,6 +61,17 @@ class IndexBuilder:
             logger.info("Loading embedding model...")
             from sentence_transformers import SentenceTransformer
             self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+        # Force rebuild: clear manifest and all vector store data
+        if force:
+            logger.info("Force rebuild: clearing manifest and vector store")
+            self.manifest.clear()
+            # Delete all existing chunks from vector store
+            all_pages = list({p.stem for p in (graph_path / "pages").glob("*.md")}) if (graph_path / "pages").exists() else []
+            for page_name in all_pages:
+                chunk_ids = self.vector_store.get_ids_by_metadata({"page_name": page_name})
+                if chunk_ids:
+                    self.vector_store.delete(chunk_ids)
 
         stats = {
             'added': 0,
@@ -163,18 +175,13 @@ class IndexBuilder:
         """
         logger.debug(f"Updating page: {page_name}")
 
-        # Delete old chunks for this page
-        # Note: We'll need to query for all chunks from this page
-        # For now, we'll use a simpler approach: delete by reconstructing old chunks
-        # In practice, this would query the vector store for all chunks with
-        # metadata.page_name == page_name, then delete those IDs
+        # Delete old chunks for this page using metadata filter
+        old_chunk_ids = self.vector_store.get_ids_by_metadata({"page_name": page_name})
+        if old_chunk_ids:
+            logger.debug(f"Deleting {len(old_chunk_ids)} old chunks for {page_name}")
+            self.vector_store.delete(old_chunk_ids)
 
-        # Parse old version to get old chunk IDs (before update)
-        # This is a limitation - we can't easily get old chunk IDs without
-        # storing them separately. For MVP, we'll just add new chunks.
-        # A proper implementation would track chunk IDs per page in manifest.
-
-        # For now: Add new chunks (old chunks will become stale but harmless)
+        # Add new chunks
         self._add_page(page_name, page_path, mtime)
 
     def _delete_page(self, page_name: str) -> None:
@@ -185,9 +192,11 @@ class IndexBuilder:
         """
         logger.debug(f"Deleting page: {page_name}")
 
+        # Delete chunks from vector store using metadata filter
+        chunk_ids = self.vector_store.get_ids_by_metadata({"page_name": page_name})
+        if chunk_ids:
+            logger.debug(f"Deleting {len(chunk_ids)} chunks for {page_name}")
+            self.vector_store.delete(chunk_ids)
+
         # Remove from manifest
         self.manifest.remove(page_name)
-
-        # Note: Deleting chunks from vector store requires knowing their IDs
-        # For MVP, we'll leave orphaned chunks (filtered out by metadata queries)
-        # A proper implementation would track chunk IDs per page in manifest

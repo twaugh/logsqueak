@@ -63,6 +63,18 @@ class VectorStore(ABC):
         pass
 
     @abstractmethod
+    def get_ids_by_metadata(self, filter_metadata: dict) -> List[str]:
+        """Get all IDs matching metadata filter.
+
+        Args:
+            filter_metadata: Metadata filter (e.g., {"page_name": "Project X"})
+
+        Returns:
+            List of matching hybrid IDs
+        """
+        pass
+
+    @abstractmethod
     def close(self) -> None:
         """Close the vector store and release resources."""
         pass
@@ -168,6 +180,19 @@ class ChromaDBStore(VectorStore):
         metadatas = results["metadatas"][0] if results["metadatas"] else []
 
         return ids, distances, metadatas
+
+    def get_ids_by_metadata(self, filter_metadata: dict) -> List[str]:
+        """Get all IDs matching metadata filter.
+
+        Args:
+            filter_metadata: Metadata filter (e.g., {"page_name": "Project X"})
+
+        Returns:
+            List of matching hybrid IDs
+        """
+        # ChromaDB get() with where filter returns all matching entries
+        results = self.collection.get(where=filter_metadata)
+        return results["ids"] if results["ids"] else []
 
     def close(self) -> None:
         """Close ChromaDB client.
