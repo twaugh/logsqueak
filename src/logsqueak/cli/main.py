@@ -74,8 +74,8 @@ def build_vector_store(graph_path: Path, ctx: click.Context):
         # Build/load vector store (ChromaDB persists in graph/.logsqueak/chroma)
         persist_dir = graph_path / ".logsqueak" / "chroma"
         vector_store = ChromaDBStore(persist_directory=persist_dir)
-        builder = IndexBuilder(vector_store, graph_path)
-        stats = builder.build_index()
+        builder = IndexBuilder(vector_store)
+        stats = builder.build_incremental(graph_path, force=False)
 
         duration = time.time() - start_time
         progress.show_index_built(
