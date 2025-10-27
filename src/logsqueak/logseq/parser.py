@@ -22,6 +22,7 @@ class LogseqBlock:
         content: Block text content (first line after "- ")
         indent_level: Indentation level (0 = root)
         properties: Block properties (preserves insertion order)
+        block_id: Persistent block ID from id:: property (None if not present)
         children: Child blocks
         continuation_lines: Lines that continue this block's content (preserves exact formatting)
         _original_lines: All original lines for exact round-trip (bullet + continuations)
@@ -30,6 +31,7 @@ class LogseqBlock:
     content: str
     indent_level: int
     properties: dict = field(default_factory=dict)  # Preserves insertion order (Python 3.7+)
+    block_id: Optional[str] = None  # Persistent ID from id:: property
     children: list["LogseqBlock"] = field(default_factory=list)
     continuation_lines: list[str] = field(default_factory=list)  # Multi-line content
     _original_lines: list[str] = field(default_factory=list, repr=False)  # For exact round-trip
@@ -231,10 +233,18 @@ def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], 
                 continuation_lines.append(next_line)
                 j += 1
 
-            # Create block with continuation lines
+            # Parse properties from continuation lines
+            properties = _parse_properties(continuation_lines)
+
+            # Extract block_id from id:: property if present
+            block_id = properties.get("id")
+
+            # Create block with continuation lines and properties
             block = LogseqBlock(
                 content=content,
                 indent_level=indent_level,
+                properties=properties,
+                block_id=block_id,
                 continuation_lines=continuation_lines,
                 _original_lines=original_lines,
             )
@@ -270,6 +280,38 @@ def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], 
             i += 1
 
     return frontmatter, root_blocks
+
+
+def _parse_properties(continuation_lines: list[str]) -> dict[str, str]:
+    """Parse properties from continuation lines.
+
+    Properties have the format: `key:: value` (with optional leading whitespace).
+
+    Args:
+        continuation_lines: Lines following a bullet
+
+    Returns:
+        Dictionary of properties (preserves insertion order)
+
+    Examples:
+        >>> _parse_properties(["  id:: 123", "  tags:: foo, bar"])
+        {'id': '123', 'tags': 'foo, bar'}
+    """
+    properties = {}
+
+    for line in continuation_lines:
+        stripped = line.strip()
+
+        # Property lines have format: key:: value
+        if "::" in stripped:
+            # Split on first "::" only
+            parts = stripped.split("::", 1)
+            if len(parts) == 2:
+                key = parts[0].strip()
+                value = parts[1].strip()
+                properties[key] = value
+
+    return properties
 
 
 def _detect_indentation(lines: list[str]) -> str:

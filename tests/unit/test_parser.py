@@ -284,3 +284,118 @@ class TestLogseqOutline:
         outline = LogseqOutline.parse(markdown)
 
         assert len(outline.blocks) == 3
+
+
+class TestBlockProperties:
+    """Tests for parsing block properties (M1.1)."""
+
+    def test_parse_block_with_id_property(self):
+        """Test parsing block with id:: property."""
+        markdown = dedent(
+            """\
+            - Block with ID
+              id:: 65f3a8e0-1234-5678-9abc-def012345678"""
+        )
+        outline = LogseqOutline.parse(markdown)
+
+        assert len(outline.blocks) == 1
+        block = outline.blocks[0]
+        assert block.content == "Block with ID"
+        assert block.properties == {"id": "65f3a8e0-1234-5678-9abc-def012345678"}
+        assert block.block_id == "65f3a8e0-1234-5678-9abc-def012345678"
+
+    def test_parse_block_without_id_property(self):
+        """Test parsing block without id:: property."""
+        markdown = "- Block without ID"
+        outline = LogseqOutline.parse(markdown)
+
+        block = outline.blocks[0]
+        assert block.properties == {}
+        assert block.block_id is None
+
+    def test_parse_multiple_properties(self):
+        """Test parsing block with multiple properties."""
+        markdown = dedent(
+            """\
+            - Block with properties
+              id:: abc123
+              tags:: important, urgent
+              priority:: high"""
+        )
+        outline = LogseqOutline.parse(markdown)
+
+        block = outline.blocks[0]
+        assert block.properties == {
+            "id": "abc123",
+            "tags": "important, urgent",
+            "priority": "high",
+        }
+        assert block.block_id == "abc123"
+
+    def test_property_order_preserved(self):
+        """Test that property insertion order is preserved."""
+        markdown = dedent(
+            """\
+            - Block
+              zebra:: last
+              alpha:: first
+              middle:: second"""
+        )
+        outline = LogseqOutline.parse(markdown)
+
+        block = outline.blocks[0]
+        # Properties should be in the order they appear
+        keys = list(block.properties.keys())
+        assert keys == ["zebra", "alpha", "middle"]
+
+    def test_parse_property_with_double_colon_in_value(self):
+        """Test parsing property where value contains ::."""
+        markdown = dedent(
+            """\
+            - Block
+              url:: https://example.com/path::with::colons"""
+        )
+        outline = LogseqOutline.parse(markdown)
+
+        block = outline.blocks[0]
+        assert block.properties == {"url": "https://example.com/path::with::colons"}
+
+    def test_parse_nested_blocks_with_properties(self):
+        """Test parsing nested blocks with properties."""
+        markdown = dedent(
+            """\
+            - Parent block
+              id:: parent-id
+              - Child block
+                id:: child-id"""
+        )
+        outline = LogseqOutline.parse(markdown)
+
+        parent = outline.blocks[0]
+        assert parent.block_id == "parent-id"
+        assert len(parent.children) == 1
+
+        child = parent.children[0]
+        assert child.block_id == "child-id"
+
+    def test_properties_with_mixed_content(self):
+        """Test block with properties mixed with other continuation lines."""
+        markdown = dedent(
+            """\
+            - Block with mixed content
+              id:: test-id
+              Some text continuation
+              tags:: test
+              More text"""
+        )
+        outline = LogseqOutline.parse(markdown)
+
+        block = outline.blocks[0]
+        # Should parse properties correctly
+        assert block.properties == {
+            "id": "test-id",
+            "tags": "test",
+        }
+        assert block.block_id == "test-id"
+        # All continuation lines should be preserved
+        assert len(block.continuation_lines) == 4
