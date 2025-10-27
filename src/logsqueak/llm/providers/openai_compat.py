@@ -108,32 +108,33 @@ class OpenAICompatibleProvider(LLMClient):
             - Routine todos without context
             - Temporary status updates
 
-            CRITICAL: Preserve hierarchical context from nested bullets!
+            CRITICAL: Return the EXACT text of each knowledge block as it appears in the journal!
 
-            When extracting from NESTED journal entries, INCLUDE parent context and [[Page Links]]:
+            Do NOT add parent context or reword the content. Just identify which specific bullets
+            contain lasting knowledge and return their exact text.
 
             EXAMPLE JOURNAL:
             - Working on [[RHEL Documentation]]
               - Updated security guidelines
                 - Added section on container scanning
 
-            GOOD EXTRACTION:
-            "[[RHEL Documentation]]: Added section on container scanning to security guidelines"
-
-            BAD EXTRACTION:
+            GOOD EXTRACTION (exact text only):
             "Added section on container scanning"
 
+            BAD EXTRACTION (with added context):
+            "[[RHEL Documentation]]: Added section on container scanning to security guidelines"
+
             RULES:
-            1. If a parent bullet contains [[Page Link]], include it in extracted knowledge
-            2. Preserve the page reference even if the knowledge is nested deep
-            3. Add brief parent context for clarity (but keep it concise)
-            4. The extracted knowledge should be self-contained and clear
+            1. Return the exact text of the knowledge bullet (no modifications)
+            2. Do NOT include parent context or page links from parent bullets
+            3. Parent context will be added automatically by the system
+            4. Multiple knowledge blocks from the same parent are fine
 
             Return a JSON object with this structure:
             {{
               "knowledge_blocks": [
                 {{
-                  "content": "The extracted knowledge text with parent context",
+                  "exact_text": "The exact text of the bullet containing knowledge",
                   "confidence": 0.85
                 }}
               ]
@@ -181,14 +182,14 @@ class OpenAICompatibleProvider(LLMClient):
 
             results = []
             for block in data["knowledge_blocks"]:
-                if "content" not in block or "confidence" not in block:
+                if "exact_text" not in block or "confidence" not in block:
                     raise LLMResponseError(
-                        "Knowledge block missing required fields"
+                        "Knowledge block missing required fields (exact_text, confidence)"
                     )
 
                 results.append(
                     ExtractionResult(
-                        content=block["content"],
+                        content=block["exact_text"],  # Map exact_text to content for now
                         confidence=float(block["confidence"]),
                     )
                 )

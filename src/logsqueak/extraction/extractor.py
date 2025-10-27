@@ -17,8 +17,9 @@ from logsqueak.llm.client import (
 )
 from logsqueak.llm.prompts import build_page_selection_messages
 from logsqueak.llm.token_counter import TokenCounter
+from logsqueak.logseq.parser import LogseqBlock
 from logsqueak.models.journal import JournalEntry
-from logsqueak.models.knowledge import ActionType, KnowledgeBlock
+from logsqueak.models.knowledge import ActionType, KnowledgeBlock, KnowledgePackage
 from logsqueak.models.page import PageIndex, TargetPage
 
 logger = logging.getLogger(__name__)
@@ -43,32 +44,66 @@ class Extractor:
 
     def extract_knowledge(
         self, journal: JournalEntry
-    ) -> List[ExtractionResult]:
-        """Extract knowledge blocks from journal entry (Stage 1).
+    ) -> List[KnowledgePackage]:
+        """Extract knowledge blocks from journal entry.
 
-        This is the first stage of the two-stage extraction process.
-        The LLM identifies pieces of information with lasting value,
-        filtering out temporary activity logs.
+        This is Phase 1 of the multi-stage extraction pipeline.
+        The LLM identifies exact block text containing lasting knowledge,
+        then code adds parent context via AST walk.
 
-        Stage 2 (page selection) happens separately after RAG search.
+        The returned KnowledgePackages contain:
+        - original_id: Hybrid ID of the source journal block
+        - exact_text: Raw block text as identified by LLM
+        - full_text: Contextualized text with parent blocks
+        - confidence: LLM confidence score (0.0-1.0)
 
         Args:
             journal: Journal entry to extract from
 
         Returns:
-            List of extracted knowledge blocks with confidence scores
+            List of KnowledgePackage objects with full context
 
         Raises:
             LLMError: If LLM request fails
         """
-        # Call LLM to extract knowledge blocks
-        results = self.llm_client.extract_knowledge(
+        # Call LLM to extract exact knowledge block text
+        llm_results = self.llm_client.extract_knowledge(
             journal_content=journal.raw_content,
             journal_date=journal.date,
             indent_str=journal.outline.indent_str,
         )
 
-        return results
+        # Convert ExtractionResults to KnowledgePackages with AST walk
+        packages = []
+        for result in llm_results:
+            exact_text = result.content  # LLM returns exact block text
+
+            # Find the block in the journal AST
+            block = self._find_block_by_content(journal.outline.blocks, exact_text)
+
+            if block is None:
+                logger.warning(f"Could not find block in AST for text: {exact_text[:50]}...")
+                continue
+
+            # Find parent chain for hybrid ID generation
+            parents = self._find_parent_chain(block, journal.outline.blocks)
+
+            # Generate original_id using hybrid ID system
+            original_id = block.get_hybrid_id(parents=parents, indent_str=journal.outline.indent_str)
+
+            # Build full_text with parent context
+            full_text = self._build_full_context(block, journal.outline.blocks)
+
+            packages.append(
+                KnowledgePackage(
+                    original_id=original_id,
+                    exact_text=exact_text,
+                    full_text=full_text,
+                    confidence=result.confidence,
+                )
+            )
+
+        return packages
 
     def select_target_page(
         self,
@@ -259,6 +294,122 @@ class Extractor:
             False
         """
         return target_page.has_duplicate(knowledge_content)
+
+    def _find_block_by_content(
+        self, blocks: List[LogseqBlock], exact_text: str
+    ) -> Optional[LogseqBlock]:
+        """Find a block in the AST by exact content match.
+
+        Recursively searches through blocks and their children to find
+        a block whose content matches the exact_text.
+
+        Args:
+            blocks: List of LogseqBlock to search
+            exact_text: Exact block content to find
+
+        Returns:
+            Matching LogseqBlock or None if not found
+        """
+        for block in blocks:
+            # Strip whitespace for comparison
+            if block.content.strip() == exact_text.strip():
+                return block
+
+            # Recursively search children
+            if block.children:
+                found = self._find_block_by_content(block.children, exact_text)
+                if found:
+                    return found
+
+        return None
+
+    def _build_full_context(
+        self, block: LogseqBlock, root_blocks: List[LogseqBlock]
+    ) -> str:
+        """Build full-context text by walking up the AST tree.
+
+        Finds all parent blocks and prepends their content to create
+        full context. Includes [[Page Links]] from parents.
+
+        Args:
+            block: The target block
+            root_blocks: Root-level blocks to search for parents
+
+        Returns:
+            Full context text with parent bullets prepended
+
+        Example:
+            Journal structure:
+            - Working on [[Project X]]
+              - Updated documentation
+                - Added API examples
+
+            For "Added API examples" block, returns:
+            "[[Project X]]: Updated documentation - Added API examples"
+        """
+        # Find parent chain by walking up the tree
+        parents = self._find_parent_chain(block, root_blocks)
+
+        if not parents:
+            # No parents, return exact text
+            return block.content
+
+        # Build context from parents
+        context_parts = []
+        for parent in parents:
+            # Extract [[Page Links]] and key phrases
+            content = parent.content.strip()
+
+            # If parent has [[Page Link]], definitely include it
+            if "[[" in content and "]]" in content:
+                context_parts.append(content)
+            # Otherwise, include if it's a meaningful heading/context
+            elif len(content) > 0:
+                context_parts.append(content)
+
+        # Add the block's own content
+        context_parts.append(block.content.strip())
+
+        # Join with appropriate separator
+        if len(context_parts) == 1:
+            return context_parts[0]
+        elif len(context_parts) == 2:
+            # parent: child
+            return f"{context_parts[0]}: {context_parts[1]}"
+        else:
+            # parent: intermediate - child
+            return f"{context_parts[0]}: {' - '.join(context_parts[1:])}"
+
+    def _find_parent_chain(
+        self, target: LogseqBlock, blocks: List[LogseqBlock], parents: Optional[List[LogseqBlock]] = None
+    ) -> List[LogseqBlock]:
+        """Find the chain of parent blocks for a target block.
+
+        Recursively walks the tree to find parents.
+
+        Args:
+            target: Block to find parents for
+            blocks: Blocks to search
+            parents: Accumulated parents (used in recursion)
+
+        Returns:
+            List of parent blocks from root to immediate parent
+        """
+        if parents is None:
+            parents = []
+
+        for block in blocks:
+            # Check if target is a direct child
+            if target in block.children:
+                return parents + [block]
+
+            # Recursively search children
+            if block.children:
+                result = self._find_parent_chain(target, block.children, parents + [block])
+                if result:
+                    return result
+
+        return []
 
 
 def _format_preview_with_frontmatter(outline) -> str:
