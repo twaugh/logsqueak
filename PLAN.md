@@ -151,17 +151,25 @@ Replace session-based embedding cache with ChromaDB for block-level indexing. Re
 
 ---
 
-### **Milestone 3: Block-Level Targeting** (4 tasks)
+### **Milestone 3: Block-Level Targeting** (5 tasks)
 
 Implement precise block targeting using hybrid IDs for UPDATE and APPEND operations. Simplifies current section-path approach.
 
-#### M3.1: Implement `find_target_node_by_id()`
+#### M3.1: Remove Backward-Compatible PageIndex API
+- **File**: `src/logsqueak/models/page.py`
+- **Task**: Remove `PageIndex.build_with_vector_store()` transitional API (added in M2.6)
+- **Task**: Migrate all code to use block-level search directly via VectorStore
+- **Task**: Update CLI and RAG components to query VectorStore instead of PageIndex
+- **Rationale**: M2.6 created backward-compatible API for transition; M3 completes the migration
+- **Test**: Ensure all existing integration tests pass with direct VectorStore usage
+
+#### M3.2: Implement `find_target_node_by_id()`
 - **File**: `src/logsqueak/logseq/parser.py`
 - **Task**: Add `LogseqOutline.find_block_by_id(target_id) -> Optional[LogseqBlock]`
 - **Task**: Traverse AST, comparing hybrid IDs
 - **Test**: Unit test for finding blocks by `id::` and content hash
 
-#### M3.2: Replace Section Paths with Block ID Targeting
+#### M3.3: Replace Section Paths with Block ID Targeting
 - **File**: `src/logsqueak/models/knowledge.py`
 - **Task**: Replace `target_section: List[str]` with `target_block_id: Optional[str]`
 - **Task**: Update all references to use direct block ID instead of section paths
@@ -169,13 +177,13 @@ Implement precise block targeting using hybrid IDs for UPDATE and APPEND operati
 - **Rationale**: FUTURE-STATE uses single `target_id` (simpler, more precise than section paths)
 - **Test**: Update tests to use block IDs instead of section paths
 
-#### M3.3: Implement Block Modification (UPDATE)
+#### M3.4: Implement Block Modification (UPDATE)
 - **File**: `src/logsqueak/integration/writer.py`
 - **Task**: Implement `update_block(target_block, new_content, preserve_id=True)`
 - **Task**: Replace block content while preserving existing `id::`
 - **Test**: Unit test for UPDATE operation
 
-#### M3.4: Implement APPEND Operations
+#### M3.5: Implement APPEND Operations
 - **File**: `src/logsqueak/integration/writer.py`
 - **Task**: Implement `append_to_block(target_block, new_content, new_id)`
   - Add child to specific target block
@@ -298,10 +306,10 @@ Comprehensive testing and polish for the new pipeline.
 |-----------|-------|----------------|--------|-------------|
 | M1: Hybrid-ID Foundation | 5 | 3-5 days | ✅ Complete | ~1 day |
 | M2: Persistent Vector Store | 6 | 4-6 days | ⏳ Next | - |
-| M3: Block-Level Targeting | 4 | 2-4 days | Pending | - |
+| M3: Block-Level Targeting | 5 | 3-5 days | Pending | - |
 | M4: Multi-Stage Pipeline | 9 | 7-10 days | Pending | - |
 | M5: Testing & Refinement | 6 | 4-6 days | Pending | - |
-| **Total** | **30 tasks** | **20-31 days** | 17% | 1/20-31 |
+| **Total** | **31 tasks** | **21-32 days** | 16% | 1/21-32 |
 
 ---
 

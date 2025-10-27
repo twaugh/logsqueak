@@ -294,6 +294,11 @@ class PageIndex:
         if len(self.pages) == 0:
             return []
 
+        # Check if we're using VectorStore backend (M2.6 transitional API)
+        if hasattr(self, "_vector_store"):
+            return self._find_similar_with_vector_store(text, top_k)
+
+        # Original implementation using page-level embeddings
         # Embed the query text
         query_embedding = self.model.encode(text, convert_to_numpy=True)
 
@@ -312,6 +317,66 @@ class PageIndex:
 
         # Return (page, score) tuples
         return [(self.pages[i], float(similarities[i])) for i in top_k_indices]
+
+    def _find_similar_with_vector_store(
+        self, text: str, top_k: int = 5
+    ) -> list[tuple["TargetPage", float]]:
+        """Find similar pages using VectorStore (block-level search with page aggregation).
+
+        NOTE: This is a transitional implementation for M2.6. Will be removed in M3.1.
+
+        Args:
+            text: Knowledge block content to match
+            top_k: Number of pages to return
+
+        Returns:
+            List of (page, similarity_score) tuples, sorted by score descending
+        """
+        # Embed the query
+        query_embedding = self.model.encode(text, convert_to_numpy=True)
+
+        # Query vector store for top blocks (use larger K to ensure we get enough pages)
+        block_ids, distances, metadatas = self._vector_store.query(
+            query_embedding=query_embedding.tolist(),
+            n_results=top_k * 5,  # Get more blocks to ensure we get top_k pages
+        )
+
+        # Aggregate block scores by page
+        page_scores: dict[str, list[float]] = {}
+        for i, metadata in enumerate(metadatas):
+            page_name = metadata["page_name"]
+            score = 1.0 - distances[i]  # Convert distance to similarity
+            if page_name not in page_scores:
+                page_scores[page_name] = []
+            page_scores[page_name].append(score)
+
+        # Aggregate scores per page (use max score for each page)
+        page_results: list[tuple[str, float]] = []
+        for page_name, scores in page_scores.items():
+            # Use max score as page relevance (best matching block)
+            max_score = max(scores)
+            page_results.append((page_name, max_score))
+
+        # Sort by score descending
+        page_results.sort(key=lambda x: x[1], reverse=True)
+
+        # Take top-K pages
+        page_results = page_results[:top_k]
+
+        # Convert to (TargetPage, score) tuples
+        results = []
+        for page_name, score in page_results:
+            # Find the TargetPage object
+            page = next((p for p in self.pages if p.name == page_name), None)
+            if page:
+                results.append((page, score))
+            else:
+                # Reload page if not in cache (shouldn't happen normally)
+                page = TargetPage.load(self._graph_path, page_name)
+                if page:
+                    results.append((page, score))
+
+        return results
 
     def refresh(self, page_name: str) -> None:
         """Update embedding for a single page after modification.
@@ -338,6 +403,85 @@ class PageIndex:
                 page_file = page.file_path
                 self._save_embedding(self.cache_dir, page_file, embedding, page_text)
                 break
+
+    @classmethod
+    def build_with_vector_store(
+        cls,
+        graph_path: Path,
+        vector_store_path: Optional[Path] = None,
+        embedding_model=None,
+    ) -> "PageIndex":
+        """Build index using persistent VectorStore (M2.6).
+
+        Alternative constructor that uses ChromaDB VectorStore instead of
+        pkl cache files. Provides block-level RAG with page aggregation.
+
+        NOTE: This is a transitional API for M2.6. The full migration to
+        block-level search will be completed in M3.1 (remove this method).
+
+        Args:
+            graph_path: Path to Logseq graph
+            vector_store_path: Path for ChromaDB storage
+            embedding_model: Optional embedding model (defaults to all-MiniLM-L6-v2)
+
+        Returns:
+            PageIndex with VectorStore backend
+        """
+        from logsqueak.rag.indexer import IndexBuilder
+        from logsqueak.rag.manifest import CacheManifest
+        from logsqueak.rag.vector_store import ChromaDBStore
+
+        # Setup paths
+        if vector_store_path is None:
+            vector_store_path = Path.home() / ".cache" / "logsqueak" / "chroma"
+
+        manifest_path = vector_store_path.parent / "manifest.json"
+
+        # Initialize infrastructure
+        vector_store = ChromaDBStore(vector_store_path)
+        manifest = CacheManifest(manifest_path)
+
+        # Build index incrementally (pass embedding_model for testing)
+        builder = IndexBuilder(vector_store, manifest, embedding_model)
+        stats = builder.build_incremental(graph_path)
+
+        logger.info(
+            f"✓ Indexed with VectorStore: "
+            f"+{stats['added']} ~{stats['updated']} -{stats['deleted']}"
+        )
+
+        # For backward compatibility, we still need to return a PageIndex
+        # with the old API. Load all pages for compatibility.
+        pages_dir = graph_path / "pages"
+        pages = []
+        if pages_dir.exists():
+            for page_file in pages_dir.glob("*.md"):
+                page = TargetPage.load(graph_path, page_file.stem)
+                if page:
+                    pages.append(page)
+
+        # Load embedding model if not provided
+        if embedding_model is None:
+            from sentence_transformers import SentenceTransformer
+            embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+        # Create a minimal PageIndex (embeddings handled by VectorStore)
+        import numpy as np
+
+        # Create empty arrays (VectorStore handles the actual storage)
+        index = cls(
+            pages=pages,
+            embeddings=np.array([]),  # Not used with VectorStore
+            model=embedding_model,
+            page_texts=[],
+            cache_dir=vector_store_path,
+        )
+
+        # Store VectorStore reference for find_similar()
+        index._vector_store = vector_store  # type: ignore
+        index._graph_path = graph_path  # type: ignore
+
+        return index
 
 
 def _detect_convention(outline: "LogseqOutline") -> ConventionType:
