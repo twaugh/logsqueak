@@ -131,6 +131,35 @@ This pattern prevents sending 500+ pages to the LLM while maintaining high-quali
   - `index.py`: PageIndex implementation with sentence-transformers
   - `embedder.py`: Embedding utilities with cache (`~/.cache/logsqueak/embeddings/`)
 
+## Project Constitution
+
+**See `.specify/memory/constitution.md` for the complete project constitution.**
+
+Key principles from the constitution:
+
+### I. Proof-of-Concept First
+- Prioritize working software over perfection
+- Ship iteratively, demonstrate feasibility
+- No backwards compatibility guarantees (POC stage)
+
+### II. Non-Destructive Operations (NON-NEGOTIABLE)
+- NEVER modify or delete existing Logseq content without explicit user approval
+- All changes MUST be additive (new blocks, new sections)
+- Dry-run mode required before any writes
+- Provenance links to source journals are MANDATORY
+
+### III. Simplicity and Transparency
+- Prefer file-based I/O over databases
+- Use JSON for structured LLM outputs
+- Show the user what the LLM is doing
+- Avoid premature abstraction
+
+### Commit Message Requirements
+**IMPORTANT**: All AI-assisted commits MUST include:
+```
+Assisted-by: Claude Code
+```
+
 ## Critical Design Principles
 
 ### 1. Property Order Preservation (FR-008) - NON-NEGOTIABLE
@@ -140,23 +169,14 @@ This pattern prevents sending 500+ pages to the LLM while maintaining high-quali
 - Use Python 3.7+ dict ordering (insertion order guaranteed)
 - Round-trip tests verify no reordering occurs
 
-### 2. Non-Destructive Operations (Constitution Principle II)
-
-All changes are additive only:
-- New child bullets can be inserted at appropriate locations
-- No deletion or modification of existing content
-- Dry-run mode mandatory (FR-002)
-- User approval required (FR-012: y/n/e prompt)
-- 100% data safety guarantee (SC-004)
-
-### 3. Provenance Links (FR-003)
+### 2. Provenance Links (FR-003)
 
 Every knowledge block MUST link back to source journal:
 - Format: `[[journal/YYYY-MM-DD]]`
 - 100% coverage enforced by tests
 - Links added during integration phase
 
-### 4. RAG Caching
+### 3. RAG Caching
 
 Per-page embedding cache for performance:
 - Cache location: `~/.cache/logsqueak/embeddings/`
