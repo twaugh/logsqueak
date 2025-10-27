@@ -157,7 +157,7 @@ def mock_page_index(tmp_path):
 def test_full_extraction_workflow(sample_journal_entry, mock_llm_client, mock_page_index):
     """Test complete workflow from journal to preview."""
     # Setup
-    extractor = Extractor(mock_llm_client)
+    extractor = Extractor(mock_llm_client, model="test-model")
 
     # Stage 1: Extract knowledge blocks
     extractions = extractor.extract_knowledge(sample_journal_entry)
@@ -249,7 +249,7 @@ def test_workflow_with_duplicate_detection(
         organizational_convention="heading_bullets",
     )
 
-    extractor = Extractor(mock_llm_client)
+    extractor = Extractor(mock_llm_client, model="test-model")
     extractions = extractor.extract_knowledge(sample_journal_entry)
     knowledge_blocks, _ = classify_extractions(extractions)
 
@@ -286,7 +286,7 @@ def test_workflow_with_no_knowledge_found(mock_llm_client, mock_page_index):
         ExtractionResult(content="Updated ticket", confidence=0.3),
     ]
 
-    extractor = Extractor(mock_llm_client)
+    extractor = Extractor(mock_llm_client, model="test-model")
     extractions = extractor.extract_knowledge(journal)
     knowledge_blocks, activity_logs = classify_extractions(extractions)
 
@@ -298,7 +298,7 @@ def test_workflow_with_missing_target_page(
     sample_journal_entry, mock_llm_client, mock_page_index, tmp_path
 ):
     """Test workflow when target page doesn't exist."""
-    extractor = Extractor(mock_llm_client)
+    extractor = Extractor(mock_llm_client, model="test-model")
     extractions = extractor.extract_knowledge(sample_journal_entry)
     knowledge_blocks, _ = classify_extractions(extractions)
 
@@ -345,7 +345,7 @@ def test_workflow_classification_boundary_cases(mock_llm_client):
         line_count=1,
     )
 
-    extractor = Extractor(mock_llm_client)
+    extractor = Extractor(mock_llm_client, model="test-model")
     extractions = extractor.extract_knowledge(journal)
     knowledge_blocks, activity_logs = classify_extractions(extractions)
 
@@ -376,7 +376,7 @@ def test_workflow_with_multiple_sections(mock_page_index):
         line_count=1,
     )
 
-    extractor = Extractor(fresh_mock_client)
+    extractor = Extractor(fresh_mock_client, model="test-model")
     extractions = extractor.extract_knowledge(journal)
     knowledge_blocks, _ = classify_extractions(extractions)
 
@@ -409,7 +409,7 @@ def test_workflow_with_create_section_action(mock_page_index):
         line_count=1,
     )
 
-    extractor = Extractor(fresh_mock_client)
+    extractor = Extractor(fresh_mock_client, model="test-model")
     extractions = extractor.extract_knowledge(journal)
     knowledge_blocks, _ = classify_extractions(extractions)
 
@@ -439,7 +439,7 @@ def test_workflow_error_propagation(mock_llm_client):
         line_count=1,
     )
 
-    extractor = Extractor(mock_llm_client)
+    extractor = Extractor(mock_llm_client, model="test-model")
 
     with pytest.raises(Exception, match="LLM API error"):
         extractor.extract_knowledge(journal)
@@ -449,7 +449,7 @@ def test_workflow_preview_with_warnings(
     sample_journal_entry, mock_llm_client, mock_page_index
 ):
     """Test workflow generates preview with warnings."""
-    extractor = Extractor(mock_llm_client)
+    extractor = Extractor(mock_llm_client, model="test-model")
     extractions = extractor.extract_knowledge(sample_journal_entry)
     knowledge_blocks, _ = classify_extractions(extractions)
 
@@ -487,7 +487,7 @@ def test_workflow_preview_with_warnings(
 
 def test_workflow_mixed_action_statuses(sample_journal_entry, mock_llm_client, mock_page_index):
     """Test workflow with mix of READY, SKIPPED, and WARNING actions."""
-    extractor = Extractor(mock_llm_client)
+    extractor = Extractor(mock_llm_client, model="test-model")
     extractions = extractor.extract_knowledge(sample_journal_entry)
     knowledge_blocks, _ = classify_extractions(extractions)
 
@@ -547,7 +547,7 @@ def test_workflow_empty_journal(mock_llm_client, mock_page_index):
 
     mock_llm_client.extract_knowledge.return_value = []
 
-    extractor = Extractor(mock_llm_client)
+    extractor = Extractor(mock_llm_client, model="test-model")
     extractions = extractor.extract_knowledge(empty_journal)
 
     assert len(extractions) == 0
@@ -555,7 +555,7 @@ def test_workflow_empty_journal(mock_llm_client, mock_page_index):
 
 def test_workflow_rag_candidate_selection(sample_journal_entry, mock_llm_client, mock_page_index):
     """Test that RAG finds top-5 candidates and LLM selects from them."""
-    extractor = Extractor(mock_llm_client)
+    extractor = Extractor(mock_llm_client, model="test-model")
     extractions = extractor.extract_knowledge(sample_journal_entry)
     knowledge_blocks, _ = classify_extractions(extractions)
 
@@ -577,7 +577,7 @@ def test_workflow_rag_candidate_selection(sample_journal_entry, mock_llm_client,
 
 def test_workflow_provenance_links(sample_journal_entry, mock_llm_client, mock_page_index):
     """Test that all knowledge blocks have correct provenance."""
-    extractor = Extractor(mock_llm_client)
+    extractor = Extractor(mock_llm_client, model="test-model")
     extractions = extractor.extract_knowledge(sample_journal_entry)
     knowledge_blocks, _ = classify_extractions(extractions)
 
@@ -599,7 +599,7 @@ def test_workflow_provenance_links(sample_journal_entry, mock_llm_client, mock_p
 
 def test_workflow_confidence_preservation(sample_journal_entry, mock_llm_client, mock_page_index):
     """Test that confidence scores are preserved through workflow."""
-    extractor = Extractor(mock_llm_client)
+    extractor = Extractor(mock_llm_client, model="test-model")
     extractions = extractor.extract_knowledge(sample_journal_entry)
 
     # Original confidences from mock: 0.9, 0.2, 0.85, 0.3
@@ -649,7 +649,7 @@ def test_workflow_with_all_activity_logs(mock_llm_client, mock_page_index):
         ExtractionResult(content="Responded to emails", confidence=0.15),
     ]
 
-    extractor = Extractor(mock_llm_client)
+    extractor = Extractor(mock_llm_client, model="test-model")
     extractions = extractor.extract_knowledge(journal)
     knowledge_blocks, activities = classify_extractions(extractions)
 
@@ -702,7 +702,7 @@ def test_workflow_with_indent_str_propagation(sample_journal_entry, mock_llm_cli
         ExtractionResult(content="Test knowledge", confidence=0.9),
     ]
 
-    extractor = Extractor(mock_llm_client)
+    extractor = Extractor(mock_llm_client, model="test-model")
     extractions = extractor.extract_knowledge(journal)
 
     # Verify indent_str was passed to LLM during extraction
