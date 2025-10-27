@@ -204,48 +204,57 @@ Implement precise block targeting using hybrid IDs for UPDATE and APPEND operati
 
 ---
 
-### **Milestone 4: Multi-Stage LLM Pipeline** (7-9 tasks)
+### **Milestone 4: Multi-Stage LLM Pipeline** (8-10 tasks)
 
-Implement Phase 3 (Decider + Reworder) and Phase 4 (Execution + Cleanup) from FUTURE-STATE.
+Implement Phase 1 (Knowledge Extraction changes), Phase 3 (Decider + Reworder) and Phase 4 (Execution + Cleanup) from FUTURE-STATE.
 
-#### M4.1: Implement Phase 2 Candidate Retrieval (Enhanced)
+#### M4.1: Update Phase 1 Extraction to Return Exact Block Text
+- **File**: `src/logsqueak/llm/providers/openai_compat.py`, `src/logsqueak/extraction/extractor.py`
+- **Task**: Modify extraction prompt to return exact block text (not pre-contextualized)
+- **Task**: Add post-extraction step to walk AST and add parent context to each block
+- **Task**: Generate `original_id` for each extracted block (using id:: or content hash)
+- **Task**: Return "Knowledge Packages" with `{original_id, full_text}` instead of just content
+- **Rationale**: Separates LLM responsibility (identify blocks) from code responsibility (add context)
+- **Test**: Verify extracted blocks get proper context from parent bullets
+
+#### M4.2: Implement Phase 2 Candidate Retrieval (Enhanced)
 - **File**: `src/logsqueak/extraction/extractor.py`
 - **Task**: Update `select_target_page()` to return block-level candidates
 - **Task**: Include `target_id` for each relevant chunk
 - **Test**: Unit test for block-level candidate retrieval
 
-#### M4.2: Create Decider Prompt (Phase 3.1)
+#### M4.3: Create Decider Prompt (Phase 3.1)
 - **File**: `src/logsqueak/llm/prompts.py`
 - **Task**: Add `build_decider_prompt(knowledge, targetable_chunks)`
 - **Task**: LLM chooses: IGNORE_*, UPDATE, APPEND (with `target_id`)
 - **Test**: Prompt inspection test
 
-#### M4.3: Implement Decider LLM Call
+#### M4.4: Implement Decider LLM Call
 - **File**: `src/logsqueak/llm/client.py`
 - **Task**: Add `decide_action(knowledge, targetable_chunks) -> DecisionResult`
 - **Task**: Parse JSON response with action and `target_id`
 - **Test**: Mock LLM test for decision parsing
 
-#### M4.4: Create Reworder Prompt (Phase 3.2)
+#### M4.5: Create Reworder Prompt (Phase 3.2)
 - **File**: `src/logsqueak/llm/prompts.py`
 - **Task**: Add `build_reworder_prompt(knowledge_full_text)`
 - **Task**: Instructions: remove journal context, preserve links, create evergreen block
 - **Test**: Prompt inspection test
 
-#### M4.5: Implement Reworder LLM Call
+#### M4.6: Implement Reworder LLM Call
 - **File**: `src/logsqueak/llm/client.py`
 - **Task**: Add `reword_knowledge(full_text) -> str`
 - **Task**: Use high-quality model (configurable)
 - **Test**: Mock LLM test for reword output
 
-#### M4.6: Wire Up Phase 3 in Pipeline
+#### M4.7: Wire Up Phase 3 in Pipeline
 - **File**: `src/logsqueak/cli/main.py`
 - **Task**: Call Decider for each candidate
 - **Task**: Call Reworder only if action is UPDATE/APPEND
 - **Task**: Build "Write List" with `{page, decision, new_content}`
 - **Test**: Integration test for Phase 3 pipeline
 
-#### M4.7: Implement Journal Cleanup (Phase 4.5)
+#### M4.8: Implement Journal Cleanup (Phase 4.5)
 - **File**: `src/logsqueak/integration/journal_cleanup.py`
 - **Task**: Add `processed::` markers to journal blocks
 - **Task**: Format: `processed:: [page1](((uuid1))), [page2](((uuid2)))`
@@ -253,13 +262,13 @@ Implement Phase 3 (Decider + Reworder) and Phase 4 (Execution + Cleanup) from FU
 - **Task**: Handle page name formatting (remove `.md`, replace `___` with `/`)
 - **Test**: Unit test for cleanup formatting and link syntax
 
-#### M4.8: Wire Up Phase 4 Cleanup
+#### M4.9: Wire Up Phase 4 Cleanup
 - **File**: `src/logsqueak/cli/main.py`
 - **Task**: After file writes, update journal with `processed::` markers
 - **Task**: Track `{original_id: [(page, new_id), ...]}`
 - **Test**: Integration test for end-to-end cleanup
 
-#### M4.9: Add Configuration for Model Selection
+#### M4.10: Add Configuration for Model Selection
 - **File**: `src/logsqueak/models/config.py`
 - **Task**: Add optional `llm.decider_model` and `llm.reworder_model` config fields
 - **Task**: Both default to `llm.model` if not specified (allows using different models for speed vs quality)
@@ -315,10 +324,10 @@ Comprehensive testing and polish for the new pipeline.
 |-----------|-------|----------------|--------|-------------|
 | M1: Hybrid-ID Foundation | 5 | 3-5 days | ✅ Complete | ~1 day |
 | M2: Persistent Vector Store | 6 | 4-6 days | ✅ Complete | ~1 day |
-| M3: Block-Level Targeting | 5 | 3-5 days | ⏳ Next | - |
-| M4: Multi-Stage Pipeline | 9 | 7-10 days | Pending | - |
+| M3: Block-Level Targeting | 3 | 2-3 days | ✅ Complete | <1 day |
+| M4: Multi-Stage Pipeline | 10 | 8-12 days | ⏳ Next | - |
 | M5: Testing & Refinement | 6 | 4-6 days | Pending | - |
-| **Total** | **31 tasks** | **21-32 days** | 35% | 2/21-32 |
+| **Total** | **30 tasks** | **21-32 days** | 47% | ~3/21-32 |
 
 ---
 
