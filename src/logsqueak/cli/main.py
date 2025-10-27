@@ -609,6 +609,177 @@ def parse_date_or_range(date_str: str) -> list[date]:
         raise ValueError(f'Invalid date format: "{date_str}"') from e
 
 
+@cli.group()
+@click.pass_context
+def index(ctx: click.Context):
+    """Manage the page index and vector store.
+
+    Commands for building, rebuilding, and inspecting the page index
+    used for semantic search.
+    """
+    pass
+
+
+@index.command()
+@click.option(
+    "--graph",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Override Logseq graph path (default: from config)",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Force full rebuild (ignore cache)",
+)
+@click.pass_context
+def rebuild(ctx: click.Context, graph: Optional[Path], force: bool):
+    """Rebuild the page index.
+
+    Incrementally updates the index by detecting additions, updates, and
+    deletions. Use --force to ignore cache and rebuild from scratch.
+
+    Examples:
+        logsqueak index rebuild              # Incremental update
+        logsqueak index rebuild --force      # Full rebuild
+    """
+    verbose = ctx.obj["verbose"]
+
+    # Configure logging
+    if verbose:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(levelname)s [%(name)s] %(message)s",
+            force=True,
+        )
+    else:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(levelname)s: %(message)s",
+            force=True,
+        )
+
+    # Load configuration
+    try:
+        config_path = ctx.obj["config_path"]
+        config = load_config(config_path)
+        if verbose:
+            click.echo(f"Loading configuration from {config_path or '~/.config/logsqueak/config.yaml'}")
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        ctx.exit(1)
+    except Exception as e:
+        click.echo(f"Error loading configuration: {e}", err=True)
+        ctx.exit(1)
+
+    # Apply graph override
+    if graph:
+        config.logseq.graph_path = graph
+
+    # Build index using VectorStore
+    try:
+        graph_paths = GraphPaths(config.logseq.graph_path)
+        page_files = list(graph_paths.pages_dir.glob("*.md"))
+
+        click.echo(f"Building index for {len(page_files)} pages...")
+        start_time = time.time()
+
+        # Use VectorStore backend (M2.6)
+        page_index = PageIndex.build_with_vector_store(config.logseq.graph_path)
+
+        duration = time.time() - start_time
+        click.echo(f"✓ Index built in {duration:.1f}s")
+
+        # Clean up
+        if hasattr(page_index, "_vector_store"):
+            page_index._vector_store.close()
+
+    except Exception as e:
+        click.echo(f"Error: Failed to build index: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        ctx.exit(1)
+
+
+@index.command()
+@click.option(
+    "--graph",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Override Logseq graph path (default: from config)",
+)
+@click.pass_context
+def status(ctx: click.Context, graph: Optional[Path]):
+    """Show index status and cache statistics.
+
+    Displays information about the current index state, including
+    number of indexed pages and cache location.
+
+    Examples:
+        logsqueak index status
+    """
+    verbose = ctx.obj["verbose"]
+
+    # Load configuration
+    try:
+        config_path = ctx.obj["config_path"]
+        config = load_config(config_path)
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        ctx.exit(1)
+    except Exception as e:
+        click.echo(f"Error loading configuration: {e}", err=True)
+        ctx.exit(1)
+
+    # Apply graph override
+    if graph:
+        config.logseq.graph_path = graph
+
+    try:
+        graph_paths = GraphPaths(config.logseq.graph_path)
+
+        # Check if pages directory exists
+        if not graph_paths.pages_dir.exists():
+            click.echo(f"Error: Pages directory not found: {graph_paths.pages_dir}", err=True)
+            ctx.exit(1)
+
+        # Count pages
+        page_files = list(graph_paths.pages_dir.glob("*.md"))
+
+        # Check cache locations
+        default_cache = Path.home() / ".cache" / "logsqueak"
+        chroma_cache = default_cache / "chroma"
+        manifest_path = default_cache / "manifest.json"
+
+        click.echo(f"Graph: {config.logseq.graph_path}")
+        click.echo(f"Pages: {len(page_files)}")
+        click.echo(f"\nCache locations:")
+        click.echo(f"  VectorStore: {chroma_cache} {'(exists)' if chroma_cache.exists() else '(not found)'}")
+        click.echo(f"  Manifest: {manifest_path} {'(exists)' if manifest_path.exists() else '(not found)'}")
+
+        # Read manifest if it exists
+        if manifest_path.exists():
+            from logsqueak.rag.manifest import CacheManifest
+            manifest = CacheManifest(manifest_path)
+            indexed_pages = manifest.get_all_pages()
+            click.echo(f"\nIndexed pages: {len(indexed_pages)}")
+
+            if verbose and indexed_pages:
+                click.echo("\nIndexed page names:")
+                for page_name in sorted(indexed_pages[:10]):  # Show first 10
+                    click.echo(f"  - {page_name}")
+                if len(indexed_pages) > 10:
+                    click.echo(f"  ... and {len(indexed_pages) - 10} more")
+        else:
+            click.echo("\nNo index found. Run 'logsqueak index rebuild' to create one.")
+
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        ctx.exit(1)
+
+
 def main():
     """Entry point for the CLI."""
     cli(obj={})
