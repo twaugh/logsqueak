@@ -140,6 +140,33 @@ def _resolve_page_path(graph_path: Path, page_name: str) -> Path:
     return graph_path / "pages" / filename
 
 
+def _strip_page_prefix(target_id: str) -> str:
+    """Strip page_name prefix from global target_id.
+
+    Candidate chunks use globally unique IDs with format: page_name::hybrid_id
+    But when searching within a specific page's AST, we need just: hybrid_id
+
+    Args:
+        target_id: Global ID (e.g., "Project X::abc123" or "abc123")
+
+    Returns:
+        Local hybrid_id (e.g., "abc123")
+
+    Examples:
+        >>> _strip_page_prefix("Project X::abc123")
+        "abc123"
+        >>> _strip_page_prefix("UMB___Decommissioning::4cde045ce439cf334654dc3a275fb3ba")
+        "4cde045ce439cf334654dc3a275fb3ba"
+        >>> _strip_page_prefix("abc123")  # No prefix
+        "abc123"
+    """
+    if "::" in target_id:
+        # Split on first :: to separate page_name from hybrid_id
+        parts = target_id.split("::", 1)
+        return parts[1] if len(parts) > 1 else target_id
+    return target_id
+
+
 def _apply_operation(outline: LogseqOutline, op: "WriteOperation") -> str:
     """Apply a single write operation to the outline AST.
 
@@ -157,7 +184,9 @@ def _apply_operation(outline: LogseqOutline, op: "WriteOperation") -> str:
     """
     if op.action == ActionType.UPDATE:
         # Find target block and update its content
-        target_block = outline.find_block_by_id(op.target_id)
+        # Strip page prefix from global target_id (page_name::hybrid_id -> hybrid_id)
+        local_target_id = _strip_page_prefix(op.target_id)
+        target_block = outline.find_block_by_id(local_target_id)
         if not target_block:
             raise ValueError(f"Target block not found: {op.target_id}")
 
@@ -171,7 +200,9 @@ def _apply_operation(outline: LogseqOutline, op: "WriteOperation") -> str:
 
     elif op.action == ActionType.APPEND_CHILD:
         # Find target block and append as child
-        target_block = outline.find_block_by_id(op.target_id)
+        # Strip page prefix from global target_id (page_name::hybrid_id -> hybrid_id)
+        local_target_id = _strip_page_prefix(op.target_id)
+        target_block = outline.find_block_by_id(local_target_id)
         if not target_block:
             raise ValueError(f"Target block not found: {op.target_id}")
 
