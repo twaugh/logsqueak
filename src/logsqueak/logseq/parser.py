@@ -57,6 +57,39 @@ class LogseqBlock:
 
         return child
 
+    def get_hybrid_id(self, parents: list["LogseqBlock"] = None, indent_str: str = "  ") -> str:
+        """Get hybrid ID for this block.
+
+        Returns the persistent id:: property if present, otherwise generates
+        a content hash based on full context (block + all parents).
+
+        Args:
+            parents: List of parent blocks from root to immediate parent
+            indent_str: Indentation string (default: "  ")
+
+        Returns:
+            Hybrid ID (id:: property or MD5 hash of full context)
+
+        Examples:
+            >>> # Block with id:: property
+            >>> block.get_hybrid_id()
+            '65f3a8e0-1234-5678-9abc-def012345678'
+
+            >>> # Block without id:: (generates hash)
+            >>> block.get_hybrid_id(parents=[root, parent])
+            'a1b2c3d4e5f6...'
+        """
+        if self.block_id:
+            # Has explicit id:: property
+            return self.block_id
+
+        # Generate hash from full context
+        from logsqueak.logseq.context import generate_full_context, generate_content_hash
+
+        parents = parents or []
+        full_context = generate_full_context(self, parents, indent_str)
+        return generate_content_hash(full_context)
+
 
 @dataclass
 class LogseqOutline:
@@ -126,6 +159,36 @@ class LogseqOutline:
             return None
 
         return search(self.blocks)
+
+    def find_block_by_id(self, target_id: str) -> Optional[LogseqBlock]:
+        """Find block by hybrid ID (id:: property or content hash).
+
+        Uses generate_chunks() for efficient one-pass traversal with pre-computed IDs.
+
+        Args:
+            target_id: Hybrid ID to search for
+
+        Returns:
+            LogseqBlock if found, None otherwise
+
+        Examples:
+            >>> outline.find_block_by_id("explicit-id-123")
+            <LogseqBlock with id:: explicit-id-123>
+
+            >>> outline.find_block_by_id("a1b2c3d4...")  # content hash
+            <LogseqBlock matching that hash>
+        """
+        from logsqueak.logseq.context import generate_chunks
+
+        # Generate all chunks with pre-computed hybrid IDs (single pass)
+        chunks = generate_chunks(self)
+
+        # Search for matching ID
+        for block, _context, hybrid_id in chunks:
+            if hybrid_id == target_id:
+                return block
+
+        return None
 
     def render(self) -> str:
         """Render outline back to Logseq markdown.

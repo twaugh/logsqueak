@@ -399,3 +399,118 @@ class TestBlockProperties:
         assert block.block_id == "test-id"
         # All continuation lines should be preserved
         assert len(block.continuation_lines) == 4
+
+
+class TestHybridID:
+    """Tests for hybrid ID functionality (M1.3)."""
+
+    def test_get_hybrid_id_with_explicit_id(self):
+        """Test get_hybrid_id returns id:: property when present."""
+        markdown = dedent(
+            """\
+            - Block with ID
+              id:: explicit-123"""
+        )
+        outline = LogseqOutline.parse(markdown)
+        block = outline.blocks[0]
+
+        hybrid_id = block.get_hybrid_id()
+
+        assert hybrid_id == "explicit-123"
+
+    def test_get_hybrid_id_without_explicit_id(self):
+        """Test get_hybrid_id generates hash when no id:: property."""
+        markdown = "- Block without ID"
+        outline = LogseqOutline.parse(markdown)
+        block = outline.blocks[0]
+
+        hybrid_id = block.get_hybrid_id()
+
+        # Should be MD5 hash (32 hex chars)
+        assert len(hybrid_id) == 32
+        assert all(c in "0123456789abcdef" for c in hybrid_id)
+
+    def test_get_hybrid_id_with_parents(self):
+        """Test get_hybrid_id uses parent context for hash."""
+        from logsqueak.logseq.parser import LogseqBlock
+
+        parent = LogseqBlock(content="Parent", indent_level=0)
+        child = LogseqBlock(content="Child", indent_level=1)
+
+        # Hash with parent context
+        hybrid_id_with_parent = child.get_hybrid_id(parents=[parent])
+
+        # Hash without parent context
+        hybrid_id_without_parent = child.get_hybrid_id(parents=[])
+
+        # Should be different due to different context
+        assert hybrid_id_with_parent != hybrid_id_without_parent
+
+    def test_find_block_by_id_with_explicit_id(self):
+        """Test finding block by explicit id:: property."""
+        markdown = dedent(
+            """\
+            - Block 1
+            - Block 2
+              id:: target-id
+            - Block 3"""
+        )
+        outline = LogseqOutline.parse(markdown)
+
+        found = outline.find_block_by_id("target-id")
+
+        assert found is not None
+        assert found.content == "Block 2"
+        assert found.block_id == "target-id"
+
+    def test_find_block_by_id_with_hash(self):
+        """Test finding block by content hash."""
+        markdown = "- Unique block content"
+        outline = LogseqOutline.parse(markdown)
+        block = outline.blocks[0]
+
+        # Get the hybrid ID (which will be a hash)
+        target_id = block.get_hybrid_id()
+
+        # Find it
+        found = outline.find_block_by_id(target_id)
+
+        assert found is not None
+        assert found.content == "Unique block content"
+
+    def test_find_block_by_id_in_nested_structure(self):
+        """Test finding nested block by ID."""
+        markdown = dedent(
+            """\
+            - Parent
+              - Child
+                id:: nested-id
+                - Grandchild"""
+        )
+        outline = LogseqOutline.parse(markdown)
+
+        found = outline.find_block_by_id("nested-id")
+
+        assert found is not None
+        assert found.content == "Child"
+        assert found.block_id == "nested-id"
+
+    def test_find_block_by_id_not_found(self):
+        """Test find_block_by_id returns None when not found."""
+        markdown = "- Some block"
+        outline = LogseqOutline.parse(markdown)
+
+        found = outline.find_block_by_id("nonexistent-id")
+
+        assert found is None
+
+    def test_hybrid_id_consistency(self):
+        """Test that hybrid ID is consistent across calls."""
+        markdown = "- Test block"
+        outline = LogseqOutline.parse(markdown)
+        block = outline.blocks[0]
+
+        id1 = block.get_hybrid_id()
+        id2 = block.get_hybrid_id()
+
+        assert id1 == id2
