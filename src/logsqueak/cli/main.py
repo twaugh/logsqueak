@@ -254,6 +254,14 @@ def process_journal_date(
         dry_run: If True, skip approval and file writes
         token_budget: Optional token budget for Stage 2 prompts
     """
+    # TEMPORARY: CLI not yet updated for new 5-phase pipeline (M4)
+    click.echo("\nError: The CLI has not yet been updated for the new multi-stage pipeline.", err=True)
+    click.echo("The 'extract' command is temporarily disabled on the better-pipeline branch.", err=True)
+    click.echo("\nThe new pipeline is complete but needs CLI integration (M5 tasks).", err=True)
+    click.echo("For now, you can use the pipeline programmatically via:", err=True)
+    click.echo("  extractor.extract_and_integrate(journal, vector_store, graph_path)", err=True)
+    raise click.Abort()
+
     try:
         # Load journal entry
         progress.show_processing_journal(journal_date.isoformat())
