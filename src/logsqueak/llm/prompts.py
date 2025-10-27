@@ -118,3 +118,114 @@ def build_page_selection_messages(
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
+
+
+def build_decider_messages(
+    knowledge_text: str,
+    candidate_chunks: List[dict],
+) -> List[dict]:
+    """Build Phase 3 (Decider) prompt messages.
+
+    This is the canonical implementation of the Decider prompt.
+    The Decider LLM decides what action to take with the knowledge.
+
+    Args:
+        knowledge_text: The full-context knowledge text to integrate
+        candidate_chunks: List of candidate chunks from Phase 2 RAG
+                         Each dict has: page_name, target_id, content, similarity_score
+
+    Returns:
+        List of message dicts for chat completion API
+    """
+    system_prompt = dedent("""
+        You are a knowledge integration assistant for a personal knowledge base.
+
+        Your task is to decide what action to take with a piece of knowledge from a journal entry.
+
+        You will receive:
+        1. Knowledge to integrate (in <knowledge> tags)
+        2. Candidate chunks from semantic search (in <candidate_chunks> tags)
+
+        Each candidate chunk represents a specific block in the knowledge base that might be relevant.
+        Candidates include:
+        - page_name: The page containing this block
+        - target_id: The unique ID of this block
+        - content: The current content of the block
+        - similarity_score: How semantically similar it is (0.0-1.0)
+
+        You must decide ONE of these actions:
+
+        1. IGNORE_ALREADY_PRESENT - The knowledge already exists in the target location
+           Use when: A candidate block contains essentially the same information
+           Returns: target_id of the block with existing knowledge
+
+        2. IGNORE_IRRELEVANT - The knowledge doesn't relate to any candidate
+           Use when: None of the candidates are appropriate targets for this knowledge
+           Returns: target_id null, page_name null
+
+        3. UPDATE - Modify an existing block's content
+           Use when: The knowledge updates or refines existing information in a candidate
+           Returns: target_id of block to update
+
+        4. APPEND_CHILD - Add as a child bullet under an existing block
+           Use when: The knowledge adds detail/context to an existing candidate block
+           Returns: target_id of parent block
+
+        5. APPEND_ROOT - Add at page root level
+           Use when: The knowledge relates to a page but doesn't fit under any specific block
+           Returns: target_id null, page_name of the target page
+
+        Return a JSON object with this structure:
+        {{
+          "action": "APPEND_CHILD",
+          "target_id": "65f3a8e0-1234-5678-9abc-def012345678",
+          "reasoning": "Brief explanation of your decision"
+        }}
+
+        Or for APPEND_ROOT:
+        {{
+          "action": "APPEND_ROOT",
+          "target_id": null,
+          "page_name": "Project X",
+          "reasoning": "Brief explanation of your decision"
+        }}
+
+        CRITICAL RULES:
+        - If no candidates are provided, use IGNORE_IRRELEVANT
+        - Higher similarity scores indicate better semantic matches
+        - IGNORE_ALREADY_PRESENT requires very high confidence (near-duplicate content)
+        - IGNORE_IRRELEVANT means none of the candidates are appropriate (not that knowledge is irrelevant)
+        - UPDATE should only be used when truly updating/correcting existing info
+        - When unsure between UPDATE and APPEND_CHILD, prefer APPEND_CHILD (safer)
+        - APPEND_ROOT requires page_name - choose the most relevant page from candidates
+        - target_id is required for: IGNORE_ALREADY_PRESENT, UPDATE, APPEND_CHILD
+        - page_name is required only for: APPEND_ROOT
+        - action must be one of: IGNORE_ALREADY_PRESENT, IGNORE_IRRELEVANT, UPDATE, APPEND_CHILD, APPEND_ROOT
+    """).strip()
+
+    # Format candidates for prompt using XML structure
+    if not candidate_chunks:
+        chunks_xml = "<candidate_chunks>\n(No candidates found - consider APPEND_ROOT)\n</candidate_chunks>"
+    else:
+        chunks_xml_items = []
+        for i, chunk in enumerate(candidate_chunks[:10], 1):  # Limit to top 10
+            chunks_xml_items.append(
+                f"<chunk rank=\"{i}\">\n"
+                f"  <page_name>{chunk['page_name']}</page_name>\n"
+                f"  <target_id>{chunk['target_id']}</target_id>\n"
+                f"  <similarity_score>{chunk['similarity_score']:.3f}</similarity_score>\n"
+                f"  <content>\n{chunk['content']}\n  </content>\n"
+                f"</chunk>"
+            )
+        chunks_xml = f"<candidate_chunks>\n{chr(10).join(chunks_xml_items)}\n</candidate_chunks>"
+
+    user_prompt = (
+        f"<knowledge>\n{knowledge_text}\n</knowledge>\n\n"
+        f"{chunks_xml}\n\n"
+        f"Decide what action to take with this knowledge."
+    )
+
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]

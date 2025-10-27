@@ -64,6 +64,32 @@ class PageSelectionResult:
         self.reasoning = reasoning
 
 
+class DecisionResult:
+    """Result from Phase 3: Decider LLM decision.
+
+    The Decider LLM chooses what action to take with the knowledge
+    based on candidate chunks from Phase 2.
+
+    Attributes:
+        action: What to do with the knowledge (IGNORE_*, UPDATE, APPEND_CHILD, APPEND_ROOT)
+        page_name: Target page name (None only for IGNORE_IRRELEVANT)
+        target_id: Hybrid ID of target block (None for IGNORE_IRRELEVANT and APPEND_ROOT)
+        reasoning: LLM's explanation for the decision
+    """
+
+    def __init__(
+        self,
+        action: ActionType,
+        page_name: Optional[str],
+        target_id: Optional[str],
+        reasoning: str,
+    ):
+        self.action = action
+        self.page_name = page_name
+        self.target_id = target_id
+        self.reasoning = reasoning
+
+
 class LLMClient(ABC):
     """Abstract interface for LLM providers.
 
@@ -113,6 +139,31 @@ class LLMClient(ABC):
 
         Returns:
             Selected target page, section path, and suggested action
+
+        Raises:
+            LLMError: If API request fails or returns invalid response
+        """
+        pass
+
+    @abstractmethod
+    def decide_action(
+        self,
+        knowledge_text: str,
+        candidate_chunks: List[dict],
+    ) -> DecisionResult:
+        """Decide what action to take with knowledge (Phase 3: Decider).
+
+        The LLM analyzes the knowledge and candidate chunks to decide:
+        - Does this knowledge relate to any candidates?
+        - If yes, which page and block should receive it?
+        - Should it UPDATE existing content or APPEND as new content?
+
+        Args:
+            knowledge_text: The full-context knowledge text
+            candidate_chunks: List of candidate chunks (dicts with page_name, target_id, content, score)
+
+        Returns:
+            Decision with action type, page_name, target_id, and reasoning
 
         Raises:
             LLMError: If API request fails or returns invalid response

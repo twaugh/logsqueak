@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from logsqueak.llm.client import (
+    DecisionResult,
     ExtractionResult,
     LLMAPIError,
     LLMClient,
@@ -22,7 +23,7 @@ from logsqueak.llm.client import (
     PageSelectionResult,
 )
 from logsqueak.llm.prompt_logger import PromptLogger
-from logsqueak.llm.prompts import build_page_selection_messages
+from logsqueak.llm.prompts import build_decider_messages, build_page_selection_messages
 from logsqueak.models.knowledge import ActionType
 
 
@@ -301,6 +302,108 @@ class OpenAICompatibleProvider(LLMClient):
         except httpx.RequestError as e:
             if self.prompt_logger:
                 self.prompt_logger.log_response(stage="page_selection", response={}, error=e)
+            raise LLMError(f"Network error: {e}") from e
+
+    def decide_action(
+        self,
+        knowledge_text: str,
+        candidate_chunks: List[dict],
+    ) -> DecisionResult:
+        """Decide what action to take with knowledge (Phase 3: Decider).
+
+        Args:
+            knowledge_text: The full-context knowledge text
+            candidate_chunks: List of candidate chunks from Phase 2 RAG
+
+        Returns:
+            Decision with action type, target_id, and reasoning
+
+        Raises:
+            LLMError: If API request fails or returns invalid response
+        """
+        # Build messages using shared prompt builder
+        messages = build_decider_messages(
+            knowledge_text=knowledge_text,
+            candidate_chunks=candidate_chunks,
+        )
+
+        # Log request if logger is enabled
+        if self.prompt_logger:
+            self.prompt_logger.log_request(
+                stage="decider",
+                messages=messages,
+                model=self.model,
+                metadata={
+                    "knowledge_text": knowledge_text[:200] + "..." if len(knowledge_text) > 200 else knowledge_text,
+                    "num_candidates": len(candidate_chunks),
+                },
+            )
+
+        try:
+            response = self._make_request(messages=messages)
+
+            # Parse JSON response
+            data = self._parse_json_response(response)
+
+            # Log successful response
+            if self.prompt_logger:
+                self.prompt_logger.log_response(
+                    stage="decider",
+                    response=response,
+                    parsed_content=data,
+                )
+
+            # Validate required structure
+            required_fields = ["action", "reasoning"]
+            for field in required_fields:
+                if field not in data:
+                    raise LLMResponseError(f"Response missing '{field}' field")
+
+            # Parse action type
+            action_str = data["action"]
+            try:
+                action = ActionType(action_str.lower())
+            except ValueError:
+                raise LLMResponseError(
+                    f"Invalid action type: {action_str}. "
+                    "Must be one of: IGNORE_ALREADY_PRESENT, IGNORE_IRRELEVANT, UPDATE, APPEND_CHILD, APPEND_ROOT"
+                )
+
+            # Get page_name (required only for APPEND_ROOT)
+            page_name = data.get("page_name")
+
+            # Get target_id (required for UPDATE, APPEND_CHILD, IGNORE_ALREADY_PRESENT)
+            target_id = data.get("target_id")
+
+            # Validate based on action type
+            if action == ActionType.APPEND_ROOT and page_name is None:
+                raise LLMResponseError("page_name is required for APPEND_ROOT action")
+
+            if action in (ActionType.UPDATE, ActionType.APPEND_CHILD, ActionType.IGNORE_ALREADY_PRESENT):
+                if target_id is None:
+                    raise LLMResponseError(f"target_id is required for {action_str} action")
+
+            return DecisionResult(
+                action=action,
+                page_name=page_name,
+                target_id=target_id,
+                reasoning=data.get("reasoning", ""),
+            )
+
+        except httpx.TimeoutException as e:
+            if self.prompt_logger:
+                self.prompt_logger.log_response(stage="decider", response={}, error=e)
+            raise LLMTimeoutError(f"Request timeout: {e}") from e
+        except httpx.HTTPStatusError as e:
+            if self.prompt_logger:
+                self.prompt_logger.log_response(stage="decider", response={}, error=e)
+            raise LLMAPIError(
+                f"API error: {e.response.status_code} - {e.response.text}",
+                status_code=e.response.status_code,
+            ) from e
+        except httpx.RequestError as e:
+            if self.prompt_logger:
+                self.prompt_logger.log_response(stage="decider", response={}, error=e)
             raise LLMError(f"Network error: {e}") from e
 
     def _make_request(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:
