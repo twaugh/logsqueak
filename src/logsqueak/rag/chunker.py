@@ -39,6 +39,9 @@ def chunk_page(outline: LogseqOutline, page_name: str) -> List[Chunk]:
     full-context text and hybrid IDs, then wraps results in Chunk dataclass
     with page metadata.
 
+    Note: The hybrid_id is made globally unique by prefixing with page_name
+    to avoid collisions when the same block content appears on multiple pages.
+
     Args:
         outline: Parsed Logseq page outline
         page_name: Name of the page (for metadata)
@@ -61,16 +64,31 @@ def chunk_page(outline: LogseqOutline, page_name: str) -> List[Chunk]:
 
     # Wrap in Chunk dataclass with page metadata
     chunks = []
+    # Track IDs to detect duplicates within the same page
+    seen_ids = {}
+
     for block, full_context, hybrid_id in raw_chunks:
+        # Make ID globally unique by including page name
+        # Format: page_name::hybrid_id::seq (seq only if duplicate)
+        global_id = f"{page_name}::{hybrid_id}"
+
+        # Handle duplicates within same page by adding sequence number
+        if global_id in seen_ids:
+            seen_ids[global_id] += 1
+            global_id = f"{global_id}::{seen_ids[global_id]}"
+        else:
+            seen_ids[global_id] = 0
+
         chunk = Chunk(
             full_context_text=full_context,
-            hybrid_id=hybrid_id,
+            hybrid_id=global_id,
             page_name=page_name,
             block_content=block.content,
             metadata={
                 "page_name": page_name,
                 "block_content": block.content,
                 "indent_level": block.indent_level,
+                "local_hybrid_id": hybrid_id,  # Store original for reference
             },
         )
         chunks.append(chunk)

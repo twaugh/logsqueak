@@ -103,7 +103,10 @@ class TestChunkPage:
         chunks = chunk_page(outline, "ID Page")
 
         assert len(chunks) == 1
-        assert chunks[0].hybrid_id == "explicit-id-123"
+        # ID should be globally unique: page_name::hybrid_id
+        assert chunks[0].hybrid_id == "ID Page::explicit-id-123"
+        # Local ID stored in metadata
+        assert chunks[0].metadata["local_hybrid_id"] == "explicit-id-123"
 
     def test_chunk_without_explicit_ids(self):
         """Test chunking blocks without id:: (uses content hash)."""
@@ -113,9 +116,12 @@ class TestChunkPage:
         chunks = chunk_page(outline, "Hash Page")
 
         assert len(chunks) == 1
-        # Should be MD5 hash (32 hex chars)
-        assert len(chunks[0].hybrid_id) == 32
-        assert all(c in "0123456789abcdef" for c in chunks[0].hybrid_id)
+        # Should be globally unique: page_name::hash
+        # Format: "Hash Page::32_hex_chars"
+        assert chunks[0].hybrid_id.startswith("Hash Page::")
+        local_id = chunks[0].hybrid_id.split("::", 1)[1]
+        assert len(local_id) == 32  # MD5 hash
+        assert all(c in "0123456789abcdef" for c in local_id)
 
     def test_chunk_metadata_includes_page_name(self):
         """Test that metadata includes page name."""
@@ -179,8 +185,9 @@ class TestChunkPage:
         for chunk in chunks:
             assert chunk.page_name == "Complex Page"
 
-        # Verify root block has explicit ID
-        assert chunks[0].hybrid_id == "root-1"
+        # Verify root block has explicit ID (globally unique)
+        assert chunks[0].hybrid_id == "Complex Page::root-1"
+        assert chunks[0].metadata["local_hybrid_id"] == "root-1"
         assert chunks[0].block_content == "Root 1"
 
         # Verify child context
@@ -249,4 +256,6 @@ class TestChunkPageFile:
         chunks = chunk_page_file(page_file)
 
         assert len(chunks) == 1
-        assert chunks[0].hybrid_id == "prop-id-123"
+        # ID should be globally unique
+        assert chunks[0].hybrid_id == "Props::prop-id-123"
+        assert chunks[0].metadata["local_hybrid_id"] == "prop-id-123"
