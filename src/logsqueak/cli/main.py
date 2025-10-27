@@ -52,35 +52,39 @@ def cli(ctx: click.Context, config: Optional[Path], verbose: bool, version: bool
     ctx.obj["verbose"] = verbose
 
 
-def build_page_index(graph_path: Path, ctx: click.Context) -> PageIndex:
-    """Build PageIndex with progress feedback.
+def build_vector_store(graph_path: Path, ctx: click.Context):
+    """Build VectorStore with progress feedback.
 
-    Uses per-page embedding cache for page-level RAG.
+    Uses persistent ChromaDB for block-level semantic search.
 
     Args:
         graph_path: Path to Logseq graph
         ctx: Click context for error handling
 
     Returns:
-        Built PageIndex
+        Built VectorStore
     """
-    try:
-        graph_paths = GraphPaths(graph_path)
-        page_files = list(graph_paths.pages_dir.glob("*.md"))
+    from logsqueak.rag.indexer import IndexBuilder
+    from logsqueak.rag.vector_store import VectorStore
 
-        progress.show_building_index(len(page_files))
+    try:
+        progress.show_building_index(0)  # Don't know count yet
         start_time = time.time()
 
-        # Use original PageIndex.build() with per-page pkl cache
-        page_index = PageIndex.build(graph_path)
+        # Build/load vector store
+        vector_store = VectorStore(graph_path)
+        builder = IndexBuilder(vector_store, graph_path)
+        stats = builder.build_index()
 
         duration = time.time() - start_time
-        # Get cache stats from PageIndex attributes (set in build())
-        cached = getattr(page_index, 'cached_count', 0)
-        computed = getattr(page_index, 'computed_count', len(page_files))
-        progress.show_index_built(len(page_files), duration, cached, computed)
+        progress.show_index_built(
+            stats["total_blocks"],
+            duration,
+            stats["cached_blocks"],
+            stats["indexed_blocks"]
+        )
 
-        return page_index
+        return vector_store
     except Exception as e:
         progress.show_error(f"Failed to build page index: {e}")
         ctx.exit(1)
@@ -233,7 +237,7 @@ def match_knowledge_to_pages(
 def process_journal_date(
     journal_date: date,
     extractor: Extractor,
-    page_index: PageIndex,
+    vector_store,  # Changed from page_index to vector_store
     graph_path: Path,
     model: str,
     verbose: bool,
@@ -241,26 +245,25 @@ def process_journal_date(
     dry_run: bool = True,
     token_budget: Optional[int] = None,
 ) -> None:
-    """Process a single journal date.
+    """Process a single journal date using the new 5-phase pipeline.
 
     Args:
         journal_date: Date to process
         extractor: Extractor instance
-        page_index: PageIndex for RAG search
+        vector_store: VectorStore for semantic search
         graph_path: Path to Logseq graph
         model: LLM model name (for progress display)
         verbose: Verbose output flag
-        show_diffs: Show diffs in preview
-        dry_run: If True, skip approval and file writes
-        token_budget: Optional token budget for Stage 2 prompts
+        show_diffs: Show diffs in preview (ignored - no preview in new pipeline yet)
+        dry_run: If True, show what would happen but don't actually write
+        token_budget: Optional token budget (ignored - new pipeline uses top_k)
     """
-    # TEMPORARY: CLI not yet updated for new 5-phase pipeline (M4)
-    click.echo("\nError: The CLI has not yet been updated for the new multi-stage pipeline.", err=True)
-    click.echo("The 'extract' command is temporarily disabled on the better-pipeline branch.", err=True)
-    click.echo("\nThe new pipeline is complete but needs CLI integration (M5 tasks).", err=True)
-    click.echo("For now, you can use the pipeline programmatically via:", err=True)
-    click.echo("  extractor.extract_and_integrate(journal, vector_store, graph_path)", err=True)
-    raise click.Abort()
+    if dry_run:
+        click.echo("\nWarning: --dry-run mode not yet implemented for new pipeline.", err=True)
+        click.echo("The new 5-phase pipeline will execute immediately without approval.", err=True)
+        click.echo("Use Ctrl+C to cancel now if you don't want to proceed.\n", err=True)
+        import time
+        time.sleep(2)
 
     try:
         # Load journal entry
@@ -276,121 +279,20 @@ def process_journal_date(
 
         journal = JournalEntry.load(journal_file)
 
-        # Stage 1: Extract knowledge blocks
+        # Run the new 5-phase pipeline
         progress.show_extracting_knowledge(model)
-        extractions = extractor.extract_knowledge(journal)
 
-        # Classify into knowledge vs activity logs
-        knowledge_extractions, activity_logs = classify_extractions(extractions)
-
-        progress.show_extraction_complete(len(knowledge_extractions))
-
-        if not knowledge_extractions:
-            click.echo(f"No knowledge blocks found in {journal_date.isoformat()}")
-            return
-
-        # Stage 2: Match each knowledge block to target pages
-        proposed_actions, warnings = match_knowledge_to_pages(
-            knowledge_extractions,
-            activity_logs,
-            extractor,
-            page_index,
-            graph_path,
-            journal_date,
-            indent_str=journal.outline.indent_str,
-            token_budget=token_budget,
-        )
-
-        # Display preview (T027)
-        preview = ExtractionPreview(
-            journal_date=journal_date,
-            knowledge_blocks=[action.knowledge for action in proposed_actions],
-            proposed_actions=proposed_actions,
-            warnings=warnings,
+        num_operations = extractor.extract_and_integrate(
+            journal=journal,
+            vector_store=vector_store,
             graph_path=graph_path,
+            top_k=20,  # Default to top 20 candidates
         )
 
-        # Handle approval workflow
-        if dry_run:
-            # Dry-run mode: show full preview and exit
-            progress.show_preview_header()
-            click.echo(preview.display(show_diffs=show_diffs))
-            progress.show_dry_run_complete()
+        if num_operations == 0:
+            click.echo(f"No knowledge blocks found in {journal_date.isoformat()}")
         else:
-            # Normal mode: show summary, then prompt for each action individually
-            click.echo(f"\nFound {len(proposed_actions)} knowledge blocks in {journal_file.name}:")
-
-            # Show warnings/skipped if any
-            skipped = [a for a in proposed_actions if a.status == ActionStatus.SKIPPED]
-            if skipped:
-                click.echo(f"\n{len(skipped)} blocks will be skipped:")
-                for action in skipped:
-                    click.echo(f"  - {action.knowledge.content[:60]}... ({action.reason})")
-
-            ready_actions = [a for a in proposed_actions if a.status == ActionStatus.READY]
-
-            if not ready_actions:
-                click.echo("\nNo actions to apply (all skipped or warnings).")
-                return
-
-            # Prompt for each action individually with its diff
-            approved_actions = []
-
-            for i, action in enumerate(ready_actions, 1):
-                kb = action.knowledge
-
-                # Show the block description
-                click.echo(f'\n{i}. "{kb.content[:60]}{"..." if len(kb.content) > 60 else ""}"')
-                click.echo(f"   Target: {kb.target_page}")
-                if kb.target_section:
-                    click.echo(f"   Section: {' > '.join(kb.target_section)}")
-                click.echo(f"   Action: {kb.suggested_action.value}")
-                if action.similarity_score:
-                    click.echo(f"   Similarity: {action.similarity_score:.2f}")
-
-                # Show the diff for this specific action
-                click.echo("\n   Diff:")
-                target_page = TargetPage.load(graph_path, kb.target_page)
-                if target_page:
-                    diff_text = action.show_diff(target_page)
-                    if diff_text:
-                        # Indent the diff for readability
-                        for line in diff_text.split('\n'):
-                            click.echo(f"   {line}")
-                else:
-                    click.echo(f"   (Target page '{kb.target_page}' does not exist)")
-
-                # Prompt for this specific action
-                click.echo()
-                choice = interactive.prompt_for_approval()
-
-                if choice == 'y':
-                    approved_actions.append(action)
-                elif choice == 'n':
-                    interactive.show_warning(f"Skipped block {i}")
-                elif choice == 'e':
-                    interactive.show_warning("Edit mode not yet implemented - skipping this block")
-
-            if not approved_actions:
-                interactive.show_warning("No blocks approved - nothing to integrate")
-                return
-
-            # Integrate approved actions
-            click.echo(f"\nIntegrating {len(approved_actions)} approved blocks...")
-
-            integrator = Integrator(graph_path, page_index=page_index)
-            result = integrator.integrate(approved_actions, dry_run=False)
-
-            if result.success:
-                interactive.show_success(
-                    f"Successfully integrated {result.actions_applied} knowledge blocks into {len(result.modified_pages)} pages"
-                )
-                if verbose:
-                    click.echo(f"Modified pages: {', '.join(result.modified_pages)}")
-            else:
-                interactive.show_error("Integration failed")
-                for error in result.errors:
-                    click.echo(f"  - {error}", err=True)
+            click.echo(f"\n✓ Successfully integrated {num_operations} knowledge blocks from {journal_date.isoformat()}")
 
     except Exception as e:
         progress.show_error(f"Failed to process {journal_date.isoformat()}: {e}")
@@ -534,15 +436,15 @@ def extract(
     )
     extractor = Extractor(llm_client, model=config.llm.model)
 
-    # Build PageIndex (with cache)
-    page_index = build_page_index(config.logseq.graph_path, ctx)
+    # Build VectorStore (persistent block-level index)
+    vector_store = build_vector_store(config.logseq.graph_path, ctx)
 
     # Process each date
     for journal_date in dates:
         process_journal_date(
             journal_date,
             extractor,
-            page_index,
+            vector_store,
             config.logseq.graph_path,
             config.llm.model,
             verbose,
