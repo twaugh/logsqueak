@@ -102,52 +102,61 @@ Build the infrastructure for persistent block IDs and full-context chunk generat
 
 ---
 
-### **Milestone 2: Persistent Vector Store** (6 tasks)
+### **Milestone 2: Persistent Vector Store** ✅ (6 tasks - COMPLETE)
 
 Replace session-based embedding cache with ChromaDB for block-level indexing. Reuses full-context generation from M1.
 
-#### M2.1: Add ChromaDB Dependency
+**Status**: Complete (commits: f63c5e1, 3b8ce3f, bbb065c, e3589d1, de0a269, 2169316, 62892f5)
+
+#### M2.1: Add ChromaDB Dependency ✅
 - **File**: `pyproject.toml`
-- **Task**: Add `chromadb>=0.4.0` to dependencies
+- **Task**: ✅ Added `chromadb>=0.4.0` to dependencies
+- **Commit**: f63c5e1
 
-#### M2.2: Create VectorStore Abstraction
+#### M2.2: Create VectorStore Abstraction ✅
 - **File**: `src/logsqueak/rag/vector_store.py`
-- **Task**: Define `VectorStore` interface (add, delete, query, close)
-- **Task**: Implement `ChromaDBStore` with collection management
-- **Test**: Unit test for store initialization and CRUD operations
+- **Task**: ✅ Defined `VectorStore` interface (add, delete, query, close)
+- **Task**: ✅ Implemented `ChromaDBStore` with collection management
+- **Test**: ✅ 10 unit tests for store initialization and CRUD operations
+- **Commit**: 3b8ce3f
 
-#### M2.3: Create Chunk Dataclass and Page Chunker
+#### M2.3: Create Chunk Dataclass and Page Chunker ✅
 - **File**: `src/logsqueak/rag/chunker.py`
-- **Task**: Define `Chunk` dataclass with fields: `full_context_text`, `hybrid_id`, `page_name`, `metadata`
-- **Task**: Implement `chunk_page(outline, page_name) -> List[Chunk]`
+- **Task**: ✅ Defined `Chunk` dataclass with fields: `full_context_text`, `hybrid_id`, `page_name`, `metadata`
+- **Task**: ✅ Implemented `chunk_page(outline, page_name) -> List[Chunk]`
   - Reuses `generate_chunks()` from M1.2 (`logseq/context.py`)
   - Wraps results in `Chunk` dataclass with page metadata
-- **Test**: Unit test for Chunk serialization and page chunking
+- **Test**: ✅ 16 unit tests for Chunk serialization and page chunking
+- **Commit**: bbb065c
 
-#### M2.4: Create Cache Manifest System
+#### M2.4: Create Cache Manifest System ✅
 - **File**: `src/logsqueak/rag/manifest.py`
-- **Task**: Implement `CacheManifest` class (load/save JSON)
-- **Task**: Track `{page_name: mtime}` mappings
-- **Test**: Unit test for manifest persistence
+- **Task**: ✅ Implemented `CacheManifest` class (load/save JSON)
+- **Task**: ✅ Tracks `{page_name: mtime}` mappings
+- **Test**: ✅ 20 unit tests for manifest persistence
+- **Commit**: e3589d1
 
-#### M2.5: Implement Incremental Index Builder
+#### M2.5: Implement Incremental Index Builder ✅
 - **File**: `src/logsqueak/rag/indexer.py`
-- **Task**: Implement `IndexBuilder.build_incremental(graph_path, vector_store)`
-- **Task**: Detect deletions (in manifest but not on disk)
-- **Task**: Detect updates (mtime changed) and additions (not in manifest)
-- **Test**: Integration test for incremental updates
+- **Task**: ✅ Implemented `IndexBuilder.build_incremental(graph_path, vector_store)`
+- **Task**: ✅ Detects deletions (in manifest but not on disk)
+- **Task**: ✅ Detects updates (mtime changed) and additions (not in manifest)
+- **Test**: ✅ 8 integration tests for incremental updates
+- **Commit**: de0a269
 
-#### M2.6: Migrate PageIndex to Use VectorStore
+#### M2.6: Migrate PageIndex to Use VectorStore ✅
 - **File**: `src/logsqueak/models/page.py`
-- **Task**: Refactor `PageIndex.build()` to use `VectorStore`
-- **Task**: Maintain backward compatibility with existing API
-- **Test**: Integration test for RAG search with ChromaDB
+- **Task**: ✅ Created `PageIndex.build_with_vector_store()` transitional API
+- **Task**: ✅ Maintained backward compatibility with existing API
+- **Test**: ✅ 6 integration tests for RAG search with ChromaDB
+- **Commit**: 2169316
 
-#### M2.7: CLI Command for Index Management
+#### M2.7: CLI Command for Index Management ✅
 - **File**: `src/logsqueak/cli/main.py`
-- **Task**: Add `logsqueak index rebuild` command
-- **Task**: Add `logsqueak index status` command (show cache stats)
-- **Test**: CLI test for index commands
+- **Task**: ✅ Added `logsqueak index rebuild` command
+- **Task**: ✅ Added `logsqueak index status` command (show cache stats)
+- **Test**: ✅ 10 CLI integration tests
+- **Commit**: 62892f5
 
 ---
 
@@ -305,11 +314,11 @@ Comprehensive testing and polish for the new pipeline.
 | Milestone | Tasks | Estimated Days | Status | Actual Time |
 |-----------|-------|----------------|--------|-------------|
 | M1: Hybrid-ID Foundation | 5 | 3-5 days | ✅ Complete | ~1 day |
-| M2: Persistent Vector Store | 6 | 4-6 days | ⏳ Next | - |
-| M3: Block-Level Targeting | 5 | 3-5 days | Pending | - |
+| M2: Persistent Vector Store | 6 | 4-6 days | ✅ Complete | ~1 day |
+| M3: Block-Level Targeting | 5 | 3-5 days | ⏳ Next | - |
 | M4: Multi-Stage Pipeline | 9 | 7-10 days | Pending | - |
 | M5: Testing & Refinement | 6 | 4-6 days | Pending | - |
-| **Total** | **31 tasks** | **21-32 days** | 16% | 1/21-32 |
+| **Total** | **31 tasks** | **21-32 days** | 35% | 2/21-32 |
 
 ---
 
@@ -343,10 +352,10 @@ Comprehensive testing and polish for the new pipeline.
 - [x] Round-trip tests pass for IDs ✅
 
 ### Milestone 2 Complete When:
-- [ ] ChromaDB stores block-level embeddings ✅
-- [ ] Incremental indexing detects changes ✅
-- [ ] RAG search works with new vector store ✅
-- [ ] Index rebuild command available ✅
+- [x] ChromaDB stores block-level embeddings ✅
+- [x] Incremental indexing detects changes ✅
+- [x] RAG search works with new vector store ✅
+- [x] Index rebuild command available ✅
 
 ### Milestone 3 Complete When:
 - [ ] `find_target_node_by_id()` works for hybrid IDs ✅
