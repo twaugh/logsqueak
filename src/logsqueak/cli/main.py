@@ -65,6 +65,7 @@ def build_vector_store(graph_path: Path, ctx: click.Context):
         Built VectorStore
     """
     from logsqueak.rag.indexer import IndexBuilder
+    from logsqueak.rag.manifest import CacheManifest
     from logsqueak.rag.vector_store import ChromaDBStore
 
     try:
@@ -74,15 +75,17 @@ def build_vector_store(graph_path: Path, ctx: click.Context):
         # Build/load vector store (ChromaDB persists in graph/.logsqueak/chroma)
         persist_dir = graph_path / ".logsqueak" / "chroma"
         vector_store = ChromaDBStore(persist_directory=persist_dir)
-        builder = IndexBuilder(vector_store)
+        manifest_path = persist_dir.parent / "manifest.json"
+        manifest = CacheManifest(manifest_path)
+        builder = IndexBuilder(vector_store, manifest)
         stats = builder.build_incremental(graph_path, force=False)
 
         duration = time.time() - start_time
-        progress.show_index_built(
-            stats["total_blocks"],
-            duration,
-            stats["cached_blocks"],
-            stats["indexed_blocks"]
+        total_pages = stats['added'] + stats['updated'] + stats['deleted'] + stats['unchanged']
+        newly_indexed = stats['added'] + stats['updated']
+        click.echo(
+            f"✓ Index built in {duration:.1f}s "
+            f"(+{stats['added']} ~{stats['updated']} -{stats['deleted']} ={stats['unchanged']})"
         )
 
         return vector_store

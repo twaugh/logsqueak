@@ -199,15 +199,18 @@ class OpenAICompatibleProvider(LLMClient):
 
             results = []
             for block in data["knowledge_blocks"]:
-                if "exact_text" not in block or "confidence" not in block:
+                if "exact_text" not in block:
                     raise LLMResponseError(
-                        "Knowledge block missing required fields (exact_text, confidence)"
+                        "Knowledge block missing required field: exact_text"
                     )
+
+                # Use default confidence of 0.5 if not provided (common with local models)
+                confidence = float(block.get("confidence", 0.5))
 
                 results.append(
                     ExtractionResult(
                         content=block["exact_text"],  # Map exact_text to content for now
-                        confidence=float(block["confidence"]),
+                        confidence=confidence,
                     )
                 )
 
