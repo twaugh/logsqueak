@@ -38,6 +38,9 @@ def add_knowledge_to_page(
         knowledge.content, knowledge.source_date
     )
 
+    # Get indentation string from outline
+    indent_str = target_page.outline.indent_str
+
     # Find target section in outline
     target_block = _find_target_section(
         target_page.outline, knowledge.target_section
@@ -45,10 +48,10 @@ def add_knowledge_to_page(
 
     if target_block is None:
         # Fallback: Add to page end
-        _add_to_page_end(target_page.outline, content_with_provenance)
+        _add_to_page_end(target_page.outline, content_with_provenance, indent_str)
     else:
         # Add as child bullet to target section
-        _add_child_bullet(target_block, content_with_provenance, knowledge.suggested_action)
+        _add_child_bullet(target_block, content_with_provenance, knowledge.suggested_action, indent_str)
 
 
 def _find_target_section(
@@ -156,7 +159,7 @@ def _add_provenance_link(content: str, source_date) -> str:
 
 
 def _add_child_bullet(
-    parent_block: LogseqBlock, content: str, action: ActionType
+    parent_block: LogseqBlock, content: str, action: ActionType, indent_str: str
 ) -> None:
     """Add content as child bullet to parent block (T038).
 
@@ -166,13 +169,15 @@ def _add_child_bullet(
         parent_block: Parent block to add child to
         content: Content to add (with provenance)
         action: Suggested action type (ADD_CHILD or CREATE_SECTION)
+        indent_str: Indentation string from outline (e.g., "  ", "\t")
     """
     # Generate unique ID for new block
     block_id = _generate_block_id()
 
     # Calculate indentation for the id:: property line
+    # Properties are indented to bullet level + 2 spaces
     indent_level = parent_block.indent_level + 1
-    indent = "  " * (indent_level + 1)  # Property is indented one more level
+    indent = indent_str * indent_level + "  "
     id_line = f"{indent}id:: {block_id}"
 
     # Create new child block with id:: property
@@ -189,7 +194,7 @@ def _add_child_bullet(
     parent_block.children.append(new_child)
 
 
-def _add_to_page_end(outline: LogseqOutline, content: str) -> None:
+def _add_to_page_end(outline: LogseqOutline, content: str, indent_str: str) -> None:
     """Add content to page end as fallback (T039).
 
     When no clear section match exists, add knowledge at the end
@@ -198,11 +203,12 @@ def _add_to_page_end(outline: LogseqOutline, content: str) -> None:
     Args:
         outline: Page outline
         content: Content to add (with provenance)
+        indent_str: Indentation string from outline (e.g., "  ", "\t")
     """
     # Generate unique ID for new block
     block_id = _generate_block_id()
 
-    # Root-level block, so id:: property is indented by 1 level
+    # Root-level block (indent_level=0), so id:: property is indented by 2 spaces
     indent = "  "
     id_line = f"{indent}id:: {block_id}"
 
@@ -220,7 +226,7 @@ def _add_to_page_end(outline: LogseqOutline, content: str) -> None:
     outline.blocks.append(new_block)
 
 
-def update_block(target_block: LogseqBlock, new_content: str, preserve_id: bool = True) -> None:
+def update_block(target_block: LogseqBlock, new_content: str, preserve_id: bool = True, indent_str: str = "  ") -> None:
     """Update an existing block's content in place.
 
     Replaces the block's content while optionally preserving its id:: property.
@@ -231,6 +237,7 @@ def update_block(target_block: LogseqBlock, new_content: str, preserve_id: bool 
         target_block: Block to update
         new_content: New content to replace with
         preserve_id: If True, preserve existing id:: property (default: True)
+        indent_str: Indentation string from outline (e.g., "  ", "\t") (default: "  ")
     """
     # Update content
     target_block.content = new_content
@@ -242,8 +249,9 @@ def update_block(target_block: LogseqBlock, new_content: str, preserve_id: bool 
             target_block.properties["id"] = target_block.block_id
 
         # Ensure id:: is in continuation_lines
+        # Properties are indented to bullet level + 2 spaces
         indent_level = target_block.indent_level
-        indent = "  " * (indent_level + 1)
+        indent = indent_str * indent_level + "  "
         id_line = f"{indent}id:: {target_block.block_id}"
 
         # Check if id:: already exists in continuation_lines
@@ -252,7 +260,7 @@ def update_block(target_block: LogseqBlock, new_content: str, preserve_id: bool 
             target_block.continuation_lines.append(id_line)
 
 
-def append_to_block(target_block: LogseqBlock, new_content: str) -> str:
+def append_to_block(target_block: LogseqBlock, new_content: str, indent_str: str = "  ") -> str:
     """Append new content as a child of the target block.
 
     Creates a new block with a unique UUID and adds it as a child of the specified
@@ -262,6 +270,7 @@ def append_to_block(target_block: LogseqBlock, new_content: str) -> str:
     Args:
         target_block: Block to append child to
         new_content: Content for the new child block
+        indent_str: Indentation string from outline (e.g., "  ", "\t") (default: "  ")
 
     Returns:
         The generated UUID for the new block
@@ -270,8 +279,9 @@ def append_to_block(target_block: LogseqBlock, new_content: str) -> str:
     new_id = _generate_block_id()
 
     # Calculate indentation for the id:: property line
+    # Properties are indented to bullet level + 2 spaces
     indent_level = target_block.indent_level + 1
-    indent = "  " * (indent_level + 1)
+    indent = indent_str * indent_level + "  "
     id_line = f"{indent}id:: {new_id}"
 
     # Create new child block
@@ -290,7 +300,7 @@ def append_to_block(target_block: LogseqBlock, new_content: str) -> str:
     return new_id
 
 
-def append_to_root(outline: LogseqOutline, new_content: str) -> str:
+def append_to_root(outline: LogseqOutline, new_content: str, indent_str: str = "  ") -> str:
     """Append new content to the page root level.
 
     Creates a new block with a unique UUID and adds it at the root level of the page.
@@ -300,6 +310,7 @@ def append_to_root(outline: LogseqOutline, new_content: str) -> str:
     Args:
         outline: Page outline
         new_content: Content for the new root-level block
+        indent_str: Indentation string from outline (e.g., "  ", "\t") (default: "  ")
 
     Returns:
         The generated UUID for the new block
@@ -307,7 +318,7 @@ def append_to_root(outline: LogseqOutline, new_content: str) -> str:
     # Generate UUID for new block
     new_id = _generate_block_id()
 
-    # Root-level block, so id:: property is indented by 1 level
+    # Root-level block (indent_level=0), so id:: property is indented by 2 spaces
     indent = "  "
     id_line = f"{indent}id:: {new_id}"
 
