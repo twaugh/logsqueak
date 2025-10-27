@@ -160,39 +160,35 @@ Replace session-based embedding cache with ChromaDB for block-level indexing. Re
 
 ---
 
-### **Milestone 3: Block-Level Targeting** (5 tasks)
+### **Milestone 3: Block-Level Targeting** ✅ (4 tasks - COMPLETE)
 
 Implement precise block targeting using hybrid IDs for UPDATE and APPEND operations. Simplifies current section-path approach.
 
-#### M3.1: Remove Backward-Compatible PageIndex API
-- **File**: `src/logsqueak/models/page.py`
-- **Task**: Remove `PageIndex.build_with_vector_store()` transitional API (added in M2.6)
-- **Task**: Migrate all code to use block-level search directly via VectorStore
-- **Task**: Update CLI and RAG components to query VectorStore instead of PageIndex
-- **Rationale**: M2.6 created backward-compatible API for transition; M3 completes the migration
-- **Test**: Ensure all existing integration tests pass with direct VectorStore usage
+**Status**: Complete (commit: ba475e2)
 
-#### M3.2: Implement `find_target_node_by_id()`
+#### M3.2: Implement `find_target_node_by_id()` ✅
 - **File**: `src/logsqueak/logseq/parser.py`
 - **Task**: Add `LogseqOutline.find_block_by_id(target_id) -> Optional[LogseqBlock]`
 - **Task**: Traverse AST, comparing hybrid IDs
-- **Test**: Unit test for finding blocks by `id::` and content hash
+- **Test**: ✅ Unit test for finding blocks by `id::` and content hash
+- **Note**: Implementation already existed from M1.3
 
-#### M3.3: Replace Section Paths with Block ID Targeting
+#### M3.3: Replace Section Paths with Block ID Targeting ✅
 - **File**: `src/logsqueak/models/knowledge.py`
 - **Task**: Replace `target_section: List[str]` with `target_block_id: Optional[str]`
 - **Task**: Update all references to use direct block ID instead of section paths
 - **Task**: Simplify `_find_target_section()` to use `find_block_by_id()`
 - **Rationale**: FUTURE-STATE uses single `target_id` (simpler, more precise than section paths)
-- **Test**: Update tests to use block IDs instead of section paths
+- **Test**: ✅ Updated tests to use block IDs instead of section paths
+- **Note**: Added `target_block_id` field; section paths still supported for legacy compatibility
 
-#### M3.4: Implement Block Modification (UPDATE)
+#### M3.4: Implement Block Modification (UPDATE) ✅
 - **File**: `src/logsqueak/integration/writer.py`
 - **Task**: Implement `update_block(target_block, new_content, preserve_id=True)`
 - **Task**: Replace block content while preserving existing `id::`
-- **Test**: Unit test for UPDATE operation
+- **Test**: ✅ Unit test for UPDATE operation
 
-#### M3.5: Implement APPEND Operations
+#### M3.5: Implement APPEND Operations ✅
 - **File**: `src/logsqueak/integration/writer.py`
 - **Task**: Implement `append_to_block(target_block, new_content, new_id)`
   - Add child to specific target block
@@ -200,16 +196,26 @@ Implement precise block targeting using hybrid IDs for UPDATE and APPEND operati
   - Add block to page root (when target_id == "root")
 - **Task**: Update `add_knowledge_to_page()` to handle both APPEND modes
 - **Rationale**: FUTURE-STATE only has UPDATE, APPEND (as child), APPEND (to root) - no CREATE_SECTION
-- **Test**: Unit test for both APPEND operations
+- **Test**: ✅ Unit test for both APPEND operations
 
 ---
 
-### **Milestone 4: Multi-Stage LLM Pipeline** (11 tasks)
+### **Milestone 4: Multi-Stage LLM Pipeline** (12 tasks)
 
 Implement Phase 1 (Knowledge Extraction changes), Phase 2 (Enhanced RAG), Phase 3 (Decider + Reworder) and Phase 4 (Execution + Cleanup) from FUTURE-STATE.
 
+#### M4.0: Remove Backward-Compatible PageIndex API (moved from M3.1)
+- **File**: `src/logsqueak/models/page.py`, `src/logsqueak/cli/main.py`
+- **Task**: Remove `PageIndex.build_with_vector_store()` transitional API (added in M2.6)
+- **Task**: Remove `_find_similar_with_vector_store()` method from PageIndex
+- **Task**: Update CLI to query VectorStore directly instead of via PageIndex wrapper
+- **Task**: Update extraction pipeline to use block-level search directly
+- **Rationale**: M2.6 created backward-compatible API for transition; cleanup before M4 pipeline implementation needs direct VectorStore access
+- **Test**: Ensure all existing integration tests pass with direct VectorStore usage
+- **Note**: Moved from M3 to M4.0 as prerequisite for M4.2 (Enhanced RAG needs direct block-level access)
+
 #### M4.1: Update Phase 1 Extraction to Return Exact Block Text
-- **File**: `src/logsqueak/llm/providers/openai_compat.py`, `src/logsqueak/extraction/extractor.py`
+- **File**: `src/logsqueak/extraction/extractor.py`, `src/logsqueak/llm/prompts.py`
 - **Task**: Modify extraction prompt to return exact block text (not pre-contextualized)
 - **Task**: Add post-extraction step to walk AST and add parent context to each block
 - **Task**: Generate `original_id` for each extracted block (using id:: or content hash)
@@ -353,10 +359,10 @@ Comprehensive testing and polish for the new pipeline.
 |-----------|-------|----------------|--------|-------------|
 | M1: Hybrid-ID Foundation | 5 | 3-5 days | ✅ Complete | ~1 day |
 | M2: Persistent Vector Store | 6 | 4-6 days | ✅ Complete | ~1 day |
-| M3: Block-Level Targeting | 3 | 2-3 days | ✅ Complete | <1 day |
-| M4: Multi-Stage Pipeline | 11 | 10-14 days | ⏳ Next | - |
+| M3: Block-Level Targeting | 4 | 2-3 days | ✅ Complete | <1 day |
+| M4: Multi-Stage Pipeline | 12 | 10-14 days | ⏳ Next | - |
 | M5: Testing & Refinement | 6 | 4-6 days | Pending | - |
-| **Total** | **31 tasks** | **23-35 days** | 45% | ~3/23-35 |
+| **Total** | **32 tasks** | **23-35 days** | 44% | ~3/23-35 |
 
 ---
 
@@ -396,10 +402,10 @@ Comprehensive testing and polish for the new pipeline.
 - [x] Index rebuild command available ✅
 
 ### Milestone 3 Complete When:
-- [ ] `find_target_node_by_id()` works for hybrid IDs ✅
-- [ ] UPDATE operation modifies blocks precisely ✅
-- [ ] CREATE_SECTION adds nested headings ✅
-- [ ] Block-level APPEND works ✅
+- [x] `find_target_node_by_id()` works for hybrid IDs ✅
+- [x] UPDATE operation modifies blocks precisely ✅
+- [x] APPEND operations work (to block and to root) ✅
+- [x] Block ID targeting infrastructure in place ✅
 
 ### Milestone 4 Complete When:
 - [ ] Decider LLM selects action + target ✅
