@@ -301,3 +301,204 @@ class TestParsingRoundTrip:
         rendered = outline.render()
 
         assert rendered == original
+
+
+class TestIDPreservation:
+    """Test that block IDs are preserved during round-trip (M1.5)."""
+
+    def test_explicit_id_preserved_in_roundtrip(self):
+        """Test that explicit id:: properties are preserved through parse-render cycle."""
+        original = dedent(
+            """\
+            - Block with ID
+              id:: 65f3a8e0-1234-5678-9abc-def012345678"""
+        )
+
+        outline = LogseqOutline.parse(original)
+        rendered = outline.render()
+
+        assert rendered == original
+        # Verify the id was parsed correctly
+        assert outline.blocks[0].block_id == "65f3a8e0-1234-5678-9abc-def012345678"
+
+    def test_explicit_id_never_modified(self):
+        """Test that existing id:: properties are never changed during modifications."""
+        original = dedent(
+            """\
+            - Parent block
+              id:: parent-id-123
+              - Child block
+                id:: child-id-456"""
+        )
+
+        outline = LogseqOutline.parse(original)
+
+        # Store original IDs
+        parent_id = outline.blocks[0].block_id
+        child_id = outline.blocks[0].children[0].block_id
+
+        # Add new child to parent
+        outline.blocks[0].add_child("New child")
+
+        # Render and re-parse
+        rendered = outline.render()
+        reparsed = LogseqOutline.parse(rendered)
+
+        # Original IDs must be unchanged
+        assert reparsed.blocks[0].block_id == parent_id
+        assert reparsed.blocks[0].children[0].block_id == child_id
+        # New child should not have an ID (only writer adds IDs)
+        assert reparsed.blocks[0].children[1].block_id is None
+
+    def test_multiple_blocks_with_ids_roundtrip(self):
+        """Test multiple blocks with IDs preserve all IDs."""
+        original = dedent(
+            """\
+            - Block 1
+              id:: id-001
+            - Block 2
+              id:: id-002
+            - Block 3
+              id:: id-003"""
+        )
+
+        outline = LogseqOutline.parse(original)
+        rendered = outline.render()
+
+        assert rendered == original
+
+        # Verify all IDs parsed
+        assert outline.blocks[0].block_id == "id-001"
+        assert outline.blocks[1].block_id == "id-002"
+        assert outline.blocks[2].block_id == "id-003"
+
+    def test_nested_blocks_preserve_ids_through_modification(self):
+        """Test that nested blocks preserve IDs when parent is modified."""
+        original = dedent(
+            """\
+            - Parent
+              id:: parent-123
+              - Child 1
+                id:: child-1-456
+              - Child 2
+                id:: child-2-789"""
+        )
+
+        outline = LogseqOutline.parse(original)
+
+        # Store original IDs
+        original_ids = {
+            "parent": outline.blocks[0].block_id,
+            "child1": outline.blocks[0].children[0].block_id,
+            "child2": outline.blocks[0].children[1].block_id,
+        }
+
+        # Add new child between existing children
+        outline.blocks[0].add_child("New child", position=1)
+
+        # Render and re-parse
+        rendered = outline.render()
+        reparsed = LogseqOutline.parse(rendered)
+
+        # All original IDs must be preserved
+        assert reparsed.blocks[0].block_id == original_ids["parent"]
+        assert reparsed.blocks[0].children[0].block_id == original_ids["child1"]
+        assert reparsed.blocks[0].children[2].block_id == original_ids["child2"]
+
+        # New child at position 1 should not have ID
+        assert reparsed.blocks[0].children[1].block_id is None
+        assert reparsed.blocks[0].children[1].content == "New child"
+
+    def test_id_property_order_preserved(self):
+        """Test that id:: property maintains its position relative to other properties."""
+        original = dedent(
+            """\
+            - Block with multiple properties
+              id:: test-id-123
+              tags:: important, urgent
+              priority:: high"""
+        )
+
+        outline = LogseqOutline.parse(original)
+        rendered = outline.render()
+
+        assert rendered == original
+
+        # Verify property order is preserved
+        props = outline.blocks[0].properties
+        keys = list(props.keys())
+        assert keys == ["id", "tags", "priority"]
+
+    def test_hybrid_id_consistency_across_roundtrip(self):
+        """Test that blocks without explicit IDs get consistent hybrid IDs."""
+        original = "- Block without explicit ID"
+
+        outline = LogseqOutline.parse(original)
+        block = outline.blocks[0]
+
+        # Get hybrid ID (should be hash)
+        hybrid_id_1 = block.get_hybrid_id()
+
+        # Render and re-parse
+        rendered = outline.render()
+        reparsed = LogseqOutline.parse(rendered)
+        reparsed_block = reparsed.blocks[0]
+
+        # Get hybrid ID again
+        hybrid_id_2 = reparsed_block.get_hybrid_id()
+
+        # Should be the same hash
+        assert hybrid_id_1 == hybrid_id_2
+        # Should be MD5 hash format
+        assert len(hybrid_id_1) == 32
+
+    def test_find_block_by_id_after_roundtrip(self):
+        """Test that blocks can be found by ID after render-parse cycle."""
+        original = dedent(
+            """\
+            - Block A
+              id:: findable-id
+            - Block B
+            - Block C"""
+        )
+
+        outline = LogseqOutline.parse(original)
+
+        # Find by ID before round-trip
+        found_before = outline.find_block_by_id("findable-id")
+        assert found_before is not None
+        assert found_before.content == "Block A"
+
+        # Render and re-parse
+        rendered = outline.render()
+        reparsed = LogseqOutline.parse(rendered)
+
+        # Find by ID after round-trip
+        found_after = reparsed.find_block_by_id("findable-id")
+        assert found_after is not None
+        assert found_after.content == "Block A"
+        assert found_after.block_id == "findable-id"
+
+    def test_deep_nesting_preserves_all_ids(self):
+        """Test that deeply nested structure preserves all IDs."""
+        original = dedent(
+            """\
+            - Root
+              id:: root-id
+              - Level 1
+                id:: level1-id
+                - Level 2
+                  id:: level2-id
+                  - Level 3
+                    id:: level3-id"""
+        )
+
+        outline = LogseqOutline.parse(original)
+        rendered = outline.render()
+        reparsed = LogseqOutline.parse(rendered)
+
+        # Navigate down and verify all IDs preserved
+        assert reparsed.blocks[0].block_id == "root-id"
+        assert reparsed.blocks[0].children[0].block_id == "level1-id"
+        assert reparsed.blocks[0].children[0].children[0].block_id == "level2-id"
+        assert reparsed.blocks[0].children[0].children[0].children[0].block_id == "level3-id"
