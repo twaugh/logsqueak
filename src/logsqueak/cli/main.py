@@ -55,7 +55,7 @@ def cli(ctx: click.Context, config: Optional[Path], verbose: bool, version: bool
 def build_page_index(graph_path: Path, ctx: click.Context) -> PageIndex:
     """Build PageIndex with progress feedback.
 
-    Uses VectorStore backend for persistent, incremental indexing.
+    Uses per-page embedding cache for page-level RAG.
 
     Args:
         graph_path: Path to Logseq graph
@@ -71,11 +71,14 @@ def build_page_index(graph_path: Path, ctx: click.Context) -> PageIndex:
         progress.show_building_index(len(page_files))
         start_time = time.time()
 
-        # Use VectorStore backend (M2.6)
-        page_index = PageIndex.build_with_vector_store(graph_path)
+        # Use original PageIndex.build() with per-page pkl cache
+        page_index = PageIndex.build(graph_path)
 
         duration = time.time() - start_time
-        progress.show_index_built(len(page_files), duration, 0, len(page_files))
+        # Get cache stats from PageIndex attributes (set in build())
+        cached = getattr(page_index, 'cached_count', 0)
+        computed = getattr(page_index, 'computed_count', len(page_files))
+        progress.show_index_built(len(page_files), duration, cached, computed)
 
         return page_index
     except Exception as e:

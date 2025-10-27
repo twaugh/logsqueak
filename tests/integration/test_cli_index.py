@@ -69,15 +69,15 @@ class TestIndexRebuild:
         """Test basic index rebuild."""
         runner = CliRunner()
 
-        # Patch PageIndex.build_with_vector_store to use mock model
-        from logsqueak.models import page as page_module
-        original_build = page_module.PageIndex.build_with_vector_store
+        # Patch IndexBuilder to use mock model
+        from logsqueak.rag import indexer as indexer_module
+        original_init = indexer_module.IndexBuilder.__init__
 
-        def mock_build(graph_path, vector_store_path=None, embedding_model=None):
+        def mock_init(self, vector_store, manifest, embedding_model=None):
             # Call original with mock embedding model
-            return original_build(graph_path, vector_store_path, embedding_model=mock_embedding_model)
+            original_init(self, vector_store, manifest, embedding_model=mock_embedding_model)
 
-        with patch.object(page_module.PageIndex, 'build_with_vector_store', mock_build):
+        with patch.object(indexer_module.IndexBuilder, '__init__', mock_init):
             result = runner.invoke(cli, ["--config", str(test_config), "index", "rebuild"])
 
         assert result.exit_code == 0, f"Output: {result.output}"
@@ -94,13 +94,13 @@ class TestIndexRebuild:
 
         runner = CliRunner()
 
-        from logsqueak.models import page as page_module
-        original_build = page_module.PageIndex.build_with_vector_store
+        from logsqueak.rag import indexer as indexer_module
+        original_init = indexer_module.IndexBuilder.__init__
 
-        def mock_build(graph_path, vector_store_path=None, embedding_model=None):
-            return original_build(graph_path, vector_store_path, embedding_model=mock_embedding_model)
+        def mock_init(self, vector_store, manifest, embedding_model=None):
+            original_init(self, vector_store, manifest, embedding_model=mock_embedding_model)
 
-        with patch.object(page_module.PageIndex, 'build_with_vector_store', mock_build):
+        with patch.object(indexer_module.IndexBuilder, '__init__', mock_init):
             result = runner.invoke(
                 cli, ["--config", str(test_config), "index", "rebuild", "--graph", str(alt_graph)]
             )
@@ -112,13 +112,13 @@ class TestIndexRebuild:
         """Test rebuild with --verbose flag."""
         runner = CliRunner()
 
-        from logsqueak.models import page as page_module
-        original_build = page_module.PageIndex.build_with_vector_store
+        from logsqueak.rag import indexer as indexer_module
+        original_init = indexer_module.IndexBuilder.__init__
 
-        def mock_build(graph_path, vector_store_path=None, embedding_model=None):
-            return original_build(graph_path, vector_store_path, embedding_model=mock_embedding_model)
+        def mock_init(self, vector_store, manifest, embedding_model=None):
+            original_init(self, vector_store, manifest, embedding_model=mock_embedding_model)
 
-        with patch.object(page_module.PageIndex, 'build_with_vector_store', mock_build):
+        with patch.object(indexer_module.IndexBuilder, '__init__', mock_init):
             result = runner.invoke(cli, ["--config", str(test_config), "--verbose", "index", "rebuild"])
 
         assert result.exit_code == 0, f"Output: {result.output}"
@@ -150,16 +150,13 @@ class TestIndexStatus:
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
         # First, build an index
-        from logsqueak.models import page as page_module
-        original_build = page_module.PageIndex.build_with_vector_store
+        from logsqueak.rag import indexer as indexer_module
+        original_init = indexer_module.IndexBuilder.__init__
 
-        def mock_build(graph_path, vector_store_path=None, embedding_model=None):
-            # Use custom cache path for test isolation
-            if vector_store_path is None:
-                vector_store_path = tmp_path / ".cache" / "logsqueak" / "chroma"
-            return original_build(graph_path, vector_store_path, embedding_model=mock_embedding_model)
+        def mock_init(self, vector_store, manifest, embedding_model=None):
+            original_init(self, vector_store, manifest, embedding_model=mock_embedding_model)
 
-        with patch.object(page_module.PageIndex, 'build_with_vector_store', mock_build):
+        with patch.object(indexer_module.IndexBuilder, '__init__', mock_init):
             # Build the index first
             build_result = runner.invoke(cli, ["--config", str(test_config), "index", "rebuild"])
             assert build_result.exit_code == 0, f"Build output: {build_result.output}"
