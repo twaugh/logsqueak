@@ -84,26 +84,10 @@ pip install --upgrade pip --quiet
 echo "✓ pip upgraded"
 echo ""
 
-# Install dependencies
-echo "Installing dependencies from requirements.txt..."
-pip install -r requirements.txt --quiet
+# Install package in editable mode with all dependencies
+echo "Installing logsqueak in editable mode..."
+pip install -e . --quiet
 echo "✓ Dependencies installed"
-echo ""
-
-# Optional: Install sentence-transformers
-if [ "$AUTO_YES" = false ]; then
-    read -p "Do you want to install sentence-transformers? (large download, ~500MB) (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "Installing sentence-transformers..."
-        pip install sentence-transformers>=2.2.0
-        echo "✓ sentence-transformers installed"
-    else
-        echo "⚠ Skipping sentence-transformers (some tests will be skipped)"
-    fi
-else
-    echo "⚠ Skipping sentence-transformers (use manual install if needed)"
-fi
 echo ""
 
 echo "=== Setup Complete! ==="

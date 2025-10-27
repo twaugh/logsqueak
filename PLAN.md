@@ -107,9 +107,8 @@ Build the infrastructure for persistent block IDs and full-context chunk generat
 Replace session-based embedding cache with ChromaDB for block-level indexing. Reuses full-context generation from M1.
 
 #### M2.1: Add ChromaDB Dependency
-- **File**: `requirements.txt`, `pyproject.toml`
+- **File**: `pyproject.toml`
 - **Task**: Add `chromadb>=0.4.0` to dependencies
-- **Task**: Update setup documentation
 
 #### M2.2: Create VectorStore Abstraction
 - **File**: `src/logsqueak/rag/vector_store.py`

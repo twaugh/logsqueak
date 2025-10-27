@@ -37,7 +37,7 @@ pytest tests/unit/ tests/integration/ --cov=logsqueak --cov-report=html
 pytest -m "not slow"
 ```
 
-**Note**: Some tests require `sentence-transformers` which is a large dependency. It's included in requirements.txt but may take time to install.
+**Note**: Some tests require `sentence-transformers` which is a large dependency. It's included in pyproject.toml but may take time to install.
 
 ### Code Quality
 

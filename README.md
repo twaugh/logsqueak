@@ -60,10 +60,10 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Upgrade pip in the venv
 pip install --upgrade pip
 
-# Install dependencies in the venv
-pip install -r requirements.txt
+# Install logsqueak in editable mode (installs all dependencies)
+pip install -e .
 
-# Note: Tests run directly from source, no installation needed
+# Note: Tests run directly from source
 # Tests use: pytest (which reads pythonpath from pyproject.toml)
 ```
 
@@ -158,8 +158,7 @@ logsqueak/
 │   ├── unit/              # Unit tests
 │   ├── integration/       # Integration tests
 │   └── fixtures/          # Test data
-├── specs/                 # Feature specifications
-└── requirements.txt       # Python dependencies
+└── specs/                 # Feature specifications
 ```
 
 ## Development
