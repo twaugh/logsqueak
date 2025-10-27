@@ -16,6 +16,22 @@ class LLMConfig(BaseModel):
     endpoint: HttpUrl
     api_key: str = Field(..., min_length=1)
     model: str = Field(default="gpt-4-turbo-preview")
+    decider_model: Optional[str] = Field(
+        default=None,
+        description="Model for Decider LLM (Phase 3.1). Defaults to 'model' if not specified."
+    )
+    reworder_model: Optional[str] = Field(
+        default=None,
+        description="Model for Reworder LLM (Phase 3.2). Defaults to 'model' if not specified."
+    )
+
+    def get_decider_model(self) -> str:
+        """Get the model to use for Decider (defaults to main model)."""
+        return self.decider_model or self.model
+
+    def get_reworder_model(self) -> str:
+        """Get the model to use for Reworder (defaults to main model)."""
+        return self.reworder_model or self.model
 
 
 class LogseqConfig(BaseModel):

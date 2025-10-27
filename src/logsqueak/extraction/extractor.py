@@ -480,6 +480,82 @@ class Extractor:
         )
         return write_list, processed_blocks_map
 
+    def extract_and_integrate(
+        self,
+        journal: "JournalEntry",
+        vector_store: VectorStore,
+        graph_path: Path,
+        top_k: int = 20,
+    ) -> int:
+        """End-to-end pipeline: Extract knowledge and integrate into pages.
+
+        Runs the complete multi-stage pipeline:
+        - Phase 1: Extract knowledge packages from journal
+        - Phase 2: Find candidate chunks (in Phase 3 loop)
+        - Phase 3: Decider + Reworder to build Write List
+        - Phase 4: Execute write operations
+        - Phase 4.5: Add processed:: markers to journal
+
+        Args:
+            journal: JournalEntry to process
+            vector_store: VectorStore for semantic search
+            graph_path: Path to Logseq graph
+            top_k: Number of candidate chunks to retrieve (default: 20)
+
+        Returns:
+            Number of write operations executed
+
+        Raises:
+            LLMError: If LLM calls fail
+            IOError: If file operations fail
+        """
+        from logsqueak.integration.executor import execute_write_list
+        from logsqueak.integration.journal_cleanup import add_processed_markers
+
+        logger.info(f"Starting end-to-end pipeline for journal: {journal.date}")
+
+        # Phase 1: Extract knowledge packages
+        logger.info("Phase 1: Extracting knowledge from journal")
+        packages = self.extract_knowledge(journal)
+
+        if not packages:
+            logger.info("No knowledge found in journal")
+            return 0
+
+        logger.info(f"Extracted {len(packages)} knowledge packages")
+
+        # Phase 2 & 3: Process packages (candidate retrieval + Decider + Reworder)
+        logger.info("Phase 2 & 3: Processing knowledge packages")
+        write_list, processed_blocks_map = self.process_knowledge_packages(
+            packages=packages,
+            vector_store=vector_store,
+            graph_path=graph_path,
+            top_k=top_k,
+        )
+
+        if not write_list:
+            logger.info("No write operations generated")
+            return 0
+
+        # Phase 4: Execute write operations
+        logger.info("Phase 4: Executing write operations")
+        updated_map = execute_write_list(
+            write_list=write_list,
+            processed_blocks_map=processed_blocks_map,
+            graph_path=graph_path,
+        )
+
+        # Phase 4.5: Add processed:: markers to journal
+        logger.info("Phase 4.5: Adding processed markers to journal")
+        journal_path = graph_path / "journals" / f"{journal.date.strftime('%Y_%m_%d')}.md"
+        add_processed_markers(
+            journal_path=journal_path,
+            processed_blocks_map=updated_map,
+        )
+
+        logger.info(f"Pipeline complete: {len(write_list)} operations executed")
+        return len(write_list)
+
     def select_target_page(
         self,
         knowledge_content: str,
