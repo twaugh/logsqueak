@@ -113,9 +113,10 @@ def _add_processed_marker(
     source_block.properties["processed"] = processed_value
 
     # Add processed:: as a continuation line (property format)
-    # Properties appear as continuation lines indented relative to block content
-    property_indent = indent_str * source_block.indent_level + indent_str
-    property_line = f"{property_indent}processed:: {processed_value}"
+    # Properties are indented: (block's indent) + 2 spaces (not + indent_str!)
+    # This matches how id:: properties are formatted
+    block_indent = indent_str * source_block.indent_level
+    property_line = f"{block_indent}  processed:: {processed_value}"
 
     # Add to continuation_lines (after any existing properties like id::)
     source_block.continuation_lines.append(property_line)
