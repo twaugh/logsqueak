@@ -6,7 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Logsqueak is a CLI tool that extracts lasting knowledge from Logseq journal entries and integrates it into relevant pages using LLM-powered analysis with RAG-based semantic search. It distinguishes between temporary activity logs and knowledge blocks, presents changes in dry-run mode, and adds extracted knowledge as new child bullets with provenance links.
 
-**Current Status**: Phase 4 Complete (Integration with Approval) - 69% Complete
+**Current Status**: Planning major pipeline upgrade (better-pipeline branch)
+- **Existing**: Basic 2-stage pipeline (extract → RAG match) working on main branch (69% complete)
+- **Goal**: Comprehensive 5-phase pipeline with persistent vector store and hybrid-ID system (see FUTURE-STATE.md)
+- **Plan**: 30 tasks across 5 milestones, 20-31 days estimated (see PLAN.md)
 
 ## Development Commands
 
@@ -332,21 +335,20 @@ Without `--verbose`, only warnings and errors are shown.
 
 ## Implementation Status
 
-Current branch: `001-knowledge-extraction`
+**Main branch**: Working proof-of-concept (69% complete)
+- Basic 2-stage pipeline (extract → RAG match)
+- Session-based embedding cache
+- ADD_CHILD operations only
+- See `specs/001-knowledge-extraction/tasks.md`
 
-**Completed (69%)**:
-- Foundational data models and parsing (Phases 1-2.5)
-- Extraction and preview with RAG (Phases 3-3.5)
-- Integration and approval workflow (Phase 4)
+**Current branch: `better-pipeline`** - Major pipeline redesign in planning
+- **Milestone 1**: Hybrid-ID Foundation (5 tasks) - id:: properties + full-context hashing
+- **Milestone 2**: Persistent Vector Store (6 tasks) - ChromaDB with block-level indexing
+- **Milestone 3**: Block-Level Targeting (4 tasks) - Precise block targeting via hybrid IDs
+- **Milestone 4**: Multi-Stage LLM Pipeline (9 tasks) - Decider + Reworder + journal cleanup
+- **Milestone 5**: Testing & Refinement (6 tasks) - Integration tests and documentation
 
-**In Progress**:
-- Phase 4.5: Integration Safety Testing (3/9 tasks)
-
-**Planned**:
-- Phase 5: Section Creation
-- Phase 6: Polish & Logging
-
-See `specs/001-knowledge-extraction/tasks.md` for detailed task breakdown.
+See `PLAN.md` for detailed task breakdown and `FUTURE-STATE.md` for target architecture.
 
 ## Python Version & Dependencies
 
