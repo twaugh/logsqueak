@@ -72,8 +72,8 @@ def build_vector_store(graph_path: Path, ctx: click.Context):
         progress.show_building_index(0)  # Don't know count yet
         start_time = time.time()
 
-        # Build/load vector store (ChromaDB persists in graph/.logsqueak/chroma)
-        persist_dir = graph_path / ".logsqueak" / "chroma"
+        # Build/load vector store (ChromaDB persists in ~/.cache/logsqueak/chroma)
+        persist_dir = Path.home() / ".cache" / "logsqueak" / "chroma"
         vector_store = ChromaDBStore(persist_directory=persist_dir)
         manifest_path = persist_dir.parent / "manifest.json"
         manifest = CacheManifest(manifest_path)
