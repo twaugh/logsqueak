@@ -116,19 +116,30 @@ class OpenAICompatibleProvider(LLMClient):
 
             CRITICAL: Return the EXACT text of each knowledge block as it appears in the journal!
 
-            Do NOT add parent context or reword the content. Just identify which specific bullets
-            contain lasting knowledge and return their exact text.
+            Do NOT:
+            - Add parent context or reword the content
+            - Remove words from the beginning (like "This means that")
+            - Trim the end of sentences
+            - Change ANY words at all
+
+            You MUST copy the text character-for-character from the journal. Just identify which
+            specific bullets contain lasting knowledge and return their EXACT, COMPLETE text.
 
             EXAMPLE JOURNAL:
             - Working on [[RHEL Documentation]]
               - Updated security guidelines
                 - Added section on container scanning
+            - This means that the service will be read-only
 
-            GOOD EXTRACTION (exact text only):
+            GOOD EXTRACTION (exact text, character-for-character):
             "Added section on container scanning"
+            "This means that the service will be read-only"
 
             BAD EXTRACTION (with added context):
             "[[RHEL Documentation]]: Added section on container scanning to security guidelines"
+
+            BAD EXTRACTION (missing words from beginning):
+            "The service will be read-only"  ← WRONG! Missing "This means that"
 
             RULES:
             1. Return the exact text of the knowledge bullet (no modifications)
