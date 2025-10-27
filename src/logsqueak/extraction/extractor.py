@@ -14,6 +14,8 @@ from datetime import date
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+import numpy as np
+
 from logsqueak.llm.client import (
     ExtractionResult,
     LLMClient,
@@ -80,15 +82,18 @@ class Extractor:
     extract knowledge blocks with confidence scores.
     """
 
-    def __init__(self, llm_client: LLMClient, model: str):
+    def __init__(self, llm_client: LLMClient, model: str, use_fuzzy_matching: bool = True):
         """Initialize the extractor.
 
         Args:
             llm_client: LLM client for knowledge extraction
             model: Model name for token counting
+            use_fuzzy_matching: Enable fuzzy block matching with embeddings (default: True)
         """
         self.llm_client = llm_client
         self.token_counter = TokenCounter(model)
+        self.use_fuzzy_matching = use_fuzzy_matching
+        self._embedding_model = None  # Lazy-loaded
 
     def extract_knowledge(
         self, journal: JournalEntry
@@ -124,10 +129,22 @@ class Extractor:
         # Convert ExtractionResults to KnowledgePackages with AST walk
         packages = []
         for result in llm_results:
-            exact_text = result.content  # LLM returns exact block text
+            exact_text = result.content  # LLM returns (possibly approximate) block text
 
-            # Find the block in the journal AST
+            # Try exact match first
             block = self._find_block_by_content(journal.outline.blocks, exact_text)
+
+            # Fall back to fuzzy matching if enabled and exact match fails
+            if block is None and self.use_fuzzy_matching:
+                logger.debug(f"Exact match failed, trying fuzzy matching for: {exact_text[:50]}...")
+                block, similarity = self._find_block_by_fuzzy_match(
+                    journal.outline.blocks, exact_text
+                )
+                if block is not None:
+                    logger.info(
+                        f"Fuzzy match found (similarity: {similarity:.3f}): "
+                        f"{block.content[:50]}..."
+                    )
 
             if block is None:
                 logger.warning(f"Could not find block in AST for text: {exact_text[:50]}...")
@@ -773,6 +790,77 @@ class Extractor:
                     return found
 
         return None
+
+    def _find_block_by_fuzzy_match(
+        self, blocks: List[LogseqBlock], approximate_text: str, threshold: float = 0.7
+    ) -> Tuple[Optional[LogseqBlock], float]:
+        """Find a block in the AST using semantic similarity (fuzzy matching).
+
+        When LLMs (especially smaller models) return approximate text instead of
+        exact copies, this method uses embedding-based similarity to find the
+        most likely matching block.
+
+        Args:
+            blocks: List of LogseqBlock to search
+            approximate_text: Approximate block content from LLM
+            threshold: Minimum similarity score (0.0-1.0) to accept match (default: 0.7)
+
+        Returns:
+            Tuple of (matching_block, similarity_score) or (None, 0.0) if no match above threshold
+
+        Example:
+            LLM returns: "The service will be read-only"
+            Actual block: "This means that the service will be read-only"
+            Similarity: 0.92 → Match!
+        """
+        # Lazy-load embedding model
+        if self._embedding_model is None:
+            logger.info("Loading embedding model for fuzzy matching...")
+            from sentence_transformers import SentenceTransformer
+            self._embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+        # Flatten all blocks into a list with their content
+        all_blocks = []
+
+        def collect_blocks(block_list: List[LogseqBlock]) -> None:
+            for block in block_list:
+                all_blocks.append(block)
+                if block.children:
+                    collect_blocks(block.children)
+
+        collect_blocks(blocks)
+
+        if not all_blocks:
+            return None, 0.0
+
+        # Extract content from all blocks
+        block_contents = [block.content.strip() for block in all_blocks]
+
+        # Encode all blocks and the query text
+        logger.debug(f"Encoding {len(all_blocks)} blocks for fuzzy matching...")
+        block_embeddings = self._embedding_model.encode(block_contents, convert_to_numpy=True)
+        query_embedding = self._embedding_model.encode([approximate_text.strip()], convert_to_numpy=True)[0]
+
+        # Compute cosine similarities
+        similarities = np.dot(block_embeddings, query_embedding) / (
+            np.linalg.norm(block_embeddings, axis=1) * np.linalg.norm(query_embedding)
+        )
+
+        # Find best match
+        best_idx = int(np.argmax(similarities))
+        best_score = float(similarities[best_idx])
+
+        if best_score >= threshold:
+            logger.debug(
+                f"Best match: '{block_contents[best_idx][:50]}...' "
+                f"(score: {best_score:.3f})"
+            )
+            return all_blocks[best_idx], best_score
+        else:
+            logger.debug(
+                f"Best candidate score {best_score:.3f} below threshold {threshold}"
+            )
+            return None, 0.0
 
     def _build_full_context(
         self, block: LogseqBlock, root_blocks: List[LogseqBlock]
