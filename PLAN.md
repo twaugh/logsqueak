@@ -204,9 +204,9 @@ Implement precise block targeting using hybrid IDs for UPDATE and APPEND operati
 
 ---
 
-### **Milestone 4: Multi-Stage LLM Pipeline** (8-10 tasks)
+### **Milestone 4: Multi-Stage LLM Pipeline** (11 tasks)
 
-Implement Phase 1 (Knowledge Extraction changes), Phase 3 (Decider + Reworder) and Phase 4 (Execution + Cleanup) from FUTURE-STATE.
+Implement Phase 1 (Knowledge Extraction changes), Phase 2 (Enhanced RAG), Phase 3 (Decider + Reworder) and Phase 4 (Execution + Cleanup) from FUTURE-STATE.
 
 #### M4.1: Update Phase 1 Extraction to Return Exact Block Text
 - **File**: `src/logsqueak/llm/providers/openai_compat.py`, `src/logsqueak/extraction/extractor.py`
@@ -219,9 +219,13 @@ Implement Phase 1 (Knowledge Extraction changes), Phase 3 (Decider + Reworder) a
 
 #### M4.2: Implement Phase 2 Candidate Retrieval (Enhanced)
 - **File**: `src/logsqueak/extraction/extractor.py`
-- **Task**: Update `select_target_page()` to return block-level candidates
-- **Task**: Include `target_id` for each relevant chunk
-- **Test**: Unit test for block-level candidate retrieval
+- **Task**: Implement semantic search - query vector store for Top-K similar chunks
+- **Task**: Implement hinted search - parse [[Page Links]] from knowledge text using regex
+- **Task**: Aggregate and deduplicate results from both semantic + hinted searches
+- **Task**: For each candidate page, gather all relevant chunks with {page_name, target_id, content}
+- **Task**: Return augmented Knowledge Package with candidates list
+- **Rationale**: Combines RAG similarity with explicit page references for better targeting
+- **Test**: Unit test for semantic search, hinted search, and deduplication
 
 #### M4.3: Create Decider Prompt (Phase 3.1)
 - **File**: `src/logsqueak/llm/prompts.py`
@@ -249,26 +253,51 @@ Implement Phase 1 (Knowledge Extraction changes), Phase 3 (Decider + Reworder) a
 
 #### M4.7: Wire Up Phase 3 in Pipeline
 - **File**: `src/logsqueak/cli/main.py`
-- **Task**: Call Decider for each candidate
-- **Task**: Call Reworder only if action is UPDATE/APPEND
-- **Task**: Build "Write List" with `{page, decision, new_content}`
-- **Test**: Integration test for Phase 3 pipeline
+- **Task**: Initialize empty "Write List" and "Processed Journal Blocks" map
+- **Task**: Implement nested loop: for each Knowledge Package, loop through each of its candidates
+- **Task**: For each (knowledge, candidate) pair, call Decider LLM
+- **Task**: If action is IGNORE_*, skip to next candidate
+- **Task**: If action is UPDATE/APPEND, call Reworder LLM with knowledge full_text
+- **Task**: Add to Write List: {page_name, action, target_id, new_content}
+- **Task**: Track in Processed Journal Blocks map: original_id -> [(page_name, None)] (new_id added in Phase 4)
+- **Rationale**: Nested loop structure evaluates each knowledge block against ALL candidate pages
+- **Test**: Integration test for Phase 3 pipeline with multiple candidates
 
-#### M4.8: Implement Journal Cleanup (Phase 4.5)
+#### M4.8: Implement Phase 4 Execution Logic
+- **File**: `src/logsqueak/integration/executor.py` (new file)
+- **Task**: Group all operations in Write List by page_name (minimize file I/O)
+- **Task**: For each page: parse to AST, apply all operations, serialize back
+- **Task**: For each operation: generate NEW UUID during write (not before)
+- **Task**: Use `find_block_by_id(target_id)` to locate target node in AST
+- **Task**: Handle UPDATE: set target_node content to `{new_content}\n  id:: {new_block_id}`
+  - NOTE: handle indentation correctly! The id:: block property should be on a continuation line.
+- **Task**: Handle APPEND (as child): add child to target_node with new UUID
+- **Task**: Handle APPEND (to root): add root-level block when target_id == "root"
+- **Task**: Update Processed Journal Blocks map with new_block_id for each write
+- **Rationale**: Batching by page reduces I/O, UUID generation during write ensures uniqueness
+- **Test**: Unit tests for UPDATE/APPEND operations, grouping logic
+
+#### M4.9: Implement Journal Cleanup (Phase 4.5)
 - **File**: `src/logsqueak/integration/journal_cleanup.py`
-- **Task**: Add `processed::` markers to journal blocks
-- **Task**: Format: `processed:: [page1](((uuid1))), [page2](((uuid2)))`
-  - NOTE: Regular markdown links with block reference targets, NOT Logseq `[[page]]` syntax
-- **Task**: Handle page name formatting (remove `.md`, replace `___` with `/`)
-- **Test**: Unit test for cleanup formatting and link syntax
+- **Task**: Read and parse journal file into AST
+- **Task**: For each original_id in Processed Journal Blocks map, find source block using `find_block_by_id()`
+- **Task**: Gather all new links for that block: [(page_name, new_id), ...]
+- **Task**: Format each link: remove `.md`, replace `___` with `/`, format as `[page](((uuid)))`
+  - NOTE: This is markdown link with block ref target, NOT Logseq `[[page]]` syntax
+- **Task**: Create processed marker: `processed:: [page1](((uuid1))), [page2](((uuid2)))`
+- **Task**: Add processed marker as child block to original journal block
+- **Task**: Serialize modified journal AST and write back to file
+- **Rationale**: Links user back to where knowledge was integrated
+- **Test**: Unit test for link formatting, AST modification, round-trip safety
 
-#### M4.9: Wire Up Phase 4 Cleanup
+#### M4.10: Wire Up Phase 4 in Pipeline
 - **File**: `src/logsqueak/cli/main.py`
-- **Task**: After file writes, update journal with `processed::` markers
-- **Task**: Track `{original_id: [(page, new_id), ...]}`
-- **Test**: Integration test for end-to-end cleanup
+- **Task**: After Phase 3, call Phase 4 execution with Write List
+- **Task**: Collect updated Processed Journal Blocks map with new_block_ids
+- **Task**: Call journal cleanup with updated map
+- **Test**: Integration test for end-to-end Phase 4 execution + cleanup
 
-#### M4.10: Add Configuration for Model Selection
+#### M4.11: Add Configuration for Model Selection
 - **File**: `src/logsqueak/models/config.py`
 - **Task**: Add optional `llm.decider_model` and `llm.reworder_model` config fields
 - **Task**: Both default to `llm.model` if not specified (allows using different models for speed vs quality)
@@ -325,9 +354,9 @@ Comprehensive testing and polish for the new pipeline.
 | M1: Hybrid-ID Foundation | 5 | 3-5 days | ✅ Complete | ~1 day |
 | M2: Persistent Vector Store | 6 | 4-6 days | ✅ Complete | ~1 day |
 | M3: Block-Level Targeting | 3 | 2-3 days | ✅ Complete | <1 day |
-| M4: Multi-Stage Pipeline | 10 | 8-12 days | ⏳ Next | - |
+| M4: Multi-Stage Pipeline | 11 | 10-14 days | ⏳ Next | - |
 | M5: Testing & Refinement | 6 | 4-6 days | Pending | - |
-| **Total** | **30 tasks** | **21-32 days** | 47% | ~3/21-32 |
+| **Total** | **31 tasks** | **23-35 days** | 45% | ~3/23-35 |
 
 ---
 

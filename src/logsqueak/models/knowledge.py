@@ -8,10 +8,30 @@ from typing import Optional
 
 
 class ActionType(Enum):
-    """Type of action to take when integrating knowledge."""
+    """Type of action to take when integrating knowledge.
 
-    ADD_CHILD = "add_child"  # Add as child bullet under existing section
-    CREATE_SECTION = "create_section"  # Create new organizational bullet
+    Legacy actions (pre-M4):
+    - ADD_CHILD: Add as child bullet under existing section
+    - CREATE_SECTION: Create new organizational bullet
+
+    New actions (M4+ multi-stage pipeline):
+    - IGNORE_ALREADY_PRESENT: Knowledge already exists in target
+    - IGNORE_IRRELEVANT: Knowledge not relevant to this candidate
+    - UPDATE: Modify existing block content in place
+    - APPEND_CHILD: Add as child to specific target block
+    - APPEND_ROOT: Add at page root level
+    """
+
+    # Legacy actions
+    ADD_CHILD = "add_child"
+    CREATE_SECTION = "create_section"
+
+    # New multi-stage pipeline actions
+    IGNORE_ALREADY_PRESENT = "ignore_already_present"
+    IGNORE_IRRELEVANT = "ignore_irrelevant"
+    UPDATE = "update"
+    APPEND_CHILD = "append_child"
+    APPEND_ROOT = "append_root"
 
 
 @dataclass
