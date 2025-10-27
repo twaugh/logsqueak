@@ -441,3 +441,108 @@ class TestSafeFileWriting:
         # Temp file should be cleaned up
         temp_file = page_file.with_suffix('.tmp')
         assert not temp_file.exists()
+
+
+class TestUUIDGeneration:
+    """Test UUID generation for new blocks (M1.4)."""
+
+    def test_add_child_bullet_generates_uuid(self):
+        """Test that adding child bullet generates UUID."""
+        parent = LogseqBlock(content="Parent", indent_level=0)
+
+        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD)
+
+        assert len(parent.children) == 1
+        child = parent.children[0]
+        assert child.block_id is not None
+        assert len(child.block_id) == 36  # UUID format: 8-4-4-4-12
+        assert "-" in child.block_id
+
+    def test_add_child_bullet_adds_id_property(self):
+        """Test that child bullet has id:: property."""
+        parent = LogseqBlock(content="Parent", indent_level=0)
+
+        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD)
+
+        child = parent.children[0]
+        assert "id" in child.properties
+        assert child.properties["id"] == child.block_id
+
+    def test_add_child_bullet_adds_id_continuation_line(self):
+        """Test that child bullet has id:: in continuation_lines."""
+        parent = LogseqBlock(content="Parent", indent_level=0)
+
+        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD)
+
+        child = parent.children[0]
+        assert len(child.continuation_lines) == 1
+        id_line = child.continuation_lines[0]
+        assert "id::" in id_line
+        assert child.block_id in id_line
+        # Should be indented properly (parent is level 0, child is level 1, property is level 2)
+        assert id_line.startswith("    ")  # 4 spaces = 2 levels
+
+    def test_add_to_page_end_generates_uuid(self):
+        """Test that adding to page end generates UUID."""
+        outline = LogseqOutline.parse("")
+
+        _add_to_page_end(outline, "New content")
+
+        assert len(outline.blocks) == 1
+        block = outline.blocks[0]
+        assert block.block_id is not None
+        assert len(block.block_id) == 36
+
+    def test_add_to_page_end_adds_id_property(self):
+        """Test that page-end block has id:: property."""
+        outline = LogseqOutline.parse("")
+
+        _add_to_page_end(outline, "New content")
+
+        block = outline.blocks[0]
+        assert "id" in block.properties
+        assert block.properties["id"] == block.block_id
+
+    def test_add_to_page_end_adds_id_continuation_line(self):
+        """Test that page-end block has id:: in continuation_lines."""
+        outline = LogseqOutline.parse("")
+
+        _add_to_page_end(outline, "New content")
+
+        block = outline.blocks[0]
+        assert len(block.continuation_lines) == 1
+        id_line = block.continuation_lines[0]
+        assert "id::" in id_line
+        assert block.block_id in id_line
+        # Root level block, so property is indented by 1 level
+        assert id_line.startswith("  ")  # 2 spaces
+
+    def test_generated_uuids_are_unique(self):
+        """Test that multiple blocks get different UUIDs."""
+        parent = LogseqBlock(content="Parent", indent_level=0)
+
+        _add_child_bullet(parent, "Child 1", ActionType.ADD_CHILD)
+        _add_child_bullet(parent, "Child 2", ActionType.ADD_CHILD)
+        _add_child_bullet(parent, "Child 3", ActionType.ADD_CHILD)
+
+        uuids = [child.block_id for child in parent.children]
+        assert len(uuids) == 3
+        assert len(set(uuids)) == 3  # All unique
+
+    def test_uuid_format_in_rendered_output(self):
+        """Test that UUID appears correctly in rendered output."""
+        outline = LogseqOutline.parse("- Parent")
+        parent = outline.blocks[0]
+
+        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD)
+
+        rendered = outline.render()
+        lines = rendered.split("\n")
+
+        # Should have parent, child, and id:: property
+        assert "- Parent" in lines
+        assert "  - Child content" in lines
+        # Find the id:: line
+        id_lines = [line for line in lines if "id::" in line]
+        assert len(id_lines) == 1
+        assert parent.children[0].block_id in id_lines[0]

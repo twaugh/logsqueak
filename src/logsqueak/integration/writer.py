@@ -5,8 +5,10 @@ This module handles:
 - Adding provenance links (T037)
 - Adding child bullets at appropriate positions (T038)
 - Fallback to page end when no section match (T039)
+- Generating unique IDs for new blocks
 """
 
+import uuid
 from typing import List, Optional
 
 from logsqueak.logseq.parser import LogseqBlock, LogseqOutline
@@ -124,6 +126,15 @@ def _find_section_recursive(
     return None
 
 
+def _generate_block_id() -> str:
+    """Generate a unique UUID for a new block.
+
+    Returns:
+        UUID string in standard format (e.g., '65f3a8e0-1234-5678-9abc-def012345678')
+    """
+    return str(uuid.uuid4())
+
+
 def _add_provenance_link(content: str, source_date) -> str:
     """Add provenance link to knowledge content (T037).
 
@@ -149,17 +160,29 @@ def _add_child_bullet(
 ) -> None:
     """Add content as child bullet to parent block (T038).
 
+    Generates a unique UUID for the new block and adds it as an id:: property.
+
     Args:
         parent_block: Parent block to add child to
         content: Content to add (with provenance)
         action: Suggested action type (ADD_CHILD or CREATE_SECTION)
     """
-    # Create new child block
+    # Generate unique ID for new block
+    block_id = _generate_block_id()
+
+    # Calculate indentation for the id:: property line
+    indent_level = parent_block.indent_level + 1
+    indent = "  " * (indent_level + 1)  # Property is indented one more level
+    id_line = f"{indent}id:: {block_id}"
+
+    # Create new child block with id:: property
     new_child = LogseqBlock(
         content=content,
-        indent_level=parent_block.indent_level + 1,
-        properties={},
+        indent_level=indent_level,
+        properties={"id": block_id},
+        block_id=block_id,
         children=[],
+        continuation_lines=[id_line],
     )
 
     # Add as last child (targeted placement)
@@ -170,18 +193,27 @@ def _add_to_page_end(outline: LogseqOutline, content: str) -> None:
     """Add content to page end as fallback (T039).
 
     When no clear section match exists, add knowledge at the end
-    of the page at root level.
+    of the page at root level. Generates a unique UUID for the new block.
 
     Args:
         outline: Page outline
         content: Content to add (with provenance)
     """
-    # Create new root-level block
+    # Generate unique ID for new block
+    block_id = _generate_block_id()
+
+    # Root-level block, so id:: property is indented by 1 level
+    indent = "  "
+    id_line = f"{indent}id:: {block_id}"
+
+    # Create new root-level block with id:: property
     new_block = LogseqBlock(
         content=content,
         indent_level=0,
-        properties={},
+        properties={"id": block_id},
+        block_id=block_id,
         children=[],
+        continuation_lines=[id_line],
     )
 
     # Add to end of root blocks
