@@ -220,6 +220,113 @@ def _add_to_page_end(outline: LogseqOutline, content: str) -> None:
     outline.blocks.append(new_block)
 
 
+def update_block(target_block: LogseqBlock, new_content: str, preserve_id: bool = True) -> None:
+    """Update an existing block's content in place.
+
+    Replaces the block's content while optionally preserving its id:: property.
+    This allows updating knowledge blocks without losing their identity, which is
+    useful for refreshing outdated information while maintaining links and references.
+
+    Args:
+        target_block: Block to update
+        new_content: New content to replace with
+        preserve_id: If True, preserve existing id:: property (default: True)
+    """
+    # Update content
+    target_block.content = new_content
+
+    # If preserving ID and block has one, keep it
+    if preserve_id and target_block.block_id:
+        # Ensure id is in properties
+        if "id" not in target_block.properties:
+            target_block.properties["id"] = target_block.block_id
+
+        # Ensure id:: is in continuation_lines
+        indent_level = target_block.indent_level
+        indent = "  " * (indent_level + 1)
+        id_line = f"{indent}id:: {target_block.block_id}"
+
+        # Check if id:: already exists in continuation_lines
+        has_id_line = any("id::" in line for line in target_block.continuation_lines)
+        if not has_id_line:
+            target_block.continuation_lines.append(id_line)
+
+
+def append_to_block(target_block: LogseqBlock, new_content: str) -> str:
+    """Append new content as a child of the target block.
+
+    Creates a new block with a unique UUID and adds it as a child of the specified
+    parent block. This is useful for adding related information under an existing
+    topic or section without modifying the parent's content.
+
+    Args:
+        target_block: Block to append child to
+        new_content: Content for the new child block
+
+    Returns:
+        The generated UUID for the new block
+    """
+    # Generate UUID for new block
+    new_id = _generate_block_id()
+
+    # Calculate indentation for the id:: property line
+    indent_level = target_block.indent_level + 1
+    indent = "  " * (indent_level + 1)
+    id_line = f"{indent}id:: {new_id}"
+
+    # Create new child block
+    new_child = LogseqBlock(
+        content=new_content,
+        indent_level=indent_level,
+        properties={"id": new_id},
+        block_id=new_id,
+        children=[],
+        continuation_lines=[id_line],
+    )
+
+    # Add as child
+    target_block.children.append(new_child)
+
+    return new_id
+
+
+def append_to_root(outline: LogseqOutline, new_content: str) -> str:
+    """Append new content to the page root level.
+
+    Creates a new block with a unique UUID and adds it at the root level of the page.
+    This is useful when adding standalone information that doesn't belong under any
+    existing section, or when the target section doesn't exist.
+
+    Args:
+        outline: Page outline
+        new_content: Content for the new root-level block
+
+    Returns:
+        The generated UUID for the new block
+    """
+    # Generate UUID for new block
+    new_id = _generate_block_id()
+
+    # Root-level block, so id:: property is indented by 1 level
+    indent = "  "
+    id_line = f"{indent}id:: {new_id}"
+
+    # Create new root-level block
+    new_block = LogseqBlock(
+        content=new_content,
+        indent_level=0,
+        properties={"id": new_id},
+        block_id=new_id,
+        children=[],
+        continuation_lines=[id_line],
+    )
+
+    # Add to root blocks
+    outline.blocks.append(new_block)
+
+    return new_id
+
+
 def write_page_safely(target_page: TargetPage, output_path: Optional = None) -> None:
     """Write modified page to disk safely (T040).
 

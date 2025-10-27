@@ -26,6 +26,7 @@ class KnowledgeBlock:
         confidence: LLM confidence score (0.0-1.0) for classification
         target_page: Page name where this should be integrated
         target_section: Hierarchical path to target location (e.g., ["Projects", "Timeline"])
+        target_block_id: Hybrid ID for precise block targeting (either an explicit id:: or content hash)
         suggested_action: How to integrate (ADD_CHILD or CREATE_SECTION)
     """
 
@@ -34,7 +35,8 @@ class KnowledgeBlock:
     confidence: float
     target_page: str
     target_section: Optional[list[str]]
-    suggested_action: ActionType
+    target_block_id: Optional[str] = None
+    suggested_action: ActionType = ActionType.ADD_CHILD
 
     def content_hash(self) -> str:
         """Generate hash for duplicate detection (FR-017).
