@@ -51,6 +51,28 @@ class CandidateChunk:
     similarity_score: float
 
 
+@dataclass
+class WriteOperation:
+    """A pending write operation (Phase 3 output).
+
+    Represents a decision by the Decider LLM to integrate knowledge
+    into a specific location. Collected into a Write List for Phase 4.
+
+    Attributes:
+        page_name: Target page name
+        action: What to do (UPDATE, APPEND_CHILD, APPEND_ROOT)
+        target_id: Hybrid ID of target block (None for APPEND_ROOT)
+        new_content: Rephrased content ready for integration
+        original_id: Hybrid ID of source journal block (for cleanup tracking)
+    """
+
+    page_name: str
+    action: ActionType
+    target_id: Optional[str]
+    new_content: str
+    original_id: str  # For tracking back to journal block
+
+
 class Extractor:
     """Orchestrates knowledge extraction from journal entries.
 
@@ -335,6 +357,128 @@ class Extractor:
         chunks = sorted(chunk_map.values(), key=lambda c: c.similarity_score, reverse=True)
 
         return chunks
+
+    def process_knowledge_packages(
+        self,
+        packages: List[KnowledgePackage],
+        vector_store: VectorStore,
+        graph_path: Path,
+        top_k: int = 20,
+    ) -> Tuple[List[WriteOperation], dict]:
+        """Process knowledge packages through Phase 3 (Decider + Reworder).
+
+        For each knowledge package, retrieves candidate chunks and evaluates
+        them with the Decider LLM. For non-IGNORE actions, calls the Reworder
+        to generate clean content. Builds a Write List for Phase 4 execution.
+
+        Args:
+            packages: List of KnowledgePackage from Phase 1
+            vector_store: VectorStore for candidate retrieval
+            graph_path: Path to Logseq graph
+            top_k: Number of candidate chunks to retrieve (default: 20)
+
+        Returns:
+            Tuple of (write_list, processed_blocks_map)
+            - write_list: List of WriteOperation for Phase 4
+            - processed_blocks_map: Dict[original_id -> List[(page_name, new_id)]]
+              (new_id is None until Phase 4 execution)
+        """
+        write_list: List[WriteOperation] = []
+        processed_blocks_map: dict = {}
+
+        logger.info(f"Processing {len(packages)} knowledge packages through Phase 3")
+
+        for package in packages:
+            logger.debug(f"Processing package: {package.exact_text[:50]}...")
+
+            # Phase 2: Get candidate chunks
+            candidates = self.find_candidate_chunks(
+                knowledge=package,
+                vector_store=vector_store,
+                graph_path=graph_path,
+                top_k=top_k,
+            )
+
+            if not candidates:
+                logger.warning(f"No candidates found for: {package.exact_text[:50]}...")
+                continue
+
+            logger.debug(f"Found {len(candidates)} candidates for knowledge package")
+
+            # Track whether we found a match for this knowledge
+            found_match = False
+
+            # Phase 3.1: Evaluate each candidate with Decider LLM
+            for candidate in candidates:
+                # Convert to dict format expected by decide_action
+                candidate_dict = {
+                    "page_name": candidate.page_name,
+                    "target_id": candidate.target_id,
+                    "content": candidate.content,
+                    "similarity_score": candidate.similarity_score,
+                }
+
+                logger.debug(
+                    f"Calling Decider for candidate: {candidate.page_name} "
+                    f"(score: {candidate.similarity_score:.3f})"
+                )
+
+                decision = self.llm_client.decide_action(
+                    knowledge_text=package.full_text,
+                    candidate_chunks=[candidate_dict],
+                )
+
+                logger.debug(f"Decider action: {decision.action.value}, reasoning: {decision.reasoning[:100]}...")
+
+                # Handle IGNORE actions - skip to next candidate
+                if decision.action in (ActionType.IGNORE_ALREADY_PRESENT, ActionType.IGNORE_IRRELEVANT):
+                    logger.debug(f"Ignoring candidate: {decision.action.value}")
+                    continue
+
+                # Phase 3.2: Call Reworder for UPDATE/APPEND actions
+                logger.debug("Calling Reworder to generate clean content")
+                rephrased = self.llm_client.rephrase_content(package.full_text)
+
+                # Determine page_name and target_id based on action
+                if decision.action == ActionType.APPEND_ROOT:
+                    page_name = decision.page_name
+                    target_id = None
+                else:
+                    # UPDATE or APPEND_CHILD - use target_id to determine page
+                    page_name = candidate.page_name
+                    target_id = decision.target_id
+
+                # Add to Write List
+                write_op = WriteOperation(
+                    page_name=page_name,
+                    action=decision.action,
+                    target_id=target_id,
+                    new_content=rephrased.content,
+                    original_id=package.original_id,
+                )
+                write_list.append(write_op)
+
+                logger.info(
+                    f"Added write operation: {decision.action.value} to {page_name}"
+                )
+
+                # Track in processed blocks map (new_id will be added in Phase 4)
+                if package.original_id not in processed_blocks_map:
+                    processed_blocks_map[package.original_id] = []
+                processed_blocks_map[package.original_id].append((page_name, None))
+
+                found_match = True
+                break  # Found a match, stop evaluating candidates for this knowledge
+
+            if not found_match:
+                logger.warning(
+                    f"No suitable target found for knowledge: {package.exact_text[:50]}..."
+                )
+
+        logger.info(
+            f"Phase 3 complete: {len(write_list)} write operations generated"
+        )
+        return write_list, processed_blocks_map
 
     def select_target_page(
         self,
