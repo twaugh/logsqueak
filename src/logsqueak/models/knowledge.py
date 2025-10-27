@@ -7,6 +7,26 @@ from enum import Enum
 from typing import Optional
 
 
+@dataclass
+class KnowledgePackage:
+    """Knowledge extracted from journal with full context (M4.1+).
+
+    This is the output of Phase 1 extraction in the new multi-stage pipeline.
+    Contains the original block ID and full-context text (with parent context).
+
+    Attributes:
+        original_id: Hybrid ID of source journal block (id:: or content hash)
+        exact_text: Exact block text as returned by LLM (no parent context)
+        full_text: Full context text (exact_text + parent context from AST walk)
+        confidence: LLM confidence score (0.0-1.0) for classification
+    """
+
+    original_id: str
+    exact_text: str
+    full_text: str
+    confidence: float
+
+
 class ActionType(Enum):
     """Type of action to take when integrating knowledge.
 
