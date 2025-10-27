@@ -54,43 +54,51 @@ This plan bridges the gap between our **current implementation** (basic 2-stage 
 
 ## Incremental Implementation Plan
 
-### **Milestone 1: Hybrid-ID Foundation** (5 tasks)
+### **Milestone 1: Hybrid-ID Foundation** ✅ (5 tasks - COMPLETE)
 
 Build the infrastructure for persistent block IDs and full-context chunk generation. This lays the groundwork for both hybrid IDs and the chunking system needed in M2.
 
-#### M1.1: Enhance Parser to Extract `id::` Properties
-- **File**: `src/logsqueak/logseq/parser.py`
-- **Task**: Modify `LogseqBlock` to store `block_id: Optional[str]`
-- **Task**: Parse `id::` property and populate `block_id` field
-- **Test**: Unit test for parsing blocks with/without `id::`
+**Status**: Complete (commits: 41c14c9, d1162d8, 332c4e5, 8b72c5c, 03d21c1)
 
-#### M1.2: Implement Full-Context Generation and Hashing
+#### M1.1: Enhance Parser to Extract `id::` Properties ✅
+- **File**: `src/logsqueak/logseq/parser.py`
+- **Task**: ✅ Modified `LogseqBlock` to store `block_id: Optional[str]`
+- **Task**: ✅ Parse `id::` property and populate `block_id` field
+- **Test**: ✅ 7 unit tests for parsing blocks with/without `id::`
+- **Commit**: 41c14c9
+
+#### M1.2: Implement Full-Context Generation and Hashing ✅
 - **File**: New `src/logsqueak/logseq/context.py`
-- **Task**: Create `generate_full_context(block, parents) -> str` helper
-- **Task**: Recursive traversal to build full context (prepend parent context)
-- **Task**: Create `generate_content_hash(full_context: str) -> str` using MD5
-- **Task**: Create `generate_chunks(outline) -> List[Tuple[block, full_context, hybrid_id]]`
+- **Task**: ✅ Created `generate_full_context(block, parents) -> str` helper (includes bullet markers)
+- **Task**: ✅ Recursive traversal to build full context (prepend parent context)
+- **Task**: ✅ Created `generate_content_hash(full_context: str) -> str` using MD5
+- **Task**: ✅ Created `generate_chunks(outline) -> List[Tuple[block, full_context, hybrid_id]]`
   - This will be reused by M2.3 for chunking
-- **Test**: Unit test for full-context generation with nested blocks
-- **Test**: Unit test for hash stability and collision resistance
+- **Test**: ✅ 18 unit tests for full-context generation with nested blocks
+- **Test**: ✅ Unit test for hash stability and collision resistance
+- **Commit**: d1162d8 (amended to include bullet markers)
 
-#### M1.3: Add Hybrid ID to LogseqBlock
+#### M1.3: Add Hybrid ID to LogseqBlock ✅
 - **File**: `src/logsqueak/logseq/parser.py`
-- **Task**: Add method `get_hybrid_id() -> str` to `LogseqBlock`
-- **Task**: Returns `block_id` if present, else content hash
-- **Test**: Unit test for hybrid ID resolution
+- **Task**: ✅ Added method `get_hybrid_id() -> str` to `LogseqBlock`
+- **Task**: ✅ Returns `block_id` if present, else content hash
+- **Task**: ✅ Added `find_block_by_id()` to LogseqOutline (optimized with generate_chunks)
+- **Test**: ✅ 8 unit tests for hybrid ID resolution
+- **Commit**: 332c4e5
 
-#### M1.4: Implement UUID Generation in Writer
+#### M1.4: Implement UUID Generation in Writer ✅
 - **File**: `src/logsqueak/integration/writer.py`
-- **Task**: Generate new UUID for each integrated block
-- **Task**: Append `id:: <uuid>` to new blocks
-- **Test**: Integration test for ID generation and formatting
+- **Task**: ✅ Generate new UUID for each integrated block
+- **Task**: ✅ Append `id:: <uuid>` to new blocks (in both properties dict and continuation_lines)
+- **Test**: ✅ 8 unit tests for ID generation and formatting
+- **Commit**: 8b72c5c
 
-#### M1.5: Round-Trip Safety Tests
-- **File**: `tests/integration/test_roundtrip.py`
-- **Task**: Test parse → modify → render → parse preserves IDs
-- **Task**: Test that existing `id::` properties are never modified
-- **Test**: Property order preservation (already exists ✅)
+#### M1.5: Round-Trip Safety Tests ✅
+- **File**: `tests/integration/test_parsing_roundtrip.py`
+- **Task**: ✅ 8 tests for parse → modify → render → parse preserves IDs
+- **Task**: ✅ Test that existing `id::` properties are never modified
+- **Test**: ✅ Property order preservation (already exists ✅)
+- **Commit**: 03d21c1
 
 ---
 
@@ -287,14 +295,14 @@ Comprehensive testing and polish for the new pipeline.
 
 ## Timeline Estimates
 
-| Milestone | Tasks | Estimated Days | Dependencies |
-|-----------|-------|----------------|--------------|
-| M1: Hybrid-ID Foundation | 5 | 3-5 days | None (builds on current parser) |
-| M2: Persistent Vector Store | 6 | 4-6 days | M1 (needs chunk generation from M1.2) |
-| M3: Block-Level Targeting | 4 | 2-4 days | M1 (needs hybrid IDs) |
-| M4: Multi-Stage Pipeline | 9 | 7-10 days | M2, M3 (needs targeting + index) |
-| M5: Testing & Refinement | 6 | 4-6 days | M4 (needs full pipeline) |
-| **Total** | **30 tasks** | **20-31 days** | |
+| Milestone | Tasks | Estimated Days | Status | Actual Time |
+|-----------|-------|----------------|--------|-------------|
+| M1: Hybrid-ID Foundation | 5 | 3-5 days | ✅ Complete | ~1 day |
+| M2: Persistent Vector Store | 6 | 4-6 days | ⏳ Next | - |
+| M3: Block-Level Targeting | 4 | 2-4 days | Pending | - |
+| M4: Multi-Stage Pipeline | 9 | 7-10 days | Pending | - |
+| M5: Testing & Refinement | 6 | 4-6 days | Pending | - |
+| **Total** | **30 tasks** | **20-31 days** | 17% | 1/20-31 |
 
 ---
 
@@ -321,11 +329,11 @@ Comprehensive testing and polish for the new pipeline.
 ## Success Criteria
 
 ### Milestone 1 Complete When:
-- [ ] Parser extracts `id::` properties ✅
-- [ ] Full-context chunk generation works (shared code for M1 and M2) ✅
-- [ ] Content hashing generates stable hybrid IDs ✅
-- [ ] Writer adds UUID to new blocks ✅
-- [ ] Round-trip tests pass for IDs ✅
+- [x] Parser extracts `id::` properties ✅
+- [x] Full-context chunk generation works (shared code for M1 and M2) ✅
+- [x] Content hashing generates stable hybrid IDs ✅
+- [x] Writer adds UUID to new blocks ✅
+- [x] Round-trip tests pass for IDs ✅
 
 ### Milestone 2 Complete When:
 - [ ] ChromaDB stores block-level embeddings ✅
