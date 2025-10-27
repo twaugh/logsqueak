@@ -21,9 +21,14 @@ from logsqueak.llm.client import (
     LLMTimeoutError,
     PageCandidate,
     PageSelectionResult,
+    RephrasedContent,
 )
 from logsqueak.llm.prompt_logger import PromptLogger
-from logsqueak.llm.prompts import build_decider_messages, build_page_selection_messages
+from logsqueak.llm.prompts import (
+    build_decider_messages,
+    build_page_selection_messages,
+    build_reworder_messages,
+)
 from logsqueak.models.knowledge import ActionType
 
 
@@ -404,6 +409,68 @@ class OpenAICompatibleProvider(LLMClient):
         except httpx.RequestError as e:
             if self.prompt_logger:
                 self.prompt_logger.log_response(stage="decider", response={}, error=e)
+            raise LLMError(f"Network error: {e}") from e
+
+    def rephrase_content(self, knowledge_full_text: str) -> RephrasedContent:
+        """Rephrase knowledge into clean, evergreen content (Phase 3.2: Reworder).
+
+        Args:
+            knowledge_full_text: The full-context knowledge text from journal
+
+        Returns:
+            Rephrased content ready for integration
+
+        Raises:
+            LLMError: If API request fails or returns invalid response
+        """
+        # Build messages using shared prompt builder
+        messages = build_reworder_messages(knowledge_full_text=knowledge_full_text)
+
+        # Log request if logger is enabled
+        if self.prompt_logger:
+            self.prompt_logger.log_request(
+                stage="reworder",
+                messages=messages,
+                model=self.model,
+                metadata={
+                    "knowledge_text": knowledge_full_text[:200] + "..." if len(knowledge_full_text) > 200 else knowledge_full_text,
+                },
+            )
+
+        try:
+            response = self._make_request(messages=messages)
+
+            # Parse JSON response
+            data = self._parse_json_response(response)
+
+            # Log successful response
+            if self.prompt_logger:
+                self.prompt_logger.log_response(
+                    stage="reworder",
+                    response=response,
+                    parsed_content=data,
+                )
+
+            # Validate required structure
+            if "rephrased_content" not in data:
+                raise LLMResponseError("Response missing 'rephrased_content' field")
+
+            return RephrasedContent(content=data["rephrased_content"])
+
+        except httpx.TimeoutException as e:
+            if self.prompt_logger:
+                self.prompt_logger.log_response(stage="reworder", response={}, error=e)
+            raise LLMTimeoutError(f"Request timeout: {e}") from e
+        except httpx.HTTPStatusError as e:
+            if self.prompt_logger:
+                self.prompt_logger.log_response(stage="reworder", response={}, error=e)
+            raise LLMAPIError(
+                f"API error: {e.response.status_code} - {e.response.text}",
+                status_code=e.response.status_code,
+            ) from e
+        except httpx.RequestError as e:
+            if self.prompt_logger:
+                self.prompt_logger.log_response(stage="reworder", response={}, error=e)
             raise LLMError(f"Network error: {e}") from e
 
     def _make_request(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:

@@ -90,6 +90,20 @@ class DecisionResult:
         self.reasoning = reasoning
 
 
+class RephrasedContent:
+    """Result from Phase 3.2: Reworder LLM rephrasing.
+
+    The Reworder LLM transforms journal-specific knowledge into
+    clean, evergreen content suitable for integration into pages.
+
+    Attributes:
+        content: Rephrased content (journal context removed, links preserved)
+    """
+
+    def __init__(self, content: str):
+        self.content = content
+
+
 class LLMClient(ABC):
     """Abstract interface for LLM providers.
 
@@ -164,6 +178,25 @@ class LLMClient(ABC):
 
         Returns:
             Decision with action type, page_name, target_id, and reasoning
+
+        Raises:
+            LLMError: If API request fails or returns invalid response
+        """
+        pass
+
+    @abstractmethod
+    def rephrase_content(self, knowledge_full_text: str) -> RephrasedContent:
+        """Rephrase knowledge into clean, evergreen content (Phase 3.2: Reworder).
+
+        The LLM transforms journal-specific knowledge into timeless content
+        suitable for integration into permanent pages. Removes journal context
+        while preserving links and technical details.
+
+        Args:
+            knowledge_full_text: The full-context knowledge text from journal
+
+        Returns:
+            Rephrased content ready for integration
 
         Raises:
             LLMError: If API request fails or returns invalid response

@@ -229,3 +229,84 @@ def build_decider_messages(
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
+
+
+def build_reworder_messages(knowledge_full_text: str) -> List[dict]:
+    """Build Phase 3.2 (Reworder) prompt messages.
+
+    This is the canonical implementation of the Reworder prompt.
+    The Reworder LLM transforms journal-specific knowledge into clean,
+    evergreen content suitable for integration into pages.
+
+    Args:
+        knowledge_full_text: The full-context knowledge text from journal
+
+    Returns:
+        List of message dicts for chat completion API
+    """
+    system_prompt = dedent("""
+        You are a knowledge rephrasing assistant for a personal knowledge base.
+
+        Your task is to transform knowledge extracted from journal entries into clean,
+        evergreen content suitable for integration into permanent pages.
+
+        You will receive knowledge text that includes:
+        - The specific knowledge to preserve
+        - Parent context from the journal entry (for understanding)
+        - Possibly journal-specific language like "today", "this morning", etc.
+
+        Your job is to:
+        1. Remove journal-specific temporal context ("today", "this morning" -> use past tense or timeless phrasing)
+        2. Preserve all page links ([[Page Name]]) and block references (((block-id)))
+        3. Preserve technical details, decisions, and rationale
+        4. Create standalone, timeless content that makes sense without the journal context
+        5. Keep the content concise and focused on the lasting knowledge
+
+        DO NOT:
+        - Add new information not present in the source
+        - Remove important technical details or links
+        - Change the meaning or intent of the knowledge
+        - Add flowery language or unnecessary elaboration
+
+        Return a JSON object with this structure:
+        {{
+          "rephrased_content": "The clean, evergreen version of the knowledge"
+        }}
+
+        EXAMPLES:
+
+        Example 1 - Use parent context to create standalone content:
+        Input:
+        - Working on [[RHEL Documentation]]
+          - Updated security guidelines
+            - Added section on container scanning
+        Output: {{"rephrased_content": "Added section on container scanning to [[RHEL Documentation]] security guidelines"}}
+
+        Example 2 - Remove temporal language, preserve technical detail:
+        Input:
+        - Today learned that [[Python]] asyncio has a subtle bug with task cancellation - need to use shield()
+        Output: {{"rephrased_content": "[[Python]] asyncio has a subtle bug with task cancellation - use shield() to avoid it"}}
+
+        Example 3 - Preserve attribution from parent, remove temporal context:
+        Input:
+        - Met with [[Alice]] this morning
+          - She suggested using [[ChromaDB]] for the vector store instead of FAISS
+        Output: {{"rephrased_content": "Suggestion from [[Alice]]: Use [[ChromaDB]] for vector store instead of FAISS"}}
+
+        Example 4 - Extract decision from nested context:
+        Input:
+        - Working on [[logsqueak]]
+          - Pipeline refactoring
+            - Decided to use 5-phase approach instead of 2-stage
+        Output: {{"rephrased_content": "[[logsqueak]] pipeline: Decided to use 5-phase approach instead of 2-stage"}}
+    """).strip()
+
+    user_prompt = (
+        f"<knowledge>\n{knowledge_full_text}\n</knowledge>\n\n"
+        f"Rephrase this knowledge into clean, evergreen content."
+    )
+
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
