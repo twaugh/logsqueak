@@ -1,13 +1,18 @@
 """Knowledge extraction orchestrator.
 
-This module implements the two-stage extraction process:
-1. Stage 1: Extract knowledge blocks from journal (content + confidence)
-2. Stage 2: Match knowledge to target pages using RAG candidates
+This module implements the multi-stage extraction process:
+1. Phase 1: Extract knowledge blocks from journal (exact text + AST context)
+2. Phase 2: Candidate retrieval (semantic + hinted search)
+3. Phase 3: Decider + Reworder (LLM selects action and generates clean content)
+4. Phase 4: Execution + Cleanup (apply changes and mark journal processed)
 """
 
 import logging
+import re
+from dataclasses import dataclass
 from datetime import date
-from typing import List, Optional
+from pathlib import Path
+from typing import List, Optional, Tuple
 
 from logsqueak.llm.client import (
     ExtractionResult,
@@ -21,8 +26,29 @@ from logsqueak.logseq.parser import LogseqBlock
 from logsqueak.models.journal import JournalEntry
 from logsqueak.models.knowledge import ActionType, KnowledgeBlock, KnowledgePackage
 from logsqueak.models.page import PageIndex, TargetPage
+from logsqueak.rag.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CandidateChunk:
+    """A candidate chunk for knowledge integration (Phase 2 output).
+
+    Represents a specific block in a target page that could receive
+    the knowledge. Used by Phase 3 (Decider) to select the best match.
+
+    Attributes:
+        page_name: Name of the target page
+        target_id: Hybrid ID of the target block
+        content: Content of the target block (for LLM context)
+        similarity_score: Semantic similarity score (0.0-1.0)
+    """
+
+    page_name: str
+    target_id: str
+    content: str
+    similarity_score: float
 
 
 class Extractor:
@@ -104,6 +130,211 @@ class Extractor:
             )
 
         return packages
+
+    def find_candidate_chunks(
+        self,
+        knowledge: KnowledgePackage,
+        vector_store: VectorStore,
+        graph_path: Path,
+        top_k: int = 20,
+    ) -> List[CandidateChunk]:
+        """Find candidate chunks for knowledge integration (Phase 2).
+
+        Uses both semantic search and hinted search to find relevant
+        blocks in the knowledge base:
+        - Semantic: Query vector store for Top-K similar chunks
+        - Hinted: Parse ((block-id)) references from knowledge text and fetch those blocks
+
+        Args:
+            knowledge: Knowledge package to find candidates for
+            vector_store: Vector store for semantic search
+            graph_path: Path to Logseq graph (for loading hinted blocks)
+            top_k: Number of semantic search results to retrieve (default: 20)
+
+        Returns:
+            List of CandidateChunk objects, deduplicated and sorted by similarity
+
+        Example:
+            knowledge.full_text = "See ((65f3a8e0-1234)): Added API documentation"
+            Returns chunks from:
+            - Semantic: Top-20 similar blocks across all pages
+            - Hinted: The specific block with id 65f3a8e0-1234 (high score: 0.95)
+        """
+        # 1. Semantic search: Query vector store for Top-K similar chunks
+        semantic_chunks = self._semantic_search(knowledge, vector_store, top_k)
+
+        # 2. Hinted search: Parse ((block-id)) references and fetch those blocks
+        hinted_chunks = self._hinted_search(knowledge, graph_path)
+
+        # 3. Aggregate and deduplicate (prefer semantic scores)
+        all_chunks = self._aggregate_chunks(semantic_chunks, hinted_chunks)
+
+        return all_chunks
+
+    def _semantic_search(
+        self, knowledge: KnowledgePackage, vector_store: VectorStore, top_k: int
+    ) -> List[CandidateChunk]:
+        """Perform semantic search for similar chunks.
+
+        Args:
+            knowledge: Knowledge package to search for
+            vector_store: Vector store to query
+            top_k: Number of results to return
+
+        Returns:
+            List of CandidateChunk objects from semantic search
+        """
+        # Embed the knowledge full_text
+        from sentence_transformers import SentenceTransformer
+
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        query_embedding = model.encode(knowledge.full_text, convert_to_numpy=True)
+
+        # Query vector store
+        ids, distances, metadatas = vector_store.query(
+            query_embedding=query_embedding.tolist(), n_results=top_k
+        )
+
+        # Convert to CandidateChunks
+        chunks = []
+        for i, block_id in enumerate(ids):
+            metadata = metadatas[i]
+            similarity = 1.0 - distances[i]  # Convert distance to similarity
+
+            chunks.append(
+                CandidateChunk(
+                    page_name=metadata["page_name"],
+                    target_id=block_id,
+                    content=metadata.get("content", ""),
+                    similarity_score=similarity,
+                )
+            )
+
+        return chunks
+
+    def _hinted_search(
+        self, knowledge: KnowledgePackage, graph_path: Path
+    ) -> List[CandidateChunk]:
+        """Perform hinted search by parsing block references.
+
+        Extracts ((block-id)) references from the knowledge text and
+        fetches those specific blocks. Supports both standalone ((uuid))
+        and markdown link [text](((uuid))) syntax.
+
+        Args:
+            knowledge: Knowledge package to extract hints from
+            graph_path: Path to Logseq graph
+
+        Returns:
+            List of CandidateChunk objects from hinted block references
+        """
+        # Parse ((block-id)) references from knowledge full_text
+        # Matches both standalone ((uuid)) and markdown links [text](((uuid)))
+        block_refs = re.findall(r'\(\(\(([^\)]+)\)\)\)|\(\(([^\)]+)\)\)', knowledge.full_text)
+        # Flatten the tuple results (regex groups) and filter out empty strings
+        block_refs = [ref for group in block_refs for ref in group if ref]
+
+        if not block_refs:
+            return []
+
+        chunks = []
+        for block_id in set(block_refs):  # Deduplicate
+            # Find the block across all pages
+            # We need to search through pages to find which one contains this block
+            # For now, we'll search through all pages (could be optimized with an index)
+            block_info = self._find_block_by_id_in_graph(block_id, graph_path)
+
+            if not block_info:
+                logger.debug(f"Hinted block reference not found: {block_id}")
+                continue
+
+            page_name, block = block_info
+
+            chunks.append(
+                CandidateChunk(
+                    page_name=page_name,
+                    target_id=block_id,
+                    content=block.content,
+                    similarity_score=0.95,  # Block refs get very high score (explicit reference)
+                )
+            )
+
+        return chunks
+
+    def _find_block_by_id_in_graph(
+        self, block_id: str, graph_path: Path
+    ) -> Optional[Tuple[str, LogseqBlock]]:
+        """Find a block by its ID across all pages in the graph.
+
+        Args:
+            block_id: Hybrid ID or explicit id:: to find
+            graph_path: Path to Logseq graph
+
+        Returns:
+            Tuple of (page_name, block) if found, None otherwise
+        """
+        from logsqueak.logseq.graph import GraphPaths
+
+        graph_paths = GraphPaths(graph_path)
+
+        # Search through all pages
+        for page_file in graph_paths.pages_dir.glob("*.md"):
+            page_name = page_file.stem
+            page = TargetPage.load(graph_path, page_name)
+            if not page:
+                continue
+
+            # Use the find_block_by_id method from LogseqOutline
+            block = page.outline.find_block_by_id(block_id)
+            if block:
+                return (page_name, block)
+
+        return None
+
+    def _iter_blocks(self, blocks: List[LogseqBlock]):
+        """Recursively iterate over all blocks in a tree.
+
+        Args:
+            blocks: List of blocks to iterate
+
+        Yields:
+            Each block in the tree (depth-first)
+        """
+        for block in blocks:
+            yield block
+            if block.children:
+                yield from self._iter_blocks(block.children)
+
+    def _aggregate_chunks(
+        self, semantic_chunks: List[CandidateChunk], hinted_chunks: List[CandidateChunk]
+    ) -> List[CandidateChunk]:
+        """Aggregate and deduplicate chunks from semantic and hinted search.
+
+        Combines results, deduplicates by target_id, and prefers semantic
+        scores over hinted scores.
+
+        Args:
+            semantic_chunks: Results from semantic search
+            hinted_chunks: Results from hinted search
+
+        Returns:
+            Deduplicated list sorted by similarity score (descending)
+        """
+        # Build a map of target_id -> CandidateChunk (prefer semantic scores)
+        chunk_map = {}
+
+        # Add hinted chunks first (lower priority)
+        for chunk in hinted_chunks:
+            chunk_map[chunk.target_id] = chunk
+
+        # Add semantic chunks (higher priority, overwrites hints)
+        for chunk in semantic_chunks:
+            chunk_map[chunk.target_id] = chunk
+
+        # Sort by similarity score descending
+        chunks = sorted(chunk_map.values(), key=lambda c: c.similarity_score, reverse=True)
+
+        return chunks
 
     def select_target_page(
         self,
