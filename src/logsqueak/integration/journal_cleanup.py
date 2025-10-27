@@ -3,11 +3,10 @@
 This module handles:
 - Finding source blocks in journal that were processed
 - Formatting links to integrated knowledge blocks
-- Adding processed:: markers as child blocks with links back to targets
+- Adding processed:: properties to source blocks with links back to targets
 """
 
 import logging
-import uuid
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -100,39 +99,23 @@ def _add_processed_marker(
     processed_value: str,
     indent_str: str = "  ",
 ) -> None:
-    """Add processed:: marker as child block.
+    """Add processed:: property to existing source block.
 
-    Creates a new child block with a processed:: property containing
-    the links to integrated knowledge.
+    Adds a processed:: property containing links to where the knowledge
+    was integrated. Does NOT create a new child block or modify id::.
 
     Args:
-        source_block: Block to add marker to
+        source_block: Block to add property to
         processed_value: Formatted links (e.g., "[Page A](((uuid1))), [Page B](((uuid2)))")
         indent_str: Indentation string from outline (default: "  ")
     """
-    # Generate UUID for the marker block
-    marker_id = str(uuid.uuid4())
+    # Add processed:: to the block's properties dict
+    source_block.properties["processed"] = processed_value
 
-    # Calculate indentation for marker block
-    marker_indent_level = source_block.indent_level + 1
-    marker_indent = indent_str * marker_indent_level
-
-    # Create property line: "  processed:: [links]"
-    property_indent = marker_indent + "  "
+    # Add processed:: as a continuation line (property format)
+    # Properties appear as continuation lines indented relative to block content
+    property_indent = indent_str * source_block.indent_level + indent_str
     property_line = f"{property_indent}processed:: {processed_value}"
 
-    # Create id:: line for the marker block
-    id_line = f"{property_indent}id:: {marker_id}"
-
-    # Create marker block with property
-    marker_block = LogseqBlock(
-        content="",  # Empty content - the property is what matters
-        indent_level=marker_indent_level,
-        properties={"processed": processed_value, "id": marker_id},
-        block_id=marker_id,
-        children=[],
-        continuation_lines=[property_line, id_line],
-    )
-
-    # Add as child to source block
-    source_block.children.append(marker_block)
+    # Add to continuation_lines (after any existing properties like id::)
+    source_block.continuation_lines.append(property_line)
