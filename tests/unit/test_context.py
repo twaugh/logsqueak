@@ -260,7 +260,7 @@ class TestGenerateChunks:
         assert len(chunks) == 6
         # Root 1 has explicit ID
         assert chunks[0][2] == "root-1"
-        # Child 1.1 has parent context
-        assert chunks[1][1] == "- Root 1\n  - Child 1.1"
-        # Grandchild has full ancestry
-        assert chunks[3][1] == "- Root 1\n  - Child 1.2\n    - Grandchild 1.2.1"
+        # Child 1.1 has parent context (including parent's properties)
+        assert chunks[1][1] == "- Root 1\n  id:: root-1\n  - Child 1.1"
+        # Grandchild has full ancestry (including parent's properties)
+        assert chunks[3][1] == "- Root 1\n  id:: root-1\n  - Child 1.2\n    - Grandchild 1.2.1"
