@@ -183,7 +183,7 @@ class TestFullPipeline:
         assert count > 0, "Vector store should have indexed chunks"
 
         # Verify manifest was updated
-        assert len(manifest.data) == 3  # 3 pages tracked
+        assert len(manifest.entries) == 3  # 3 pages tracked
 
     def test_end_to_end_pipeline(self, temp_graph):
         """Test complete pipeline: journal → index → extract → integrate → cleanup."""
@@ -201,7 +201,7 @@ class TestFullPipeline:
         journal = JournalEntry.load(journal_file)
 
         # Run complete pipeline
-        operations_count = extractor.run_full_pipeline(
+        operations_count = extractor.extract_and_integrate(
             journal=journal,
             vector_store=vector_store,
             graph_path=temp_graph,
@@ -247,7 +247,7 @@ class TestFullPipeline:
         journal_content_before = journal_file.read_text()
 
         # Run pipeline
-        extractor.run_full_pipeline(
+        extractor.extract_and_integrate(
             journal=journal,
             vector_store=vector_store,
             graph_path=temp_graph,
@@ -267,22 +267,20 @@ class TestFullPipeline:
         knowledge_block = outline.find_block_by_id("journal-knowledge-1")
         assert knowledge_block is not None
 
-        # Should have a processed:: child
-        assert len(knowledge_block.children) > 0
-
-        # Find processed:: marker
-        processed_marker = None
-        for child in knowledge_block.children:
-            if any("processed::" in line for line in child.content):
-                processed_marker = child
+        # Should have a processed:: property (not a child block)
+        # The processed:: marker is added as a property line in the block's content
+        processed_found = False
+        for line in knowledge_block.content:
+            if "processed::" in line:
+                processed_found = True
+                # Verify it has a block reference link
+                assert "(((" in line  # Block reference syntax
+                assert ")))" in line
+                # Verify it links to Database Design
+                assert "Database Design" in line
                 break
 
-        assert processed_marker is not None, "Should have processed:: marker"
-
-        # Verify processed:: marker has block reference link
-        processed_line = "".join(processed_marker.content)
-        assert "(((" in processed_line  # Block reference syntax
-        assert ")))" in processed_line
+        assert processed_found, "Should have processed:: property"
 
     def test_hybrid_id_preservation(self, temp_graph):
         """Test that hybrid IDs are preserved through the pipeline."""
@@ -315,7 +313,7 @@ class TestFullPipeline:
         journal_file = temp_graph / "journals" / "2025_01_15.md"
         journal = JournalEntry.load(journal_file)
 
-        extractor.run_full_pipeline(
+        extractor.extract_and_integrate(
             journal=journal,
             vector_store=vector_store,
             graph_path=temp_graph,
@@ -355,7 +353,7 @@ class TestFullPipeline:
         journal_file = temp_graph / "journals" / "2025_01_15.md"
         journal = JournalEntry.load(journal_file)
 
-        extractor.run_full_pipeline(
+        extractor.extract_and_integrate(
             journal=journal,
             vector_store=vector_store,
             graph_path=temp_graph,
