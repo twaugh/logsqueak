@@ -45,16 +45,12 @@ def generate_full_context(block: "LogseqBlock", parents: list["LogseqBlock"], in
     context_parts = []
 
     # Add all parent blocks with proper indentation
-    # Use full content from parents (but filter out property lines)
-    # Properties like "id::" are metadata, not semantic content
+    # Use full content (all lines) to maximize uniqueness
     for i, parent in enumerate(parents):
         indent = indent_str * i
-        # Filter out property lines (lines matching "key:: value" pattern)
+        # Join all content lines with proper continuation indentation
         parent_lines = []
         for j, line in enumerate(parent.content):
-            # Skip property lines (they start with word characters followed by ::)
-            if "::" in line and j > 0:  # Properties are never on first line
-                continue
             if j == 0:
                 # First line gets the bullet
                 parent_lines.append(f"{indent}- {line}")
@@ -64,12 +60,9 @@ def generate_full_context(block: "LogseqBlock", parents: list["LogseqBlock"], in
         context_parts.extend(parent_lines)
 
     # Add this block with its indentation
-    # Use full content but filter out property lines (metadata, not semantic content)
+    # Use full content (all lines) to maximize uniqueness
     indent = indent_str * len(parents)
     for j, line in enumerate(block.content):
-        # Skip property lines (they start with word characters followed by ::)
-        if "::" in line and j > 0:  # Properties are never on first line
-            continue
         if j == 0:
             # First line gets the bullet
             context_parts.append(f"{indent}- {line}")
