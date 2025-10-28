@@ -51,11 +51,12 @@ def generate_full_context(block: "LogseqBlock", parents: list["LogseqBlock"], in
     return "\n".join(context_parts)
 
 
-def generate_content_hash(full_context: str) -> str:
+def generate_content_hash(full_context: str, page_name: str | None = None) -> str:
     """Generate MD5 hash of full context string.
 
     Args:
         full_context: Full context string to hash
+        page_name: Optional page name to prefix content (ensures global uniqueness)
 
     Returns:
         MD5 hash as hexadecimal string
@@ -63,11 +64,15 @@ def generate_content_hash(full_context: str) -> str:
     Examples:
         >>> generate_content_hash("My content")
         'a1b2c3d4e5f6...'
+        >>> generate_content_hash("My content", "Page A")
+        'b2c3d4e5f6a1...'  # Different hash due to page name
     """
-    return hashlib.md5(full_context.encode()).hexdigest()
+    # Prefix content with page name for global uniqueness
+    content_to_hash = f"{page_name}::{full_context}" if page_name else full_context
+    return hashlib.md5(content_to_hash.encode()).hexdigest()
 
 
-def generate_chunks(outline: "LogseqOutline") -> list[tuple["LogseqBlock", str, str]]:
+def generate_chunks(outline: "LogseqOutline", page_name: str | None = None) -> list[tuple["LogseqBlock", str, str]]:
     """Generate chunks with full context and hybrid IDs for all blocks.
 
     This recursively traverses the outline and generates:
@@ -76,6 +81,7 @@ def generate_chunks(outline: "LogseqOutline") -> list[tuple["LogseqBlock", str, 
 
     Args:
         outline: Parsed LogseqOutline
+        page_name: Optional page name to include in hash (ensures global uniqueness)
 
     Returns:
         List of (block, full_context, hybrid_id) tuples
@@ -84,6 +90,8 @@ def generate_chunks(outline: "LogseqOutline") -> list[tuple["LogseqBlock", str, 
         >>> chunks = generate_chunks(outline)
         >>> for block, context, hybrid_id in chunks:
         ...     print(f"{hybrid_id}: {context[:50]}")
+        >>> chunks_with_page = generate_chunks(outline, "My Page")
+        >>> # Hashes will be different due to page name
     """
     chunks = []
     indent_str = outline.indent_str
@@ -98,8 +106,8 @@ def generate_chunks(outline: "LogseqOutline") -> list[tuple["LogseqBlock", str, 
             # Has explicit id:: property
             hybrid_id = block.block_id
         else:
-            # Generate hash of full context
-            hybrid_id = generate_content_hash(full_context)
+            # Generate hash of full context (with page name for global uniqueness)
+            hybrid_id = generate_content_hash(full_context, page_name)
 
         # Add chunk
         chunks.append((block, full_context, hybrid_id))

@@ -247,13 +247,14 @@ class LogseqOutline:
 
         return search(self.blocks)
 
-    def find_block_by_id(self, target_id: str) -> Optional[LogseqBlock]:
+    def find_block_by_id(self, target_id: str, page_name: str | None = None) -> Optional[LogseqBlock]:
         """Find block by hybrid ID (id:: property or content hash).
 
         Uses generate_chunks() for efficient one-pass traversal with pre-computed IDs.
 
         Args:
             target_id: Hybrid ID to search for
+            page_name: Optional page name (required for matching content-hashed IDs)
 
         Returns:
             LogseqBlock if found, None otherwise
@@ -262,13 +263,14 @@ class LogseqOutline:
             >>> outline.find_block_by_id("explicit-id-123")
             <LogseqBlock with id:: explicit-id-123>
 
-            >>> outline.find_block_by_id("a1b2c3d4...")  # content hash
-            <LogseqBlock matching that hash>
+            >>> outline.find_block_by_id("a1b2c3d4...", page_name="My Page")
+            <LogseqBlock matching that hash for "My Page">
         """
         from logsqueak.logseq.context import generate_chunks
 
         # Generate all chunks with pre-computed hybrid IDs (single pass)
-        chunks = generate_chunks(self)
+        # Pass page_name to ensure content hashes match global IDs
+        chunks = generate_chunks(self, page_name=page_name)
 
         # Search for matching ID
         for block, _context, hybrid_id in chunks:
