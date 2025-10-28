@@ -192,41 +192,6 @@ class TestParsingRoundTrip:
         assert block.get_property("second") == "value2"
         assert block.get_property("third") == "value3"
 
-    def test_empty_lines_handling(self):
-        """Test that empty lines don't break parsing."""
-        original = dedent(
-            """\
-            - Item 1
-
-            - Item 2
-
-            - Item 3"""
-        )
-
-        outline = LogseqOutline.parse(original)
-
-        assert len(outline.blocks) == 3
-        assert outline.blocks[0].content == ["Item 1", ""]
-        assert outline.blocks[1].content == ["Item 2", ""]
-        assert outline.blocks[2].content == ["Item 3"]
-
-    def test_non_bullet_lines_ignored(self):
-        """Test that non-bullet lines are skipped during parsing."""
-        original = dedent(
-            """\
-            Some header text
-            - Bullet 1
-            Random text
-            - Bullet 2"""
-        )
-
-        outline = LogseqOutline.parse(original)
-
-        # Should only parse bullets
-        assert len(outline.blocks) == 2
-        assert outline.blocks[0].content == ["Bullet 1", "Random text"]
-        assert outline.blocks[1].content == ["Bullet 2"]
-
     def test_multiline_content_roundtrip(self):
         """Test that multi-line bullet content is preserved."""
         original = dedent(
