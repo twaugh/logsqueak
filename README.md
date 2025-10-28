@@ -1,27 +1,42 @@
 # Logsqueak
 
-Turn your Logseq journal chaos into organized knowledge. LLM + RAG automatically extracts insights and files them where they belong. Zero risk, full control.
+Turn your Logseq journal chaos into organized knowledge. Advanced 5-phase LLM pipeline with persistent vector store automatically extracts insights and files them where they belong.
 
-**Status**: 🚧 Work in Progress - Phase 4 Complete (Integration with Approval) - 69% Complete
+**Status**: 🚧 Near Production - 5-Phase Pipeline Complete - 85% Complete (M5: Testing & Refinement in progress)
+
+Branch: `better-pipeline` | Previous: `main` (2-stage pipeline, 69% complete)
 
 ## Overview
 
-Logsqueak is a CLI tool that helps you organize your Logseq knowledge base by:
+Logsqueak implements a **5-phase pipeline** for knowledge management:
 
-1. **Extracting** lasting knowledge from daily journal entries (vs. temporary activity logs)
-2. **Matching** knowledge to relevant pages using semantic search (RAG)
-3. **Integrating** knowledge as new bullet points with provenance links
-4. **Preserving** your existing content structure (100% non-destructive)
+**Phase 0 - Indexing**: Parse your entire Logseq graph, generate block-level embeddings, store in persistent ChromaDB vector store with incremental updates
+
+**Phase 1 - Extraction**: LLM identifies lasting knowledge from journal entries (vs. temporary activity logs), returns exact block text with hybrid IDs
+
+**Phase 2 - Enhanced RAG**: Hybrid search combining semantic similarity + explicit `[[Page Links]]`, aggregates block-level candidates
+
+**Phase 3 - Decision & Rewording**: Decider LLM chooses action (UPDATE/APPEND/IGNORE), Reworder LLM refines content for evergreen knowledge base
+
+**Phase 4 - Atomic Execution**: Apply operations, generate UUIDs, add `processed::` markers to journal with bidirectional block references
 
 ## Features
 
-- **LLM-Powered Extraction**: Uses OpenAI-compatible APIs to distinguish knowledge from activity logs
-- **Semantic Search**: RAG-based page matching with per-page embedding cache
-- **Dry-Run Mode**: Preview all changes before applying (mandatory first step)
-- **Provenance Links**: Every integrated fact links back to source journal
+### Core Capabilities
+- **5-Phase LLM Pipeline**: Extractor → RAG → Decider → Reworder → Executor
+- **Persistent Vector Store**: ChromaDB with incremental indexing (survives across sessions)
+- **Hybrid ID System**: Stable block identifiers (`id::` property OR content hash)
+- **Block-Level Targeting**: Precise UPDATE/APPEND operations via hybrid IDs
+- **Enhanced RAG**: Semantic search + hinted search (page links in journal)
+- **Configurable Models**: Use different models for extraction, decisions, and rewording
+- **Atomic Journal Updates**: Bidirectional links with `processed::` markers
+
+### Non-Destructive Operations
+- **UPDATE**: Replaces block content while preserving structure and ID
+- **APPEND_CHILD**: Adds child to specific block
+- **APPEND_ROOT**: Adds root-level block to page
 - **Property Order Preservation**: NEVER reorders block properties (FR-008)
-- **Convention Detection**: Matches your page's organizational style (plain bullets vs. headings)
-- **2000-Line Limit**: Automatic truncation with warnings for large journal entries
+- **Traceability**: Every integration tracked with block references in journal
 
 ## Installation
 
@@ -39,7 +54,7 @@ Logsqueak is a CLI tool that helps you organize your Logseq knowledge base by:
 # Clone repository
 git clone https://github.com/twaugh/logsqueak.git
 cd logsqueak
-git checkout 001-knowledge-extraction
+git checkout better-pipeline  # 5-phase pipeline (recommended)
 
 # Run setup script (creates venv, installs dependencies)
 ./setup-dev.sh
@@ -51,7 +66,7 @@ git checkout 001-knowledge-extraction
 # Clone repository
 git clone https://github.com/twaugh/logsqueak.git
 cd logsqueak
-git checkout 001-knowledge-extraction
+git checkout better-pipeline  # 5-phase pipeline (recommended)
 
 # Create virtual environment (REQUIRED - do not skip this step!)
 python3.11 -m venv venv
@@ -60,7 +75,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Upgrade pip in the venv
 pip install --upgrade pip
 
-# Install logsqueak in editable mode (installs all dependencies)
+# Install logsqueak in editable mode (installs all dependencies including ChromaDB)
 pip install -e .
 
 # Note: Tests run directly from source
@@ -75,14 +90,18 @@ Create `~/.config/logsqueak/config.yaml`:
 llm:
   endpoint: https://api.openai.com/v1
   api_key: sk-your-api-key-here
-  model: gpt-4-turbo-preview
+  model: gpt-4-turbo-preview  # Default model for all phases
+
+  # Optional: Configure separate models for different phases
+  # extractor_model: gpt-4-turbo-preview  # Phase 1 (defaults to model)
+  # decider_model: gpt-3.5-turbo         # Phase 3.1 - faster/cheaper
+  # reworder_model: gpt-4-turbo-preview  # Phase 3.2 - high quality
 
 logseq:
   graph_path: ~/Documents/logseq-graph
 
-# Optional: Control token usage for RAG search
 rag:
-  token_budget: 3000  # Token budget for page selection (default: null = top 5 candidates)
+  top_k: 10  # Number of similar chunks to retrieve (default: 10)
 ```
 
 **For Ollama (local)**:
@@ -91,55 +110,68 @@ rag:
 llm:
   endpoint: http://localhost:11434/v1
   api_key: ollama  # Any non-empty value
-  model: llama2
+  model: llama3.2
+  decider_model: llama3.2  # Use same model for all phases
+  reworder_model: llama3.2
 
 logseq:
   graph_path: ~/Documents/logseq-graph
 
 rag:
-  token_budget: 2000  # Smaller budget for local models
+  top_k: 5  # Fewer candidates for local models
 ```
 
-#### RAG Token Budget
+#### RAG Configuration
 
-The `rag.token_budget` setting controls how many candidate pages are sent to the LLM during page selection (Stage 2). The system uses **exact token counting** (tiktoken) to fit as many candidates as possible within your budget.
+The `rag.top_k` setting controls how many similar chunks are retrieved in Phase 2 (Enhanced RAG). The Decider (Phase 3.1) then evaluates each (knowledge, candidate page) pair.
 
-**How it works:**
-- **null (default)**: Uses top 5 candidates from semantic search (backward compatible)
-- **Set a budget** (e.g., 3000): System calculates tokens for each candidate and includes as many as fit
+**Tuning recommendations:**
+- **5-10**: Good balance for most use cases
+- **10-20**: More thorough search, higher LLM cost
+- **3-5**: Faster, cheaper, may miss relevant pages
 
-**Typical budgets:**
-- **1000-1500**: 1-2 candidates (minimal cost)
-- **2000-3000**: 3-5 candidates (recommended)
-- **4000-6000**: 5-10 candidates (thorough)
-- **8000+**: 10-20 candidates (comprehensive)
-
-The system uses **exact token counting** with tiktoken - it constructs the actual prompts and counts tokens for each candidate before adding them to the budget.
-
-**Viewing token usage:**
+**Viewing pipeline details:**
 ```bash
-# See detailed token budget logs
+# See detailed logs for all phases
 logsqueak extract --verbose 2025-01-15
 ```
 
-This shows which candidates were selected and exact token counts.
+Shows candidate retrieval, decider decisions, and write operations.
 
 ## Usage
 
-```bash
-# Preview only (dry-run mode - no writes)
-logsqueak extract 2025-01-15 --dry-run
+### First Time Setup
 
-# Extract and apply with approval (normal mode)
+```bash
+# Build the vector store index (Phase 0)
+logsqueak index rebuild
+
+# Check index status
+logsqueak index status
+```
+
+### Extracting Knowledge
+
+```bash
+# Extract from specific date (writes directly with processed:: markers)
 logsqueak extract 2025-01-15
-# Shows preview, then prompts: Apply changes? [y/n/e]
 
 # Extract from date range
 logsqueak extract 2025-01-10..2025-01-15
 
 # Extract from today's journal
 logsqueak extract
+
+# Enable verbose logging to see pipeline details
+logsqueak extract --verbose 2025-01-15
 ```
+
+**Note**: The 5-phase pipeline writes directly to pages and adds `processed::` markers to journal entries. Each marker contains bidirectional links in the format:
+```
+processed:: [PageName](((block-uuid-1))), [OtherPage](((block-uuid-2)))
+```
+
+Click these links in Logseq to jump to the integrated knowledge blocks.
 
 ## Project Structure
 
@@ -209,82 +241,83 @@ mypy src/
 
 ## Implementation Status
 
-### ✅ Completed (Phases 1-4) - 69%
+### ✅ Milestone 1: Hybrid-ID Foundation (Complete)
+- [x] Parser extracts `id::` properties
+- [x] Full-context chunk generation with parent traversal
+- [x] Content hashing for hybrid IDs
+- [x] Writer generates UUIDs for new blocks
+- [x] Round-trip safety tests (preserve IDs)
+- [x] `find_block_by_id()` for AST lookup
 
-**Foundational (Phases 1-2.5)**
-- [x] Project structure and dependencies
-- [x] Configuration model with Pydantic validation
-- [x] JournalEntry model with 2000-line limit enforcement
-- [x] KnowledgeBlock model with provenance and hashing
-- [x] TargetPage and PageIndex models with RAG caching
-- [x] ExtractionPreview model with display formatting
-- [x] LogseqOutline and LogseqBlock models with property order preservation
-- [x] Logseq markdown parser and renderer
-- [x] Graph path operations
-- [x] RAG index with per-page embedding cache
-- [x] Comprehensive unit tests (111 tests passing)
+### ✅ Milestone 2: Persistent Vector Store (Complete)
+- [x] ChromaDB dependency and integration
+- [x] VectorStore abstraction with ChromaDBStore
+- [x] Block-level chunking with full-context text
+- [x] Cache manifest system (mtime tracking)
+- [x] Incremental index builder (detects add/update/delete)
+- [x] CLI commands: `index rebuild`, `index status`
 
-**Extraction & Preview (Phases 3-3.5)**
-- [x] Configuration loader with YAML support
-- [x] LLM client (OpenAI-compatible)
-- [x] Two-stage extraction (extract → RAG match → LLM select)
-- [x] Activity vs knowledge classification
-- [x] Duplicate detection
-- [x] Preview display with diffs
-- [x] Error handling and progress feedback
-- [x] Prompt inspection system
-- [x] LLM integration tests
+### ✅ Milestone 3: Block-Level Targeting (Complete)
+- [x] Block ID targeting infrastructure
+- [x] UPDATE operation (replace content, preserve ID)
+- [x] APPEND_CHILD operation (add to specific block)
+- [x] APPEND_ROOT operation (add to page root)
 
-**Integration & Approval (Phase 4)**
-- [x] Interactive approval workflow (y/n/e)
-- [x] Integration orchestrator
-- [x] Section finding and knowledge placement
-- [x] Provenance link generation (100% coverage)
-- [x] Safe file writing with atomic operations
-- [x] PageIndex refresh after modifications
-- [x] Per-change approval with diff preview
+### ✅ Milestone 4: Multi-Stage LLM Pipeline (Complete)
+- [x] Phase 1: Knowledge extraction with hybrid IDs
+- [x] Phase 2: Enhanced RAG (semantic + hinted search)
+- [x] Phase 3.1: Decider LLM (action selection)
+- [x] Phase 3.2: Reworder LLM (content refinement)
+- [x] Phase 4: Atomic execution with journal cleanup
+- [x] Configurable models for each phase
+- [x] Full 5-phase pipeline integration
 
-### 🚧 In Progress
-
-- [ ] Phase 4.5: Integration Safety Testing (3/9 tasks complete)
-  - [x] Writer unit tests (26 tests)
-  - [x] Integrator unit tests (15 tests)
-  - [x] Interactive unit tests (19 tests)
-  - [ ] File safety integration tests
-  - [ ] Provenance integration tests
-  - [ ] Error recovery tests
-
-### 📋 Planned
-
-- [ ] Phase 5: Section Creation (T044-T049)
-- [ ] Phase 5.5: Section Creation Testing
-- [ ] Phase 6: Polish & Logging (T050-T051)
-- [ ] Phase 6.5: End-to-End Testing
+### ⏳ Milestone 5: Testing & Refinement (3/7 complete)
+- [x] Removed dry-run mode (incompatible with new architecture)
+- [x] Full pipeline integration test (5 tests passing)
+- [x] Error recovery tests (17 comprehensive tests)
+- [ ] Performance benchmarks
+- [ ] Documentation updates (in progress)
+- [ ] CLI polish
 
 ## Architecture
 
-### Data Flow
+### 5-Phase Pipeline
 
 ```
-1. Load journal entry from file
-2. Extract knowledge blocks via LLM (Stage 1)
-3. For each block:
-   a. Find top-5 candidate pages via RAG (semantic search)
-   b. LLM selects best page + section (Stage 2)
-   c. Check for duplicates
-   d. Create proposed action
-4. Build preview and display to user
-5. On approval: integrate knowledge with provenance links
+Phase 0 - Indexing (run once, then incrementally):
+  Parse all pages → Generate full-context chunks → Extract hybrid IDs
+  → Store in ChromaDB → Maintain manifest (mtime tracking)
+
+Phase 1 - Knowledge Extraction:
+  Load journal → LLM identifies knowledge blocks → Add parent context
+  → Create Knowledge Packages with hybrid IDs
+
+Phase 2 - Enhanced RAG:
+  Semantic search (ChromaDB top_k) + Hinted search ([[Page Links]])
+  → Aggregate and deduplicate → Group by page → Return candidates
+
+Phase 3 - Decision & Rewording:
+  For each (knowledge, candidate) pair:
+    Phase 3.1 - Decider: LLM chooses UPDATE/APPEND_CHILD/APPEND_ROOT/IGNORE
+    Phase 3.2 - Reworder: LLM refines content (if not IGNORE)
+  → Build Write List
+
+Phase 4 - Execution & Cleanup:
+  Group by page → Parse AST → Apply operations → Generate UUIDs
+  → Atomically update journal with processed:: markers
+  → Write all changes
 ```
 
 ### Key Design Principles
 
-1. **Property Order**: NEVER reorder (insertion order sacred)
-2. **Non-Destructive**: All changes are additive (no deletions/modifications)
-3. **Dry-Run First**: Always preview before applying
-4. **Provenance**: Every knowledge block links back to source journal
-5. **RAG Matching**: Two-stage LLM (extract, then match to candidates)
-6. **Per-Page Caching**: Embeddings cached with mtime validation
+1. **Property Order Preservation**: NEVER reorder (insertion order sacred - FR-008)
+2. **Hybrid ID System**: Persistent `id::` OR content hash for stable targeting
+3. **Atomic Consistency**: Journal marked only when page write succeeds
+4. **Block-Level Precision**: Target specific blocks via `find_block_by_id()`
+5. **Persistent Vector Store**: ChromaDB with incremental updates (manifest-based)
+6. **Multi-Model Architecture**: Separate models for extraction, decisions, and rewording
+7. **Bidirectional Links**: `processed::` markers in journal reference integrated blocks
 
 ## License
 
@@ -319,18 +352,32 @@ pytest --cov=logsqueak --cov-report=term-missing
 
 ## Performance
 
-Tested on 566 pages (2.3MB Logseq graph):
+Tested on 500+ page Logseq graph:
 
-- **First index build**: ~20 seconds (embed all pages)
-- **Subsequent runs**: <1 second (load from cache)
-- **After modifying 5 pages**: ~1.5 seconds (561 cached + 5 new)
+**Vector Store Indexing (Phase 0):**
+- **Initial build**: ~20-30 seconds (parse all pages, generate block embeddings)
+- **Incremental updates**: ~2 seconds (only process changed pages)
+- **Storage**: `~/.cache/logsqueak/chroma/` (persistent across sessions)
+
+**Knowledge Extraction (Phases 1-4):**
+- **Phase 1-2**: ~2-3 seconds per journal (extraction + RAG search)
+- **Phase 3**: Variable (depends on number of candidates and LLM speed)
+- **Phase 4**: ~1-2 seconds (AST operations + file writes)
+
+**Total**: Typically 5-10 seconds per journal entry (excluding LLM API latency)
 
 ## Roadmap
 
-See [specs/001-knowledge-extraction/spec.md](specs/001-knowledge-extraction/spec.md) for future enhancements:
+**Current Focus (M5):**
+- Performance benchmarks and optimization
+- Documentation updates
+- CLI polish and error messages
 
-- Batch processing of date ranges
-- Semantic merging of similar facts
+**Future Enhancements:**
+- Batch processing optimization
+- Semantic deduplication across pages
 - Historical journal summarization
 - Rich terminal UI (TUI)
-- Async processing
+- Async LLM calls for parallelization
+
+See `PLAN.md` for detailed milestone breakdown and `FUTURE-STATE.md` for architecture details.
