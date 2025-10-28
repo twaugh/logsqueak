@@ -452,7 +452,8 @@ class OpenAICompatibleProvider(LLMClient):
             )
 
         try:
-            response = self._make_request(messages=messages)
+            # Use plain text mode (not JSON) for reworder
+            response = self._make_request(messages=messages, use_json_mode=False)
 
             # Extract plain text response
             content = response.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
@@ -486,11 +487,14 @@ class OpenAICompatibleProvider(LLMClient):
                 self.prompt_logger.log_response(stage="reworder", response={}, error=e)
             raise LLMError(f"Network error: {e}") from e
 
-    def _make_request(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:
+    def _make_request(
+        self, messages: List[Dict[str, str]], use_json_mode: bool = True
+    ) -> Dict[str, Any]:
         """Make HTTP request to OpenAI-compatible API.
 
         Args:
             messages: List of chat messages
+            use_json_mode: If True, request JSON formatted responses (default: True)
 
         Returns:
             Response JSON
@@ -507,9 +511,12 @@ class OpenAICompatibleProvider(LLMClient):
         payload = {
             "model": self.model,
             "messages": messages,
-            "response_format": {"type": "json_object"},
             "temperature": 0.7,
         }
+
+        # Add JSON mode if requested
+        if use_json_mode:
+            payload["response_format"] = {"type": "json_object"}
 
         # Make request
         response = self.client.post(

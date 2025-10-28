@@ -250,15 +250,17 @@ def build_reworder_messages(knowledge_full_text: str) -> List[dict]:
         Your task is to transform knowledge extracted from journal entries into clean,
         evergreen content suitable for integration into permanent pages.
 
-        FORMAT: The input is Logseq-flavored Markdown with these conventions:
+        FORMAT: The input is Logseq-flavored Markdown from a journal entry.
         - Bullets start with "- " and can be nested with indentation
-        - Page links use [[Page Name]] syntax
-        - Block references use (((block-id))) syntax
-        - Your output will be inserted as a bullet in the target page
+        - Page links use [[Page Name]] syntax - MUST be preserved exactly
+        - Block references use (((block-id))) syntax - MUST be preserved exactly
+        - The deepest nested bullet is the knowledge to extract
+        - Parent bullets provide context for understanding
+        - Your output will be inserted as a single bullet in the target page (no bullet marker needed)
 
         You will receive knowledge text that includes:
-        - The specific knowledge to preserve
-        - Parent context from the journal entry (for understanding)
+        - Hierarchical bullet structure showing parent context
+        - The deepest bullet contains the specific knowledge to preserve
         - Possibly journal-specific language like "today", "this morning", etc.
 
         Your job is to:
@@ -307,10 +309,7 @@ def build_reworder_messages(knowledge_full_text: str) -> List[dict]:
         Output: [[logsqueak]] pipeline: Decided to use 5-phase approach instead of 2-stage
     """).strip()
 
-    user_prompt = (
-        f"<knowledge>\n{knowledge_full_text}\n</knowledge>\n\n"
-        f"Rephrase this knowledge into clean, evergreen content."
-    )
+    user_prompt = f"Rephrase this knowledge into clean, evergreen content:\n\n{knowledge_full_text}"
 
     return [
         {"role": "system", "content": system_prompt},
