@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from datetime import date
 from typing import List, Optional
 
-from logsqueak.models.knowledge import ActionType, KnowledgeBlock
+from logsqueak.models.knowledge import ActionType
 
 
 class ExtractionResult:
