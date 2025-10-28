@@ -277,3 +277,44 @@ class TestIndexBuilderIncremental:
         assert len(result_ids) == 4
 
         vector_store.close()
+
+    def test_build_incremental_skips_empty_blocks(self, tmp_path, mock_embedding_model):
+        """Test that empty or whitespace-only blocks are not indexed."""
+        graph_path = tmp_path / "graph"
+        pages_dir = graph_path / "pages"
+        pages_dir.mkdir(parents=True)
+
+        # Create page with empty blocks mixed with content
+        page_file = pages_dir / "WithEmpty.md"
+        content = "- Content block\n- \n  - Child of empty\n- Another content block"
+        page_file.write_text(content, encoding="utf-8")
+
+        # Setup
+        manifest_path = tmp_path / "manifest.json"
+        manifest = CacheManifest(manifest_path)
+        vector_store = ChromaDBStore(tmp_path / "chroma")
+
+        builder = IndexBuilder(vector_store, manifest, mock_embedding_model)
+
+        # Build
+        stats = builder.build_incremental(graph_path)
+
+        assert stats['added'] == 1
+
+        # Query vector store to verify only non-empty chunks were indexed
+        query_embedding = [0.0] * 384  # all-MiniLM-L6-v2 dimension
+        result_ids, _, metadatas = vector_store.query(query_embedding, n_results=10)
+
+        # Should have 3 chunks: "Content block", "Child of empty", "Another content block"
+        # Empty parent should NOT be indexed
+        assert len(result_ids) == 3
+
+        # Verify the actual content
+        block_contents = [m["block_content"] for m in metadatas]
+        assert "Content block" in block_contents
+        assert "Child of empty" in block_contents
+        assert "Another content block" in block_contents
+        # Empty string should NOT be in indexed content
+        assert "" not in block_contents
+
+        vector_store.close()

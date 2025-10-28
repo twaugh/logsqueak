@@ -163,6 +163,38 @@ class TestChunkPage:
 
         assert chunks == []
 
+    def test_chunk_skips_empty_blocks(self):
+        """Test that empty or whitespace-only blocks are not indexed."""
+        # "- " creates a block with empty content
+        markdown = "- Content block\n- \n- Another content block"
+        outline = LogseqOutline.parse(markdown)
+
+        chunks = chunk_page(outline, "Test Page")
+
+        # Should only have 2 chunks (skipping the empty block)
+        assert len(chunks) == 2
+        assert chunks[0].block_content == "Content block"
+        assert chunks[1].block_content == "Another content block"
+
+    def test_chunk_empty_parent_with_children(self):
+        """Test that children of empty blocks are still indexed."""
+        # Note: "- " (dash-space-newline) creates empty parent, children must be indented
+        markdown = "- \n  - Child with content\n    - Grandchild with content\n- Another root block"
+        outline = LogseqOutline.parse(markdown)
+
+        chunks = chunk_page(outline, "Test Page")
+
+        # Should have 3 chunks: child, grandchild, and another root
+        # The empty parent should be skipped but its children preserved
+        assert len(chunks) == 3
+        assert chunks[0].block_content == "Child with content"
+        assert chunks[1].block_content == "Grandchild with content"
+        assert chunks[2].block_content == "Another root block"
+
+        # Verify the child's full context includes the empty parent in the hierarchy
+        # (because context is generated before filtering happens)
+        assert chunks[0].full_context_text == "- \n  - Child with content"
+
     def test_chunk_complex_page(self):
         """Test chunking complex page with multiple branches."""
         markdown = dedent(

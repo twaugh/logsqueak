@@ -75,16 +75,24 @@ def chunk_page(outline: LogseqOutline, page_name: str) -> List[Chunk]:
         if hybrid_id in seen_ids:
             continue
 
+        # Skip empty or whitespace-only blocks
+        # A block is considered empty if all its content lines are whitespace-only
+        # Note: Children of empty blocks are still processed because
+        # generate_chunks() recursively traverses all blocks
+        if all(not line.strip() for line in block.content):
+            continue
+
         seen_ids.add(hybrid_id)
 
+        block_content = block.get_full_content(normalize_whitespace=True)
         chunk = Chunk(
             full_context_text=full_context,
             hybrid_id=hybrid_id,
             page_name=page_name,
-            block_content=block.get_full_content(normalize_whitespace=True),
+            block_content=block_content,
             metadata={
                 "page_name": page_name,
-                "block_content": block.get_full_content(normalize_whitespace=True),
+                "block_content": block_content,
                 "indent_level": block.indent_level,
             },
         )
