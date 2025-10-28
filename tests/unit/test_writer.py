@@ -78,20 +78,20 @@ class TestSectionFinding:
     def test_find_section_single_level(self):
         """Test finding section at single level."""
         blocks = [
-            LogseqBlock(content="## Tech Stack", indent_level=0),
-            LogseqBlock(content="## Database", indent_level=0),
+            LogseqBlock(content=["## Tech Stack"], indent_level=0),
+            LogseqBlock(content=["## Database"], indent_level=0),
         ]
         outline = LogseqOutline(blocks=blocks, source_text="")
 
         result = _find_target_section(outline, ["Tech Stack"])
 
         assert result is not None
-        assert "Tech Stack" in result.content
+        assert "Tech Stack" in result.content[0]
 
     def test_find_section_nested(self):
         """Test finding nested section."""
-        parent = LogseqBlock(content="## Tech Stack", indent_level=0)
-        child = LogseqBlock(content="## Database", indent_level=1)
+        parent = LogseqBlock(content=["## Tech Stack"], indent_level=0)
+        child = LogseqBlock(content=["## Database"], indent_level=1)
         parent.children = [child]
 
         outline = LogseqOutline(blocks=[parent], source_text="")
@@ -99,11 +99,11 @@ class TestSectionFinding:
         result = _find_target_section(outline, ["Tech Stack", "Database"])
 
         assert result is not None
-        assert "Database" in result.content
+        assert "Database" in result.content[0]
 
     def test_find_section_not_found(self):
         """Test section finding when section doesn't exist."""
-        blocks = [LogseqBlock(content="## Existing Section", indent_level=0)]
+        blocks = [LogseqBlock(content=["## Existing Section"], indent_level=0)]
         outline = LogseqOutline(blocks=blocks, source_text="")
 
         result = _find_target_section(outline, ["Nonexistent"])
@@ -112,7 +112,7 @@ class TestSectionFinding:
 
     def test_find_section_partial_match(self):
         """Test section finding with partial text match."""
-        blocks = [LogseqBlock(content="Tech Stack Overview", indent_level=0)]
+        blocks = [LogseqBlock(content=["Tech Stack Overview"], indent_level=0)]
         outline = LogseqOutline(blocks=blocks, source_text="")
 
         result = _find_target_section(outline, ["Tech Stack"])
@@ -125,31 +125,31 @@ class TestChildBulletAddition:
 
     def test_add_child_bullet(self):
         """Test adding child bullet to parent block."""
-        parent = LogseqBlock(content="## Parent", indent_level=0, children=[])
+        parent = LogseqBlock(content=["## Parent"], indent_level=0, children=[])
 
-        _add_child_bullet(parent, "Child content [[2025-01-15]]", ActionType.ADD_CHILD)
+        _add_child_bullet(parent, "Child content [[2025-01-15]]", ActionType.ADD_CHILD, "  ")
 
         assert len(parent.children) == 1
-        assert parent.children[0].content == "Child content [[2025-01-15]]"
+        assert parent.children[0].content[0] == "Child content [[2025-01-15]]"
         assert parent.children[0].indent_level == 1
 
     def test_add_child_bullet_to_existing_children(self):
         """Test adding child bullet when parent already has children."""
-        existing_child = LogseqBlock(content="Existing child", indent_level=1)
+        existing_child = LogseqBlock(content=["Existing child"], indent_level=1)
         parent = LogseqBlock(
-            content="## Parent", indent_level=0, children=[existing_child]
+            content=["## Parent"], indent_level=0, children=[existing_child]
         )
 
-        _add_child_bullet(parent, "New child [[2025-01-15]]", ActionType.ADD_CHILD)
+        _add_child_bullet(parent, "New child [[2025-01-15]]", ActionType.ADD_CHILD, "  ")
 
         assert len(parent.children) == 2
-        assert parent.children[1].content == "New child [[2025-01-15]]"
+        assert parent.children[1].content[0] == "New child [[2025-01-15]]"
 
     def test_child_bullet_indent_level(self):
         """Test that child bullet has correct indent level."""
-        parent = LogseqBlock(content="Nested parent", indent_level=2, children=[])
+        parent = LogseqBlock(content=["Nested parent"], indent_level=2, children=[])
 
-        _add_child_bullet(parent, "Content [[2025-01-15]]", ActionType.ADD_CHILD)
+        _add_child_bullet(parent, "Content [[2025-01-15]]", ActionType.ADD_CHILD, "  ")
 
         assert parent.children[0].indent_level == 3
 
@@ -161,27 +161,27 @@ class TestPageEndFallback:
         """Test adding to end of empty page."""
         outline = LogseqOutline(blocks=[], source_text="")
 
-        _add_to_page_end(outline, "New content [[2025-01-15]]")
+        _add_to_page_end(outline, "New content [[2025-01-15]]", "  ")
 
         assert len(outline.blocks) == 1
-        assert outline.blocks[0].content == "New content [[2025-01-15]]"
+        assert outline.blocks[0].content[0] == "New content [[2025-01-15]]"
         assert outline.blocks[0].indent_level == 0
 
     def test_add_to_page_end_existing_content(self):
         """Test adding to end of page with existing content."""
-        existing_block = LogseqBlock(content="Existing content", indent_level=0)
+        existing_block = LogseqBlock(content=["Existing content"], indent_level=0)
         outline = LogseqOutline(blocks=[existing_block], source_text="")
 
-        _add_to_page_end(outline, "New content [[2025-01-15]]")
+        _add_to_page_end(outline, "New content [[2025-01-15]]", "  ")
 
         assert len(outline.blocks) == 2
-        assert outline.blocks[1].content == "New content [[2025-01-15]]"
+        assert outline.blocks[1].content[0] == "New content [[2025-01-15]]"
 
     def test_add_to_page_end_root_level(self):
         """Test that fallback adds at root level."""
         outline = LogseqOutline(blocks=[], source_text="")
 
-        _add_to_page_end(outline, "Content [[2025-01-15]]")
+        _add_to_page_end(outline, "Content [[2025-01-15]]", "  ")
 
         assert outline.blocks[0].indent_level == 0
 
@@ -191,7 +191,7 @@ class TestKnowledgeAddition:
 
     def test_add_knowledge_with_section(self):
         """Test adding knowledge to specific section."""
-        parent = LogseqBlock(content="## Tech Stack", indent_level=0, children=[])
+        parent = LogseqBlock(content=["## Tech Stack"], indent_level=0, children=[])
         outline = LogseqOutline(blocks=[parent], source_text="")
 
         target_page = Mock(spec=TargetPage)
@@ -209,8 +209,8 @@ class TestKnowledgeAddition:
         add_knowledge_to_page(target_page, knowledge)
 
         assert len(parent.children) == 1
-        assert "Use PostgreSQL" in parent.children[0].content
-        assert "[[2025-01-15]]" in parent.children[0].content
+        assert "Use PostgreSQL" in parent.children[0].content[0]
+        assert "[[2025-01-15]]" in parent.children[0].content[0]
 
     def test_add_knowledge_fallback_to_page_end(self):
         """Test adding knowledge falls back to page end when section not found."""
@@ -232,8 +232,8 @@ class TestKnowledgeAddition:
 
         # Should add to page end
         assert len(outline.blocks) == 1
-        assert "Use PostgreSQL" in outline.blocks[0].content
-        assert "[[2025-01-15]]" in outline.blocks[0].content
+        assert "Use PostgreSQL" in outline.blocks[0].content[0]
+        assert "[[2025-01-15]]" in outline.blocks[0].content[0]
 
     def test_add_knowledge_to_page_root(self):
         """Test adding knowledge to page root (no section)."""
@@ -254,7 +254,7 @@ class TestKnowledgeAddition:
         add_knowledge_to_page(target_page, knowledge)
 
         assert len(outline.blocks) == 1
-        assert "General note" in outline.blocks[0].content
+        assert "General note" in outline.blocks[0].content[0]
 
 
 class TestProvenanceCoverage:
@@ -262,7 +262,7 @@ class TestProvenanceCoverage:
 
     def test_all_knowledge_blocks_get_provenance_with_section(self):
         """Test that knowledge added to section gets provenance."""
-        parent = LogseqBlock(content="## Tech Stack", indent_level=0, children=[])
+        parent = LogseqBlock(content=["## Tech Stack"], indent_level=0, children=[])
         outline = LogseqOutline(blocks=[parent], source_text="")
 
         target_page = Mock(spec=TargetPage)
@@ -280,7 +280,7 @@ class TestProvenanceCoverage:
         add_knowledge_to_page(target_page, knowledge)
 
         # Verify provenance link is present
-        added_content = parent.children[0].content
+        added_content = parent.children[0].content[0]
         assert "[[2025-01-15]]" in added_content
         assert "Use PostgreSQL" in added_content
 
@@ -303,7 +303,7 @@ class TestProvenanceCoverage:
         add_knowledge_to_page(target_page, knowledge)
 
         # Verify provenance link is present at page root
-        added_content = outline.blocks[0].content
+        added_content = outline.blocks[0].content[0]
         assert "[[2025-01-20]]" in added_content
         assert "General note" in added_content
 
@@ -326,7 +326,7 @@ class TestProvenanceCoverage:
         add_knowledge_to_page(target_page, knowledge)
 
         # Verify provenance link is present even when falling back to page end
-        added_content = outline.blocks[0].content
+        added_content = outline.blocks[0].content[0]
         assert "[[2025-02-10]]" in added_content
         assert "Fallback content" in added_content
 
@@ -358,7 +358,7 @@ class TestProvenanceCoverage:
             add_knowledge_to_page(target_page, knowledge)
 
             # Verify format: [[YYYY-MM-DD]]
-            added_content = outline.blocks[0].content
+            added_content = outline.blocks[0].content[0]
             expected_link = f"[[{test_date.strftime('%Y-%m-%d')}]]"
             assert expected_link in added_content, f"Expected {expected_link} in {added_content}"
 
@@ -380,7 +380,7 @@ class TestProvenanceCoverage:
         add_knowledge_to_page(target_page, knowledge)
 
         # Count occurrences of the provenance link
-        added_content = outline.blocks[0].content
+        added_content = "\n".join(outline.blocks[0].content)
         provenance_count = added_content.count("[[2025-01-15]]")
         assert provenance_count == 1, f"Provenance link should appear exactly once, found {provenance_count} times"
 
@@ -392,7 +392,7 @@ class TestSafeFileWriting:
         """Test writing page to disk safely."""
         page_file = tmp_path / "Test Page.md"
         outline = LogseqOutline(
-            blocks=[LogseqBlock(content="Test content", indent_level=0)],
+            blocks=[LogseqBlock(content=["Test content"], indent_level=0)],
             source_text="- Test content",
         )
 
@@ -412,7 +412,7 @@ class TestSafeFileWriting:
         custom_path = tmp_path / "custom.md"
 
         outline = LogseqOutline(
-            blocks=[LogseqBlock(content="Content", indent_level=0)],
+            blocks=[LogseqBlock(content=["Content"], indent_level=0)],
             source_text="- Content",
         )
 
@@ -448,9 +448,9 @@ class TestUUIDGeneration:
 
     def test_add_child_bullet_generates_uuid(self):
         """Test that adding child bullet generates UUID."""
-        parent = LogseqBlock(content="Parent", indent_level=0)
+        parent = LogseqBlock(content=["Parent"], indent_level=0)
 
-        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD)
+        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD, "  ")
 
         assert len(parent.children) == 1
         child = parent.children[0]
@@ -460,33 +460,32 @@ class TestUUIDGeneration:
 
     def test_add_child_bullet_adds_id_property(self):
         """Test that child bullet has id:: property."""
-        parent = LogseqBlock(content="Parent", indent_level=0)
+        parent = LogseqBlock(content=["Parent"], indent_level=0)
 
-        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD)
+        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD, "  ")
 
         child = parent.children[0]
-        assert "id" in child.properties
-        assert child.properties["id"] == child.block_id
+        assert child.get_property("id") is not None
+        assert child.get_property("id") == child.block_id
 
     def test_add_child_bullet_adds_id_continuation_line(self):
         """Test that child bullet has id:: in continuation_lines."""
-        parent = LogseqBlock(content="Parent", indent_level=0)
+        parent = LogseqBlock(content=["Parent"], indent_level=0)
 
-        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD)
+        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD, "  ")
 
         child = parent.children[0]
-        assert len(child.continuation_lines) == 1
-        id_line = child.continuation_lines[0]
+        # id:: property is stored in content[1]
+        assert len(child.content) >= 2
+        id_line = child.content[1]
         assert "id::" in id_line
         assert child.block_id in id_line
-        # Should be indented properly (parent is level 0, child is level 1, property is level 2)
-        assert id_line.startswith("    ")  # 4 spaces = 2 levels
 
     def test_add_to_page_end_generates_uuid(self):
         """Test that adding to page end generates UUID."""
         outline = LogseqOutline.parse("")
 
-        _add_to_page_end(outline, "New content")
+        _add_to_page_end(outline, "New content", "  ")
 
         assert len(outline.blocks) == 1
         block = outline.blocks[0]
@@ -497,33 +496,32 @@ class TestUUIDGeneration:
         """Test that page-end block has id:: property."""
         outline = LogseqOutline.parse("")
 
-        _add_to_page_end(outline, "New content")
+        _add_to_page_end(outline, "New content", "  ")
 
         block = outline.blocks[0]
-        assert "id" in block.properties
-        assert block.properties["id"] == block.block_id
+        assert block.get_property("id") is not None
+        assert block.get_property("id") == block.block_id
 
     def test_add_to_page_end_adds_id_continuation_line(self):
         """Test that page-end block has id:: in continuation_lines."""
         outline = LogseqOutline.parse("")
 
-        _add_to_page_end(outline, "New content")
+        _add_to_page_end(outline, "New content", "  ")
 
         block = outline.blocks[0]
-        assert len(block.continuation_lines) == 1
-        id_line = block.continuation_lines[0]
+        # id:: property is stored in content[1]
+        assert len(block.content) >= 2
+        id_line = block.content[1]
         assert "id::" in id_line
         assert block.block_id in id_line
-        # Root level block, so property is indented by 1 level
-        assert id_line.startswith("  ")  # 2 spaces
 
     def test_generated_uuids_are_unique(self):
         """Test that multiple blocks get different UUIDs."""
-        parent = LogseqBlock(content="Parent", indent_level=0)
+        parent = LogseqBlock(content=["Parent"], indent_level=0)
 
-        _add_child_bullet(parent, "Child 1", ActionType.ADD_CHILD)
-        _add_child_bullet(parent, "Child 2", ActionType.ADD_CHILD)
-        _add_child_bullet(parent, "Child 3", ActionType.ADD_CHILD)
+        _add_child_bullet(parent, "Child 1", ActionType.ADD_CHILD, "  ")
+        _add_child_bullet(parent, "Child 2", ActionType.ADD_CHILD, "  ")
+        _add_child_bullet(parent, "Child 3", ActionType.ADD_CHILD, "  ")
 
         uuids = [child.block_id for child in parent.children]
         assert len(uuids) == 3
@@ -534,7 +532,7 @@ class TestUUIDGeneration:
         outline = LogseqOutline.parse("- Parent")
         parent = outline.blocks[0]
 
-        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD)
+        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD, "  ")
 
         rendered = outline.render()
         lines = rendered.split("\n")

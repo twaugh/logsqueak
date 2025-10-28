@@ -188,7 +188,7 @@ class TestChunkPage:
         # Verify root block has explicit ID (globally unique)
         assert chunks[0].hybrid_id == "Complex Page::root-1"
         assert chunks[0].metadata["local_hybrid_id"] == "root-1"
-        assert chunks[0].block_content == "Root 1"
+        assert chunks[0].block_content == "Root 1\nid:: root-1"
 
         # Verify child context
         assert "Root 1" in chunks[1].full_context_text

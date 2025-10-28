@@ -12,54 +12,53 @@ class TestLogseqBlock:
 
     def test_create_block(self):
         """Test creating a basic block."""
-        block = LogseqBlock(content="Test content", indent_level=0)
+        block = LogseqBlock(content=["Test content"], indent_level=0)
 
-        assert block.content == "Test content"
+        assert block.content == ["Test content"]
         assert block.indent_level == 0
-        assert block.properties == {}
         assert block.children == []
 
     def test_add_child_to_end(self):
         """Test adding child block to end."""
-        parent = LogseqBlock(content="Parent", indent_level=0)
+        parent = LogseqBlock(content=["Parent"], indent_level=0)
         child = parent.add_child("Child content")
 
         assert len(parent.children) == 1
-        assert parent.children[0].content == "Child content"
+        assert parent.children[0].content == ["Child content"]
         assert parent.children[0].indent_level == 1  # One level deeper
 
     def test_add_multiple_children(self):
         """Test adding multiple children."""
-        parent = LogseqBlock(content="Parent", indent_level=0)
+        parent = LogseqBlock(content=["Parent"], indent_level=0)
         parent.add_child("Child 1")
         parent.add_child("Child 2")
         parent.add_child("Child 3")
 
         assert len(parent.children) == 3
-        assert parent.children[0].content == "Child 1"
-        assert parent.children[1].content == "Child 2"
-        assert parent.children[2].content == "Child 3"
+        assert parent.children[0].content == ["Child 1"]
+        assert parent.children[1].content == ["Child 2"]
+        assert parent.children[2].content == ["Child 3"]
 
     def test_add_child_at_position(self):
         """Test adding child at specific position."""
-        parent = LogseqBlock(content="Parent", indent_level=0)
+        parent = LogseqBlock(content=["Parent"], indent_level=0)
         parent.add_child("Child 1")
         parent.add_child("Child 3")
         parent.add_child("Child 2", position=1)  # Insert in middle
 
         assert len(parent.children) == 3
-        assert parent.children[0].content == "Child 1"
-        assert parent.children[1].content == "Child 2"
-        assert parent.children[2].content == "Child 3"
+        assert parent.children[0].content == ["Child 1"]
+        assert parent.children[1].content == ["Child 2"]
+        assert parent.children[2].content == ["Child 3"]
 
     def test_nested_children(self):
         """Test creating deeply nested structure."""
-        root = LogseqBlock(content="Root", indent_level=0)
+        root = LogseqBlock(content=["Root"], indent_level=0)
         child = root.add_child("Child")
         grandchild = child.add_child("Grandchild")
 
         assert grandchild.indent_level == 2
-        assert root.children[0].children[0].content == "Grandchild"
+        assert root.children[0].children[0].content == ["Grandchild"]
 
 
 class TestLogseqOutline:
@@ -78,7 +77,7 @@ class TestLogseqOutline:
         outline = LogseqOutline.parse(markdown)
 
         assert len(outline.blocks) == 1
-        assert outline.blocks[0].content == "Single item"
+        assert outline.blocks[0].content == ["Single item"]
         assert outline.blocks[0].indent_level == 0
 
     def test_parse_multiple_bullets(self):
@@ -92,9 +91,9 @@ class TestLogseqOutline:
         outline = LogseqOutline.parse(markdown)
 
         assert len(outline.blocks) == 3
-        assert outline.blocks[0].content == "First item"
-        assert outline.blocks[1].content == "Second item"
-        assert outline.blocks[2].content == "Third item"
+        assert outline.blocks[0].content == ["First item"]
+        assert outline.blocks[1].content == ["Second item"]
+        assert outline.blocks[2].content == ["Third item"]
 
     def test_parse_nested_bullets(self):
         """Test parsing nested bullet structure."""
@@ -107,11 +106,11 @@ class TestLogseqOutline:
         outline = LogseqOutline.parse(markdown)
 
         assert len(outline.blocks) == 1
-        assert outline.blocks[0].content == "Parent"
+        assert outline.blocks[0].content == ["Parent"]
         assert len(outline.blocks[0].children) == 1
-        assert outline.blocks[0].children[0].content == "Child"
+        assert outline.blocks[0].children[0].content == ["Child"]
         assert len(outline.blocks[0].children[0].children) == 1
-        assert outline.blocks[0].children[0].children[0].content == "Grandchild"
+        assert outline.blocks[0].children[0].children[0].content == ["Grandchild"]
 
     def test_parse_mixed_indentation(self):
         """Test parsing mixed indentation levels."""
@@ -126,9 +125,9 @@ class TestLogseqOutline:
         outline = LogseqOutline.parse(markdown)
 
         assert len(outline.blocks) == 2
-        assert outline.blocks[0].content == "Level 0"
+        assert outline.blocks[0].content == ["Level 0"]
         assert len(outline.blocks[0].children) == 1
-        assert outline.blocks[1].content == "Another level 0"
+        assert outline.blocks[1].content == ["Another level 0"]
         assert len(outline.blocks[1].children) == 1
         assert len(outline.blocks[1].children[0].children) == 1
 
@@ -138,7 +137,7 @@ class TestLogseqOutline:
         outline = LogseqOutline.parse(markdown)
 
         assert len(outline.blocks) == 1
-        assert outline.blocks[0].content == "Working on [[Project X]]"
+        assert outline.blocks[0].content == ["Working on [[Project X]]"]
 
     def test_parse_with_markdown_headings(self):
         """Test parsing bullets with markdown headings."""
@@ -146,7 +145,7 @@ class TestLogseqOutline:
         outline = LogseqOutline.parse(markdown)
 
         assert len(outline.blocks) == 1
-        assert outline.blocks[0].content == "## Section Heading"
+        assert outline.blocks[0].content == ["## Section Heading"]
 
     def test_render_empty_outline(self):
         """Test rendering empty outline."""
@@ -157,7 +156,7 @@ class TestLogseqOutline:
 
     def test_render_single_bullet(self):
         """Test rendering single bullet."""
-        block = LogseqBlock(content="Single item", indent_level=0)
+        block = LogseqBlock(content=["Single item"], indent_level=0)
         outline = LogseqOutline(blocks=[block], source_text="")
         result = outline.render()
 
@@ -166,9 +165,9 @@ class TestLogseqOutline:
     def test_render_multiple_bullets(self):
         """Test rendering multiple bullets."""
         blocks = [
-            LogseqBlock(content="First", indent_level=0),
-            LogseqBlock(content="Second", indent_level=0),
-            LogseqBlock(content="Third", indent_level=0),
+            LogseqBlock(content=["First"], indent_level=0),
+            LogseqBlock(content=["Second"], indent_level=0),
+            LogseqBlock(content=["Third"], indent_level=0),
         ]
         outline = LogseqOutline(blocks=blocks, source_text="")
         result = outline.render()
@@ -183,7 +182,7 @@ class TestLogseqOutline:
 
     def test_render_nested_structure(self):
         """Test rendering nested structure."""
-        parent = LogseqBlock(content="Parent", indent_level=0)
+        parent = LogseqBlock(content=["Parent"], indent_level=0)
         parent.add_child("Child")
         parent.children[0].add_child("Grandchild")
 
@@ -212,7 +211,7 @@ class TestLogseqOutline:
         found = outline.find_heading("Timeline")
 
         assert found is not None
-        assert found.content == "## Timeline"
+        assert found.content == ["## Timeline"]
 
     def test_find_heading_case_insensitive(self):
         """Test finding heading is case-insensitive."""
@@ -222,7 +221,7 @@ class TestLogseqOutline:
         found = outline.find_heading("timeline")
 
         assert found is not None
-        assert "Timeline" in found.content
+        assert "Timeline" in found.content[0]
 
     def test_find_heading_not_found(self):
         """Test finding heading that doesn't exist."""
@@ -246,14 +245,14 @@ class TestLogseqOutline:
         found = outline.find_heading("Timeline")
 
         assert found is not None
-        assert found.content == "## Timeline"
+        assert found.content == ["## Timeline"]
 
-    def test_preserve_original_lines(self):
-        """Test that _original_lines is preserved for round-trip."""
+    def test_preserve_content_lines(self):
+        """Test that content lines are preserved."""
         markdown = "- Original line with specific formatting"
         outline = LogseqOutline.parse(markdown)
 
-        assert outline.blocks[0]._original_lines == [markdown]
+        assert outline.blocks[0].content == ["Original line with specific formatting"]
 
     def test_skip_non_bullet_lines(self):
         """Test that non-bullet lines are skipped."""
@@ -266,10 +265,10 @@ class TestLogseqOutline:
         )
         outline = LogseqOutline.parse(markdown)
 
-        # Should only parse the bullet lines
+        # Should parse bullet lines and their continuation lines
         assert len(outline.blocks) == 2
-        assert outline.blocks[0].content == "Bullet 1"
-        assert outline.blocks[1].content == "Bullet 2"
+        assert outline.blocks[0].content == ["Bullet 1", "More text"]
+        assert outline.blocks[1].content == ["Bullet 2"]
 
     def test_skip_empty_lines(self):
         """Test that empty lines are skipped."""
@@ -300,8 +299,8 @@ class TestBlockProperties:
 
         assert len(outline.blocks) == 1
         block = outline.blocks[0]
-        assert block.content == "Block with ID"
-        assert block.properties == {"id": "65f3a8e0-1234-5678-9abc-def012345678"}
+        assert block.content == ["Block with ID", "id:: 65f3a8e0-1234-5678-9abc-def012345678"]
+        assert block.get_property("id") == "65f3a8e0-1234-5678-9abc-def012345678"
         assert block.block_id == "65f3a8e0-1234-5678-9abc-def012345678"
 
     def test_parse_block_without_id_property(self):
@@ -310,7 +309,6 @@ class TestBlockProperties:
         outline = LogseqOutline.parse(markdown)
 
         block = outline.blocks[0]
-        assert block.properties == {}
         assert block.block_id is None
 
     def test_parse_multiple_properties(self):
@@ -325,11 +323,9 @@ class TestBlockProperties:
         outline = LogseqOutline.parse(markdown)
 
         block = outline.blocks[0]
-        assert block.properties == {
-            "id": "abc123",
-            "tags": "important, urgent",
-            "priority": "high",
-        }
+        assert block.get_property("id") == "abc123"
+        assert block.get_property("tags") == "important, urgent"
+        assert block.get_property("priority") == "high"
         assert block.block_id == "abc123"
 
     def test_property_order_preserved(self):
@@ -344,9 +340,11 @@ class TestBlockProperties:
         outline = LogseqOutline.parse(markdown)
 
         block = outline.blocks[0]
-        # Properties should be in the order they appear
-        keys = list(block.properties.keys())
-        assert keys == ["zebra", "alpha", "middle"]
+        # Properties should be in the order they appear in content
+        # Check they exist in content list in the right order
+        assert block.content[1] == "zebra:: last"
+        assert block.content[2] == "alpha:: first"
+        assert block.content[3] == "middle:: second"
 
     def test_parse_property_with_double_colon_in_value(self):
         """Test parsing property where value contains ::."""
@@ -358,7 +356,7 @@ class TestBlockProperties:
         outline = LogseqOutline.parse(markdown)
 
         block = outline.blocks[0]
-        assert block.properties == {"url": "https://example.com/path::with::colons"}
+        assert block.get_property("url") == "https://example.com/path::with::colons"
 
     def test_parse_nested_blocks_with_properties(self):
         """Test parsing nested blocks with properties."""
@@ -392,13 +390,11 @@ class TestBlockProperties:
 
         block = outline.blocks[0]
         # Should parse properties correctly
-        assert block.properties == {
-            "id": "test-id",
-            "tags": "test",
-        }
+        assert block.get_property("id") == "test-id"
+        assert block.get_property("tags") == "test"
         assert block.block_id == "test-id"
-        # All continuation lines should be preserved
-        assert len(block.continuation_lines) == 4
+        # All content lines should be preserved (first line + 4 continuation lines)
+        assert len(block.content) == 5
 
 
 class TestHybridID:
@@ -434,8 +430,8 @@ class TestHybridID:
         """Test get_hybrid_id uses parent context for hash."""
         from logsqueak.logseq.parser import LogseqBlock
 
-        parent = LogseqBlock(content="Parent", indent_level=0)
-        child = LogseqBlock(content="Child", indent_level=1)
+        parent = LogseqBlock(content=["Parent"], indent_level=0)
+        child = LogseqBlock(content=["Child"], indent_level=1)
 
         # Hash with parent context
         hybrid_id_with_parent = child.get_hybrid_id(parents=[parent])
@@ -460,7 +456,7 @@ class TestHybridID:
         found = outline.find_block_by_id("target-id")
 
         assert found is not None
-        assert found.content == "Block 2"
+        assert found.content == ["Block 2", "id:: target-id"]
         assert found.block_id == "target-id"
 
     def test_find_block_by_id_with_hash(self):
@@ -476,7 +472,7 @@ class TestHybridID:
         found = outline.find_block_by_id(target_id)
 
         assert found is not None
-        assert found.content == "Unique block content"
+        assert found.content == ["Unique block content"]
 
     def test_find_block_by_id_in_nested_structure(self):
         """Test finding nested block by ID."""
@@ -492,7 +488,7 @@ class TestHybridID:
         found = outline.find_block_by_id("nested-id")
 
         assert found is not None
-        assert found.content == "Child"
+        assert found.content == ["Child", "id:: nested-id"]
         assert found.block_id == "nested-id"
 
     def test_find_block_by_id_not_found(self):

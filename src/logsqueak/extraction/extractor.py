@@ -143,7 +143,7 @@ class Extractor:
                 if block is not None:
                     logger.info(
                         f"Fuzzy match found (similarity: {similarity:.3f}): "
-                        f"{block.content[:50]}..."
+                        f"{block.content[0][:50]}..."
                     )
 
             if block is None:
@@ -293,7 +293,7 @@ class Extractor:
                 CandidateChunk(
                     page_name=page_name,
                     target_id=block_id,
-                    content=block.content,
+                    content=block.get_full_content(normalize_whitespace=True),
                     similarity_score=0.95,  # Block refs get very high score (explicit reference)
                 )
             )
@@ -779,8 +779,8 @@ class Extractor:
             Matching LogseqBlock or None if not found
         """
         for block in blocks:
-            # Strip whitespace for comparison
-            if block.content.strip() == exact_text.strip():
+            # Strip whitespace for comparison (use first line)
+            if block.content[0].strip() == exact_text.strip():
                 return block
 
             # Recursively search children
@@ -833,8 +833,8 @@ class Extractor:
         if not all_blocks:
             return None, 0.0
 
-        # Extract content from all blocks
-        block_contents = [block.content.strip() for block in all_blocks]
+        # Extract content from all blocks (use full content, normalized)
+        block_contents = [block.get_full_content(normalize_whitespace=True) for block in all_blocks]
 
         # Encode all blocks and the query text
         logger.debug(f"Encoding {len(all_blocks)} blocks for fuzzy matching...")
@@ -890,14 +890,14 @@ class Extractor:
         parents = self._find_parent_chain(block, root_blocks)
 
         if not parents:
-            # No parents, return exact text
-            return block.content
+            # No parents, return full block content
+            return block.get_full_content()
 
         # Build context from parents
         context_parts = []
         for parent in parents:
-            # Extract [[Page Links]] and key phrases
-            content = parent.content.strip()
+            # Extract [[Page Links]] and key phrases (use full content, normalized)
+            content = parent.get_full_content(normalize_whitespace=True)
 
             # If parent has [[Page Link]], definitely include it
             if "[[" in content and "]]" in content:
@@ -906,8 +906,8 @@ class Extractor:
             elif len(content) > 0:
                 context_parts.append(content)
 
-        # Add the block's own content
-        context_parts.append(block.content.strip())
+        # Add the block's own full content (normalized)
+        context_parts.append(block.get_full_content(normalize_whitespace=True))
 
         # Join with appropriate separator
         if len(context_parts) == 1:
@@ -992,10 +992,13 @@ def _render_block(block, indent_str: str) -> list[str]:
     """
     lines = []
     indent = indent_str * block.indent_level
-    lines.append(f"{indent}- {block.content}")
 
-    if block.continuation_lines:
-        lines.extend(block.continuation_lines)
+    # Render first line with bullet
+    lines.append(f"{indent}- {block.content[0]}")
+
+    # Render subsequent lines (continuation/properties) with "  " instead of "- "
+    for line in block.content[1:]:
+        lines.append(f"{indent}  {line}")
 
     for child in block.children:
         lines.extend(_render_block(child, indent_str))

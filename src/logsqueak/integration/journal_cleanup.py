@@ -99,24 +99,23 @@ def _add_processed_marker(
     processed_value: str,
     indent_str: str = "  ",
 ) -> None:
-    """Add processed:: property to existing source block.
+    """Add or append to processed:: property on existing source block.
 
     Adds a processed:: property containing links to where the knowledge
-    was integrated. Does NOT create a new child block or modify id::.
+    was integrated. If the property already exists, appends the new value
+    as a comma-separated list. Does NOT create a new child block or modify id::.
 
     Args:
         source_block: Block to add property to
         processed_value: Formatted links (e.g., "[Page A](((uuid1))), [Page B](((uuid2)))")
         indent_str: Indentation string from outline (default: "  ")
     """
-    # Add processed:: to the block's properties dict
-    source_block.properties["processed"] = processed_value
+    # Check if processed:: property already exists
+    existing = source_block.get_property("processed")
+    if existing:
+        # Append to existing value as comma-separated list
+        new_value = f"{existing}, {processed_value}"
+    else:
+        new_value = processed_value
 
-    # Add processed:: as a continuation line (property format)
-    # Properties are indented: (block's indent) + 2 spaces (not + indent_str!)
-    # This matches how id:: properties are formatted
-    block_indent = indent_str * source_block.indent_level
-    property_line = f"{block_indent}  processed:: {processed_value}"
-
-    # Add to continuation_lines (after any existing properties like id::)
-    source_block.continuation_lines.append(property_line)
+    source_block.set_property("processed", new_value)

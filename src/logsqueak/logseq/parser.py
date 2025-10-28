@@ -14,27 +14,52 @@ class LogseqBlock:
 
     IMPORTANT: Preserves exact structure and order from source.
 
-    - Properties must never be reordered (insertion order preserved)
+    - All block lines stored in unified content list (first line, continuation, properties)
+    - Properties accessed via get_property/set_property (preserves location in content)
     - Children can be inserted where appropriate (targeted, minimal changes)
-    - Continuation lines are preserved exactly for round-trip
 
     Attributes:
-        content: Block text content (first line after "- ")
+        content: All block lines (first line, continuation lines, properties)
+                 Example: ["First line", "continuation", "key:: value"]
         indent_level: Indentation level (0 = root)
-        properties: Block properties (preserves insertion order)
         block_id: Persistent block ID from id:: property (None if not present)
         children: Child blocks
-        continuation_lines: Lines that continue this block's content (preserves exact formatting)
-        _original_lines: All original lines for exact round-trip (bullet + continuations)
     """
 
-    content: str
+    content: list[str]
     indent_level: int
-    properties: dict = field(default_factory=dict)  # Preserves insertion order (Python 3.7+)
     block_id: Optional[str] = None  # Persistent ID from id:: property
     children: list["LogseqBlock"] = field(default_factory=list)
-    continuation_lines: list[str] = field(default_factory=list)  # Multi-line content
-    _original_lines: list[str] = field(default_factory=list, repr=False)  # For exact round-trip
+
+    def __post_init__(self):
+        """Initialize block_id from id:: property if not explicitly set."""
+        if self.block_id is None:
+            self.block_id = self.get_property("id")
+
+    def get_full_content(self, normalize_whitespace: bool = False) -> str:
+        """Get full block content as a single string.
+
+        Joins all content lines (first line, continuation lines, properties)
+        with newlines.
+
+        Args:
+            normalize_whitespace: If True, strips leading/trailing whitespace from each line
+                                 before joining (useful for embeddings/matching).
+                                 If False, preserves original line content.
+
+        Returns:
+            Full block content joined with newlines
+
+        Examples:
+            >>> block.get_full_content()
+            "First line\\ncontinuation\\nid:: 12345"
+            >>> block.get_full_content(normalize_whitespace=True)
+            "First line\\ncontinuation\\nid:: 12345"  # Each line stripped
+        """
+        if normalize_whitespace:
+            # Strip each line individually, then join
+            return "\n".join(line.strip() for line in self.content)
+        return "\n".join(self.content)
 
     def add_child(
         self, content: str, position: Optional[int] = None
@@ -42,13 +67,13 @@ class LogseqBlock:
         """Add child bullet with proper indentation.
 
         Args:
-            content: The bullet content
+            content: The bullet content (first line)
             position: Optional index to insert at (None = append to end)
 
         Returns:
             The created child block
         """
-        child = LogseqBlock(content=content, indent_level=self.indent_level + 1)
+        child = LogseqBlock(content=[content], indent_level=self.indent_level + 1)
 
         if position is None:
             self.children.append(child)
@@ -56,6 +81,67 @@ class LogseqBlock:
             self.children.insert(position, child)
 
         return child
+
+    def get_property(self, key: str) -> Optional[str]:
+        """Get property value by key.
+
+        Scans content for lines matching 'key:: value' pattern.
+
+        Args:
+            key: Property key to search for
+
+        Returns:
+            Property value if found, None otherwise
+
+        Examples:
+            >>> block.get_property("id")
+            "12345"
+            >>> block.get_property("missing")
+            None
+        """
+        for line in self.content:
+            stripped = line.strip()
+            if "::" in stripped:
+                parts = stripped.split("::", 1)
+                if len(parts) == 2 and parts[0].strip() == key:
+                    return parts[1].strip()
+        return None
+
+    def set_property(self, key: str, value: str) -> None:
+        """Set property value, preserving location or appending.
+
+        If the property exists, updates it in-place.
+        If the property doesn't exist, appends it to the end of content.
+
+        Args:
+            key: Property key
+            value: Property value
+
+        Examples:
+            >>> block.set_property("id", "12345")  # Appends: "id:: 12345"
+            >>> block.set_property("id", "67890")  # Updates existing in-place
+        """
+        # Search for existing property
+        for i, line in enumerate(self.content):
+            stripped = line.strip()
+            if "::" in stripped:
+                parts = stripped.split("::", 1)
+                if len(parts) == 2 and parts[0].strip() == key:
+                    # Update in-place, preserving indentation style
+                    leading_space = line[: len(line) - len(line.lstrip())]
+                    self.content[i] = f"{leading_space}{key}:: {value}"
+
+                    # Update block_id if this is the id property
+                    if key == "id":
+                        self.block_id = value
+                    return
+
+        # Property not found, append to end
+        self.content.append(f"{key}:: {value}")
+
+        # Update block_id if this is the id property
+        if key == "id":
+            self.block_id = value
 
     def get_hybrid_id(self, parents: list["LogseqBlock"] = None, indent_str: str = "  ") -> str:
         """Get hybrid ID for this block.
@@ -111,12 +197,12 @@ class LogseqOutline:
     def parse(cls, markdown: str) -> "LogseqOutline":
         """Parse Logseq markdown into outline structure.
 
-        IMPORTANT: Preserves exact order of properties:
+        IMPORTANT: Preserves exact order:
 
         - Blocks appear in same order as source
-        - Properties MUST maintain insertion order (dict preserves order in Python 3.7+)
+        - Properties MUST maintain insertion order (preserved in content list)
         - Children preserve their original sequence (can be modified with targeted inserts)
-        - Whitespace and formatting captured in _original_line for round-trip
+        - Continuation lines stored in content list (whitespace normalized during parse)
 
         Args:
             markdown: Logseq markdown content
@@ -152,7 +238,8 @@ class LogseqOutline:
 
         def search(blocks: list[LogseqBlock]) -> Optional[LogseqBlock]:
             for block in blocks:
-                if text.lower() in block.content.lower():
+                # Search in first line (main block content)
+                if text.lower() in block.content[0].lower():
                     return block
                 if found := search(block.children):
                     return found
@@ -196,11 +283,9 @@ class LogseqOutline:
         IMPORTANT: Minimal changes guarantee (FR-008):
 
         - Preserves exact order of all blocks
-        - Maintains original indentation (2 spaces per level)
-        - NEVER reorders properties (insertion order sacred)
+        - Maintains original indentation (uses detected indent_str)
+        - NEVER reorders properties (location preserved in content)
         - Children modifications are targeted and minimal
-        - Uses _original_lines when available for perfect round-trip
-        - Preserves continuation lines exactly (code blocks, properties, etc.)
         - Preserves frontmatter (page-level properties)
 
         Returns:
@@ -213,22 +298,19 @@ class LogseqOutline:
             lines.extend(self.frontmatter)
 
         def render_block(block: LogseqBlock) -> None:
-            # Use original lines if available and no children added (perfect round-trip)
-            if block._original_lines and not block.children:
-                lines.extend(block._original_lines)
-            else:
-                # Render block (possibly with new children appended)
-                # Use detected indentation style
-                indent = self.indent_str * block.indent_level
-                lines.append(f"{indent}- {block.content}")
+            # Calculate base indentation
+            indent = self.indent_str * block.indent_level
 
-                # Render continuation lines exactly as they were
-                if block.continuation_lines:
-                    lines.extend(block.continuation_lines)
+            # Render first line with bullet
+            lines.append(f"{indent}- {block.content[0]}")
 
-                # Render children in exact order (new ones at end)
-                for child in block.children:
-                    render_block(child)
+            # Render subsequent lines (continuation/properties) with "  " instead of "- "
+            for line in block.content[1:]:
+                lines.append(f"{indent}  {line}")
+
+            # Render children in exact order (new ones at end)
+            for child in block.children:
+                render_block(child)
 
         for block in self.blocks:
             render_block(block)
@@ -237,15 +319,14 @@ class LogseqOutline:
 
 
 def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], list[LogseqBlock]]:
-    """Parse lines into hierarchical blocks with continuation lines.
+    """Parse lines into hierarchical blocks.
 
     A block consists of:
     - A bullet line (starts with "- " after leading whitespace)
     - All continuation lines until the next bullet (or end of file)
 
-    Continuation lines are any non-bullet lines that follow a bullet.
-    They are preserved exactly to maintain formatting of code blocks,
-    properties, and multi-line content.
+    All lines are stored in the block's content list. Continuation line
+    whitespace is normalized (stripped) during parsing and re-added during rendering.
 
     Lines before the first bullet are captured as frontmatter (page-level properties).
 
@@ -274,12 +355,15 @@ def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], 
             leading_whitespace = line[: len(line) - len(line.lstrip())]
             indent_level = leading_whitespace.count(indent_str)
 
-            # Extract content (after "- ")
-            content = line.lstrip()[2:]  # Skip "- "
+            # Extract first line content (after "- ")
+            first_line = line.lstrip()[2:]  # Skip "- "
 
-            # Collect all original lines for this block (bullet + continuations)
-            original_lines = [line]
-            continuation_lines = []
+            # Build unified content list (first line + continuation lines)
+            content = [first_line]
+
+            # Calculate expected base indentation for continuation lines
+            # Continuation lines should be indented at least as much as the bullet + 2 spaces
+            continuation_base_indent = leading_whitespace + "  "
 
             # Look ahead for continuation lines
             j = i + 1
@@ -291,25 +375,24 @@ def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], 
                     # This is the next bullet, stop collecting
                     break
 
-                # This is a continuation line
-                original_lines.append(next_line)
-                continuation_lines.append(next_line)
+                # This is a continuation line - strip only the base indentation
+                # to preserve any extra indentation (e.g., code block indentation)
+                if next_line.startswith(continuation_base_indent):
+                    # Strip the base indentation, keep any extra
+                    continuation_content = next_line[len(continuation_base_indent):]
+                else:
+                    # Line doesn't have the expected indentation, only strip leading
+                    # (preserve trailing whitespace)
+                    continuation_content = next_line.lstrip()
+
+                content.append(continuation_content)
                 j += 1
 
-            # Parse properties from continuation lines
-            properties = _parse_properties(continuation_lines)
-
-            # Extract block_id from id:: property if present
-            block_id = properties.get("id")
-
-            # Create block with continuation lines and properties
+            # Create block with unified content
+            # block_id will be extracted automatically in __post_init__
             block = LogseqBlock(
                 content=content,
                 indent_level=indent_level,
-                properties=properties,
-                block_id=block_id,
-                continuation_lines=continuation_lines,
-                _original_lines=original_lines,
             )
 
             # Determine parent based on indent level
@@ -343,38 +426,6 @@ def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], 
             i += 1
 
     return frontmatter, root_blocks
-
-
-def _parse_properties(continuation_lines: list[str]) -> dict[str, str]:
-    """Parse properties from continuation lines.
-
-    Properties have the format: `key:: value` (with optional leading whitespace).
-
-    Args:
-        continuation_lines: Lines following a bullet
-
-    Returns:
-        Dictionary of properties (preserves insertion order)
-
-    Examples:
-        >>> _parse_properties(["  id:: 123", "  tags:: foo, bar"])
-        {'id': '123', 'tags': 'foo, bar'}
-    """
-    properties = {}
-
-    for line in continuation_lines:
-        stripped = line.strip()
-
-        # Property lines have format: key:: value
-        if "::" in stripped:
-            # Split on first "::" only
-            parts = stripped.split("::", 1)
-            if len(parts) == 2:
-                key = parts[0].strip()
-                value = parts[1].strip()
-                properties[key] = value
-
-    return properties
 
 
 def _detect_indentation(lines: list[str]) -> str:

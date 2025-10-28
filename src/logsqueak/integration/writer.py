@@ -100,8 +100,8 @@ def _find_section_recursive(
 
     for block in blocks:
         # Check if this block matches the current path element
-        # Match against block content (strip bullet and whitespace)
-        block_text = block.content.strip()
+        # Match against block content (first line, strip whitespace)
+        block_text = block.content[0].strip()
 
         # Handle heading syntax (e.g., "## Section Name")
         if block_text.startswith("#"):
@@ -174,20 +174,13 @@ def _add_child_bullet(
     # Generate unique ID for new block
     block_id = _generate_block_id()
 
-    # Calculate indentation for the id:: property line
-    # Properties are indented to bullet level + 2 spaces
     indent_level = parent_block.indent_level + 1
-    indent = indent_str * indent_level + "  "
-    id_line = f"{indent}id:: {block_id}"
 
     # Create new child block with id:: property
     new_child = LogseqBlock(
-        content=content,
+        content=[content, f"id:: {block_id}"],
         indent_level=indent_level,
-        properties={"id": block_id},
         block_id=block_id,
-        children=[],
-        continuation_lines=[id_line],
     )
 
     # Add as last child (targeted placement)
@@ -208,18 +201,11 @@ def _add_to_page_end(outline: LogseqOutline, content: str, indent_str: str) -> N
     # Generate unique ID for new block
     block_id = _generate_block_id()
 
-    # Root-level block (indent_level=0), so id:: property is indented by 2 spaces
-    indent = "  "
-    id_line = f"{indent}id:: {block_id}"
-
     # Create new root-level block with id:: property
     new_block = LogseqBlock(
-        content=content,
+        content=[content, f"id:: {block_id}"],
         indent_level=0,
-        properties={"id": block_id},
         block_id=block_id,
-        children=[],
-        continuation_lines=[id_line],
     )
 
     # Add to end of root blocks
@@ -239,25 +225,13 @@ def update_block(target_block: LogseqBlock, new_content: str, preserve_id: bool 
         preserve_id: If True, preserve existing id:: property (default: True)
         indent_str: Indentation string from outline (e.g., "  ", "\t") (default: "  ")
     """
-    # Update content
-    target_block.content = new_content
+    # Update content (replace first line only)
+    target_block.content[0] = new_content
 
     # If preserving ID and block has one, keep it
     if preserve_id and target_block.block_id:
-        # Ensure id is in properties
-        if "id" not in target_block.properties:
-            target_block.properties["id"] = target_block.block_id
-
-        # Ensure id:: is in continuation_lines
-        # Properties are indented to bullet level + 2 spaces
-        indent_level = target_block.indent_level
-        indent = indent_str * indent_level + "  "
-        id_line = f"{indent}id:: {target_block.block_id}"
-
-        # Check if id:: already exists in continuation_lines
-        has_id_line = any("id::" in line for line in target_block.continuation_lines)
-        if not has_id_line:
-            target_block.continuation_lines.append(id_line)
+        # Ensure id property is set using set_property
+        target_block.set_property("id", target_block.block_id)
 
 
 def append_to_block(target_block: LogseqBlock, new_content: str, indent_str: str = "  ") -> str:
@@ -278,20 +252,13 @@ def append_to_block(target_block: LogseqBlock, new_content: str, indent_str: str
     # Generate UUID for new block
     new_id = _generate_block_id()
 
-    # Calculate indentation for the id:: property line
-    # Properties are indented to bullet level + 2 spaces
     indent_level = target_block.indent_level + 1
-    indent = indent_str * indent_level + "  "
-    id_line = f"{indent}id:: {new_id}"
 
     # Create new child block
     new_child = LogseqBlock(
-        content=new_content,
+        content=[new_content, f"id:: {new_id}"],
         indent_level=indent_level,
-        properties={"id": new_id},
         block_id=new_id,
-        children=[],
-        continuation_lines=[id_line],
     )
 
     # Add as child
@@ -318,18 +285,11 @@ def append_to_root(outline: LogseqOutline, new_content: str, indent_str: str = "
     # Generate UUID for new block
     new_id = _generate_block_id()
 
-    # Root-level block (indent_level=0), so id:: property is indented by 2 spaces
-    indent = "  "
-    id_line = f"{indent}id:: {new_id}"
-
     # Create new root-level block
     new_block = LogseqBlock(
-        content=new_content,
+        content=[new_content, f"id:: {new_id}"],
         indent_level=0,
-        properties={"id": new_id},
         block_id=new_id,
-        children=[],
-        continuation_lines=[id_line],
     )
 
     # Add to root blocks

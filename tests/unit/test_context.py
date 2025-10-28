@@ -18,7 +18,7 @@ class TestGenerateFullContext:
 
     def test_block_with_no_parents(self):
         """Test full context for root-level block."""
-        block = LogseqBlock(content="Root content", indent_level=0)
+        block = LogseqBlock(content=["Root content"], indent_level=0)
 
         context = generate_full_context(block, [])
 
@@ -26,8 +26,8 @@ class TestGenerateFullContext:
 
     def test_block_with_one_parent(self):
         """Test full context for child block."""
-        parent = LogseqBlock(content="Parent", indent_level=0)
-        child = LogseqBlock(content="Child", indent_level=1)
+        parent = LogseqBlock(content=["Parent"], indent_level=0)
+        child = LogseqBlock(content=["Child"], indent_level=1)
 
         context = generate_full_context(child, [parent])
 
@@ -35,9 +35,9 @@ class TestGenerateFullContext:
 
     def test_block_with_multiple_parents(self):
         """Test full context for deeply nested block."""
-        root = LogseqBlock(content="Root", indent_level=0)
-        child = LogseqBlock(content="Child", indent_level=1)
-        grandchild = LogseqBlock(content="Grandchild", indent_level=2)
+        root = LogseqBlock(content=["Root"], indent_level=0)
+        child = LogseqBlock(content=["Child"], indent_level=1)
+        grandchild = LogseqBlock(content=["Grandchild"], indent_level=2)
 
         context = generate_full_context(grandchild, [root, child])
 
@@ -45,9 +45,9 @@ class TestGenerateFullContext:
 
     def test_parent_order_matters(self):
         """Test that parent order affects context."""
-        block_a = LogseqBlock(content="A", indent_level=0)
-        block_b = LogseqBlock(content="B", indent_level=0)
-        block_c = LogseqBlock(content="C", indent_level=0)
+        block_a = LogseqBlock(content=["A"], indent_level=0)
+        block_b = LogseqBlock(content=["B"], indent_level=0)
+        block_c = LogseqBlock(content=["C"], indent_level=0)
 
         context_abc = generate_full_context(block_c, [block_a, block_b])
         context_bac = generate_full_context(block_c, [block_b, block_a])
@@ -105,7 +105,7 @@ class TestGenerateChunks:
 
         assert len(chunks) == 1
         block, context, hybrid_id = chunks[0]
-        assert block.content == "Root block"
+        assert block.content == ["Root block"]
         assert context == "- Root block"
         # Should be hash since no id:: property
         assert len(hybrid_id) == 32  # MD5 hex length
@@ -202,7 +202,7 @@ class TestGenerateChunks:
         chunks = generate_chunks(outline)
 
         # Find the two "Same content" blocks
-        same_content_chunks = [c for c in chunks if c[0].content == "Same content"]
+        same_content_chunks = [c for c in chunks if c[0].content == ["Same content"]]
         assert len(same_content_chunks) == 2
 
         # Different parents mean different full context

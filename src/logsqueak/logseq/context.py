@@ -39,13 +39,14 @@ def generate_full_context(block: "LogseqBlock", parents: list["LogseqBlock"], in
     context_parts = []
 
     # Add all parent blocks with proper indentation
+    # Use only first line for context (not full content)
     for i, parent in enumerate(parents):
         indent = indent_str * i
-        context_parts.append(f"{indent}- {parent.content}")
+        context_parts.append(f"{indent}- {parent.content[0]}")
 
     # Add this block with its indentation
     indent = indent_str * len(parents)
-    context_parts.append(f"{indent}- {block.content}")
+    context_parts.append(f"{indent}- {block.content[0]}")
 
     return "\n".join(context_parts)
 

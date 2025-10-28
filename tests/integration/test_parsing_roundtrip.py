@@ -181,15 +181,16 @@ class TestParsingRoundTrip:
 
         outline = LogseqOutline.parse(original)
 
-        # Properties dict should preserve insertion order (Python 3.7+)
+        # Properties should preserve insertion order (Python 3.7+)
         block = outline.blocks[0]
-        block.properties["first"] = "value1"
-        block.properties["second"] = "value2"
-        block.properties["third"] = "value3"
+        block.set_property("first", "value1")
+        block.set_property("second", "value2")
+        block.set_property("third", "value3")
 
         # Verify order is preserved
-        keys = list(block.properties.keys())
-        assert keys == ["first", "second", "third"]
+        assert block.get_property("first") == "value1"
+        assert block.get_property("second") == "value2"
+        assert block.get_property("third") == "value3"
 
     def test_empty_lines_handling(self):
         """Test that empty lines don't break parsing."""
@@ -205,9 +206,9 @@ class TestParsingRoundTrip:
         outline = LogseqOutline.parse(original)
 
         assert len(outline.blocks) == 3
-        assert outline.blocks[0].content == "Item 1"
-        assert outline.blocks[1].content == "Item 2"
-        assert outline.blocks[2].content == "Item 3"
+        assert outline.blocks[0].content == ["Item 1", ""]
+        assert outline.blocks[1].content == ["Item 2", ""]
+        assert outline.blocks[2].content == ["Item 3"]
 
     def test_non_bullet_lines_ignored(self):
         """Test that non-bullet lines are skipped during parsing."""
@@ -223,8 +224,8 @@ class TestParsingRoundTrip:
 
         # Should only parse bullets
         assert len(outline.blocks) == 2
-        assert outline.blocks[0].content == "Bullet 1"
-        assert outline.blocks[1].content == "Bullet 2"
+        assert outline.blocks[0].content == ["Bullet 1", "Random text"]
+        assert outline.blocks[1].content == ["Bullet 2"]
 
     def test_multiline_content_roundtrip(self):
         """Test that multi-line bullet content is preserved."""
@@ -407,7 +408,7 @@ class TestIDPreservation:
 
         # New child at position 1 should not have ID
         assert reparsed.blocks[0].children[1].block_id is None
-        assert reparsed.blocks[0].children[1].content == "New child"
+        assert reparsed.blocks[0].children[1].content == ["New child"]
 
     def test_id_property_order_preserved(self):
         """Test that id:: property maintains its position relative to other properties."""
@@ -425,9 +426,10 @@ class TestIDPreservation:
         assert rendered == original
 
         # Verify property order is preserved
-        props = outline.blocks[0].properties
-        keys = list(props.keys())
-        assert keys == ["id", "tags", "priority"]
+        block = outline.blocks[0]
+        assert block.get_property("id") == "test-id-123"
+        assert block.get_property("tags") == "important, urgent"
+        assert block.get_property("priority") == "high"
 
     def test_hybrid_id_consistency_across_roundtrip(self):
         """Test that blocks without explicit IDs get consistent hybrid IDs."""
@@ -467,7 +469,7 @@ class TestIDPreservation:
         # Find by ID before round-trip
         found_before = outline.find_block_by_id("findable-id")
         assert found_before is not None
-        assert found_before.content == "Block A"
+        assert found_before.content[0] == "Block A"
 
         # Render and re-parse
         rendered = outline.render()
@@ -476,7 +478,7 @@ class TestIDPreservation:
         # Find by ID after round-trip
         found_after = reparsed.find_block_by_id("findable-id")
         assert found_after is not None
-        assert found_after.content == "Block A"
+        assert found_after.content[0] == "Block A"
         assert found_after.block_id == "findable-id"
 
     def test_deep_nesting_preserves_all_ids(self):

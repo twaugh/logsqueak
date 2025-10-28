@@ -36,15 +36,15 @@ def sample_journal_entry():
 - Key insight: Users prefer simple UI over feature-rich"""
 
     blocks = [
-        LogseqBlock(content="- Had standup meeting with team", indent_level=0, properties={}),
+        LogseqBlock(content=["Had standup meeting with team"], indent_level=0),
         LogseqBlock(
-            content="- Decided to use PostgreSQL for persistence layer",
+            content=["Decided to use PostgreSQL for persistence layer"],
             indent_level=0,
             properties={},
         ),
-        LogseqBlock(content="- Reviewed competitor features", indent_level=0, properties={}),
+        LogseqBlock(content=["Reviewed competitor features"], indent_level=0),
         LogseqBlock(
-            content="- Key insight: Users prefer simple UI over feature-rich",
+            content=["Key insight: Users prefer simple UI over feature-rich"],
             indent_level=0,
             properties={},
         ),
@@ -113,8 +113,8 @@ def mock_page_index(tmp_path):
         file_path=tmp_path / "pages" / "Project_Architecture.md",
         outline=LogseqOutline(
             blocks=[
-                LogseqBlock(content="- ## Database", indent_level=0, properties={}),
-                LogseqBlock(content="  - Using MongoDB currently", indent_level=1, properties={}),
+                LogseqBlock(content=["## Database"], indent_level=0),
+                LogseqBlock(content=["Using MongoDB currently"], indent_level=1),
             ],
             source_text=page1_source,
         ),
@@ -127,8 +127,8 @@ def mock_page_index(tmp_path):
         file_path=tmp_path / "pages" / "Product_Strategy.md",
         outline=LogseqOutline(
             blocks=[
-                LogseqBlock(content="- ## User Feedback", indent_level=0, properties={}),
-                LogseqBlock(content="  - Survey results", indent_level=1, properties={}),
+                LogseqBlock(content=["## User Feedback"], indent_level=0),
+                LogseqBlock(content=["Survey results"], indent_level=1),
             ],
             source_text=page2_source,
         ),
@@ -237,9 +237,9 @@ def test_workflow_with_duplicate_detection(
         file_path=tmp_path / "Project_Architecture.md",
         outline=LogseqOutline(
             blocks=[
-                LogseqBlock(content="- ## Database", indent_level=0, properties={}),
+                LogseqBlock(content=["## Database"], indent_level=0),
                 LogseqBlock(
-                    content="  - Decided to use PostgreSQL for persistence layer",
+                    content=["Decided to use PostgreSQL for persistence layer"],
                     indent_level=1,
                     properties={},
                 ),
@@ -270,9 +270,9 @@ def test_workflow_with_no_knowledge_found(mock_llm_client, mock_page_index):
         raw_content=source_text,
         outline=LogseqOutline(
             blocks=[
-                LogseqBlock(content="- Had meeting", indent_level=0, properties={}),
-                LogseqBlock(content="- Sent emails", indent_level=0, properties={}),
-                LogseqBlock(content="- Updated ticket", indent_level=0, properties={}),
+                LogseqBlock(content=["Had meeting"], indent_level=0),
+                LogseqBlock(content=["Sent emails"], indent_level=0),
+                LogseqBlock(content=["Updated ticket"], indent_level=0),
             ],
             source_text=source_text,
         ),
@@ -635,8 +635,8 @@ def test_workflow_with_all_activity_logs(mock_llm_client, mock_page_index):
         raw_content="- Morning standup\n- Responded to emails",
         outline=LogseqOutline(
             blocks=[
-                LogseqBlock(content="Morning standup", indent_level=0),
-                LogseqBlock(content="Responded to emails", indent_level=0),
+                LogseqBlock(content=["Morning standup"], indent_level=0),
+                LogseqBlock(content=["Responded to emails"], indent_level=0),
             ],
             source_text="- Morning standup\n- Responded to emails",
         ),
@@ -691,7 +691,7 @@ def test_workflow_with_indent_str_propagation(sample_journal_entry, mock_llm_cli
         file_path=Path("/test/journals/2025_01_15.md"),
         raw_content="- Test content",
         outline=LogseqOutline(
-            blocks=[LogseqBlock(content="Test content", indent_level=0)],
+            blocks=[LogseqBlock(content=["Test content"], indent_level=0)],
             source_text="- Test content",
             indent_str="\t",  # Tab indentation
         ),

@@ -47,7 +47,7 @@ def simulate_integration(
             else:
                 # Search in children
                 for child in current_block.children:
-                    if section_name.lower() in child.content.lower():
+                    if section_name.lower() in child.content[0].lower():
                         current_block = child
                         break
 
@@ -60,9 +60,8 @@ def simulate_integration(
             # Don't add "- " prefix - render() will add it
             modified_outline.blocks.append(
                 LogseqBlock(
-                    content=content_with_provenance,
+                    content=[content_with_provenance],
                     indent_level=0,
-                    properties={},
                 )
             )
     else:
@@ -70,9 +69,8 @@ def simulate_integration(
         # Don't add "- " prefix - render() will add it
         modified_outline.blocks.append(
             LogseqBlock(
-                content=content_with_provenance,
+                content=[content_with_provenance],
                 indent_level=0,
-                properties={},
             )
         )
 

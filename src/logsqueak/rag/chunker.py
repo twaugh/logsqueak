@@ -83,10 +83,10 @@ def chunk_page(outline: LogseqOutline, page_name: str) -> List[Chunk]:
             full_context_text=full_context,
             hybrid_id=global_id,
             page_name=page_name,
-            block_content=block.content,
+            block_content=block.get_full_content(normalize_whitespace=True),
             metadata={
                 "page_name": page_name,
-                "block_content": block.content,
+                "block_content": block.get_full_content(normalize_whitespace=True),
                 "indent_level": block.indent_level,
                 "local_hybrid_id": hybrid_id,  # Store original for reference
             },

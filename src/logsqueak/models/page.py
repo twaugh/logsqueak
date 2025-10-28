@@ -357,7 +357,7 @@ def _detect_convention(outline: "LogseqOutline") -> ConventionType:
     def check_blocks(blocks: list["LogseqBlock"]) -> None:
         nonlocal has_heading, has_plain
         for block in blocks:
-            if "##" in block.content:
+            if "##" in block.content[0]:  # Check first line
                 has_heading = True
             else:
                 has_plain = True

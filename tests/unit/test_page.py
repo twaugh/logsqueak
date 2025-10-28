@@ -65,7 +65,7 @@ class TestTargetPage:
         section = page.find_section("Timeline")
 
         assert section is not None
-        assert "Timeline" in section.content
+        assert "Timeline" in section.content[0]
 
     def test_find_section_not_found(self, tmp_path):
         """Test finding section that doesn't exist."""
