@@ -304,7 +304,10 @@ class LogseqOutline:
             indent = self.indent_str * block.indent_level
 
             # Render first line with bullet
-            lines.append(f"{indent}- {block.content[0]}")
+            if block.content[0] == "":
+                lines.append(f"{indent}-")  # Empty bullet, no space
+            else:
+                lines.append(f"{indent}- {block.content[0]}")
 
             # Render subsequent lines (continuation/properties) with "  " instead of "- "
             for line in block.content[1:]:
@@ -318,6 +321,22 @@ class LogseqOutline:
             render_block(block)
 
         return "\n".join(lines)
+
+
+def _is_bullet_line(line: str) -> bool:
+    """Check if a line is a bullet (including empty bullets).
+
+    Args:
+        line: Line to check
+
+    Returns:
+        True if line is a bullet, False otherwise
+    """
+    stripped = line.lstrip()
+    return stripped.startswith("-") and (
+        stripped == "-" or  # Empty bullet
+        stripped.startswith("- ")  # Bullet with content
+    )
 
 
 def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], list[LogseqBlock]]:
@@ -343,13 +362,19 @@ def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], 
     root_blocks = []
     stack: list[LogseqBlock] = []  # Stack of parent blocks by indent level
     found_first_bullet = False
+    in_code_fence = False  # Track if we're inside a code fence
 
     i = 0
     while i < len(lines):
         line = lines[i]
 
-        # Check if this is a bullet line
-        is_bullet = line.lstrip().startswith("- ")
+        # Track code fence state
+        if line.lstrip().startswith("```"):
+            in_code_fence = not in_code_fence
+
+        # Check if this is a bullet line (including empty bullets)
+        # Don't treat lines as bullets when inside code fences
+        is_bullet = not in_code_fence and _is_bullet_line(line)
 
         if is_bullet:
             found_first_bullet = True
@@ -357,8 +382,12 @@ def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], 
             leading_whitespace = line[: len(line) - len(line.lstrip())]
             indent_level = leading_whitespace.count(indent_str)
 
-            # Extract first line content (after "- ")
-            first_line = line.lstrip()[2:]  # Skip "- "
+            # Extract first line content (after "- " or "-")
+            stripped = line.lstrip()
+            if stripped == "-":
+                first_line = ""  # Empty bullet
+            else:
+                first_line = stripped[2:]  # Skip "- "
 
             # Build unified content list (first line + continuation lines)
             content = [first_line]
@@ -369,11 +398,18 @@ def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], 
 
             # Look ahead for continuation lines
             j = i + 1
+            # If the bullet itself opens a code fence, start inside the fence
+            continuation_in_code_fence = first_line.startswith("```")
             while j < len(lines):
                 next_line = lines[j]
 
-                # Check if next line is a bullet
-                if next_line.lstrip().startswith("- "):
+                # Track code fence state in continuation lines
+                if next_line.lstrip().startswith("```"):
+                    continuation_in_code_fence = not continuation_in_code_fence
+
+                # Check if next line is a bullet (including empty bullets)
+                # Don't treat as bullet if inside code fence
+                if not continuation_in_code_fence and _is_bullet_line(next_line):
                     # This is the next bullet, stop collecting
                     break
 
