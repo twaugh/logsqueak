@@ -16,8 +16,14 @@ if TYPE_CHECKING:
 def generate_full_context(block: "LogseqBlock", parents: list["LogseqBlock"], indent_str: str = "  ") -> str:
     """Generate full-context string for a block.
 
-    The full context includes all parent blocks with proper bullet formatting,
-    which ensures uniqueness and preserves the document structure.
+    The full context includes all parent blocks' full content with proper bullet
+    formatting, plus the block's own full content. This must be reproducible from
+    just the block and its parents (no siblings, no children) since we need to
+    recreate the hash when finding blocks by ID.
+
+    NOTE: Blocks with truly identical content and context will have the same hybrid ID.
+    This is by design - such blocks are semantically equivalent for RAG purposes.
+    Use explicit id:: properties if you need to distinguish identical blocks.
 
     Args:
         block: The block to generate context for
@@ -39,14 +45,35 @@ def generate_full_context(block: "LogseqBlock", parents: list["LogseqBlock"], in
     context_parts = []
 
     # Add all parent blocks with proper indentation
-    # Use only first line for context (not full content)
+    # Use full content (all lines) to maximize uniqueness
     for i, parent in enumerate(parents):
         indent = indent_str * i
-        context_parts.append(f"{indent}- {parent.content[0]}")
+        # Join all content lines with proper continuation indentation
+        parent_lines = []
+        for j, line in enumerate(parent.content):
+            if j == 0:
+                # First line gets the bullet
+                parent_lines.append(f"{indent}- {line}")
+            else:
+                # Continuation lines get extra indentation
+                parent_lines.append(f"{indent}  {line}")
+        context_parts.extend(parent_lines)
 
     # Add this block with its indentation
+    # Use full content (all lines) to maximize uniqueness
     indent = indent_str * len(parents)
-    context_parts.append(f"{indent}- {block.content[0]}")
+    for j, line in enumerate(block.content):
+        if j == 0:
+            # First line gets the bullet
+            context_parts.append(f"{indent}- {line}")
+        else:
+            # Continuation lines get extra indentation
+            context_parts.append(f"{indent}  {line}")
+
+    # NOTE: We do NOT include children in the hash because:
+    # 1. Creates circular dependency (parent hash changes when children added)
+    # 2. Cannot be reproduced when finding blocks by ID (we don't have children)
+    # Blocks with identical content+context will share IDs, which is acceptable.
 
     return "\n".join(context_parts)
 
