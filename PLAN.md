@@ -343,6 +343,14 @@ Implement Phase 1 (Knowledge Extraction changes), Phase 2 (Enhanced RAG), Phase 
 
 Comprehensive testing and polish for the new pipeline.
 
+#### M5.0: Remove Dry-Run Mode and Preview/Approval Workflow
+- **Files**: `src/logsqueak/cli/main.py`, `src/logsqueak/extraction/extractor.py`, `src/logsqueak/cli/interactive.py`, `src/logsqueak/models/preview.py`
+- **Task**: Remove `--dry-run` flag from CLI (incompatible with new pipeline)
+- **Task**: Remove preview generation logic (old 2-stage pipeline concept)
+- **Task**: Remove interactive approval prompts (y/n/e)
+- **Rationale**: New 5-phase pipeline writes directly with `processed::` markers for traceability; dry-run/preview doesn't fit the architecture
+- **Test**: Verify extraction command works without dry-run flags
+
 #### M5.1: Integration Test: Full Pipeline (Phase 0-4)
 - **File**: `tests/integration/test_full_pipeline.py`
 - **Task**: End-to-end test from journal → index → extract → integrate → cleanup
@@ -389,8 +397,8 @@ Comprehensive testing and polish for the new pipeline.
 | M2: Persistent Vector Store | 6 | 4-6 days | ✅ Complete | ~1 day |
 | M3: Block-Level Targeting | 4 | 2-3 days | ✅ Complete | <1 day |
 | M4: Multi-Stage Pipeline | 12 | 10-14 days | ✅ Complete | ~2 days |
-| M5: Testing & Refinement | 6 | 4-6 days | ⏳ Next | - |
-| **Total** | **33 tasks** | **23-35 days** | 85% | ~5/23-35 |
+| M5: Testing & Refinement | 7 | 4-6 days | ⏳ Next | - |
+| **Total** | **34 tasks** | **23-35 days** | 85% | ~5/23-35 |
 
 ---
 
@@ -455,6 +463,7 @@ Comprehensive testing and polish for the new pipeline.
 
 **Next: Milestone 5 - Testing & Refinement**
 
+0. **Remove Dry-Run** - M5.0: Remove dry-run mode and preview/approval workflow (incompatible with new architecture)
 1. **Integration Testing** - M5.1: Full pipeline end-to-end tests
 2. **Performance Benchmarks** - M5.2: Document indexing performance
 3. **Error Recovery** - M5.3: Test failure modes and recovery
@@ -465,7 +474,7 @@ Comprehensive testing and polish for the new pipeline.
 **Current Issues to Address in M5:**
 - Block matching in AST (warnings during extraction)
 - Target block resolution issues
-- Dry-run mode not yet reimplemented
-- Preview/approval workflow needs adaptation to new pipeline
+- Remove dry-run mode entirely (incompatible with new pipeline architecture)
+- Remove preview/approval workflow (incompatible with new pipeline architecture)
 
 **Ready to begin Milestone 5?** 🚀
