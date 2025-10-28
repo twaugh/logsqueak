@@ -76,10 +76,23 @@ def chunk_page(outline: LogseqOutline, page_name: str) -> List[Chunk]:
             continue
 
         # Skip empty or whitespace-only blocks
-        # A block is considered empty if all its content lines are whitespace-only
+        # A block is considered empty if all non-property lines are whitespace-only
+        # or contain only empty JSON structures
+        # Property lines are those containing "::" (e.g., "id:: value")
         # Note: Children of empty blocks are still processed because
         # generate_chunks() recursively traverses all blocks
-        if all(not line.strip() for line in block.content):
+        def is_property_line(line: str) -> bool:
+            """Check if line is a property (key:: value format)."""
+            stripped = line.strip()
+            return "::" in stripped and len(stripped.split("::", 1)) == 2
+
+        def is_empty_content(line: str) -> bool:
+            """Check if line is effectively empty (whitespace or empty JSON structures)."""
+            stripped = line.strip()
+            return not stripped or stripped in ['{}', '[]', '{ }', '[ ]']
+
+        non_property_lines = [line for line in block.content if not is_property_line(line)]
+        if not non_property_lines or all(is_empty_content(line) for line in non_property_lines):
             continue
 
         seen_ids.add(hybrid_id)
