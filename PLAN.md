@@ -343,13 +343,17 @@ Implement Phase 1 (Knowledge Extraction changes), Phase 2 (Enhanced RAG), Phase 
 
 Comprehensive testing and polish for the new pipeline.
 
-#### M5.0: Remove Dry-Run Mode and Preview/Approval Workflow
-- **Files**: `src/logsqueak/cli/main.py`, `src/logsqueak/extraction/extractor.py`, `src/logsqueak/cli/interactive.py`, `src/logsqueak/models/preview.py`
+#### M5.0: Remove Dry-Run Mode and Refactor Journal Updates
+- **Files**: `src/logsqueak/cli/main.py`, `src/logsqueak/extraction/extractor.py`, `src/logsqueak/cli/interactive.py`, `src/logsqueak/models/preview.py`, `src/logsqueak/integration/executor.py`, `src/logsqueak/integration/journal_cleanup.py`
 - **Task**: Remove `--dry-run` flag from CLI (incompatible with new pipeline)
 - **Task**: Remove preview generation logic (old 2-stage pipeline concept)
 - **Task**: Remove interactive approval prompts (y/n/e)
-- **Rationale**: New 5-phase pipeline writes directly with `processed::` markers for traceability; dry-run/preview doesn't fit the architecture
-- **Test**: Verify extraction command works without dry-run flags
+- **Task**: Refactor Phase 4 execution to update journal blocks atomically with page writes
+  - Currently: Phase 4 writes to pages, then Phase 4.5 updates journal separately
+  - New approach: For each page write operation, immediately add `processed::` marker to source journal block
+  - Benefit: Atomic consistency - if page write fails, journal isn't marked as processed
+- **Rationale**: New 5-phase pipeline writes directly with `processed::` markers for traceability; dry-run/preview doesn't fit the architecture. Atomic updates ensure consistency.
+- **Test**: Verify extraction command works without dry-run flags, verify journal updates happen atomically with page writes
 
 #### M5.1: Integration Test: Full Pipeline (Phase 0-4)
 - **File**: `tests/integration/test_full_pipeline.py`
