@@ -267,8 +267,13 @@ class TestLogseqOutline:
 
         # Should parse bullet lines and their continuation lines
         assert len(outline.blocks) == 2
-        assert outline.blocks[0].content == ["Bullet 1", "More text"]
-        assert outline.blocks[1].content == ["Bullet 2"]
+        # Check rendered output to verify continuation line is preserved
+        rendered = outline.render()
+        assert "- Bullet 1" in rendered
+        assert "More text" in rendered
+        assert "- Bullet 2" in rendered
+        # Verify roundtrip
+        assert LogseqOutline.parse(rendered).render() == rendered
 
     def test_skip_empty_lines(self):
         """Test that empty lines are skipped."""

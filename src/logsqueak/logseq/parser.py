@@ -311,7 +311,18 @@ class LogseqOutline:
 
             # Render subsequent lines (continuation/properties) with "  " instead of "- "
             for line in block.content[1:]:
-                lines.append(f"{indent}  {line}")
+                # Check if line has indent reduction marker
+                if line.startswith('\x00'):
+                    # Extract reduction amount and content
+                    parts = line.split('\x00', 2)
+                    reduction = int(parts[1])
+                    content = parts[2]
+                    # Calculate actual indent (base minus reduction)
+                    base_continuation = indent + "  "
+                    actual_indent = base_continuation[:-reduction] if reduction > 0 else base_continuation
+                    lines.append(f"{actual_indent}{content}")
+                else:
+                    lines.append(f"{indent}  {line}")
 
             # Render children in exact order (new ones at end)
             for child in block.children:
@@ -439,9 +450,13 @@ def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], 
                     # Strip the base indentation, keep any extra
                     continuation_content = next_line[len(continuation_base_indent):]
                 else:
-                    # Line doesn't have the expected indentation, only strip leading
-                    # (preserve trailing whitespace)
-                    continuation_content = next_line.lstrip()
+                    # Line doesn't have the expected indentation
+                    # Preserve the ACTUAL indentation by calculating the difference
+                    actual_leading = next_line[: len(next_line) - len(next_line.lstrip())]
+                    # Store with a marker showing how much to reduce from base indent
+                    # Format: "\x00{reduction}{content}" where reduction is base - actual
+                    reduction = len(continuation_base_indent) - len(actual_leading)
+                    continuation_content = f"\x00{reduction}\x00{next_line.lstrip()}"
 
                 content.append(continuation_content)
                 j += 1
