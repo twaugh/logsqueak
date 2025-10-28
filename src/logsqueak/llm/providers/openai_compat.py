@@ -454,22 +454,21 @@ class OpenAICompatibleProvider(LLMClient):
         try:
             response = self._make_request(messages=messages)
 
-            # Parse JSON response
-            data = self._parse_json_response(response)
+            # Extract plain text response
+            content = response.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+
+            if not content:
+                raise LLMResponseError("Empty response from LLM")
 
             # Log successful response
             if self.prompt_logger:
                 self.prompt_logger.log_response(
                     stage="reworder",
                     response=response,
-                    parsed_content=data,
+                    parsed_content={"content": content},
                 )
 
-            # Validate required structure
-            if "rephrased_content" not in data:
-                raise LLMResponseError("Response missing 'rephrased_content' field")
-
-            return RephrasedContent(content=data["rephrased_content"])
+            return RephrasedContent(content=content)
 
         except httpx.TimeoutException as e:
             if self.prompt_logger:

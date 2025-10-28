@@ -250,6 +250,12 @@ def build_reworder_messages(knowledge_full_text: str) -> List[dict]:
         Your task is to transform knowledge extracted from journal entries into clean,
         evergreen content suitable for integration into permanent pages.
 
+        FORMAT: The input is Logseq-flavored Markdown with these conventions:
+        - Bullets start with "- " and can be nested with indentation
+        - Page links use [[Page Name]] syntax
+        - Block references use (((block-id))) syntax
+        - Your output will be inserted as a bullet in the target page
+
         You will receive knowledge text that includes:
         - The specific knowledge to preserve
         - Parent context from the journal entry (for understanding)
@@ -257,21 +263,21 @@ def build_reworder_messages(knowledge_full_text: str) -> List[dict]:
 
         Your job is to:
         1. Remove journal-specific temporal context ("today", "this morning" -> use past tense or timeless phrasing)
-        2. Preserve all page links ([[Page Name]]) and block references (((block-id)))
+        2. PRESERVE ALL page links ([[Page Name]]) and block references (((block-id))) - these are critical
         3. Preserve technical details, decisions, and rationale
         4. Create standalone, timeless content that makes sense without the journal context
         5. Keep the content concise and focused on the lasting knowledge
+        6. Output plain text content suitable for a single bullet point (no bullet marker needed)
 
         DO NOT:
         - Add new information not present in the source
-        - Remove important technical details or links
+        - Remove or modify page links [[Page Name]] or block references (((block-id)))
         - Change the meaning or intent of the knowledge
         - Add flowery language or unnecessary elaboration
+        - Include bullet markers (-, *) in your output - just the content
 
-        Return a JSON object with this structure:
-        {{
-          "rephrased_content": "The clean, evergreen version of the knowledge"
-        }}
+        Return ONLY the rephrased content as plain text. Do not wrap it in JSON, XML, or any other format.
+        Output the clean, evergreen markdown text directly.
 
         EXAMPLES:
 
@@ -280,25 +286,25 @@ def build_reworder_messages(knowledge_full_text: str) -> List[dict]:
         - Working on [[RHEL Documentation]]
           - Updated security guidelines
             - Added section on container scanning
-        Output: {{"rephrased_content": "Added section on container scanning to [[RHEL Documentation]] security guidelines"}}
+        Output: Added section on container scanning to [[RHEL Documentation]] security guidelines
 
         Example 2 - Remove temporal language, preserve technical detail:
         Input:
         - Today learned that [[Python]] asyncio has a subtle bug with task cancellation - need to use shield()
-        Output: {{"rephrased_content": "[[Python]] asyncio has a subtle bug with task cancellation - use shield() to avoid it"}}
+        Output: [[Python]] asyncio has a subtle bug with task cancellation - use shield() to avoid it
 
         Example 3 - Preserve attribution from parent, remove temporal context:
         Input:
         - Met with [[Alice]] this morning
           - She suggested using [[ChromaDB]] for the vector store instead of FAISS
-        Output: {{"rephrased_content": "Suggestion from [[Alice]]: Use [[ChromaDB]] for vector store instead of FAISS"}}
+        Output: Suggestion from [[Alice]]: Use [[ChromaDB]] for vector store instead of FAISS
 
         Example 4 - Extract decision from nested context:
         Input:
         - Working on [[logsqueak]]
           - Pipeline refactoring
             - Decided to use 5-phase approach instead of 2-stage
-        Output: {{"rephrased_content": "[[logsqueak]] pipeline: Decided to use 5-phase approach instead of 2-stage"}}
+        Output: [[logsqueak]] pipeline: Decided to use 5-phase approach instead of 2-stage
     """).strip()
 
     user_prompt = (
