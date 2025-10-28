@@ -368,11 +368,13 @@ Comprehensive testing and polish for the new pipeline.
 - **Task**: Compare ChromaDB vs old pkl cache performance
 - **Test**: Document performance characteristics
 
-#### M5.3: Error Recovery Tests
+#### M5.3: Error Recovery Tests ✅
 - **File**: `tests/integration/test_error_recovery.py`
-- **Task**: Test corrupted vector store recovery
-- **Task**: Test LLM failures (retries, fallback strategies)
-- **Task**: Test write failures (atomic operations)
+- **Task**: ✅ Test corrupted vector store recovery (4 tests)
+- **Task**: ✅ Test LLM failures - error propagation (5 tests, including malformed JSON)
+- **Task**: ✅ Test write failures and atomic operations (5 tests)
+- **Task**: ✅ Test data validation (3 tests)
+- **Total**: 17 comprehensive error recovery tests, all passing
 
 #### M5.4: Update Documentation
 - **File**: `README.md`, `FUTURE-STATE.md`
@@ -382,15 +384,12 @@ Comprehensive testing and polish for the new pipeline.
 
 #### M5.5: CLI Enhancements
 - **File**: `src/logsqueak/cli/main.py`
-- **Task**: Add `--rebuild-index` flag to force full rebuild
-- **Task**: Add progress bars for indexing
+- **Task**: ✅ ~~Add `--rebuild-index` flag~~ (already exists: `index rebuild --force`)
+- **Task**: ~~Add progress bars for indexing~~ (ditched - not needed for POC)
 - **Task**: Improve error messages for common issues
 
 #### M5.6: Migration Guide
-- **File**: `MIGRATION.md`
-- **Task**: Document migration from old pkl cache to ChromaDB
-- **Task**: Provide script to migrate existing embeddings
-- **Task**: Breaking changes and compatibility notes
+- ~~Ditched - not needed for POC stage~~
 
 ---
 
@@ -402,8 +401,8 @@ Comprehensive testing and polish for the new pipeline.
 | M2: Persistent Vector Store | 6 | 4-6 days | ✅ Complete | ~1 day |
 | M3: Block-Level Targeting | 4 | 2-3 days | ✅ Complete | <1 day |
 | M4: Multi-Stage Pipeline | 12 | 10-14 days | ✅ Complete | ~2 days |
-| M5: Testing & Refinement | 7 | 4-6 days | ⏳ Next | - |
-| **Total** | **34 tasks** | **23-35 days** | 85% | ~5/23-35 |
+| M5: Testing & Refinement | 4 | 2-3 days | ⏳ In Progress | - |
+| **Total** | **31 tasks** | **21-31 days** | 90% | ~5/21-31 |
 
 ---
 
@@ -468,13 +467,12 @@ Comprehensive testing and polish for the new pipeline.
 
 **Next: Milestone 5 - Testing & Refinement**
 
-0. **Remove Dry-Run** - M5.0: Remove dry-run mode and preview/approval workflow (incompatible with new architecture)
-1. **Integration Testing** - M5.1: Full pipeline end-to-end tests
+0. **Remove Dry-Run** - M5.0: ✅ Remove dry-run mode and preview/approval workflow
+1. **Integration Testing** - M5.1: ✅ Full pipeline end-to-end tests (5 tests)
 2. **Performance Benchmarks** - M5.2: Document indexing performance
-3. **Error Recovery** - M5.3: Test failure modes and recovery
+3. **Error Recovery** - M5.3: ✅ Test failure modes and recovery (17 tests)
 4. **Documentation** - M5.4: Update README and FUTURE-STATE
-5. **CLI Polish** - M5.5: Progress bars and better error messages
-6. **Migration Guide** - M5.6: Document upgrade path from old pipeline
+5. **CLI Polish** - M5.5: Better error messages
 
 **Current Issues to Address in M5:**
 - Block matching in AST (warnings during extraction)
