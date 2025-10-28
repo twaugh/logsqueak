@@ -17,13 +17,15 @@ class KnowledgePackage:
     Attributes:
         original_id: Hybrid ID of source journal block (id:: or content hash)
         exact_text: Exact block text as returned by LLM (no parent context)
-        full_text: Full context text (exact_text + parent context from AST walk)
+        full_text: Full context text (exact_text + parent context from AST walk, flattened)
+        hierarchical_text: Hierarchical Logseq markdown showing block + parents (for reworder)
         confidence: LLM confidence score (0.0-1.0) for classification
     """
 
     original_id: str
     exact_text: str
     full_text: str
+    hierarchical_text: str
     confidence: float
 
 

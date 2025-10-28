@@ -147,14 +147,20 @@ class Extractor:
             # Generate original_id using hybrid ID system
             original_id = block.get_hybrid_id(parents=parents, indent_str=journal.outline.indent_str)
 
-            # Build full_text with parent context
+            # Build full_text with parent context (flattened for RAG)
             full_text = self._build_full_context(block, journal.outline.blocks)
+
+            # Build hierarchical_text with parent context (hierarchical for reworder)
+            hierarchical_text = self._build_hierarchical_context(
+                block, journal.outline.blocks, indent_str=journal.outline.indent_str
+            )
 
             packages.append(
                 KnowledgePackage(
                     original_id=original_id,
                     exact_text=exact_text,
                     full_text=full_text,
+                    hierarchical_text=hierarchical_text,
                     confidence=result.confidence,
                 )
             )
@@ -235,7 +241,7 @@ class Extractor:
                 CandidateChunk(
                     page_name=metadata["page_name"],
                     target_id=block_id,
-                    content=metadata.get("content", ""),
+                    content=metadata.get("block_content", ""),
                     similarity_score=similarity,
                 )
             )
@@ -432,7 +438,7 @@ class Extractor:
                 )
 
                 decision = self.llm_client.decide_action(
-                    knowledge_text=package.full_text,
+                    knowledge_text=package.hierarchical_text,
                     candidate_chunks=[candidate_dict],
                 )
 
@@ -445,7 +451,7 @@ class Extractor:
 
                 # Phase 3.2: Call Reworder for UPDATE/APPEND actions
                 logger.debug("Calling Reworder to generate clean content")
-                rephrased = self.llm_client.rephrase_content(package.full_text)
+                rephrased = self.llm_client.rephrase_content(package.hierarchical_text)
 
                 # Determine page_name and target_id based on action
                 if decision.action == ActionType.APPEND_ROOT:
@@ -719,6 +725,85 @@ class Extractor:
         else:
             # parent: intermediate - child
             return f"{context_parts[0]}: {' - '.join(context_parts[1:])}"
+
+    def _build_hierarchical_context(
+        self, block: LogseqBlock, root_blocks: List[LogseqBlock], indent_str: str = "  "
+    ) -> str:
+        """Build hierarchical Logseq markdown showing block with parent context.
+
+        Creates a hierarchical representation showing parent bullets leading to
+        the target block, preserving the tree structure for better LLM understanding.
+        Uses LogseqOutline.render() to ensure consistent formatting.
+
+        Args:
+            block: The target block
+            root_blocks: Root-level blocks to search for parents
+            indent_str: Indentation string (e.g., "  " or "\t")
+
+        Returns:
+            Hierarchical markdown with parent bullets
+
+        Example:
+            Journal structure:
+            - Working on [[Project X]]
+              - Updated documentation
+                - Added API examples
+
+            For "Added API examples" block, returns:
+            - Working on [[Project X]]
+              - Updated documentation
+                - Added API examples
+        """
+        from logsqueak.logseq.parser import LogseqOutline
+
+        # Find parent chain by walking up the tree
+        parents = self._find_parent_chain(block, root_blocks)
+
+        if not parents:
+            # No parents, create a simple outline with just the block
+            outline = LogseqOutline(
+                blocks=[LogseqBlock(content=block.content, indent_level=0, children=[])],
+                source_text="",  # Not needed for rendering
+                indent_str=indent_str,
+                frontmatter=[]
+            )
+            return outline.render()
+
+        # Build a hierarchical structure by nesting blocks
+        # Start from the root parent and build down to the target block
+        root_parent = LogseqBlock(
+            content=parents[0].content.copy(),
+            indent_level=0,
+            children=[]
+        )
+
+        current = root_parent
+        for parent in parents[1:]:
+            child = LogseqBlock(
+                content=parent.content.copy(),
+                indent_level=current.indent_level + 1,
+                children=[]
+            )
+            current.children.append(child)
+            current = child
+
+        # Add the target block as the final child
+        target = LogseqBlock(
+            content=block.content.copy(),
+            indent_level=current.indent_level + 1,
+            children=[]
+        )
+        current.children.append(target)
+
+        # Create an outline and render it
+        outline = LogseqOutline(
+            blocks=[root_parent],
+            source_text="",  # Not needed for rendering
+            indent_str=indent_str,
+            frontmatter=[]
+        )
+
+        return outline.render()
 
     def _find_parent_chain(
         self, target: LogseqBlock, blocks: List[LogseqBlock], parents: Optional[List[LogseqBlock]] = None
