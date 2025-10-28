@@ -553,6 +553,9 @@ class OpenAICompatibleProvider(LLMClient):
                 f"Invalid response structure: {e}"
             ) from e
         except json.JSONDecodeError as e:
+            # Include the malformed content in the error for debugging
+            content = response.get("choices", [{}])[0].get("message", {}).get("content", "")
+            preview = content[:500] + "..." if len(content) > 500 else content
             raise LLMResponseError(
-                f"Failed to parse JSON content: {e}"
+                f"Failed to parse JSON content: {e}\n\nMalformed JSON preview:\n{preview}"
             ) from e
