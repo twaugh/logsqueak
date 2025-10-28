@@ -65,9 +65,12 @@ rag:
 class TestIndexRebuild:
     """Tests for 'logsqueak index rebuild' command."""
 
-    def test_rebuild_basic(self, test_config, test_graph, mock_embedding_model):
+    def test_rebuild_basic(self, test_config, test_graph, mock_embedding_model, monkeypatch, tmp_path):
         """Test basic index rebuild."""
         runner = CliRunner()
+
+        # Redirect cache to tmp_path to avoid using real cache
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
         # Patch IndexBuilder to use mock model
         from logsqueak.rag import indexer as indexer_module
@@ -84,8 +87,11 @@ class TestIndexRebuild:
         assert "Building index for 3 pages" in result.output
         assert "✓ Index built" in result.output
 
-    def test_rebuild_with_graph_override(self, test_config, tmp_path, mock_embedding_model):
+    def test_rebuild_with_graph_override(self, test_config, tmp_path, mock_embedding_model, monkeypatch):
         """Test rebuild with --graph override."""
+        # Redirect cache to tmp_path to avoid using real cache
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
         # Create alternate graph
         alt_graph = tmp_path / "alt_graph"
         pages_dir = alt_graph / "pages"
@@ -108,9 +114,12 @@ class TestIndexRebuild:
         assert result.exit_code == 0, f"Output: {result.output}"
         assert "Building index for 1 pages" in result.output
 
-    def test_rebuild_verbose(self, test_config, test_graph, mock_embedding_model):
+    def test_rebuild_verbose(self, test_config, test_graph, mock_embedding_model, monkeypatch, tmp_path):
         """Test rebuild with --verbose flag."""
         runner = CliRunner()
+
+        # Redirect cache to tmp_path to avoid using real cache
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
         from logsqueak.rag import indexer as indexer_module
         original_init = indexer_module.IndexBuilder.__init__
@@ -169,8 +178,11 @@ class TestIndexStatus:
         assert "Pages: 3" in result.output
         assert "Indexed pages: 3" in result.output
 
-    def test_status_with_graph_override(self, test_config, tmp_path):
+    def test_status_with_graph_override(self, test_config, tmp_path, monkeypatch):
         """Test status with --graph override."""
+        # Redirect cache to tmp_path to avoid using real cache
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
         # Create alternate graph
         alt_graph = tmp_path / "alt_graph"
         pages_dir = alt_graph / "pages"
@@ -187,9 +199,12 @@ class TestIndexStatus:
         assert result.exit_code == 0
         assert "Pages: 2" in result.output
 
-    def test_status_verbose(self, test_config, test_graph):
+    def test_status_verbose(self, test_config, test_graph, monkeypatch, tmp_path):
         """Test status with --verbose flag."""
         runner = CliRunner()
+
+        # Redirect cache to tmp_path to avoid using real cache
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
         result = runner.invoke(cli, ["--config", str(test_config), "--verbose", "index", "status"])
 
