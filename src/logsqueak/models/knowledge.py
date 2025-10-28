@@ -30,11 +30,7 @@ class KnowledgePackage:
 class ActionType(Enum):
     """Type of action to take when integrating knowledge.
 
-    Legacy actions (pre-M4):
-    - ADD_CHILD: Add as child bullet under existing section
-    - CREATE_SECTION: Create new organizational bullet
-
-    New actions (M4+ multi-stage pipeline):
+    Actions (M4+ multi-stage pipeline):
     - IGNORE_ALREADY_PRESENT: Knowledge already exists in target
     - IGNORE_IRRELEVANT: Knowledge not relevant to this candidate
     - UPDATE: Modify existing block content in place
@@ -42,11 +38,6 @@ class ActionType(Enum):
     - APPEND_ROOT: Add at page root level
     """
 
-    # Legacy actions
-    ADD_CHILD = "add_child"
-    CREATE_SECTION = "create_section"
-
-    # New multi-stage pipeline actions
     IGNORE_ALREADY_PRESENT = "ignore_already_present"
     IGNORE_IRRELEVANT = "ignore_irrelevant"
     UPDATE = "update"
@@ -58,6 +49,9 @@ class ActionType(Enum):
 class KnowledgeBlock:
     """A piece of information extracted from a journal with lasting value.
 
+    DEPRECATED: This class is part of the old 2-stage pipeline.
+    The new 5-phase pipeline uses KnowledgePackage instead.
+
     This represents knowledge that should be preserved (vs. temporary activity logs).
 
     Attributes:
@@ -67,7 +61,7 @@ class KnowledgeBlock:
         target_page: Page name where this should be integrated
         target_section: Hierarchical path to target location (e.g., ["Projects", "Timeline"])
         target_block_id: Hybrid ID for precise block targeting (either an explicit id:: or content hash)
-        suggested_action: How to integrate (ADD_CHILD or CREATE_SECTION)
+        suggested_action: How to integrate
     """
 
     content: str
@@ -76,7 +70,7 @@ class KnowledgeBlock:
     target_page: str
     target_section: Optional[list[str]]
     target_block_id: Optional[str] = None
-    suggested_action: ActionType = ActionType.ADD_CHILD
+    suggested_action: ActionType = ActionType.APPEND_CHILD
 
     def content_hash(self) -> str:
         """Generate hash for duplicate detection (FR-017).

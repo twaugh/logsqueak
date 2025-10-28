@@ -13,18 +13,13 @@ from typing import Optional
 
 import click
 
-from logsqueak.cli import interactive, progress
+from logsqueak.cli import progress
 from logsqueak.config.loader import load_config
-from logsqueak.extraction.classifier import classify_extractions
-from logsqueak.extraction.extractor import Extractor, create_knowledge_block
-from logsqueak.integration.integrator import Integrator
+from logsqueak.extraction.extractor import Extractor
 from logsqueak.llm.prompt_logger import PromptLogger
 from logsqueak.llm.providers.openai_compat import OpenAICompatibleProvider
 from logsqueak.logseq.graph import GraphPaths
 from logsqueak.models.journal import JournalEntry
-from logsqueak.models.knowledge import ActionType
-from logsqueak.models.page import PageIndex, TargetPage
-from logsqueak.models.preview import ActionStatus, ExtractionPreview, ProposedAction
 
 
 @click.group()
@@ -92,150 +87,6 @@ def build_vector_store(graph_path: Path, ctx: click.Context):
     except Exception as e:
         progress.show_error(f"Failed to build page index: {e}")
         ctx.exit(1)
-
-
-def match_knowledge_to_pages(
-    knowledge_extractions: list,
-    activity_logs: list,
-    extractor: Extractor,
-    page_index: PageIndex,
-    graph_path: Path,
-    journal_date: date,
-    indent_str: str = "  ",
-    token_budget: Optional[int] = None,
-) -> tuple[list[ProposedAction], list[str]]:
-    """Match extracted knowledge to target pages using RAG.
-
-    Args:
-        knowledge_extractions: Extracted knowledge blocks
-        activity_logs: Activity logs (for progress display)
-        extractor: Extractor instance
-        page_index: PageIndex for RAG search
-        graph_path: Path to Logseq graph
-        journal_date: Journal date for provenance
-        indent_str: Indentation string from journal (e.g., "  ", "\t")
-        token_budget: Optional token budget for Stage 2 prompts
-
-    Returns:
-        Tuple of (proposed_actions, warnings)
-    """
-    proposed_actions = []
-    warnings = []
-    total_extractions = len(knowledge_extractions) + len(activity_logs)
-
-    for i, extraction in enumerate(knowledge_extractions, 1):
-        # Find target page using RAG (using journal's indentation style)
-        selection = extractor.select_target_page(
-            extraction.content,
-            page_index,
-            indent_str=indent_str,
-            token_budget=token_budget,
-        )
-
-        # Get the top similarity score for progress display
-        similar_pages = page_index.find_similar(extraction.content, top_k=1)
-        similarity_score = similar_pages[0][1] if similar_pages else 0.0
-
-        # Load target page
-        target_page = TargetPage.load(graph_path, selection.target_page)
-
-        if not target_page:
-            # Missing page (FR-009, T031)
-            warnings.append(f"Target page '{selection.target_page}' does not exist")
-            proposed_actions.append(
-                ProposedAction(
-                    knowledge=create_knowledge_block(
-                        extraction,
-                        journal_date,
-                        selection.target_page,
-                        selection.target_section,
-                        selection.suggested_action,
-                    ),
-                    status=ActionStatus.SKIPPED,
-                    reason=f"Target page '{selection.target_page}' does not exist",
-                    similarity_score=similarity_score,
-                )
-            )
-            progress.show_matching_progress(
-                i, len(knowledge_extractions), selection.target_page, similarity_score, extraction.content
-            )
-            continue
-
-        # Check if target section exists (if specified and action is add_child)
-        if (
-            selection.target_section
-            and selection.suggested_action == ActionType.ADD_CHILD
-        ):
-            # Try to find the first section in the path
-            section = target_page.find_section(selection.target_section[0])
-            if not section:
-                # Section doesn't exist and we're not creating it
-                section_path = " > ".join(selection.target_section)
-                warnings.append(
-                    f"Section '{section_path}' not found on page '{selection.target_page}'"
-                )
-                proposed_actions.append(
-                    ProposedAction(
-                        knowledge=create_knowledge_block(
-                            extraction,
-                            journal_date,
-                            selection.target_page,
-                            selection.target_section,
-                            selection.suggested_action,
-                        ),
-                        status=ActionStatus.SKIPPED,
-                        reason=f"Section '{section_path}' does not exist (consider using CREATE_SECTION)",
-                        similarity_score=similarity_score,
-                    )
-                )
-                progress.show_matching_progress(
-                    i, len(knowledge_extractions), selection.target_page, similarity_score, extraction.content
-                )
-                continue
-
-        # Check for duplicates (FR-017, T024)
-        if extractor.is_duplicate(extraction.content, target_page):
-            progress.show_duplicate_skipped(i, len(knowledge_extractions), selection.target_page, extraction.content)
-            proposed_actions.append(
-                ProposedAction(
-                    knowledge=create_knowledge_block(
-                        extraction,
-                        journal_date,
-                        selection.target_page,
-                        selection.target_section,
-                        selection.suggested_action,
-                    ),
-                    status=ActionStatus.SKIPPED,
-                    reason="Duplicate content detected",
-                    similarity_score=similarity_score,
-                )
-            )
-            continue
-
-        # Ready to integrate
-        progress.show_matching_progress(
-            i, len(knowledge_extractions), selection.target_page, similarity_score, extraction.content
-        )
-
-        proposed_actions.append(
-            ProposedAction(
-                knowledge=create_knowledge_block(
-                    extraction,
-                    journal_date,
-                    selection.target_page,
-                    selection.target_section,
-                    selection.suggested_action,
-                ),
-                status=ActionStatus.READY,
-                similarity_score=similarity_score,
-            )
-        )
-
-    # Show activity logs that were skipped
-    for i, activity in enumerate(activity_logs, 1):
-        progress.show_activity_skipped(i + len(knowledge_extractions), total_extractions)
-
-    return proposed_actions, warnings
 
 
 def process_journal_date(
@@ -438,7 +289,7 @@ def extract(
         model=config.llm.model,
         prompt_logger=prompt_logger,
     )
-    extractor = Extractor(llm_client, model=config.llm.model)
+    extractor = Extractor(llm_client)
 
     # Build VectorStore (persistent block-level index)
     vector_store = build_vector_store(config.logseq.graph_path, ctx)

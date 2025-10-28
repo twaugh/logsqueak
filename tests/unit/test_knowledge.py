@@ -18,7 +18,7 @@ class TestKnowledgeBlock:
             confidence=0.92,
             target_page="Project X",
             target_section=["Timeline"],
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         assert kb.content == "Project deadline moved to May"
@@ -26,7 +26,7 @@ class TestKnowledgeBlock:
         assert kb.confidence == 0.92
         assert kb.target_page == "Project X"
         assert kb.target_section == ["Timeline"]
-        assert kb.suggested_action == ActionType.ADD_CHILD
+        assert kb.suggested_action == ActionType.APPEND_CHILD
 
     def test_content_hash(self):
         """Test content hash generation for duplicate detection (FR-017)."""
@@ -36,7 +36,7 @@ class TestKnowledgeBlock:
             confidence=0.9,
             target_page="Page A",
             target_section=None,
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         kb2 = KnowledgeBlock(
@@ -45,7 +45,7 @@ class TestKnowledgeBlock:
             confidence=0.8,  # Different confidence
             target_page="Page B",  # Different page
             target_section=None,
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         # Same content should produce same hash
@@ -59,7 +59,7 @@ class TestKnowledgeBlock:
             confidence=0.9,
             target_page="Page",
             target_section=None,
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         kb2 = KnowledgeBlock(
@@ -68,7 +68,7 @@ class TestKnowledgeBlock:
             confidence=0.9,
             target_page="Page",
             target_section=None,
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         assert kb1.content_hash() != kb2.content_hash()
@@ -81,7 +81,7 @@ class TestKnowledgeBlock:
             confidence=0.9,
             target_page="Page",
             target_section=None,
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         assert len(kb.content_hash()) == 8
@@ -94,7 +94,7 @@ class TestKnowledgeBlock:
             confidence=0.9,
             target_page="Page",
             target_section=None,
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         assert kb.provenance_link() == "[[2025-01-15]]"
@@ -107,7 +107,7 @@ class TestKnowledgeBlock:
             confidence=0.9,
             target_page="Page",
             target_section=None,
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         assert kb.provenance_link() == "[[2024-12-31]]"
@@ -120,7 +120,7 @@ class TestKnowledgeBlock:
             confidence=0.9,
             target_page="Page",
             target_section=None,
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         assert kb.with_provenance() == "Deadline moved to May (see [[2025-01-15]] entry)"
@@ -133,7 +133,7 @@ class TestKnowledgeBlock:
             confidence=0.9,
             target_page="Page",
             target_section=["Timeline"],
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         assert kb.section_path() == "Timeline"
@@ -146,7 +146,7 @@ class TestKnowledgeBlock:
             confidence=0.9,
             target_page="Page",
             target_section=["Projects", "Active", "Timeline"],
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         assert kb.section_path() == "Projects > Active > Timeline"
@@ -159,7 +159,7 @@ class TestKnowledgeBlock:
             confidence=0.9,
             target_page="Page",
             target_section=None,
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         assert kb.section_path() == "(page root)"
@@ -172,7 +172,7 @@ class TestKnowledgeBlock:
             confidence=0.9,
             target_page="Page",
             target_section=[],
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         assert kb.section_path() == "(page root)"
@@ -183,5 +183,8 @@ class TestActionType:
 
     def test_action_types(self):
         """Test that action types have correct values."""
-        assert ActionType.ADD_CHILD.value == "add_child"
-        assert ActionType.CREATE_SECTION.value == "create_section"
+        assert ActionType.APPEND_CHILD.value == "append_child"
+        assert ActionType.APPEND_ROOT.value == "append_root"
+        assert ActionType.UPDATE.value == "update"
+        assert ActionType.IGNORE_ALREADY_PRESENT.value == "ignore_already_present"
+        assert ActionType.IGNORE_IRRELEVANT.value == "ignore_irrelevant"

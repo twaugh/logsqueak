@@ -127,7 +127,7 @@ class TestChildBulletAddition:
         """Test adding child bullet to parent block."""
         parent = LogseqBlock(content=["## Parent"], indent_level=0, children=[])
 
-        _add_child_bullet(parent, "Child content [[2025-01-15]]", ActionType.ADD_CHILD, "  ")
+        _add_child_bullet(parent, "Child content [[2025-01-15]]", ActionType.APPEND_CHILD, "  ")
 
         assert len(parent.children) == 1
         assert parent.children[0].content[0] == "Child content [[2025-01-15]]"
@@ -140,7 +140,7 @@ class TestChildBulletAddition:
             content=["## Parent"], indent_level=0, children=[existing_child]
         )
 
-        _add_child_bullet(parent, "New child [[2025-01-15]]", ActionType.ADD_CHILD, "  ")
+        _add_child_bullet(parent, "New child [[2025-01-15]]", ActionType.APPEND_CHILD, "  ")
 
         assert len(parent.children) == 2
         assert parent.children[1].content[0] == "New child [[2025-01-15]]"
@@ -149,7 +149,7 @@ class TestChildBulletAddition:
         """Test that child bullet has correct indent level."""
         parent = LogseqBlock(content=["Nested parent"], indent_level=2, children=[])
 
-        _add_child_bullet(parent, "Content [[2025-01-15]]", ActionType.ADD_CHILD, "  ")
+        _add_child_bullet(parent, "Content [[2025-01-15]]", ActionType.APPEND_CHILD, "  ")
 
         assert parent.children[0].indent_level == 3
 
@@ -203,7 +203,7 @@ class TestKnowledgeAddition:
             confidence=0.9,
             target_page="Test",
             target_section=["Tech Stack"],
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         add_knowledge_to_page(target_page, knowledge)
@@ -225,7 +225,7 @@ class TestKnowledgeAddition:
             confidence=0.9,
             target_page="Test",
             target_section=["Nonexistent Section"],
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         add_knowledge_to_page(target_page, knowledge)
@@ -248,7 +248,7 @@ class TestKnowledgeAddition:
             confidence=0.9,
             target_page="Test",
             target_section=None,
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         add_knowledge_to_page(target_page, knowledge)
@@ -274,7 +274,7 @@ class TestProvenanceCoverage:
             confidence=0.9,
             target_page="Test",
             target_section=["Tech Stack"],
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         add_knowledge_to_page(target_page, knowledge)
@@ -297,7 +297,7 @@ class TestProvenanceCoverage:
             confidence=0.9,
             target_page="Test",
             target_section=None,
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         add_knowledge_to_page(target_page, knowledge)
@@ -320,7 +320,7 @@ class TestProvenanceCoverage:
             confidence=0.9,
             target_page="Test",
             target_section=["Nonexistent Section"],
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         add_knowledge_to_page(target_page, knowledge)
@@ -350,7 +350,7 @@ class TestProvenanceCoverage:
                 confidence=0.9,
                 target_page="Test",
                 target_section=None,
-                suggested_action=ActionType.ADD_CHILD,
+                suggested_action=ActionType.APPEND_CHILD,
             )
 
             # Clear outline for each test
@@ -374,7 +374,7 @@ class TestProvenanceCoverage:
             confidence=0.9,
             target_page="Test",
             target_section=None,
-            suggested_action=ActionType.ADD_CHILD,
+            suggested_action=ActionType.APPEND_CHILD,
         )
 
         add_knowledge_to_page(target_page, knowledge)
@@ -450,7 +450,7 @@ class TestUUIDGeneration:
         """Test that adding child bullet generates UUID."""
         parent = LogseqBlock(content=["Parent"], indent_level=0)
 
-        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD, "  ")
+        _add_child_bullet(parent, "Child content", ActionType.APPEND_CHILD, "  ")
 
         assert len(parent.children) == 1
         child = parent.children[0]
@@ -462,7 +462,7 @@ class TestUUIDGeneration:
         """Test that child bullet has id:: property."""
         parent = LogseqBlock(content=["Parent"], indent_level=0)
 
-        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD, "  ")
+        _add_child_bullet(parent, "Child content", ActionType.APPEND_CHILD, "  ")
 
         child = parent.children[0]
         assert child.get_property("id") is not None
@@ -472,7 +472,7 @@ class TestUUIDGeneration:
         """Test that child bullet has id:: in continuation_lines."""
         parent = LogseqBlock(content=["Parent"], indent_level=0)
 
-        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD, "  ")
+        _add_child_bullet(parent, "Child content", ActionType.APPEND_CHILD, "  ")
 
         child = parent.children[0]
         # id:: property is stored in content[1]
@@ -519,9 +519,9 @@ class TestUUIDGeneration:
         """Test that multiple blocks get different UUIDs."""
         parent = LogseqBlock(content=["Parent"], indent_level=0)
 
-        _add_child_bullet(parent, "Child 1", ActionType.ADD_CHILD, "  ")
-        _add_child_bullet(parent, "Child 2", ActionType.ADD_CHILD, "  ")
-        _add_child_bullet(parent, "Child 3", ActionType.ADD_CHILD, "  ")
+        _add_child_bullet(parent, "Child 1", ActionType.APPEND_CHILD, "  ")
+        _add_child_bullet(parent, "Child 2", ActionType.APPEND_CHILD, "  ")
+        _add_child_bullet(parent, "Child 3", ActionType.APPEND_CHILD, "  ")
 
         uuids = [child.block_id for child in parent.children]
         assert len(uuids) == 3
@@ -532,7 +532,7 @@ class TestUUIDGeneration:
         outline = LogseqOutline.parse("- Parent")
         parent = outline.blocks[0]
 
-        _add_child_bullet(parent, "Child content", ActionType.ADD_CHILD, "  ")
+        _add_child_bullet(parent, "Child content", ActionType.APPEND_CHILD, "  ")
 
         rendered = outline.render()
         lines = rendered.split("\n")
