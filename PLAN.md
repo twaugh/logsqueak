@@ -339,21 +339,22 @@ Implement Phase 1 (Knowledge Extraction changes), Phase 2 (Enhanced RAG), Phase 
 
 ---
 
-### **Milestone 5: Testing & Refinement** (5-7 tasks)
+### **Milestone 5: Testing & Refinement** ✅ (1/7 tasks - IN PROGRESS)
 
 Comprehensive testing and polish for the new pipeline.
 
-#### M5.0: Remove Dry-Run Mode and Refactor Journal Updates
-- **Files**: `src/logsqueak/cli/main.py`, `src/logsqueak/extraction/extractor.py`, `src/logsqueak/cli/interactive.py`, `src/logsqueak/models/preview.py`, `src/logsqueak/integration/executor.py`, `src/logsqueak/integration/journal_cleanup.py`
-- **Task**: Remove `--dry-run` flag from CLI (incompatible with new pipeline)
-- **Task**: Remove preview generation logic (old 2-stage pipeline concept)
-- **Task**: Remove interactive approval prompts (y/n/e)
-- **Task**: Refactor Phase 4 execution to update journal blocks atomically with page writes
-  - Currently: Phase 4 writes to pages, then Phase 4.5 updates journal separately
-  - New approach: For each page write operation, immediately add `processed::` marker to source journal block
+#### M5.0: Remove Dry-Run Mode and Refactor Journal Updates ✅
+- **Files**: `src/logsqueak/cli/main.py`, `src/logsqueak/extraction/extractor.py`, `src/logsqueak/integration/executor.py`
+- **Task**: ✅ Remove `--dry-run` and `--show-diffs` flags from CLI
+- **Task**: ✅ Remove preview generation logic (files already deleted - just bytecode remained)
+- **Task**: ✅ Remove interactive approval prompts (files already deleted - just bytecode remained)
+- **Task**: ✅ Refactor Phase 4 execution to update journal blocks atomically with page writes
+  - Old: Phase 4 writes all pages, then Phase 4.5 updates journal separately
+  - New: For each page write, immediately update journal with `processed::` markers
   - Benefit: Atomic consistency - if page write fails, journal isn't marked as processed
 - **Rationale**: New 5-phase pipeline writes directly with `processed::` markers for traceability; dry-run/preview doesn't fit the architecture. Atomic updates ensure consistency.
-- **Test**: Verify extraction command works without dry-run flags, verify journal updates happen atomically with page writes
+- **Test**: ✅ All 281 tests passing, CLI help shows no dry-run flags
+- **Commit**: 5844a8d
 
 #### M5.1: Integration Test: Full Pipeline (Phase 0-4)
 - **File**: `tests/integration/test_full_pipeline.py`

@@ -524,7 +524,6 @@ class Extractor:
             IOError: If file operations fail
         """
         from logsqueak.integration.executor import execute_write_list
-        from logsqueak.integration.journal_cleanup import add_processed_markers
 
         logger.info(f"Starting end-to-end pipeline for journal: {journal.date}")
 
@@ -551,20 +550,14 @@ class Extractor:
             logger.info("No write operations generated")
             return 0
 
-        # Phase 4: Execute write operations
-        logger.info("Phase 4: Executing write operations")
+        # Phase 4: Execute write operations with atomic journal updates
+        logger.info("Phase 4: Executing write operations with atomic journal updates")
+        journal_path = graph_path / "journals" / f"{journal.date.strftime('%Y_%m_%d')}.md"
         updated_map = execute_write_list(
             write_list=write_list,
             processed_blocks_map=processed_blocks_map,
             graph_path=graph_path,
-        )
-
-        # Phase 4.5: Add processed:: markers to journal
-        logger.info("Phase 4.5: Adding processed markers to journal")
-        journal_path = graph_path / "journals" / f"{journal.date.strftime('%Y_%m_%d')}.md"
-        add_processed_markers(
             journal_path=journal_path,
-            processed_blocks_map=updated_map,
         )
 
         logger.info(f"Pipeline complete: {len(write_list)} operations executed")

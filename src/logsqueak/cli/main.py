@@ -92,15 +92,16 @@ def build_vector_store(graph_path: Path, ctx: click.Context):
 def process_journal_date(
     journal_date: date,
     extractor: Extractor,
-    vector_store,  # Changed from page_index to vector_store
+    vector_store,
     graph_path: Path,
     model: str,
     verbose: bool,
-    show_diffs: bool = False,
-    dry_run: bool = True,
     token_budget: Optional[int] = None,
 ) -> None:
-    """Process a single journal date using the new 5-phase pipeline.
+    """Process a single journal date using the 5-phase pipeline.
+
+    Executes the complete pipeline: extraction, RAG search, decision,
+    rewording, and integration with atomic journal updates.
 
     Args:
         journal_date: Date to process
@@ -109,16 +110,8 @@ def process_journal_date(
         graph_path: Path to Logseq graph
         model: LLM model name (for progress display)
         verbose: Verbose output flag
-        show_diffs: Show diffs in preview (ignored - no preview in new pipeline yet)
-        dry_run: If True, show what would happen but don't actually write
         token_budget: Optional token budget (ignored - new pipeline uses top_k)
     """
-    if dry_run:
-        click.echo("\nWarning: --dry-run mode not yet implemented for new pipeline.", err=True)
-        click.echo("The new 5-phase pipeline will execute immediately without approval.", err=True)
-        click.echo("Use Ctrl+C to cancel now if you don't want to proceed.\n", err=True)
-        import time
-        time.sleep(2)
 
     try:
         # Load journal entry
@@ -160,16 +153,6 @@ def process_journal_date(
 @cli.command()
 @click.argument("date_or_range", required=False, default="today")
 @click.option(
-    "--dry-run",
-    is_flag=True,
-    help="Dry-run mode: show preview without writing files",
-)
-@click.option(
-    "--show-diffs",
-    is_flag=True,
-    help="Show diffs of proposed changes in preview",
-)
-@click.option(
     "--prompt-log-file",
     type=click.Path(path_type=Path),
     default=None,
@@ -189,13 +172,11 @@ def process_journal_date(
 def extract(
     ctx: click.Context,
     date_or_range: str,
-    dry_run: bool,
-    show_diffs: bool,
     prompt_log_file: Optional[Path],
     model: Optional[str],
     graph: Optional[Path],
 ):
-    """Extract knowledge from journal entries.
+    """Extract knowledge from journal entries and integrate into pages.
 
     DATE_OR_RANGE can be:
       - Single date: 2025-01-15 (ISO 8601)
@@ -205,7 +186,9 @@ def extract(
     Examples:
       logsqueak extract                    # Extract from today
       logsqueak extract 2025-01-15        # Extract from specific date
-      logsqueak extract --dry-run today   # Dry-run mode (shows diffs, no writes)
+
+    Note: Changes are written immediately. Journal blocks are marked with
+    processed:: markers linking to the integrated content.
     """
     verbose = ctx.obj["verbose"]
 
@@ -235,7 +218,6 @@ def extract(
 
     if verbose:
         click.echo(f"Date/range: {date_or_range}")
-        click.echo(f"Dry-run: {dry_run}")
         click.echo(f"Prompt log file: {prompt_log_file}")
         if model:
             click.echo(f"Model override: {model}")
@@ -303,8 +285,6 @@ def extract(
             config.logseq.graph_path,
             config.llm.model,
             verbose,
-            show_diffs,
-            dry_run,
             token_budget=config.rag.token_budget,
         )
 
