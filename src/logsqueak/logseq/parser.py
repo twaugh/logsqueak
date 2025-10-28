@@ -409,9 +409,29 @@ def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], 
 
                 # Check if next line is a bullet (including empty bullets)
                 # Don't treat as bullet if inside code fence
+                # Also check indentation to distinguish bullets from bullet-like continuation content
                 if not continuation_in_code_fence and _is_bullet_line(next_line):
-                    # This is the next bullet, stop collecting
-                    break
+                    # Check indentation of this potential bullet
+                    next_leading = next_line[: len(next_line) - len(next_line.lstrip())]
+
+                    # Count indent levels for both current and next
+                    current_indent_level = leading_whitespace.count(indent_str)
+                    next_indent_level = next_leading.count(indent_str)
+
+                    # A real bullet must be at the same level (sibling), deeper (child), or shallower (parent level)
+                    # If it's deeper, it's a child - stop collecting
+                    if next_indent_level > current_indent_level:
+                        break
+
+                    # If it's at the same level or shallower, check if it's exactly at a level boundary
+                    # (no extra spaces mixed with tabs)
+                    if next_indent_level <= current_indent_level:
+                        # Calculate expected indent for this level
+                        expected_indent = indent_str * next_indent_level
+                        # If the indent exactly matches (no extra spaces), it's a sibling or shallower bullet
+                        if next_leading == expected_indent:
+                            break
+                    # Otherwise, has mixed indentation (e.g., tab + spaces) - treat as continuation content
 
                 # This is a continuation line - strip only the base indentation
                 # to preserve any extra indentation (e.g., code block indentation)
