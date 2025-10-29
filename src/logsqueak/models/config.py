@@ -24,6 +24,12 @@ class LLMConfig(BaseModel):
         default=None,
         description="Model for Reworder LLM (Phase 3.2). Defaults to 'model' if not specified."
     )
+    num_ctx: Optional[int] = Field(
+        default=None,
+        ge=512,
+        description="Context window size for Ollama models (num_ctx parameter). "
+                    "Controls GPU VRAM usage. Typical values: 8192, 16384, 32768, 65536."
+    )
 
     def get_decider_model(self) -> str:
         """Get the model to use for Decider (defaults to main model)."""

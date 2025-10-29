@@ -48,6 +48,7 @@ class OpenAICompatibleProvider(LLMClient):
         model: str,
         timeout: float = 60.0,
         prompt_logger: Optional[PromptLogger] = None,
+        num_ctx: Optional[int] = None,
     ):
         """Initialize the provider.
 
@@ -57,12 +58,14 @@ class OpenAICompatibleProvider(LLMClient):
             model: Model name to use
             timeout: Request timeout in seconds (default: 60s)
             prompt_logger: Optional logger for prompts and responses
+            num_ctx: Context window size for Ollama (optional, controls VRAM usage)
         """
         self.endpoint = endpoint
         self.api_key = api_key
         self.model = model
         self.timeout = timeout
         self.prompt_logger = prompt_logger
+        self.num_ctx = num_ctx
         self.client = httpx.Client(timeout=timeout)
 
     def __del__(self):
@@ -490,6 +493,36 @@ class OpenAICompatibleProvider(LLMClient):
     def _make_request(
         self, messages: List[Dict[str, str]], use_json_mode: bool = True
     ) -> Dict[str, Any]:
+        """Make HTTP request to OpenAI-compatible or Ollama native API.
+
+        Args:
+            messages: List of chat messages
+            use_json_mode: If True, request JSON formatted responses (default: True)
+
+        Returns:
+            Response JSON
+
+        Raises:
+            httpx exceptions on network/API errors
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Detect if this is an Ollama endpoint
+        base_endpoint = str(self.endpoint).rstrip("/")
+        is_ollama = base_endpoint.endswith("/v1") or "/v1/" in base_endpoint
+
+        if is_ollama and self.num_ctx is not None:
+            # Use Ollama's native /api/chat endpoint for num_ctx support
+            logger.debug(f"Detected Ollama endpoint, using native API with num_ctx={self.num_ctx}")
+            return self._make_ollama_request(messages, use_json_mode)
+        else:
+            # Use OpenAI-compatible endpoint
+            return self._make_openai_request(messages, use_json_mode)
+
+    def _make_openai_request(
+        self, messages: List[Dict[str, str]], use_json_mode: bool = True
+    ) -> Dict[str, Any]:
         """Make HTTP request to OpenAI-compatible API.
 
         Args:
@@ -532,6 +565,79 @@ class OpenAICompatibleProvider(LLMClient):
         response.raise_for_status()
 
         return response.json()
+
+    def _make_ollama_request(
+        self, messages: List[Dict[str, str]], use_json_mode: bool = True
+    ) -> Dict[str, Any]:
+        """Make HTTP request to Ollama's native /api/chat endpoint.
+
+        This endpoint supports the options field including num_ctx.
+
+        Args:
+            messages: List of chat messages
+            use_json_mode: If True, request JSON formatted responses (default: True)
+
+        Returns:
+            Response JSON in OpenAI format (converted from Ollama format)
+
+        Raises:
+            httpx exceptions on network/API errors
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Construct Ollama native endpoint URL
+        base_endpoint = str(self.endpoint).rstrip("/")
+        # Remove /v1 suffix if present
+        if base_endpoint.endswith("/v1"):
+            base_endpoint = base_endpoint[:-3]
+        endpoint = f"{base_endpoint}/api/chat"
+
+        # Build Ollama native request payload
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,  # Get complete response
+            "options": {
+                "temperature": 0.7,
+            }
+        }
+
+        # Add num_ctx to options
+        if self.num_ctx is not None:
+            payload["options"]["num_ctx"] = self.num_ctx
+            logger.info(f"Using Ollama native API with num_ctx={self.num_ctx}")
+
+        # Add format: json for JSON mode
+        if use_json_mode:
+            payload["format"] = "json"
+
+        # Make request (Ollama doesn't require Authorization header)
+        response = self.client.post(
+            endpoint,
+            json=payload,
+            headers={
+                "Content-Type": "application/json",
+            },
+        )
+
+        # Raise for HTTP errors
+        response.raise_for_status()
+
+        ollama_response = response.json()
+
+        # Convert Ollama response format to OpenAI format
+        # Ollama format: {"message": {"role": "assistant", "content": "..."}}
+        # OpenAI format: {"choices": [{"message": {"role": "assistant", "content": "..."}}]}
+        return {
+            "choices": [
+                {
+                    "message": ollama_response.get("message", {}),
+                    "finish_reason": "stop",
+                    "index": 0,
+                }
+            ]
+        }
 
     def _parse_json_response(self, response: Dict[str, Any]) -> Dict[str, Any]:
         """Parse JSON content from OpenAI API response.

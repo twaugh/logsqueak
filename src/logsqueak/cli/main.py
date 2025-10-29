@@ -270,6 +270,7 @@ def extract(
         api_key=config.llm.api_key,
         model=config.llm.model,
         prompt_logger=prompt_logger,
+        num_ctx=config.llm.num_ctx,
     )
     extractor = Extractor(llm_client)
 

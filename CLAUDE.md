@@ -349,6 +349,8 @@ llm:
   model: llama3.2
   decider_model: llama3.2  # Use same model for all phases
   reworder_model: llama3.2
+  num_ctx: 32768  # Context window size (controls VRAM usage)
+                  # Typical values: 8192, 16384, 32768, 65536
 
 logseq:
   graph_path: ~/Documents/logseq-graph
@@ -356,6 +358,22 @@ logseq:
 rag:
   top_k: 5  # Fewer candidates for local models
 ```
+
+**Ollama-specific configuration:**
+
+- **`num_ctx`**: Context window size for Ollama models (optional)
+  - **Automatically uses Ollama's native `/api/chat` endpoint** when `num_ctx` is configured
+  - Controls how much GPU VRAM is used
+  - Larger values allow longer prompts but use more VRAM
+  - Typical values:
+    - `8192`: ~4-6 GB VRAM (conservative)
+    - `16384`: ~8-10 GB VRAM (balanced)
+    - `32768`: ~14-18 GB VRAM (recommended for 24GB+ GPUs)
+    - `65536`: ~28-32 GB VRAM (for 40GB+ GPUs)
+  - If not specified, uses Ollama's model default (usually 2048-4096)
+  - Set this to maximize your GPU utilization
+  - **Note**: The model must be unloaded/reloaded for `num_ctx` changes to take effect
+    - On Ollama server: `curl http://localhost:11434/api/generate -d '{"model": "your-model", "keep_alive": 0}'`
 
 ### RAG Configuration
 
