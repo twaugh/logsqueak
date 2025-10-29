@@ -100,6 +100,7 @@ class PromptLogger:
         response: Dict[str, Any],
         parsed_content: Optional[Dict[str, Any]] = None,
         error: Optional[Exception] = None,
+        raw_content: Optional[str] = None,
     ) -> None:
         """Log an LLM response.
 
@@ -108,6 +109,7 @@ class PromptLogger:
             response: Raw API response (not logged, only used for error context)
             parsed_content: Parsed/structured content from response
             error: Exception if request failed
+            raw_content: Raw content string (logged when error occurs for debugging)
         """
         output = []
         output.append(f"[{self._interaction_count}] LLM RESPONSE - {stage}")
@@ -121,6 +123,14 @@ class PromptLogger:
             output.append("Status: Success")
 
         output.append("")
+
+        # Log raw content when error occurs (for debugging malformed responses)
+        if error and raw_content is not None:
+            output.append("Raw LLM Content:")
+            output.append("-" * 80)
+            output.append(raw_content)
+            output.append("-" * 80)
+            output.append("")
 
         if parsed_content:
             output.append("Parsed Content:")

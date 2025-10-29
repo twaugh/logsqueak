@@ -184,7 +184,20 @@ class OpenAICompatibleProvider(LLMClient):
             response = self._make_request(messages=messages)
 
             # Parse JSON response
-            data = self._parse_json_response(response)
+            try:
+                data = self._parse_json_response(response)
+            except LLMResponseError as e:
+                # Log response even when parsing fails (for debugging)
+                if self.prompt_logger:
+                    # Extract raw content for debugging
+                    raw_content = response.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    self.prompt_logger.log_response(
+                        stage="extraction",
+                        response=response,
+                        error=e,
+                        raw_content=raw_content,
+                    )
+                raise
 
             # Log successful response
             if self.prompt_logger:
