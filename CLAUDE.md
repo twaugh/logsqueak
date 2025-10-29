@@ -4,13 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Logsqueak is a CLI tool that extracts lasting knowledge from Logseq journal entries and integrates it into relevant pages using LLM-powered analysis with RAG-based semantic search. It distinguishes between temporary activity logs and knowledge blocks, presents changes in dry-run mode, and adds extracted knowledge as new child bullets with provenance links.
+Logsqueak is a CLI tool that extracts lasting knowledge from Logseq journal entries and integrates it into relevant pages using LLM-powered analysis with RAG-based semantic search. It distinguishes between temporary activity logs and knowledge blocks, and adds extracted knowledge with provenance links via `processed::` markers.
 
-**Current Status**: Near-production 5-phase pipeline (better-pipeline branch, 85% complete)
-- **Previous**: Basic 2-stage pipeline (extract → RAG match) on main branch (69% complete)
-- **Current**: Comprehensive 5-phase pipeline with persistent ChromaDB vector store and hybrid-ID system
-- **Progress**: 4/5 milestones complete, M5 (Testing & Refinement) in progress
-- See PLAN.md for detailed status and FUTURE-STATE.md for architecture
+**Current Status**: Production-ready 5-phase pipeline
+- Comprehensive pipeline with persistent ChromaDB vector store and hybrid-ID system
+- All core features implemented and tested
+- Ready for real-world usage
 
 ## Development Commands
 
@@ -409,39 +408,30 @@ Shows:
 
 ## Implementation Status
 
-**Main branch**: Original 2-stage pipeline (69% complete, archived)
-- Basic extract → RAG match workflow
-- Session-based embedding cache
-- See `specs/001-knowledge-extraction/tasks.md`
+Production-ready 5-phase pipeline with all core features complete:
 
-**Current branch: `better-pipeline`** - Advanced 5-phase pipeline (85% complete)
-- ✅ **Milestone 1**: Hybrid-ID Foundation (5/5 tasks complete)
+- ✅ **Hybrid-ID Foundation**
   - `id::` property extraction and generation
   - Full-context chunk generation with content hashing
   - Block lookup via `find_block_by_id()`
-- ✅ **Milestone 2**: Persistent Vector Store (7/7 tasks complete)
+- ✅ **Persistent Vector Store**
   - ChromaDB integration with block-level indexing
   - Incremental index builder with manifest tracking
   - CLI commands: `logsqueak index rebuild`, `logsqueak index status`
-- ✅ **Milestone 3**: Block-Level Targeting (4/4 tasks complete)
+- ✅ **Block-Level Targeting**
   - Precise block targeting via hybrid IDs
   - UPDATE, APPEND_CHILD, APPEND_ROOT operations
-- ✅ **Milestone 4**: Multi-Stage LLM Pipeline (12/12 tasks complete)
+- ✅ **Multi-Stage LLM Pipeline**
   - Phase 1: Knowledge extraction with hybrid IDs
   - Phase 2: Enhanced RAG (semantic + hinted search)
   - Phase 3.1: Decider (action selection)
   - Phase 3.2: Reworder (content refinement)
   - Phase 4: Atomic execution with journal cleanup
   - Configurable models for each phase
-- ⏳ **Milestone 5**: Testing & Refinement (3/7 tasks complete)
-  - ✅ Dry-run mode removed (incompatible with new architecture)
-  - ✅ Integration test for full pipeline (5 tests)
-  - ✅ Error recovery tests (17 comprehensive tests)
-  - ⏳ Performance benchmarks
-  - ⏳ Documentation updates
-  - ⏳ CLI polish
-
-See `PLAN.md` for detailed status and `FUTURE-STATE.md` for architecture.
+- ✅ **Testing & Reliability**
+  - Integration tests for full pipeline
+  - Comprehensive error recovery tests
+  - Round-trip parsing validation
 
 ## Python Version & Dependencies
 
@@ -451,7 +441,7 @@ See `PLAN.md` for detailed status and `FUTURE-STATE.md` for architecture.
   - markdown-it-py (parsing)
   - pydantic (validation)
   - click (CLI)
-  - chromadb (persistent vector store - NEW in better-pipeline)
+  - chromadb (persistent vector store)
   - sentence-transformers (RAG embeddings - large dependency)
   - numpy (vector operations)
   - tiktoken (token counting for LLM prompts)
