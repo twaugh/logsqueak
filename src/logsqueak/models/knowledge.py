@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 from enum import Enum
 
+from logsqueak.models.block_locator import BlockLocator
+
 
 @dataclass
 class KnowledgePackage:
@@ -17,6 +19,7 @@ class KnowledgePackage:
         full_text: Full context text (exact_text + parent context from AST walk, flattened)
         hierarchical_text: Hierarchical Logseq markdown showing block + parents (for reworder)
         confidence: LLM confidence score (0.0-1.0) for classification
+        block_locator: Logical position info to re-find the journal block (for Phase 4 cleanup)
     """
 
     original_id: str
@@ -24,6 +27,7 @@ class KnowledgePackage:
     full_text: str
     hierarchical_text: str
     confidence: float
+    block_locator: BlockLocator
 
 
 class ActionType(Enum):

@@ -18,6 +18,7 @@ import numpy as np
 
 from logsqueak.llm.client import LLMClient
 from logsqueak.logseq.parser import LogseqBlock
+from logsqueak.models.block_locator import BlockLocator
 from logsqueak.models.journal import JournalEntry
 from logsqueak.models.knowledge import ActionType, KnowledgePackage
 from logsqueak.models.page import TargetPage
@@ -59,6 +60,7 @@ class WriteOperation:
         target_id: Hybrid ID of target block (None for APPEND_ROOT)
         new_content: Rephrased content ready for integration
         original_id: Hybrid ID of source journal block (for cleanup tracking)
+        block_locator: Logical position to re-find the journal block (from Phase 1)
     """
 
     page_name: str
@@ -66,6 +68,7 @@ class WriteOperation:
     target_id: Optional[str]
     new_content: str
     original_id: str  # For tracking back to journal block
+    block_locator: "BlockLocator"  # From Phase 1
 
 
 class Extractor:
@@ -155,6 +158,9 @@ class Extractor:
                 block, journal.outline.blocks, indent_str=journal.outline.indent_str
             )
 
+            # Create block locator for reliable re-finding in Phase 4
+            block_locator = BlockLocator.from_block(block, parents, root_blocks=journal.outline.blocks)
+
             packages.append(
                 KnowledgePackage(
                     original_id=original_id,
@@ -162,6 +168,7 @@ class Extractor:
                     full_text=full_text,
                     hierarchical_text=hierarchical_text,
                     confidence=result.confidence,
+                    block_locator=block_locator,  # Store locator for Phase 4 cleanup
                 )
             )
 
@@ -469,6 +476,7 @@ class Extractor:
                     target_id=target_id,
                     new_content=rephrased.content,
                     original_id=package.original_id,
+                    block_locator=package.block_locator,  # Propagate from Phase 1
                 )
                 write_list.append(write_op)
 

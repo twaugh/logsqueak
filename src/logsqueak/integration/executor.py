@@ -90,10 +90,23 @@ def execute_write_list(
         logger.info(f"Wrote {len(operations)} operations to {page_name}")
 
         # Immediately update journal with processed:: markers for this page (atomic)
+        # Use BlockLocators from WriteOperation to re-find blocks in the parsed journal
         for original_id, block_ids in page_level_updates.items():
-            source_block = journal_outline.find_block_by_id(original_id)
+            # Find the block locator from any operation with this original_id
+            block_locator = None
+            for op in operations:
+                if op.original_id == original_id:
+                    block_locator = op.block_locator
+                    break
+
+            if not block_locator:
+                logger.warning(f"Block locator not found in operations: {original_id}")
+                continue
+
+            # Re-find the block in the (freshly parsed) journal outline
+            source_block = block_locator.find_in_outline(journal_outline)
             if not source_block:
-                logger.warning(f"Source block not found in journal: {original_id}")
+                logger.warning(f"Source block not found in journal using locator: {block_locator}")
                 continue
 
             # Format links for this page's integrations
