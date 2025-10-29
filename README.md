@@ -2,9 +2,7 @@
 
 Turn your Logseq journal chaos into organized knowledge. Advanced 5-phase LLM pipeline with persistent vector store automatically extracts insights and files them where they belong.
 
-**Status**: 🚧 Near Production - 5-Phase Pipeline Complete - 85% Complete (M5: Testing & Refinement in progress)
-
-Branch: `better-pipeline` | Previous: `main` (2-stage pipeline, 69% complete)
+**Status**: ✅ Production Ready - All core features complete and tested
 
 ## Overview
 
@@ -54,7 +52,6 @@ Logsqueak implements a **5-phase pipeline** for knowledge management:
 # Clone repository
 git clone https://github.com/twaugh/logsqueak.git
 cd logsqueak
-git checkout better-pipeline  # 5-phase pipeline (recommended)
 
 # Run setup script (creates venv, installs dependencies)
 ./setup-dev.sh
@@ -66,7 +63,6 @@ git checkout better-pipeline  # 5-phase pipeline (recommended)
 # Clone repository
 git clone https://github.com/twaugh/logsqueak.git
 cd logsqueak
-git checkout better-pipeline  # 5-phase pipeline (recommended)
 
 # Create virtual environment (REQUIRED - do not skip this step!)
 python3.11 -m venv venv
@@ -241,44 +237,43 @@ mypy src/
 
 ## Implementation Status
 
-### ✅ Milestone 1: Hybrid-ID Foundation (Complete)
-- [x] Parser extracts `id::` properties
-- [x] Full-context chunk generation with parent traversal
-- [x] Content hashing for hybrid IDs
-- [x] Writer generates UUIDs for new blocks
-- [x] Round-trip safety tests (preserve IDs)
-- [x] `find_block_by_id()` for AST lookup
+Production-ready 5-phase pipeline with all core features complete:
 
-### ✅ Milestone 2: Persistent Vector Store (Complete)
-- [x] ChromaDB dependency and integration
-- [x] VectorStore abstraction with ChromaDBStore
-- [x] Block-level chunking with full-context text
-- [x] Cache manifest system (mtime tracking)
-- [x] Incremental index builder (detects add/update/delete)
-- [x] CLI commands: `index rebuild`, `index status`
+- ✅ **Hybrid-ID Foundation**
+  - Parser extracts `id::` properties
+  - Full-context chunk generation with parent traversal
+  - Content hashing for hybrid IDs
+  - Writer generates UUIDs for new blocks
+  - Round-trip safety tests (preserve IDs)
+  - `find_block_by_id()` for AST lookup
 
-### ✅ Milestone 3: Block-Level Targeting (Complete)
-- [x] Block ID targeting infrastructure
-- [x] UPDATE operation (replace content, preserve ID)
-- [x] APPEND_CHILD operation (add to specific block)
-- [x] APPEND_ROOT operation (add to page root)
+- ✅ **Persistent Vector Store**
+  - ChromaDB dependency and integration
+  - VectorStore abstraction with ChromaDBStore
+  - Block-level chunking with full-context text
+  - Cache manifest system (mtime tracking)
+  - Incremental index builder (detects add/update/delete)
+  - CLI commands: `index rebuild`, `index status`
 
-### ✅ Milestone 4: Multi-Stage LLM Pipeline (Complete)
-- [x] Phase 1: Knowledge extraction with hybrid IDs
-- [x] Phase 2: Enhanced RAG (semantic + hinted search)
-- [x] Phase 3.1: Decider LLM (action selection)
-- [x] Phase 3.2: Reworder LLM (content refinement)
-- [x] Phase 4: Atomic execution with journal cleanup
-- [x] Configurable models for each phase
-- [x] Full 5-phase pipeline integration
+- ✅ **Block-Level Targeting**
+  - Block ID targeting infrastructure
+  - UPDATE operation (replace content, preserve ID)
+  - APPEND_CHILD operation (add to specific block)
+  - APPEND_ROOT operation (add to page root)
 
-### ⏳ Milestone 5: Testing & Refinement (3/7 complete)
-- [x] Removed dry-run mode (incompatible with new architecture)
-- [x] Full pipeline integration test (5 tests passing)
-- [x] Error recovery tests (17 comprehensive tests)
-- [ ] Performance benchmarks
-- [ ] Documentation updates (in progress)
-- [ ] CLI polish
+- ✅ **Multi-Stage LLM Pipeline**
+  - Phase 1: Knowledge extraction with hybrid IDs
+  - Phase 2: Enhanced RAG (semantic + hinted search)
+  - Phase 3.1: Decider LLM (action selection)
+  - Phase 3.2: Reworder LLM (content refinement)
+  - Phase 4: Atomic execution with journal cleanup
+  - Configurable models for each phase
+  - Full 5-phase pipeline integration
+
+- ✅ **Testing & Reliability**
+  - Full pipeline integration tests
+  - Comprehensive error recovery tests
+  - Round-trip parsing validation
 
 ## Architecture
 
@@ -327,13 +322,11 @@ This project uses AI assistance (Claude Code) in development. All code is licens
 
 ## Contributing
 
-See [specs/001-knowledge-extraction/](specs/001-knowledge-extraction/) for detailed specifications:
+See [CLAUDE.md](CLAUDE.md) for developer documentation and architecture details.
 
+Additional resources in [specs/001-knowledge-extraction/](specs/001-knowledge-extraction/):
 - `spec.md` - Feature requirements and user stories
-- `plan.md` - Implementation plan and architecture
-- `tasks.md` - Detailed task breakdown
 - `data-model.md` - Entity definitions
-- `research.md` - Library choices and rationale
 - `quickstart.md` - Developer setup guide
 
 ## Testing
@@ -368,16 +361,10 @@ Tested on 500+ page Logseq graph:
 
 ## Roadmap
 
-**Current Focus (M5):**
-- Performance benchmarks and optimization
-- Documentation updates
-- CLI polish and error messages
-
 **Future Enhancements:**
+- Performance benchmarks and optimization
 - Batch processing optimization
 - Semantic deduplication across pages
 - Historical journal summarization
 - Rich terminal UI (TUI)
 - Async LLM calls for parallelization
-
-See `PLAN.md` for detailed milestone breakdown and `FUTURE-STATE.md` for architecture details.
