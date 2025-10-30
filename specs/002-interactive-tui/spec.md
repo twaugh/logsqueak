@@ -152,7 +152,7 @@ As a Logsqueak user, I want to see the progress of write operations to my knowle
 - **FR-025**: System MUST show progressively appearing refined text as it streams from the LLM
 - **FR-026**: System MUST collapse pages with no accepted integrations and show explanatory text (e.g., "All blocks skipped - already covered")
 - **FR-027**: Users MUST be able to cycle through available actions (Skip, Add as new section, Add under, Replace) using keyboard controls
-- **FR-028**: Users MUST be able to edit refined text using an inline text editor
+- **FR-028**: Users MUST be able to edit refined text using an inline text editor that displays both the original journal text (read-only, for reference) and the editable refined text, with explicit Save/Cancel actions
 - **FR-029**: Users MUST be able to select different target block locations for "Add under" and "Replace" actions
 - **FR-030**: System MUST lock user-modified decisions against LLM overrides
 - **FR-031**: Users MUST be able to collapse/expand page sections to manage screen space
@@ -179,10 +179,11 @@ As a Logsqueak user, I want to see the progress of write operations to my knowle
 - **FR-043**: System MUST support both standard (arrow keys, Enter, Esc) and vim-style (j/k/h/l) navigation
 - **FR-044**: System MUST allow users to quit at any phase using Ctrl+C or 'Q' key
 - **FR-045**: System MUST maintain responsive UI performance while streaming LLM responses (UI updates should not block user input)
+- **FR-046**: System MUST notify users when malformed JSON is encountered during LLM streaming (via visual indicator or status message) while continuing to process remaining items
 
 ### Key Entities
 
-- **BlockState**: Represents the classification state of a journal block throughout the pipeline (block ID, classification type, confidence score, source of classification)
+- **BlockState**: Represents the classification state of a journal block throughout the pipeline (block_id: str, classification: Literal["pending", "knowledge", "activity"], confidence: float | None, source: Literal["user", "llm"], llm_classification: Literal["knowledge", "activity"] | None, llm_confidence: float | None) - Preserves original LLM decision even after user override for potential reset functionality
 - **IntegrationDecision**: Represents a decision about integrating a specific knowledge block into a target page (knowledge block ID, target page, action type, target block ID if applicable, confidence score, refined text, source of decision)
 - **CandidatePage**: Represents a page retrieved during RAG search (page name, semantic match score, included/excluded status, blocks within the page for targeting)
 - **ProgressState**: Represents the current phase and completion status (phase number, completion percentage, streaming status indicators)
@@ -192,9 +193,9 @@ As a Logsqueak user, I want to see the progress of write operations to my knowle
 ### Measurable Outcomes
 
 - **SC-001**: Users can navigate through all four phases of knowledge extraction without requiring any external documentation for basic operations
-- **SC-002**: Users see visual feedback within 500ms of any interaction (keyboard input, phase transition)
+- **SC-002**: Users see visual feedback within 500ms of any interaction (keyboard input, phase transition) - measured as absolute wall-clock time including any background network/LLM operations
 - **SC-003**: Users can override any LLM decision at any phase before final write operations execute
-- **SC-004**: System completes the extraction workflow for a typical 10-block journal entry (with 5 knowledge blocks, 3 candidate pages per block) in under 3 minutes
+- **SC-004**: System completes the extraction workflow for a typical journal entry (11 avg root blocks, 22 avg total blocks as validated in Assumption #3, with ~5 knowledge blocks, 3 candidate pages per block) in under 3 minutes
 - **SC-005**: Users can understand the purpose of each UI element from visible labels and indicators (no hidden keyboard shortcuts required for core functionality)
 - **SC-006**: When write operations fail for one page, at least 90% of successful integrations still complete successfully
 - **SC-007**: Users can identify low-confidence LLM decisions (< 75%) through visual indicators without reading documentation

@@ -23,7 +23,7 @@ This is a POC project - prioritize working software over perfection. Features sh
 
 ### II. Non-Destructive Operations (NON-NEGOTIABLE)
 
-The system MUST NOT modify or delete existing Logseq content except by explicit user approval. All changes MUST be additive (new blocks, new sections) or reviewable in dry-run mode before application. Provenance links to source journals are MANDATORY for all extracted knowledge.
+The system MUST NOT modify or delete existing Logseq content except by explicit user approval. All changes MUST be additive (new blocks, new sections) or reviewable before application (via batch dry-run mode or interactive phase-by-phase approval). Provenance links to source journals are MANDATORY for all extracted knowledge.
 
 **Rationale**: Users trust their knowledge bases. A tool that corrupts or loses information will never be adopted, regardless of how clever the LLM integration is. Safety first enables experimentation.
 

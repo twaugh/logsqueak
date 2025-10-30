@@ -81,6 +81,7 @@ Single project structure:
 - [ ] T028 [US1] Implement LLM classification update handler in Phase1Screen (check source != "user" before updating, post message for UI refresh)
 - [ ] T029 [US1] Add action_continue() to Phase1Screen (cancel LLM tasks, validate at least one knowledge block, push Phase2Screen)
 - [ ] T030 [US1] Add async on_unmount() to Phase1Screen to cancel background LLM task
+- [ ] T030b [US1] Add LLM task cancellation to Phase1Screen.action_continue() (store asyncio.Task reference from _stream_extraction, call task.cancel() when proceeding to Phase 2)
 - [ ] T031 [US1] Update ExtractionApp.on_mount() in src/logsqueak/tui/app.py to push Phase1Screen as initial screen
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - user can classify journal blocks interactively with LLM assistance
@@ -174,7 +175,8 @@ Single project structure:
 - [ ] T069 [US5] Implement Phase4Screen.on_mount() to group decisions by target page
 - [ ] T070 [US5] Add async _execute_writes() task to Phase4Screen (process each page sequentially)
 - [ ] T071 [US5] Implement per-page write logic in Phase4Screen (convert decisions to WriteOperations, call executor)
-- [ ] T072 [US5] Add atomic journal update logic to Phase4Screen (add processed:: marker only after successful page write)
+- [ ] T072 [US5] Add atomic journal update logic to Phase4Screen with rollback (if page write succeeds but journal marker addition fails, roll back the page write to maintain consistency)
+- [ ] T072b [US5] Implement rollback mechanism in Phase4Screen (save pre-write page state, restore on journal update failure)
 - [ ] T073 [US5] Add error handling to Phase4Screen (continue with other pages if one fails, collect errors)
 - [ ] T074 [US5] Add progress display updates to Phase4Screen (show pending → writing → complete status per page)
 - [ ] T075 [US5] Implement completion summary in Phase4Screen (total blocks added, pages updated, link to journal entry)
