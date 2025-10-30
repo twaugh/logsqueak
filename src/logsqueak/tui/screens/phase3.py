@@ -1,7 +1,9 @@
-"""Phase 3 Screen: Integration decisions with streaming LLM feedback.
+"""Phase 3 Screen: Single-decision-per-screen review interface.
 
-This screen orchestrates Phase 3.1 (Decider) and Phase 3.2 (Reworder) to show
-users in real-time where knowledge will be integrated and how it will be reworded.
+This screen shows one integration decision at a time with full context:
+- Hierarchical journal context (where knowledge came from)
+- Target page preview with visual diff
+- Navigation between decisions
 """
 
 import asyncio
@@ -9,50 +11,39 @@ import logging
 from typing import Optional
 
 from textual.app import ComposeResult
-from textual.containers import Container, Vertical, ScrollableContainer
+from textual.containers import Container, ScrollableContainer
 from textual.screen import Screen
-from textual.widgets import Footer, Header, Label, Static
+from textual.widgets import Footer, Header, Static
 
 from logsqueak.tui.models import IntegrationDecision, ScreenState
-from logsqueak.tui.utils import find_block_by_id
-from logsqueak.tui.widgets.decision_list import DecisionList
+from logsqueak.tui.utils import find_block_by_id, get_block_hierarchy
 
 logger = logging.getLogger(__name__)
 
 
 class Phase3Screen(Screen):
     """
-    Phase 3: Integration Decisions Screen.
+    Phase 3: Integration Decisions Screen (Single-Decision View).
 
-    Streams LLM decisions (Decider + Reworder) showing where knowledge will be
-    integrated and how it will be reworded. Organized by destination page.
-
-    User Stories:
-    - US2: See LLM integration decisions with streaming feedback (core feature)
-    - US3: Override integration decisions and edit content (future: Phase 5)
-
-    Workflow:
-    1. On mount: Initialize decision streaming
-    2. Phase 3.1 (Decider): For each (knowledge block, candidate page) pair:
-       - Stream action decisions (skip, add_section, add_under, replace)
-       - Show confidence scores with low-confidence warnings
-    3. Phase 3.2 (Reworder): For non-skip decisions:
-       - Stream refined text progressively
-       - Show "Refining... [streaming]" while generating
-    4. Group decisions by target page
-    5. Collapse pages with all-skip decisions
-    6. Press Enter to continue to Phase 4 when complete
+    Shows one decision at a time with:
+    - Hierarchical journal context
+    - Target page preview with visual diff
+    - Navigation controls
 
     Keyboard Bindings:
-    - n: Proceed when ready (write operations)
-    - j/k, ↑/↓: Navigate (future: Phase 5 - US3)
-    - Space: Cycle action (future: Phase 5 - US3)
-    - E: Edit refined text (future: Phase 5 - US3)
+    - n: Next decision
+    - p: Previous decision
+    - a: Accept decision
+    - s: Skip decision
+    - e: Edit refined text (future)
     - q: Quit application
     """
 
     BINDINGS = [
-        ("n", "continue", "Next →"),
+        ("n", "next_decision", "Next →"),
+        ("p", "prev_decision", "← Previous"),
+        ("a", "accept_decision", "Accept"),
+        ("s", "skip_decision", "Skip"),
     ]
 
     CSS = """
@@ -60,23 +51,49 @@ class Phase3Screen(Screen):
         layout: vertical;
     }
 
-    #status-container {
+    #header-container {
         dock: top;
         height: auto;
         background: $panel;
         padding: 1;
     }
 
-    #decisions-container {
+    #content-container {
         height: 1fr;
-        overflow-y: scroll;
         padding: 1;
     }
 
-    .status-message {
-        color: $accent;
+    .section-box {
+        border: solid $primary;
+        padding: 1;
         margin-bottom: 1;
     }
+
+    .section-title {
+        color: $accent;
+        text-style: bold;
+    }
+
+    .knowledge-highlight {
+        border-left: thick $success;
+        padding-left: 1;
+    }
+
+    .new-content {
+        border-left: thick $success;
+        padding-left: 1;
+        color: $success;
+    }
+
+    .replaced-content {
+        text-style: strike;
+    }
+
+    .indent-1 { padding-left: 2; }
+    .indent-2 { padding-left: 4; }
+    .indent-3 { padding-left: 6; }
+    .indent-4 { padding-left: 8; }
+    .indent-5 { padding-left: 10; }
     """
 
     def __init__(self, state: ScreenState):
@@ -92,52 +109,33 @@ class Phase3Screen(Screen):
         self.rewording_task: Optional[asyncio.Task] = None
         self.decisions_complete = False
         self.rewording_complete = False
+        self.current_decision_index = 0
+        self.decision_list: list[tuple[tuple[str, str], IntegrationDecision]] = []
 
     def compose(self) -> ComposeResult:
         """Compose screen layout."""
         yield Header()
-        with Container(id="status-container"):
+        with Container(id="header-container"):
             yield Static(
                 "Phase 3: Streaming integration decisions...",
-                classes="status-message",
                 id="status-label",
             )
-        with ScrollableContainer(id="decisions-container"):
-            yield DecisionList(decisions=self.state.decisions)
+        with ScrollableContainer(id="content-container"):
+            yield Static("Waiting for decisions...", id="decision-content")
         yield Footer()
 
     async def on_mount(self) -> None:
         """
         Initialize Phase 3 and start decision + rewording streaming.
-
-        Steps:
-        1. Set current phase to 3
-        2. Start Decider streaming task (Phase 3.1)
-        3. Start Reworder streaming task (Phase 3.2)
-        4. Tasks update state.decisions dict as results arrive
-        5. DecisionList widget reactively re-renders on updates
         """
         self.state.current_phase = 3
 
         # Start decision streaming (Phase 3.1)
         self.decision_task = asyncio.create_task(self._stream_decisions())
 
-        # Rewording task will start after decisions complete
-        # (needs to know which decisions are non-skip)
-
     async def _stream_decisions(self) -> None:
         """
         Stream Decider LLM decisions for all (knowledge block, candidate page) pairs.
-
-        This implements Phase 3.1 of the pipeline:
-        - For each knowledge block (classification="knowledge"):
-          - For each candidate page (included=True):
-            - Call LLM to decide action (skip, add_section, add_under, replace)
-            - Stream results as they arrive
-            - Update state.decisions dict
-            - Trigger UI refresh
-
-        After all decisions complete, starts rewording task for non-skip decisions.
         """
         try:
             # Get knowledge blocks
@@ -238,8 +236,8 @@ class Phase3Screen(Screen):
                     key = (block_id, decision.target_page)
                     self.state.decisions[key] = decision
 
-                    # Trigger UI update
-                    self._refresh_decision_list()
+                    # Update display
+                    self._update_decision_display()
 
                     processed_pairs += 1
 
@@ -255,22 +253,12 @@ class Phase3Screen(Screen):
 
         except Exception as e:
             logger.error(f"Error during decision streaming: {e}", exc_info=True)
-            self._update_status(f"Error: {e}. Press Enter to continue anyway.")
+            self._update_status(f"Error: {e}. Press 'n' to continue anyway.")
             self.decisions_complete = True
 
     async def _stream_rewording(self) -> None:
         """
         Stream Reworder LLM refined text for all non-skip decisions.
-
-        This implements Phase 3.2 of the pipeline:
-        - Filter decisions for action != "skip"
-        - For each accepted decision:
-          - Call LLM to rephrase knowledge into clean, evergreen content
-          - Stream refined text as it arrives
-          - Update decision.refined_text progressively
-          - Trigger UI refresh
-
-        After all rewording complete, enables Phase 4 continuation.
         """
         try:
             # Filter for non-skip decisions
@@ -282,7 +270,7 @@ class Phase3Screen(Screen):
 
             if not accepted_decisions:
                 logger.info("No decisions to reword (all skipped)")
-                self._update_status("All decisions skipped. Ready to continue.")
+                self._update_status("All decisions skipped. Press 'n' to continue.")
                 self.rewording_complete = True
                 return
 
@@ -327,8 +315,8 @@ class Phase3Screen(Screen):
                 if key in self.state.decisions:
                     self.state.decisions[key].refined_text = refined_text
 
-                    # Trigger UI update
-                    self._refresh_decision_list()
+                    # Update display
+                    self._update_decision_display()
 
                     processed += 1
                     self._update_status(
@@ -341,12 +329,12 @@ class Phase3Screen(Screen):
             # All rewording complete
             self.rewording_complete = True
             self._update_status(
-                f"Phase 3 complete! {processed} blocks ready to integrate. Press Enter to continue."
+                f"Phase 3 complete! {processed} blocks ready. Press 'n' to continue."
             )
 
         except Exception as e:
             logger.error(f"Error during rewording streaming: {e}", exc_info=True)
-            self._update_status(f"Error: {e}. Press Enter to continue anyway.")
+            self._update_status(f"Error: {e}. Press 'n' to continue anyway.")
             self.rewording_complete = True
 
     def _parse_decision_dict(
@@ -354,13 +342,6 @@ class Phase3Screen(Screen):
     ) -> IntegrationDecision:
         """
         Parse LLM decision dict into IntegrationDecision model.
-
-        Args:
-            decision_dict: Dict from LLM with page, action, confidence, etc.
-            knowledge_block_id: Source knowledge block ID
-
-        Returns:
-            IntegrationDecision object
         """
         # Map LLM action types to user-friendly action names
         action_map = {
@@ -387,12 +368,6 @@ class Phase3Screen(Screen):
     def _get_hierarchical_text(self, block) -> str:
         """
         Get hierarchical markdown representation of block with parent context.
-
-        Args:
-            block: LogseqBlock from journal
-
-        Returns:
-            Hierarchical markdown text
         """
         # For now, just return block content
         # TODO: Add parent context in future if needed
@@ -401,36 +376,211 @@ class Phase3Screen(Screen):
     def _update_status(self, message: str) -> None:
         """
         Update status message display.
-
-        Args:
-            message: Status message to show
         """
         status_label = self.query_one("#status-label", Static)
         status_label.update(message)
 
-    def _refresh_decision_list(self) -> None:
+    def _update_decision_display(self) -> None:
         """
-        Trigger DecisionList widget refresh.
-
-        This forces the widget to re-render with updated decisions.
+        Update the decision display with current decision.
         """
-        # Remove the old widget and mount a new one with updated data
-        old_list = self.query_one(DecisionList)
-        old_list.remove()
+        # Build list of decisions
+        self.decision_list = list(self.state.decisions.items())
 
-        new_list = DecisionList(decisions=self.state.decisions)
-        container = self.query_one("#decisions-container")
-        container.mount(new_list)
+        # Ensure current index is valid
+        if self.current_decision_index >= len(self.decision_list):
+            self.current_decision_index = max(0, len(self.decision_list) - 1)
+
+        # Render current decision
+        if self.decision_list:
+            content = self._render_current_decision()
+        else:
+            content = "No decisions yet. Waiting for streaming..."
+
+        # Update content widget
+        content_widget = self.query_one("#decision-content", Static)
+        content_widget.update(content)
+
+    def _render_current_decision(self) -> str:
+        """
+        Render the current decision as Rich markup.
+        """
+        if not self.decision_list:
+            return "No decisions available."
+
+        key, decision = self.decision_list[self.current_decision_index]
+        knowledge_block_id, target_page = key
+
+        # Build the display
+        total = len(self.decision_list)
+        current = self.current_decision_index + 1
+
+        # Header
+        lines = [
+            f"[bold cyan]Decision {current} of {total}[/bold cyan]",
+            f"Target: {target_page}",
+            "",
+        ]
+
+        # Knowledge from journal (with hierarchy)
+        lines.append("[bold]Knowledge from Journal:[/bold]")
+        journal_context = self._render_journal_context(knowledge_block_id)
+        lines.extend(journal_context)
+        lines.append("")
+
+        # Target page preview
+        lines.append(f"[bold]Target Page: {target_page}[/bold]")
+        lines.append(f"Action: {self._format_action_label(decision)} (Confidence: {decision.confidence:.0%})")
+        lines.append("")
+
+        if decision.action == "skip":
+            lines.append(f"[dim]Reason: {decision.skip_reason or 'No reason given'}[/dim]")
+        else:
+            # Show page preview with highlighted new content
+            page_preview = self._render_page_preview(decision)
+            lines.extend(page_preview)
+
+        return "\n".join(lines)
+
+    def _render_journal_context(self, block_id: str) -> list[str]:
+        """
+        Render hierarchical journal context showing where knowledge came from.
+        """
+        # Get full hierarchy from root to this block
+        hierarchy = get_block_hierarchy(self.state.journal_entry.outline.blocks, block_id)
+        if not hierarchy:
+            return ["[dim](Block not found)[/dim]"]
+
+        lines = []
+        # Add journal date
+        lines.append(f"[dim]{self.state.journal_entry.date}[/dim]")
+
+        # Render each level of hierarchy
+        for depth, block in enumerate(hierarchy):
+            indent = "  " * depth
+
+            # Highlight the target block (last in hierarchy)
+            if depth == len(hierarchy) - 1:
+                # This is the knowledge block - show in bold with full content
+                for i, line in enumerate(block.content):
+                    if i == 0:
+                        lines.append(f"{indent}• [bold]{line}[/bold]")
+                    else:
+                        lines.append(f"{indent}  [bold]{line}[/bold]")
+            else:
+                # Parent context - show dimmed, just first line
+                content_preview = block.content[0] if block.content else "(empty)"
+                # Truncate long content
+                if len(content_preview) > 80:
+                    content_preview = content_preview[:80] + "..."
+                lines.append(f"{indent}• [dim]{content_preview}[/dim]")
+
+        return lines
+
+    def _render_page_preview(self, decision: IntegrationDecision) -> list[str]:
+        """
+        Render target page preview with visual diff highlighting.
+
+        Shows the REFINED (reworded) content, not the original journal entry.
+        """
+        lines = []
+
+        # Get candidate to show existing page blocks
+        candidate = None
+        for cand in self.state.candidates.get(decision.knowledge_block_id, []):
+            if cand.page_name == decision.target_page:
+                candidate = cand
+                break
+
+        if candidate and candidate.blocks:
+            # Show existing blocks
+            for block_info in candidate.blocks[:5]:
+                content = block_info.get("content", "")
+                if len(content) > 80:
+                    content = content[:80] + "..."
+
+                # Check if this block is being replaced
+                if decision.action == "replace" and block_info.get("id") == decision.target_block_id:
+                    # Show strikethrough for old content
+                    lines.append(f"  • [strike]{content}[/strike]")
+                    # Show new refined content below with green bar
+                    if decision.refined_text:
+                        # Split refined text into lines if it's multiline
+                        for refined_line in decision.refined_text.split('\n'):
+                            lines.append(f"  [green]┃[/green] {refined_line}")
+                    else:
+                        lines.append("  [dim]┃ (Refining...)[/dim]")
+                else:
+                    lines.append(f"  • {content}")
+
+                # If adding under this block, show new REFINED content here
+                if decision.action == "add_under" and block_info.get("id") == decision.target_block_id:
+                    if decision.refined_text:
+                        # Show refined text (reworded version), not original journal entry
+                        for refined_line in decision.refined_text.split('\n'):
+                            lines.append(f"    [green]┃[/green] {refined_line}")
+                    else:
+                        lines.append("    [dim]┃ (Refining...)[/dim]")
+
+        # If add_section, show new REFINED content at root level
+        if decision.action == "add_section":
+            if decision.refined_text:
+                # Show refined text, not original
+                for refined_line in decision.refined_text.split('\n'):
+                    lines.append(f"[green]┃[/green] {refined_line}")
+            else:
+                lines.append("[dim]┃ (Refining...)[/dim]")
+
+        return lines
+
+    def _format_action_label(self, decision: IntegrationDecision) -> str:
+        """
+        Format action label for display.
+        """
+        if decision.action == "skip":
+            return "✗ Skip"
+        elif decision.action == "add_section":
+            return "✓ Add as new section"
+        elif decision.action == "add_under":
+            target = decision.target_block_title or "unknown block"
+            return f"↳ Add under '{target}'"
+        elif decision.action == "replace":
+            target = decision.target_block_title or "unknown block"
+            return f"⟳ Replace '{target}'"
+        else:
+            return f"? Unknown: {decision.action}"
+
+    async def action_next_decision(self) -> None:
+        """Navigate to next decision."""
+        if self.current_decision_index < len(self.decision_list) - 1:
+            self.current_decision_index += 1
+            self._update_decision_display()
+        else:
+            # At the end, proceed to Phase 4
+            await self.action_continue()
+
+    async def action_prev_decision(self) -> None:
+        """Navigate to previous decision."""
+        if self.current_decision_index > 0:
+            self.current_decision_index -= 1
+            self._update_decision_display()
+
+    async def action_accept_decision(self) -> None:
+        """Accept current decision and move to next."""
+        # Mark as accepted (already in state)
+        await self.action_next_decision()
+
+    async def action_skip_decision(self) -> None:
+        """Skip current decision and move to next."""
+        if self.decision_list:
+            key, decision = self.decision_list[self.current_decision_index]
+            decision.action = "skip"
+            decision.skip_reason = "User skipped"
+        await self.action_next_decision()
 
     async def action_continue(self) -> None:
         """
         Continue to Phase 4 (write operations).
-
-        Validation:
-        - At least one non-skip decision exists (optional - can proceed with zero)
-
-        Navigation:
-        - Push Phase4Screen onto screen stack
         """
         # Check if we have any non-skip decisions
         non_skip_count = sum(
@@ -441,22 +591,16 @@ class Phase3Screen(Screen):
         if non_skip_count == 0:
             logger.warning("No integrations to perform (all decisions skipped)")
             self._update_status(
-                "No integrations to perform. Press Enter again to exit."
+                "No integrations to perform. Press 'n' again to exit."
             )
-            # User can press Enter again to exit
-            # For now, just log warning
             return
 
         logger.info(f"Proceeding to Phase 4 with {non_skip_count} integrations")
 
-        # TODO: Push Phase4Screen when implemented (User Story 5)
-        # For now, just show completion message
+        # TODO: Push Phase4Screen when implemented
         self._update_status(
             f"Phase 4 not yet implemented. Would write {non_skip_count} blocks. Press 'q' to quit."
         )
-
-        # from logsqueak.tui.screens.phase4 import Phase4Screen
-        # await self.app.push_screen(Phase4Screen(self.state))
 
     async def on_unmount(self) -> None:
         """Cancel background streaming tasks on unmount."""
