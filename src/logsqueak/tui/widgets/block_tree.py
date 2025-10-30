@@ -90,9 +90,9 @@ class BlockTree(Tree):
 
         # Add to tree (use the generated block_id, not block.block_id)
         if parent_node is None:
-            node = self.root.add(label, data=block_id)
+            node = self.root.add(label, data=block_id, allow_expand=len(block.children) > 0)
         else:
-            node = parent_node.add(label, data=block_id)
+            node = parent_node.add(label, data=block_id, allow_expand=len(block.children) > 0)
 
         # Recursively add children
         for child in block.children:
