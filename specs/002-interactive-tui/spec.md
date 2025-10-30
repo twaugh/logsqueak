@@ -144,18 +144,20 @@ As a Logsqueak user, I want to see the progress of write operations to my knowle
 
 #### Phase 3: Integration Decisions
 
-- **FR-020**: System MUST group integration decisions by destination page (not by knowledge block)
-- **FR-021**: System MUST display streaming LLM decisions for each (knowledge block, candidate page) pair as they arrive
-- **FR-022**: System MUST translate technical action types to user-friendly labels (e.g., "APPEND_ROOT" → "Add as new section")
-- **FR-023**: System MUST show confidence scores for each integration decision
-- **FR-024**: System MUST display "Refining... [streaming]" status while reworded content is being generated
-- **FR-025**: System MUST show progressively appearing refined text as it streams from the LLM
-- **FR-026**: System MUST collapse pages with no accepted integrations and show explanatory text (e.g., "All blocks skipped - already covered")
-- **FR-027**: Users MUST be able to cycle through available actions (Skip, Add as new section, Add under, Replace) using keyboard controls
-- **FR-028**: Users MUST be able to edit refined text using an inline text editor that displays both the original journal text (read-only, for reference) and the editable refined text, with explicit Save/Cancel actions
-- **FR-029**: Users MUST be able to select different target block locations for "Add under" and "Replace" actions
-- **FR-030**: System MUST lock user-modified decisions against LLM overrides
-- **FR-031**: Users MUST be able to collapse/expand page sections to manage screen space
+**Implementation Note**: Initial implementation uses single-decision-per-screen approach for simplicity and clarity. Each decision shows full hierarchical journal context, target page preview with visual diff, and navigation controls (n/p/a/s keys). Future iterations may add grouped view as alternative display mode.
+
+- **FR-020**: System MUST group integration decisions by destination page (not by knowledge block) [IMPLEMENTED: Single-decision navigation allows review of all decisions for a page sequentially]
+- **FR-021**: System MUST display streaming LLM decisions for each (knowledge block, candidate page) pair as they arrive [IMPLEMENTED: Real-time streaming with UI updates]
+- **FR-022**: System MUST translate technical action types to user-friendly labels (e.g., "APPEND_ROOT" → "Add as new section") [IMPLEMENTED: ✓/↳/⟳/✗ icons with clear labels]
+- **FR-023**: System MUST show confidence scores for each integration decision [IMPLEMENTED: Confidence % shown for each decision]
+- **FR-024**: System MUST display "Refining... [streaming]" status while reworded content is being generated [IMPLEMENTED: Shows "(Refining...)" placeholder]
+- **FR-025**: System MUST show progressively appearing refined text as it streams from the LLM [IMPLEMENTED: Refined text updates in real-time]
+- **FR-026**: System MUST collapse pages with no accepted integrations and show explanatory text (e.g., "All blocks skipped - already covered") [DEFERRED: Single-decision view makes this less relevant]
+- **FR-027**: Users MUST be able to cycle through available actions (Skip, Add as new section, Add under, Replace) using keyboard controls [DEFERRED to US3]
+- **FR-028**: Users MUST be able to edit refined text using an inline text editor that displays both the original journal text (read-only, for reference) and the editable refined text, with explicit Save/Cancel actions [DEFERRED to US3]
+- **FR-029**: Users MUST be able to select different target block locations for "Add under" and "Replace" actions [DEFERRED to US3]
+- **FR-030**: System MUST lock user-modified decisions against LLM overrides [DEFERRED to US3]
+- **FR-031**: Users MUST be able to collapse/expand page sections to manage screen space [N/A in single-decision view]
 
 #### Phase 4: Write Operations
 
@@ -180,6 +182,13 @@ As a Logsqueak user, I want to see the progress of write operations to my knowle
 - **FR-044**: System MUST allow users to quit at any phase using Ctrl+C or 'Q' key
 - **FR-045**: System MUST maintain responsive UI performance while streaming LLM responses (UI updates should not block user input)
 - **FR-046**: System MUST notify users when malformed JSON is encountered during LLM streaming (via visual indicator or status message) while continuing to process remaining items
+
+#### Logging & Debugging
+
+- **FR-047**: System MUST log complete raw LLM prompts and responses to `~/.cache/logsqueak/prompts/*.log` for all phases (extraction, decisions, rewording) [IMPLEMENTED]
+- **FR-048**: System MUST capture partial LLM responses when user cancels streaming (press 'n') for debugging purposes [IMPLEMENTED]
+- **FR-049**: System MUST log detailed structured information about decisions and rewording to `~/.cache/logsqueak/logs/tui_*.log` including block IDs, confidence scores, reasoning, and before/after text [IMPLEMENTED]
+- **FR-050**: System MUST use try/finally patterns to ensure logging occurs even on errors or cancellation [IMPLEMENTED]
 
 ### Key Entities
 

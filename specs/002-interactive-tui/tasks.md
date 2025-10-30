@@ -113,6 +113,8 @@ Single project structure:
 - [X] T046 [US2] Add page grouping logic to Phase3Screen (collapse pages with all skipped decisions, show explanatory text)
 - [X] T047 [US2] Add low-confidence warning indicators to Phase3Screen (⚠ for decisions <60% confidence)
 - [X] T048 [US2] Add keyboard binding for continuing to Phase 4 (Enter key pushes Phase4Screen)
+- [X] T048a [US2] Refactor Phase3Screen to single-decision-per-screen UI (src/logsqueak/tui/screens/phase3.py - simplified navigation with n/p/a/s keys, hierarchical journal context, visual diff preview)
+- [X] T048b [US2] Add comprehensive prompt/response logging for all streaming phases (src/logsqueak/llm/providers/openai_compat.py, src/logsqueak/llm/prompt_logger.py - raw NDJSON responses, partial response capture on cancellation)
 
 **Checkpoint**: ✅ User Story 2 COMPLETE - user can see full LLM decision process with streaming feedback
 
@@ -192,7 +194,7 @@ Single project structure:
 **Purpose**: Improvements that affect multiple user stories and production readiness
 
 - [ ] T078 [P] Add comprehensive error recovery to all screens (network timeout retry with exponential backoff)
-- [ ] T079 [P] Add logging statements to all LLM streaming tasks (src/logsqueak/tui/screens/*.py)
+- [X] T079 [P] Add logging statements to all LLM streaming tasks (src/logsqueak/tui/screens/*.py - Phase3Screen has detailed decision/rewording logging)
 - [ ] T080 Add validation for all state transitions (validate_phase1_complete, validate_phase2_complete, validate_phase3_complete)
 - [ ] T081 [P] Add CSS styling to ExtractionApp for visual polish (src/logsqueak/tui/app.py)
 - [ ] T082 [P] Update CLAUDE.md with Textual framework and NDJSON streaming pattern documentation
