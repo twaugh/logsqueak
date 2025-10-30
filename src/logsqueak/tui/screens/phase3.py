@@ -220,16 +220,24 @@ class Phase3Screen(Screen):
                     knowledge_block=knowledge_block_dict,
                     candidate_pages=candidate_pages_list,
                 ):
+                    # Log the full raw decision response
+                    logger.info(f"Decision response received: {decision_dict}")
+
                     # Parse decision and create IntegrationDecision
                     decision = self._parse_decision_dict(
                         decision_dict=decision_dict,
                         knowledge_block_id=block_id,
                     )
 
-                    # Log the decision
+                    # Log the decision with details
                     logger.info(
-                        f"Decision for {decision.target_page}: {decision.action} "
-                        f"(confidence: {decision.confidence:.0%})"
+                        f"Decision {processed_pairs + 1}/{total_pairs}:\n"
+                        f"  Block ID: {block_id}\n"
+                        f"  Target Page: {decision.target_page}\n"
+                        f"  Action: {decision.action}\n"
+                        f"  Confidence: {decision.confidence:.0%}\n"
+                        f"  Target Block: {decision.target_block_title or 'N/A'}\n"
+                        f"  Reasoning: {decision.skip_reason or 'N/A'}"
                     )
 
                     # Store in state.decisions
@@ -296,24 +304,39 @@ class Phase3Screen(Screen):
             total = len(decisions_to_reword)
             processed = 0
 
+            logger.info(f"Starting rewording for {total} decisions")
+
             # Stream rewording results from LLM
             async for reworded_dict in self.state.llm_client.stream_rewording_ndjson(
                 decisions=decisions_to_reword
             ):
+                # Log the full raw response
+                logger.info(f"Rewording response received: {reworded_dict}")
+
                 # Extract fields
                 knowledge_block_id = reworded_dict["knowledge_block_id"]
                 target_page = reworded_dict["page"]
                 refined_text = reworded_dict["refined_text"]
 
-                # Log the rewording
+                # Log the full rewording with details
                 logger.info(
-                    f"Reworded for {target_page}: {refined_text[:80]}..."
+                    f"Rewording complete for decision {processed + 1}/{total}:\n"
+                    f"  Block ID: {knowledge_block_id}\n"
+                    f"  Target Page: {target_page}\n"
+                    f"  Original: {decisions_to_reword[processed].get('full_text', '')[:100]}...\n"
+                    f"  Refined: {refined_text}"
                 )
 
                 # Update decision in state
                 key = (knowledge_block_id, target_page)
                 if key in self.state.decisions:
+                    original_action = self.state.decisions[key].action
                     self.state.decisions[key].refined_text = refined_text
+
+                    logger.info(
+                        f"Updated decision state for ({knowledge_block_id[:8]}..., {target_page}): "
+                        f"action={original_action}, refined_text_length={len(refined_text)}"
+                    )
 
                     # Update display
                     self._update_decision_display()
