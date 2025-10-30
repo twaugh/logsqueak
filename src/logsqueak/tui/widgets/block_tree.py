@@ -101,6 +101,10 @@ class BlockTree(Tree):
         for child in block.children:
             self.add_block(child, node)
 
+        # Expand node if it has children (show all nodes initially)
+        if len(block.children) > 0:
+            node.expand()
+
         return node
 
     def format_block_label(self, block: LogseqBlock, block_state: BlockState, knowledge_count: int) -> str:
