@@ -88,7 +88,7 @@ Single project structure:
 
 ---
 
-## Phase 4: User Story 2 - See LLM Integration Decisions with Streaming Feedback (Priority: P1) 🎯 MVP
+## Phase 4: User Story 2 - See LLM Integration Decisions with Streaming Feedback (Priority: P1) 🎯 MVP ✅ COMPLETE
 
 **Goal**: Provide real-time transparency into where knowledge will be integrated and how it will be reworded
 
@@ -96,25 +96,25 @@ Single project structure:
 
 ### Implementation for User Story 2
 
-- [ ] T032 [P] [US2] Create Phase2Screen in src/logsqueak/tui/screens/phase2.py (auto-proceed screen with progress display)
-- [ ] T033 [P] [US2] Implement Phase2Screen.on_mount() to start RAG candidate retrieval for each knowledge block
-- [ ] T034 [US2] Add async _retrieve_candidates() task to Phase2Screen (semantic + hinted search, populate candidates dict)
-- [ ] T035 [US2] Add progress indicator to Phase2Screen showing "Retrieving candidates for block X/Y"
-- [ ] T036 [US2] Add optional review mode binding (R key) to Phase2Screen to enable candidate page filtering
-- [ ] T037 [US2] Implement auto-proceed logic in Phase2Screen (when all candidates retrieved and no review requested, push Phase3Screen)
-- [ ] T038 [P] [US2] Create DecisionList custom widget in src/logsqueak/tui/widgets/decision_list.py (grouped by destination page)
-- [ ] T039 [P] [US2] Add decision item formatting to DecisionList widget (action labels, confidence, refined text preview)
-- [ ] T040 [US2] Create Phase3Screen in src/logsqueak/tui/screens/phase3.py (compose with Header, DecisionList, Footer)
-- [ ] T041 [US2] Implement Phase3Screen.on_mount() to initialize decision streaming
-- [ ] T042 [US2] Add async _stream_decisions() task to Phase3Screen (Phase 3.1 Decider for each knowledge block + candidate page pair)
-- [ ] T043 [US2] Add async _stream_rewording() task to Phase3Screen (Phase 3.2 Reworder for non-skip decisions)
-- [ ] T044 [US2] Implement decision update handler in Phase3Screen (populate decisions dict, update DecisionList UI)
-- [ ] T045 [US2] Implement rewording update handler in Phase3Screen (update refined_text in decisions dict, show streaming refined text)
-- [ ] T046 [US2] Add page grouping logic to Phase3Screen (collapse pages with all skipped decisions, show explanatory text)
-- [ ] T047 [US2] Add low-confidence warning indicators to Phase3Screen (⚠ for decisions <60% confidence)
-- [ ] T048 [US2] Add keyboard binding for continuing to Phase 4 (Enter key pushes Phase4Screen)
+- [X] T032 [P] [US2] Create Phase2Screen in src/logsqueak/tui/screens/phase2.py (auto-proceed screen with progress display)
+- [X] T033 [P] [US2] Implement Phase2Screen.on_mount() to start RAG candidate retrieval for each knowledge block
+- [X] T034 [US2] Add async _retrieve_candidates() task to Phase2Screen (semantic + hinted search, populate candidates dict)
+- [X] T035 [US2] Add progress indicator to Phase2Screen showing "Retrieving candidates for block X/Y"
+- [X] T036 [US2] Add optional review mode binding (R key) to Phase2Screen to enable candidate page filtering
+- [X] T037 [US2] Implement auto-proceed logic in Phase2Screen (when all candidates retrieved and no review requested, push Phase3Screen)
+- [X] T038 [P] [US2] Create DecisionList custom widget in src/logsqueak/tui/widgets/decision_list.py (grouped by destination page)
+- [X] T039 [P] [US2] Add decision item formatting to DecisionList widget (action labels, confidence, refined text preview)
+- [X] T040 [US2] Create Phase3Screen in src/logsqueak/tui/screens/phase3.py (compose with Header, DecisionList, Footer)
+- [X] T041 [US2] Implement Phase3Screen.on_mount() to initialize decision streaming
+- [X] T042 [US2] Add async _stream_decisions() task to Phase3Screen (Phase 3.1 Decider for each knowledge block + candidate page pair)
+- [X] T043 [US2] Add async _stream_rewording() task to Phase3Screen (Phase 3.2 Reworder for non-skip decisions)
+- [X] T044 [US2] Implement decision update handler in Phase3Screen (populate decisions dict, update DecisionList UI)
+- [X] T045 [US2] Implement rewording update handler in Phase3Screen (update refined_text in decisions dict, show streaming refined text)
+- [X] T046 [US2] Add page grouping logic to Phase3Screen (collapse pages with all skipped decisions, show explanatory text)
+- [X] T047 [US2] Add low-confidence warning indicators to Phase3Screen (⚠ for decisions <60% confidence)
+- [X] T048 [US2] Add keyboard binding for continuing to Phase 4 (Enter key pushes Phase4Screen)
 
-**Checkpoint**: At this point, User Stories 1 AND 2 should both work - user can see full LLM decision process with streaming feedback
+**Checkpoint**: ✅ User Story 2 COMPLETE - user can see full LLM decision process with streaming feedback
 
 ---
 

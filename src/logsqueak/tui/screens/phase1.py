@@ -17,6 +17,7 @@ from textual.widgets.tree import TreeNode
 
 from logsqueak.logseq.parser import LogseqBlock
 from logsqueak.tui.models import BlockState, ScreenState
+from logsqueak.tui.utils import find_block_by_id, generate_content_hash
 from logsqueak.tui.widgets.block_tree import BlockTree
 
 logger = logging.getLogger(__name__)
@@ -43,10 +44,11 @@ class Phase1Screen(Screen):
     Keyboard Bindings:
     - j/↓: Navigate down
     - k/↑: Navigate up
+    - Enter: Expand/collapse node
     - K: Mark current block as knowledge
     - A: Mark current block as activity
     - R: Reset to LLM classification (or pending if LLM hasn't classified yet)
-    - Enter: Continue to Phase 2 (validate at least one knowledge block exists)
+    - n: Proceed when ready (validate at least one knowledge block exists)
     - q: Quit application
     """
 
@@ -58,7 +60,7 @@ class Phase1Screen(Screen):
         ("K", "mark_knowledge", "Mark Knowledge"),
         ("A", "mark_activity", "Mark Activity"),
         ("R", "reset", "Reset"),
-        ("enter", "continue", "Continue"),
+        ("n", "continue", "Next →"),
     ]
 
     CSS = """
@@ -156,7 +158,7 @@ class Phase1Screen(Screen):
         """
         def walk_blocks(block: LogseqBlock) -> None:
             """Recursively walk blocks and initialize states."""
-            block_id = block.block_id or self._generate_content_hash(block)
+            block_id = block.block_id or generate_content_hash(block)
 
             self.state.block_states[block_id] = BlockState(
                 block_id=block_id,
@@ -175,23 +177,6 @@ class Phase1Screen(Screen):
             walk_blocks(root_block)
 
         logger.info(f"Initialized {len(self.state.block_states)} block states")
-
-    def _generate_content_hash(self, block: LogseqBlock) -> str:
-        """
-        Generate content hash for block without id:: property.
-
-        Uses MD5 hash of full block content (normalized).
-
-        Args:
-            block: LogseqBlock to hash
-
-        Returns:
-            MD5 hash string
-        """
-        import hashlib
-
-        content = block.get_full_content(normalize_whitespace=True)
-        return hashlib.md5(content.encode("utf-8")).hexdigest()
 
     async def _stream_extraction(self) -> None:
         """
@@ -248,7 +233,7 @@ class Phase1Screen(Screen):
                     classified_count += 1
 
                     # Get block content for logging
-                    logseq_block = self._find_logseq_block(block_id)
+                    logseq_block = find_block_by_id(self.state.journal_entry.outline.blocks, block_id)
                     block_content = ""
                     if logseq_block:
                         first_line = logseq_block.content[0] if logseq_block.content else "(empty)"
@@ -332,7 +317,7 @@ class Phase1Screen(Screen):
             """Recursively inject id:: properties where missing."""
             # If block doesn't have an id:: property, add hash-based ID
             if not block.block_id:
-                hash_id = self._generate_content_hash(block)
+                hash_id = generate_content_hash(block)
                 # Use set_property to add id:: property
                 block.set_property("id", hash_id)
 
@@ -519,13 +504,9 @@ class Phase1Screen(Screen):
 
         logger.info(f"Proceeding to Phase 2 with {knowledge_count} knowledge blocks")
 
-        # TODO: Push Phase2Screen when implemented
-        # from logsqueak.tui.screens.phase2 import Phase2Screen
-        # await self.app.push_screen(Phase2Screen(self.state))
-
-        # For now, just show message
-        status = self.query_one("#llm-status", Static)
-        status.update(f"✓ Ready to proceed with {knowledge_count} knowledge blocks (Phase 2 not yet implemented)")
+        # Push Phase2Screen
+        from logsqueak.tui.screens.phase2 import Phase2Screen
+        await self.app.push_screen(Phase2Screen(self.state))
 
     def _cascade_classification(
         self,
@@ -592,7 +573,7 @@ class Phase1Screen(Screen):
 
         # Find the corresponding LogseqBlock
         # We need to walk the journal entry to find the block with matching ID
-        logseq_block = self._find_logseq_block(block_id)
+        logseq_block = find_block_by_id(self.state.journal_entry.outline.blocks, block_id)
 
         if logseq_block is None:
             logger.warning(f"Could not find LogseqBlock for ID {block_id}")
@@ -639,38 +620,6 @@ class Phase1Screen(Screen):
 
         for child in node.children:
             result = self._find_tree_node(child, block_id)
-            if result is not None:
-                return result
-
-        return None
-
-    def _find_logseq_block(self, block_id: str) -> Optional[LogseqBlock]:
-        """
-        Find LogseqBlock by ID in journal entry.
-
-        Args:
-            block_id: Block ID to search for
-
-        Returns:
-            LogseqBlock if found, None otherwise
-        """
-        def walk_blocks(block: LogseqBlock) -> Optional[LogseqBlock]:
-            """Recursively search for block."""
-            block_block_id = block.block_id or self._generate_content_hash(block)
-
-            if block_block_id == block_id:
-                return block
-
-            for child in block.children:
-                result = walk_blocks(child)
-                if result is not None:
-                    return result
-
-            return None
-
-        # Search all root blocks
-        for root_block in self.state.journal_entry.outline.blocks:
-            result = walk_blocks(root_block)
             if result is not None:
                 return result
 

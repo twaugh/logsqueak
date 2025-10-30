@@ -14,6 +14,7 @@ from textual.widgets.tree import TreeNode
 
 from logsqueak.logseq.parser import LogseqBlock
 from logsqueak.tui.models import BlockState
+from logsqueak.tui.utils import generate_content_hash
 
 
 class BlockTree(Tree):
@@ -72,7 +73,7 @@ class BlockTree(Tree):
         """
         # Generate stable block ID (same logic as _initialize_block_states)
         # Use block.block_id if present, otherwise generate content hash
-        block_id = block.block_id or self._generate_content_hash(block)
+        block_id = block.block_id or generate_content_hash(block)
 
         # Get block state (should exist, default to pending if not)
         block_state = self.block_states.get(
@@ -186,7 +187,7 @@ class BlockTree(Tree):
             Number of knowledge blocks in subtree
         """
         # Generate block ID
-        block_id = block.block_id or self._generate_content_hash(block)
+        block_id = block.block_id or generate_content_hash(block)
 
         # Check if this block is knowledge
         block_state = self.block_states.get(block_id)
@@ -197,23 +198,6 @@ class BlockTree(Tree):
             count += self._count_knowledge_in_subtree(child)
 
         return count
-
-    def _generate_content_hash(self, block: LogseqBlock) -> str:
-        """
-        Generate content hash for block without id:: property.
-
-        Uses MD5 hash of full block content (normalized).
-
-        Args:
-            block: LogseqBlock to hash
-
-        Returns:
-            MD5 hash string
-        """
-        import hashlib
-
-        content = block.get_full_content(normalize_whitespace=True)
-        return hashlib.md5(content.encode("utf-8")).hexdigest()
 
     def _get_classification_icon(self, classification: str) -> str:
         """
