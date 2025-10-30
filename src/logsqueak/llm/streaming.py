@@ -46,6 +46,8 @@ async def parse_ndjson_stream(stream: AsyncIterator[str]) -> AsyncIterator[dict]
     buffer = ""
     line_number = 0
 
+    logger.debug("Starting NDJSON stream parsing")
+
     async for chunk in stream:
         buffer += chunk
 
@@ -70,6 +72,7 @@ async def parse_ndjson_stream(stream: AsyncIterator[str]) -> AsyncIterator[dict]
                     )
                     continue
 
+                logger.debug(f"Parsed NDJSON line {line_number}: {obj}")
                 yield obj
 
             except json.JSONDecodeError as e:
@@ -80,12 +83,15 @@ async def parse_ndjson_stream(stream: AsyncIterator[str]) -> AsyncIterator[dict]
                 )
                 # Don't yield anything, just continue to next line
 
+    logger.debug(f"NDJSON stream parsing complete ({line_number} lines processed)")
+
     # Handle any remaining content in buffer at stream end
     if buffer.strip():
         line_number += 1
         try:
             obj = json.loads(buffer.strip())
             if isinstance(obj, dict):
+                logger.debug(f"Parsed final NDJSON line {line_number}: {obj}")
                 yield obj
             else:
                 logger.warning(

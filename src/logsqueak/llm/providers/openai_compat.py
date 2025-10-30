@@ -764,6 +764,7 @@ class OpenAICompatibleProvider(LLMClient):
                                     delta = data.get("choices", [{}])[0].get("delta", {})
                                     content = delta.get("content", "")
                                     if content:
+                                        logger.debug(f"OpenAI SSE chunk: {content[:200]}")
                                         yield content
                                 except json.JSONDecodeError:
                                     logger.warning(f"Malformed SSE data: {data_str[:100]}")
@@ -831,10 +832,12 @@ class OpenAICompatibleProvider(LLMClient):
                                 data = json.loads(line)
                                 content = data.get("message", {}).get("content", "")
                                 if content:
+                                    logger.debug(f"Ollama chunk: {content[:200]}")
                                     yield content
 
                                 # Check if done
                                 if data.get("done", False):
+                                    logger.debug("Ollama stream complete (done=true)")
                                     return
 
                             except json.JSONDecodeError:
@@ -914,9 +917,39 @@ class OpenAICompatibleProvider(LLMClient):
             {"role": "user", "content": user_prompt},
         ]
 
+        # Log the request if prompt logger is configured
+        if self.prompt_logger:
+            self.prompt_logger.log_request(
+                stage="extraction_streaming",
+                messages=messages,
+                model=self.model,
+                metadata={"block_count": len(blocks)},
+            )
+
         # Stream HTTP response and parse NDJSON
-        async for obj in parse_ndjson_stream(self._stream_http_ndjson(messages)):
-            yield obj
+        response_objects = []
+        try:
+            async for obj in parse_ndjson_stream(self._stream_http_ndjson(messages)):
+                response_objects.append(obj)
+                yield obj
+
+            # Log successful completion
+            if self.prompt_logger:
+                self.prompt_logger.log_response(
+                    stage="extraction_streaming",
+                    response={},
+                    parsed_content={"objects": response_objects, "count": len(response_objects)},
+                )
+        except Exception as e:
+            # Log error
+            if self.prompt_logger:
+                self.prompt_logger.log_response(
+                    stage="extraction_streaming",
+                    response={},
+                    error=e,
+                    raw_content=f"Received {len(response_objects)} objects before error",
+                )
+            raise
 
     async def stream_decisions_ndjson(
         self, knowledge_block: dict, candidate_pages: List[dict]

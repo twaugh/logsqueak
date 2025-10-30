@@ -136,7 +136,7 @@ class ExtractionApp(App):
         # Initialize LLM client with optional prompt logging
         prompt_logger = None
         if self.prompt_log_file:
-            prompt_logger = PromptLogger(self.prompt_log_file)
+            prompt_logger = PromptLogger(log_file=self.prompt_log_file)
 
         llm_client: LLMClient = OpenAICompatibleProvider(
             endpoint=str(self.config.llm.endpoint),
@@ -157,13 +157,11 @@ class ExtractionApp(App):
             llm_client=llm_client,
         )
 
-        # TODO: Push Phase1Screen when implemented
-        # from logsqueak.tui.screens.phase1 import Phase1Screen
-        # await self.push_screen(Phase1Screen(self.state))
+        # Push Phase1Screen to start workflow
+        from logsqueak.tui.screens.phase1 import Phase1Screen
+        await self.push_screen(Phase1Screen(self.state))
 
-        # For now, show placeholder message
         self.title = f"Logsqueak TUI - {self.journal_date}"
-        self.sub_title = "Phase 1: Knowledge Classification (not yet implemented)"
 
     def action_quit(self) -> None:
         """Quit the application."""

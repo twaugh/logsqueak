@@ -274,6 +274,30 @@ def extract(
             )
             ctx.exit(1)
 
+        # Configure file-based logging for TUI mode (avoid messing up the display)
+        from datetime import datetime
+        log_dir = Path.home() / ".cache" / "logsqueak" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = log_dir / f"tui_{timestamp}.log"
+
+        # Remove any existing handlers and configure file logging
+        root_logger = logging.getLogger()
+        root_logger.handlers.clear()
+
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(logging.DEBUG if verbose else logging.INFO)
+        file_handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+                datefmt="%H:%M:%S",
+            )
+        )
+        root_logger.addHandler(file_handler)
+        root_logger.setLevel(logging.DEBUG if verbose else logging.INFO)
+
+        click.echo(f"Logging to: {log_file}")
+
         # Launch interactive TUI
         from logsqueak.tui.app import ExtractionApp
 
@@ -292,6 +316,7 @@ def extract(
             app.run()
         except Exception as e:
             click.echo(f"Error: TUI crashed: {e}", err=True)
+            click.echo(f"Check log file for details: {log_file}", err=True)
             if verbose:
                 import traceback
                 traceback.print_exc()

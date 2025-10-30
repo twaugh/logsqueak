@@ -68,23 +68,23 @@ Single project structure:
 
 ### Implementation for User Story 1
 
-- [ ] T018 [P] [US1] Create BlockTree custom widget in src/logsqueak/tui/widgets/block_tree.py (hierarchical tree with classification icons and confidence scores)
-- [ ] T019 [P] [US1] Add block tree label formatting helper to BlockTree widget (icons: ✓/✗/⊙/⊗/?, confidence percentages, low-confidence warnings)
-- [ ] T020 [US1] Create Phase1Screen in src/logsqueak/tui/screens/phase1.py (compose with Header, BlockTree, Footer)
-- [ ] T021 [US1] Implement Phase1Screen.on_mount() to initialize all block_states as "pending" (src/logsqueak/tui/screens/phase1.py)
-- [ ] T022 [US1] Add async LLM streaming task to Phase1Screen (_stream_extraction method)
-- [ ] T023 [US1] Implement Phase1Screen keyboard bindings (j/k/↑/↓ navigation, K mark knowledge, A mark activity, R reset, Enter continue)
-- [ ] T024 [US1] Add action_mark_knowledge() to Phase1Screen (sets source="user", classification="knowledge", preserves llm_classification/llm_confidence)
-- [ ] T025 [US1] Add action_mark_activity() to Phase1Screen (sets source="user", classification="activity", preserves llm_classification/llm_confidence)
-- [ ] T026 [US1] Add action_reset() to Phase1Screen (restore llm_classification if exists, else reset to "pending")
-- [ ] T027 [US1] Add smart defaults logic to Phase1Screen (when parent marked, cascade to children unless individually overridden)
-- [ ] T028 [US1] Implement LLM classification update handler in Phase1Screen (check source != "user" before updating, post message for UI refresh)
-- [ ] T029 [US1] Add action_continue() to Phase1Screen (cancel LLM tasks, validate at least one knowledge block, push Phase2Screen)
-- [ ] T030 [US1] Add async on_unmount() to Phase1Screen to cancel background LLM task
-- [ ] T030b [US1] Add LLM task cancellation to Phase1Screen.action_continue() (store asyncio.Task reference from _stream_extraction, call task.cancel() when proceeding to Phase 2)
-- [ ] T031 [US1] Update ExtractionApp.on_mount() in src/logsqueak/tui/app.py to push Phase1Screen as initial screen
+- [X] T018 [P] [US1] Create BlockTree custom widget in src/logsqueak/tui/widgets/block_tree.py (hierarchical tree with classification icons and confidence scores)
+- [X] T019 [P] [US1] Add block tree label formatting helper to BlockTree widget (icons: ✓/✗/⊙/⊗/?, confidence percentages, low-confidence warnings)
+- [X] T020 [US1] Create Phase1Screen in src/logsqueak/tui/screens/phase1.py (compose with Header, BlockTree, Footer)
+- [X] T021 [US1] Implement Phase1Screen.on_mount() to initialize all block_states as "pending" (src/logsqueak/tui/screens/phase1.py)
+- [X] T022 [US1] Add async LLM streaming task to Phase1Screen (_stream_extraction method)
+- [X] T023 [US1] Implement Phase1Screen keyboard bindings (j/k/↑/↓ navigation, K mark knowledge, A mark activity, R reset, Enter continue)
+- [X] T024 [US1] Add action_mark_knowledge() to Phase1Screen (sets source="user", classification="knowledge", preserves llm_classification/llm_confidence)
+- [X] T025 [US1] Add action_mark_activity() to Phase1Screen (sets source="user", classification="activity", preserves llm_classification/llm_confidence)
+- [X] T026 [US1] Add action_reset() to Phase1Screen (restore llm_classification if exists, else reset to "pending")
+- [X] T027 [US1] Add smart defaults logic to Phase1Screen (when parent marked, cascade to children unless individually overridden)
+- [X] T028 [US1] Implement LLM classification update handler in Phase1Screen (check source != "user" before updating, post message for UI refresh)
+- [X] T029 [US1] Add action_continue() to Phase1Screen (cancel LLM tasks, validate at least one knowledge block, push Phase2Screen)
+- [X] T030 [US1] Add async on_unmount() to Phase1Screen to cancel background LLM task
+- [X] T030b [US1] Add LLM task cancellation to Phase1Screen.action_continue() (store asyncio.Task reference from _stream_extraction, call task.cancel() when proceeding to Phase 2)
+- [X] T031 [US1] Update ExtractionApp.on_mount() in src/logsqueak/tui/app.py to push Phase1Screen as initial screen
 
-**Checkpoint**: At this point, User Story 1 should be fully functional - user can classify journal blocks interactively with LLM assistance
+**Checkpoint**: ✅ User Story 1 COMPLETE - user can classify journal blocks interactively with LLM assistance
 
 ---
 
