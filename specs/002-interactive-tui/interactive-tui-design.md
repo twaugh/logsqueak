@@ -127,8 +127,8 @@ The UI updates progressively as LLM responses stream in:
 │ ? Call mom                                                           │
 │                                                                       │
 ├───────────────────────────────────────────────────────────────────────┤
-│ ↑/↓ Move    K Keep as knowledge    A Mark as activity    R Reset     │
-│ Enter Continue to next step        Ctrl+C Cancel                     │
+│ ↑/↓ Move    K Keep as knowledge    A Mark as activity    R Undo      │
+│ Enter Continue to next step        Q Quit                            │
 ├───────────────────────────────────────────────────────────────────────┤
 │ Analyzing... • 2 knowledge blocks • 1 activity • 4 waiting           │
 └───────────────────────────────────────────────────────────────────────┘
@@ -162,9 +162,9 @@ Example:
 - `↑/↓` or `j/k` - Navigate between blocks
 - `K` - Mark current block as knowledge
 - `A` - Mark current block as activity
-- `R` - Reset current block (let LLM decide)
+- `R` - Undo (restore LLM decision if available, otherwise reset to pending)
 - `Enter` - Continue to next phase
-- `Ctrl+C` - Cancel extraction
+- `Q` - Quit
 
 #### Behavior
 
@@ -745,6 +745,8 @@ class Phase1Screen(Screen):
                 classification="pending",
                 confidence=None,
                 source="llm",
+                llm_classification=None,  # LLM hasn't classified yet
+                llm_confidence=None,
             )
 
         # Start LLM extraction in background
@@ -763,11 +765,14 @@ class Phase1Screen(Screen):
         async for block_id, is_knowledge, confidence in llm_client.stream_extract(blocks_to_analyze):
             # Only update if user hasn't overridden this block in the meantime
             if self.extraction_app.block_states[block_id].source != "user":
+                classification = "knowledge" if is_knowledge else "activity"
                 self.extraction_app.block_states[block_id] = BlockState(
                     block_id=block_id,
-                    classification="knowledge" if is_knowledge else "activity",
+                    classification=classification,
                     confidence=confidence,
                     source="llm",
+                    llm_classification=classification,  # Preserve LLM's original decision
+                    llm_confidence=confidence,
                 )
                 self._update_tree_display(block_id)
                 self._update_status_bar()
@@ -775,16 +780,65 @@ class Phase1Screen(Screen):
     def action_mark_knowledge(self) -> None:
         """User manually marks block as knowledge"""
         block_id = self._get_selected_block_id()
+        current_state = self.extraction_app.block_states[block_id]
+
         self.extraction_app.block_states[block_id] = BlockState(
             block_id=block_id,
             classification="knowledge",
             confidence=None,
             source="user",
+            llm_classification=current_state.llm_classification,  # Preserve LLM decision
+            llm_confidence=current_state.llm_confidence,
         )
         self._update_tree_display(block_id)
 
         # Smart default: mark all children as knowledge too
         self._default_children(block_id, "knowledge")
+
+    def action_mark_activity(self) -> None:
+        """User manually marks block as activity"""
+        block_id = self._get_selected_block_id()
+        current_state = self.extraction_app.block_states[block_id]
+
+        self.extraction_app.block_states[block_id] = BlockState(
+            block_id=block_id,
+            classification="activity",
+            confidence=None,
+            source="user",
+            llm_classification=current_state.llm_classification,  # Preserve LLM decision
+            llm_confidence=current_state.llm_confidence,
+        )
+        self._update_tree_display(block_id)
+
+        # Smart default: mark all children as activity too
+        self._default_children(block_id, "activity")
+
+    def action_reset(self) -> None:
+        """Reset block to LLM decision or pending"""
+        block_id = self._get_selected_block_id()
+        current_state = self.extraction_app.block_states[block_id]
+
+        if current_state.llm_classification is not None:
+            # LLM has classified this block - restore LLM decision
+            self.extraction_app.block_states[block_id] = BlockState(
+                block_id=block_id,
+                classification=current_state.llm_classification,
+                confidence=current_state.llm_confidence,
+                source="llm",
+                llm_classification=current_state.llm_classification,  # Preserve
+                llm_confidence=current_state.llm_confidence,
+            )
+        else:
+            # LLM hasn't classified yet - reset to pending
+            self.extraction_app.block_states[block_id] = BlockState(
+                block_id=block_id,
+                classification="pending",
+                confidence=None,
+                source="llm",
+                llm_classification=None,
+                llm_confidence=None,
+            )
+        self._update_tree_display(block_id)
 
     def action_continue(self) -> None:
         """Proceed to Phase 2"""

@@ -491,3 +491,10 @@ Beyond simple append-only:
 ## License
 
 GPLv3 - All code is licensed under GPLv3 regardless of authorship method (including AI-assisted development).
+
+## Active Technologies
+- Python 3.11+ (already project requirement) (002-interactive-tui)
+- File-based I/O (Logseq markdown files) - no change from current architecture (002-interactive-tui)
+
+## Recent Changes
+- 002-interactive-tui: Added Python 3.11+ (already project requirement)
