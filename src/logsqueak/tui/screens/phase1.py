@@ -271,9 +271,13 @@ class Phase1Screen(Screen):
                         else:
                             logger.warning(f"Could not find tree node for block {block_id[:8]}... (classification: {classification})")
 
-            # Streaming complete
+            # Streaming complete - mark remaining pending blocks as activity
+            unclassified_count = self._mark_unclassified_as_activity()
+
             logger.info(f"LLM classification complete: {classified_count} blocks classified")
-            status.update(f"Classification complete ({classified_count} blocks)")
+            if unclassified_count > 0:
+                logger.info(f"Marked {unclassified_count} unclassified blocks as activity")
+            status.update(f"Classification complete ({classified_count} blocks, {unclassified_count} inferred as activity)")
 
         except asyncio.CancelledError:
             logger.info("LLM streaming task cancelled by user")
@@ -285,6 +289,35 @@ class Phase1Screen(Screen):
             logger.error(f"Classified {classified_count} blocks before error")
             status = self.query_one("#llm-status", Static)
             status.update(f"Error: {str(e)}")
+
+    def _mark_unclassified_as_activity(self) -> int:
+        """
+        Mark all remaining pending blocks as activity after LLM streaming completes.
+
+        The LLM was instructed to output knowledge blocks first. Any blocks not
+        explicitly classified are assumed to be activity logs.
+
+        Returns:
+            Number of blocks marked as activity
+        """
+        count = 0
+
+        for block_id, block_state in self.state.block_states.items():
+            # Only mark blocks that are still pending
+            if block_state.classification == "pending":
+                block_state.classification = "activity"
+                block_state.source = "llm"
+                block_state.confidence = None  # Inferred, not explicitly classified
+                count += 1
+
+                # Update UI for this block
+                if self.block_tree:
+                    node = self._find_tree_node(self.block_tree.root, block_id)
+                    if node:
+                        self._refresh_tree_node(node)
+                        self._refresh_ancestors(node)
+
+        return count
 
     def _prepare_journal_with_ids(self) -> str:
         """
