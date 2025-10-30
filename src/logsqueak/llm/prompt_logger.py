@@ -124,8 +124,8 @@ class PromptLogger:
 
         output.append("")
 
-        # Log raw content when error occurs (for debugging malformed responses)
-        if error and raw_content is not None:
+        # Log raw content when provided (for full response inspection)
+        if raw_content is not None:
             output.append("Raw LLM Content:")
             output.append("-" * 80)
             output.append(raw_content)

@@ -959,30 +959,34 @@ class OpenAICompatibleProvider(LLMClient):
                 metadata={"journal_length": len(journal_content)},
             )
 
-        # Stream HTTP response and parse NDJSON
-        response_objects = []
-        try:
-            async for obj in parse_ndjson_stream(self._stream_http_ndjson(messages)):
-                response_objects.append(obj)
-                yield obj
+        # Collect raw response text
+        raw_response = ""
+        error = None
 
-            # Log successful completion
-            if self.prompt_logger:
-                self.prompt_logger.log_response(
-                    stage="extraction_streaming",
-                    response={},
-                    parsed_content={"objects": response_objects, "count": len(response_objects)},
-                )
+        try:
+            # Wrap in an async generator that collects raw text
+            async def collect_and_yield():
+                nonlocal raw_response
+                async for chunk in self._stream_http_ndjson(messages):
+                    raw_response += chunk
+                    yield chunk
+
+            # Parse NDJSON from the stream
+            async for obj in parse_ndjson_stream(collect_and_yield()):
+                yield obj
         except Exception as e:
-            # Log error
+            error = e
+            raise
+        finally:
+            # Log the complete (or partial) RAW response if prompt logging is enabled
+            # This ensures we log even if the user cancels or an error occurs
             if self.prompt_logger:
                 self.prompt_logger.log_response(
                     stage="extraction_streaming",
-                    response={},
-                    error=e,
-                    raw_content=f"Received {len(response_objects)} objects before error",
+                    response={},  # Empty dict, actual data in raw_content
+                    raw_content=raw_response,
+                    error=error,
                 )
-            raise
 
     async def stream_decisions_ndjson(
         self, knowledge_block: dict, candidate_pages: List[dict]
@@ -1044,9 +1048,43 @@ class OpenAICompatibleProvider(LLMClient):
             {"role": "user", "content": user_prompt},
         ]
 
-        # Stream HTTP response and parse NDJSON
-        async for obj in parse_ndjson_stream(self._stream_http_ndjson(messages)):
-            yield obj
+        # Log the request if prompt logging is enabled
+        if self.prompt_logger:
+            self.prompt_logger.log_request(
+                stage="phase3_decisions",
+                messages=messages,
+                model=self.model,
+                metadata={"knowledge_block_id": knowledge_block.get("block_id")},
+            )
+
+        # Collect raw response text
+        raw_response = ""
+        error = None
+
+        try:
+            # Wrap in an async generator that collects raw text
+            async def collect_and_yield():
+                nonlocal raw_response
+                async for chunk in self._stream_http_ndjson(messages):
+                    raw_response += chunk
+                    yield chunk
+
+            # Parse NDJSON from the stream
+            async for obj in parse_ndjson_stream(collect_and_yield()):
+                yield obj
+        except Exception as e:
+            error = e
+            raise
+        finally:
+            # Log the complete (or partial) RAW response if prompt logging is enabled
+            # This ensures we log even if the user cancels or an error occurs
+            if self.prompt_logger:
+                self.prompt_logger.log_response(
+                    stage="phase3_decisions",
+                    response={},  # Empty dict, actual data in raw_content
+                    raw_content=raw_response,
+                    error=error,
+                )
 
     async def stream_rewording_ndjson(self, decisions: List[dict]) -> AsyncIterator[dict]:
         """Stream reworded content for accepted integration decisions.
@@ -1103,6 +1141,40 @@ class OpenAICompatibleProvider(LLMClient):
             {"role": "user", "content": user_prompt},
         ]
 
-        # Stream HTTP response and parse NDJSON
-        async for obj in parse_ndjson_stream(self._stream_http_ndjson(messages)):
-            yield obj
+        # Log the request if prompt logging is enabled
+        if self.prompt_logger:
+            self.prompt_logger.log_request(
+                stage="phase3_rewording",
+                messages=messages,
+                model=self.model,
+                metadata={"num_decisions": len(decisions)},
+            )
+
+        # Collect raw response text
+        raw_response = ""
+        error = None
+
+        try:
+            # Wrap in an async generator that collects raw text
+            async def collect_and_yield():
+                nonlocal raw_response
+                async for chunk in self._stream_http_ndjson(messages):
+                    raw_response += chunk
+                    yield chunk
+
+            # Parse NDJSON from the stream
+            async for obj in parse_ndjson_stream(collect_and_yield()):
+                yield obj
+        except Exception as e:
+            error = e
+            raise
+        finally:
+            # Log the complete (or partial) RAW response if prompt logging is enabled
+            # This ensures we log even if the user cancels or an error occurs
+            if self.prompt_logger:
+                self.prompt_logger.log_response(
+                    stage="phase3_rewording",
+                    response={},  # Empty dict, actual data in raw_content
+                    raw_content=raw_response,
+                    error=error,
+                )
