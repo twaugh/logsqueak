@@ -901,6 +901,29 @@ class OpenAICompatibleProvider(LLMClient):
             - Routine todos without context
             - Temporary status updates
 
+            CRITICAL - Handling Hierarchies:
+            - Focus on identifying the DEEPEST/MOST SPECIFIC blocks with knowledge
+            - Parent blocks that only provide context should be marked as ACTIVITY
+            - Only mark a parent as knowledge if IT ITSELF contains lasting information
+
+            EXAMPLE HIERARCHY:
+            - Working on [[RHEL Documentation]]
+              id:: abc123
+              - Updated security guidelines
+                id:: def456
+                - Added section on container scanning
+                  id:: ghi789
+
+            CORRECT CLASSIFICATION:
+            - "Working on [[RHEL Documentation]]" → ACTIVITY (just context, no specific knowledge)
+            - "Updated security guidelines" → ACTIVITY (still just context)
+            - "Added section on container scanning" → KNOWLEDGE (specific, actionable information)
+
+            PARENT CONTEXT RULE:
+            - Parent context will be added automatically by the system when integrating
+            - Do NOT mark parents as knowledge just because they have knowledge children
+            - Multiple knowledge blocks from the same parent are fine
+
             You will receive the full journal entry in its original Logseq format.
             Each block has an id:: property - use this to identify blocks in your response.
 
