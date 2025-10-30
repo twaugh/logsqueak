@@ -10,13 +10,15 @@ import asyncio
 import logging
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
-from sentence_transformers import SentenceTransformer
 from textual.app import ComposeResult
 from textual.containers import Container, Vertical
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Label, Static
+
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 from logsqueak.logseq.parser import LogseqBlock, LogseqOutline
 from logsqueak.rag.vector_store import VectorStore
@@ -87,7 +89,7 @@ class Phase2Screen(Screen):
         self.state = state
         self.retrieval_task: Optional[asyncio.Task] = None
         self.review_mode_active = False
-        self.embedding_model: Optional[SentenceTransformer] = None
+        self.embedding_model: Optional["SentenceTransformer"] = None
         self.progress_messages: list[str] = []
 
     def compose(self) -> ComposeResult:
@@ -114,7 +116,12 @@ class Phase2Screen(Screen):
         """
         self.state.current_phase = 2
 
-        # Start candidate retrieval task
+        # Defer retrieval task until after screen is rendered
+        # This ensures the screen appears immediately without blocking
+        self.call_after_refresh(self._start_retrieval)
+
+    def _start_retrieval(self) -> None:
+        """Start the retrieval task after screen is visible."""
         self.retrieval_task = asyncio.create_task(self._retrieve_candidates())
 
     async def _retrieve_candidates(self) -> None:
@@ -136,6 +143,10 @@ class Phase2Screen(Screen):
         - If ALL searches fail: Show error, allow user to proceed anyway
         """
         try:
+            # Show initial progress message immediately
+            self._update_progress("Starting candidate retrieval...")
+            await asyncio.sleep(0.1)  # Let UI render
+
             # Get knowledge blocks
             knowledge_blocks = [
                 (block_id, state)
@@ -151,9 +162,21 @@ class Phase2Screen(Screen):
                 return
 
             # Initialize embedding model (lazy-loaded, shared across all searches)
-            self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+            self._update_progress("Loading embedding model (this may take a few seconds)...")
+            await asyncio.sleep(0.1)  # Let UI update
+
+            # Load model in executor to avoid blocking UI
+            # Import here to avoid blocking the screen transition
+            from sentence_transformers import SentenceTransformer
+
+            loop = asyncio.get_event_loop()
+            self.embedding_model = await loop.run_in_executor(
+                None, lambda: SentenceTransformer("all-MiniLM-L6-v2")
+            )
 
             # Initialize vector store
+            self._update_progress("Initializing vector store...")
+            await asyncio.sleep(0.1)  # Let UI update
             cache_dir = Path.home() / ".cache" / "logsqueak" / "chroma"
             vector_store = ChromaDBStore(persist_directory=cache_dir)
 
