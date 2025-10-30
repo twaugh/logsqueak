@@ -238,8 +238,7 @@ class DecisionList(Widget):
         elif decision.action == "add_section":
             return ("✓", "Add as new section", "action-add")
         elif decision.action == "add_under":
-            target_title = decision.target_block_title or "unknown block"
-            return ("↳", f"Add under '{target_title}'", "action-add")
+            return ("↳", "Add new block", "action-add")
         elif decision.action == "replace":
             target_title = decision.target_block_title or "unknown block"
             return ("⟳", f"Replace '{target_title}'", "action-replace")

@@ -505,6 +505,7 @@ class Phase3Screen(Screen):
         Render target page preview with visual diff highlighting.
 
         Shows the REFINED (reworded) content, not the original journal entry.
+        Displays hierarchical structure with proper indentation.
         """
         lines = []
 
@@ -515,40 +516,59 @@ class Phase3Screen(Screen):
                 candidate = cand
                 break
 
-        if candidate and candidate.blocks:
-            # Show existing blocks
-            for block_info in candidate.blocks[:5]:
-                content = block_info.get("content", "")
-                if len(content) > 80:
-                    content = content[:80] + "..."
-
-                # Check if this block is being replaced
-                if decision.action == "replace" and block_info.get("id") == decision.target_block_id:
-                    # Show strikethrough for old content
-                    lines.append(f"  • [strike]{content}[/strike]")
-                    # Show new refined content below with green bar
-                    if decision.refined_text:
-                        # Split refined text into lines if it's multiline
-                        for refined_line in decision.refined_text.split('\n'):
-                            lines.append(f"  [green]┃[/green] {refined_line}")
-                    else:
-                        lines.append("  [dim]┃ (Refining...)[/dim]")
+        if not candidate:
+            # No candidate data - just show action description
+            if decision.action == "add_section":
+                lines.append("[dim]Adding as new section:[/dim]")
+                if decision.refined_text:
+                    for refined_line in decision.refined_text.split('\n'):
+                        lines.append(f"[green]┃[/green] {refined_line}")
                 else:
-                    lines.append(f"  • {content}")
+                    lines.append("[dim]┃ (Refining...)[/dim]")
+            return lines
 
-                # If adding under this block, show new REFINED content here
-                if decision.action == "add_under" and block_info.get("id") == decision.target_block_id:
-                    if decision.refined_text:
-                        # Show refined text (reworded version), not original journal entry
-                        for refined_line in decision.refined_text.split('\n'):
-                            lines.append(f"    [green]┃[/green] {refined_line}")
-                    else:
-                        lines.append("    [dim]┃ (Refining...)[/dim]")
+        # Build hierarchical tree structure
+        blocks = candidate.blocks if candidate.blocks else []
+
+        # Render blocks with hierarchy
+        for i, block_info in enumerate(blocks):
+            block_id = block_info.get("id")
+            content = block_info.get("content", "")
+            depth = block_info.get("depth", 0)
+
+            # Truncate long content
+            if len(content) > 80:
+                content = content[:80] + "..."
+
+            # Calculate indentation (2 spaces per depth level)
+            indent = "  " * depth
+
+            # Check if this block is being replaced
+            if decision.action == "replace" and block_id == decision.target_block_id:
+                # Show strikethrough for old content
+                lines.append(f"{indent}• [strike]{content}[/strike]")
+                # Show new refined content below with green bar
+                if decision.refined_text:
+                    for refined_line in decision.refined_text.split('\n'):
+                        lines.append(f"{indent}[green]┃[/green] {refined_line}")
+                else:
+                    lines.append(f"{indent}[dim]┃ (Refining...)[/dim]")
+            else:
+                # Normal block display
+                lines.append(f"{indent}• {content}")
+
+            # If adding under this block, show new REFINED content as child
+            if decision.action == "add_under" and block_id == decision.target_block_id:
+                child_indent = "  " * (depth + 1)
+                if decision.refined_text:
+                    for refined_line in decision.refined_text.split('\n'):
+                        lines.append(f"{child_indent}[green]┃[/green] {refined_line}")
+                else:
+                    lines.append(f"{child_indent}[dim]┃ (Refining...)[/dim]")
 
         # If add_section, show new REFINED content at root level
         if decision.action == "add_section":
             if decision.refined_text:
-                # Show refined text, not original
                 for refined_line in decision.refined_text.split('\n'):
                     lines.append(f"[green]┃[/green] {refined_line}")
             else:
@@ -565,8 +585,7 @@ class Phase3Screen(Screen):
         elif decision.action == "add_section":
             return "✓ Add as new section"
         elif decision.action == "add_under":
-            target = decision.target_block_title or "unknown block"
-            return f"↳ Add under '{target}'"
+            return "↳ Add new block"
         elif decision.action == "replace":
             target = decision.target_block_title or "unknown block"
             return f"⟳ Replace '{target}'"
