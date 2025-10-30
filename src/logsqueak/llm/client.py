@@ -8,7 +8,7 @@ two-stage extraction process:
 
 from abc import ABC, abstractmethod
 from datetime import date
-from typing import List, Optional
+from typing import AsyncIterator, List, Optional
 
 from logsqueak.models.knowledge import ActionType
 
@@ -200,6 +200,118 @@ class LLMClient(ABC):
 
         Raises:
             LLMError: If API request fails or returns invalid response
+        """
+        pass
+
+    @abstractmethod
+    async def stream_extract_ndjson(self, blocks: List[dict]) -> AsyncIterator[dict]:
+        """Stream knowledge extraction results as NDJSON.
+
+        Phase 1 of the extraction pipeline: Classify each journal block
+        as either "knowledge" (lasting information) or "activity" (temporary log).
+
+        Args:
+            blocks: List of journal blocks to classify. Each dict contains:
+                - block_id: str - Hybrid ID (id:: property or content hash)
+                - content: str - Block text content
+                - hierarchy: str - Full hierarchical context (parent blocks)
+
+        Yields:
+            dict: One classification result per block:
+                {
+                    "block_id": "abc123",
+                    "is_knowledge": true,
+                    "confidence": 0.85
+                }
+
+        Raises:
+            LLMError: Network error, API failure, or timeout
+
+        Notes:
+            - Each yielded dict is a complete, parseable JSON object
+            - Objects arrive in arbitrary order (not necessarily input order)
+            - Malformed lines are logged and skipped (parser handles gracefully)
+            - Stream may end early on network errors (partial results preserved)
+        """
+        pass
+
+    @abstractmethod
+    async def stream_decisions_ndjson(
+        self, knowledge_block: dict, candidate_pages: List[dict]
+    ) -> AsyncIterator[dict]:
+        """Stream integration decisions for one knowledge block across candidate pages.
+
+        Phase 3.1 (Decider): For each candidate page, decide what action to take
+        (skip, add_section, add_under, replace).
+
+        Args:
+            knowledge_block: Dict with:
+                - block_id: str - Source block ID
+                - content: str - Full-context knowledge text
+                - hierarchical_text: str - Hierarchical markdown representation
+
+            candidate_pages: List of candidate pages from Phase 2 RAG search. Each dict:
+                - page_name: str - Page name
+                - similarity_score: float - Semantic match score (0.0-1.0)
+                - chunks: list[dict] - Blocks within page with:
+                    - target_id: str - Hybrid ID of block
+                    - content: str - Block text
+                    - title: str - Human-readable block identifier
+
+        Yields:
+            dict: One decision per candidate page:
+                {
+                    "page": "Software Architecture",
+                    "action": "add_section",
+                    "target_id": null,
+                    "target_title": null,
+                    "confidence": 0.88,
+                    "reasoning": "This knowledge belongs as a new root-level section"
+                }
+
+        Raises:
+            LLMError: Network error, API failure, or timeout
+
+        Notes:
+            - One decision per candidate page (order may not match input)
+            - LLM may decide "skip" for all pages (valid outcome)
+            - target_id and target_title are null for "skip" and "add_section"
+            - target_id and target_title are required for "add_under" and "replace"
+        """
+        pass
+
+    @abstractmethod
+    async def stream_rewording_ndjson(self, decisions: List[dict]) -> AsyncIterator[dict]:
+        """Stream reworded content for accepted integration decisions.
+
+        Phase 3.2 (Reworder): Transform journal-specific knowledge into clean,
+        evergreen content suitable for integration into permanent pages.
+
+        Args:
+            decisions: List of accepted decisions from Phase 3.1 (action != "skip"). Each dict:
+                - knowledge_block_id: str - Source block ID
+                - page: str - Target page name
+                - action: str - Action type ("add_section", "add_under", "replace")
+                - full_text: str - Full-context knowledge text
+                - hierarchical_text: str - Hierarchical markdown representation
+
+        Yields:
+            dict: One reworded result per decision:
+                {
+                    "knowledge_block_id": "abc123",
+                    "page": "Software Architecture",
+                    "refined_text": "Bounded contexts matter more than service size"
+                }
+
+        Raises:
+            LLMError: Network error, API failure, or timeout
+
+        Notes:
+            - refined_text should be plain block content (no bullet markers or indentation)
+            - Refined text removes journal-specific context (dates, "Today I learned", etc.)
+            - Preserves important links: [[Page Links]] and ((block refs))
+            - Results may arrive in any order
+            - Each result corresponds to exactly one input decision
         """
         pass
 

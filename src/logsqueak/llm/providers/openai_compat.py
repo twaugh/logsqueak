@@ -4,10 +4,12 @@ This provider works with any OpenAI-compatible API (OpenAI, local models via lla
 using httpx for HTTP requests and JSON mode for structured outputs.
 """
 
+import asyncio
 import json
+import logging
 from datetime import date
 from textwrap import dedent
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
 
@@ -29,7 +31,10 @@ from logsqueak.llm.prompts import (
     build_page_selection_messages,
     build_reworder_messages,
 )
+from logsqueak.llm.streaming import parse_ndjson_stream
 from logsqueak.models.knowledge import ActionType
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAICompatibleProvider(LLMClient):
@@ -67,11 +72,13 @@ class OpenAICompatibleProvider(LLMClient):
         self.prompt_logger = prompt_logger
         self.num_ctx = num_ctx
         self.client = httpx.Client(timeout=timeout)
+        self._async_client: Optional[httpx.AsyncClient] = None
 
     def __del__(self):
         """Clean up HTTP client."""
         if hasattr(self, "client"):
             self.client.close()
+        # Note: async client cleanup handled by context manager in async methods
 
     def extract_knowledge(
         self, journal_content: str, journal_date: date, indent_str: str = "  "
@@ -678,3 +685,358 @@ class OpenAICompatibleProvider(LLMClient):
             raise LLMResponseError(
                 f"Failed to parse JSON content: {e}\n\nMalformed JSON preview:\n{preview}"
             ) from e
+
+    async def _stream_http_ndjson(
+        self, messages: List[Dict[str, str]], max_retries: int = 3
+    ) -> AsyncIterator[str]:
+        """Stream HTTP responses with retry logic and automatic protocol detection.
+
+        Handles both OpenAI-compatible SSE format and Ollama's native streaming format.
+
+        Args:
+            messages: Chat messages to send
+            max_retries: Maximum retry attempts for transient errors
+
+        Yields:
+            String chunks from the LLM response
+
+        Raises:
+            LLMError: On HTTP errors or after max retries
+        """
+        base_endpoint = str(self.endpoint).rstrip("/")
+        is_ollama = base_endpoint.endswith("/v1") or "/v1/" in base_endpoint
+
+        if is_ollama and self.num_ctx is not None:
+            # Use Ollama native streaming
+            async for chunk in self._stream_ollama_native(messages, max_retries):
+                yield chunk
+        else:
+            # Use OpenAI-compatible streaming
+            async for chunk in self._stream_openai_compatible(messages, max_retries):
+                yield chunk
+
+    async def _stream_openai_compatible(
+        self, messages: List[Dict[str, str]], max_retries: int = 3
+    ) -> AsyncIterator[str]:
+        """Stream from OpenAI-compatible endpoint with SSE format.
+
+        Args:
+            messages: Chat messages to send
+            max_retries: Maximum retry attempts
+
+        Yields:
+            String chunks from the LLM response
+        """
+        endpoint = str(self.endpoint).rstrip("/")
+        if not endpoint.endswith("/chat/completions"):
+            endpoint = f"{endpoint}/chat/completions"
+
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.7,
+            "stream": True,
+        }
+
+        for attempt in range(max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    async with client.stream(
+                        "POST",
+                        endpoint,
+                        json=payload,
+                        headers={
+                            "Authorization": f"Bearer {self.api_key}",
+                            "Content-Type": "application/json",
+                        },
+                    ) as response:
+                        response.raise_for_status()
+
+                        async for line in response.aiter_lines():
+                            # OpenAI SSE format: "data: {...}"
+                            if line.startswith("data: "):
+                                data_str = line[6:]  # Remove "data: " prefix
+                                if data_str == "[DONE]":
+                                    return
+
+                                try:
+                                    data = json.loads(data_str)
+                                    delta = data.get("choices", [{}])[0].get("delta", {})
+                                    content = delta.get("content", "")
+                                    if content:
+                                        yield content
+                                except json.JSONDecodeError:
+                                    logger.warning(f"Malformed SSE data: {data_str[:100]}")
+                                    continue
+                        return  # Success
+
+            except (httpx.TimeoutException, httpx.RequestError) as e:
+                logger.warning(f"Attempt {attempt + 1}/{max_retries}: {e}")
+                if attempt < max_retries - 1:
+                    backoff = 1.0 * (2 ** attempt)
+                    logger.info(f"Retrying in {backoff:.1f}s...")
+                    await asyncio.sleep(backoff)
+                else:
+                    raise LLMTimeoutError(f"Failed after {max_retries} attempts: {e}")
+
+            except httpx.HTTPStatusError as e:
+                raise LLMAPIError(
+                    f"HTTP error {e.response.status_code}: {e.response.text}",
+                    status_code=e.response.status_code,
+                )
+
+    async def _stream_ollama_native(
+        self, messages: List[Dict[str, str]], max_retries: int = 3
+    ) -> AsyncIterator[str]:
+        """Stream from Ollama's native /api/chat endpoint.
+
+        Args:
+            messages: Chat messages to send
+            max_retries: Maximum retry attempts
+
+        Yields:
+            String chunks from the LLM response
+        """
+        base_endpoint = str(self.endpoint).rstrip("/")
+        if base_endpoint.endswith("/v1"):
+            base_endpoint = base_endpoint[:-3]
+        endpoint = f"{base_endpoint}/api/chat"
+
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "stream": True,
+            "options": {"temperature": 0.7},
+        }
+
+        if self.num_ctx is not None:
+            payload["options"]["num_ctx"] = self.num_ctx
+
+        for attempt in range(max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    async with client.stream(
+                        "POST",
+                        endpoint,
+                        json=payload,
+                        headers={"Content-Type": "application/json"},
+                    ) as response:
+                        response.raise_for_status()
+
+                        async for line in response.aiter_lines():
+                            if not line.strip():
+                                continue
+
+                            try:
+                                data = json.loads(line)
+                                content = data.get("message", {}).get("content", "")
+                                if content:
+                                    yield content
+
+                                # Check if done
+                                if data.get("done", False):
+                                    return
+
+                            except json.JSONDecodeError:
+                                logger.warning(f"Malformed Ollama response: {line[:100]}")
+                                continue
+                        return  # Success
+
+            except (httpx.TimeoutException, httpx.RequestError) as e:
+                logger.warning(f"Attempt {attempt + 1}/{max_retries}: {e}")
+                if attempt < max_retries - 1:
+                    backoff = 1.0 * (2 ** attempt)
+                    logger.info(f"Retrying in {backoff:.1f}s...")
+                    await asyncio.sleep(backoff)
+                else:
+                    raise LLMTimeoutError(f"Failed after {max_retries} attempts: {e}")
+
+            except httpx.HTTPStatusError as e:
+                raise LLMAPIError(
+                    f"HTTP error {e.response.status_code}: {e.response.text}",
+                    status_code=e.response.status_code,
+                )
+
+    async def stream_extract_ndjson(self, blocks: List[dict]) -> AsyncIterator[dict]:
+        """Stream knowledge extraction results as NDJSON.
+
+        Phase 1 of the extraction pipeline: Classify each journal block
+        as either "knowledge" (lasting information) or "activity" (temporary log).
+
+        Args:
+            blocks: List of journal blocks to classify
+
+        Yields:
+            dict: Classification results as they arrive
+
+        Raises:
+            LLMError: Network error, API failure, or timeout
+        """
+        # Build prompt for NDJSON extraction
+        system_prompt = dedent("""
+            You are a knowledge extraction assistant for a personal knowledge management system.
+
+            Your task is to classify journal blocks as either "knowledge" (lasting information)
+            or "activity" (temporary logs).
+
+            EXTRACT knowledge like:
+            - Key decisions and rationale
+            - Important insights or learnings
+            - Project updates with meaningful context
+            - Ideas worth preserving
+
+            IGNORE activity logs like:
+            - "Worked on X"
+            - "Had meeting with Y"
+            - Routine todos without context
+            - Temporary status updates
+
+            For each block, return ONE JSON object per line (NDJSON format):
+            {"block_id": "...", "is_knowledge": true/false, "confidence": 0.0-1.0}
+
+            IMPORTANT:
+            - Output exactly ONE JSON object per line
+            - Each line MUST end with a newline character
+            - Do NOT wrap in a top-level array
+            - Process blocks in any order (parallel processing is fine)
+        """).strip()
+
+        # Format blocks for the prompt
+        blocks_text = "\n\n".join([
+            f"Block ID: {b['block_id']}\nHierarchy: {b.get('hierarchy', '')}\nContent: {b['content']}"
+            for b in blocks
+        ])
+
+        user_prompt = f"Classify these journal blocks:\n\n{blocks_text}"
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        # Stream HTTP response and parse NDJSON
+        async for obj in parse_ndjson_stream(self._stream_http_ndjson(messages)):
+            yield obj
+
+    async def stream_decisions_ndjson(
+        self, knowledge_block: dict, candidate_pages: List[dict]
+    ) -> AsyncIterator[dict]:
+        """Stream integration decisions for one knowledge block across candidate pages.
+
+        Phase 3.1 (Decider): For each candidate page, decide what action to take
+        (skip, add_section, add_under, replace).
+
+        Args:
+            knowledge_block: Knowledge block to integrate
+            candidate_pages: Candidate pages from RAG search
+
+        Yields:
+            dict: Decision results as they arrive
+
+        Raises:
+            LLMError: Network error, API failure, or timeout
+        """
+        # Build prompt for decision making
+        system_prompt = dedent("""
+            You are an integration decision assistant for a knowledge management system.
+
+            Your task is to decide where and how to integrate knowledge into existing pages.
+
+            For each candidate page, choose ONE action:
+            - "skip": Knowledge already covered or not relevant
+            - "add_section": Add as new root-level section
+            - "add_under": Add under a specific existing block
+            - "replace": Replace an existing block's content
+
+            For each candidate page, return ONE JSON object per line (NDJSON format):
+            {"page": "...", "action": "...", "target_id": null/"...", "target_title": null/"...", "confidence": 0.0-1.0, "reasoning": "..."}
+
+            Rules:
+            - For "skip" and "add_section": target_id and target_title MUST be null
+            - For "add_under" and "replace": target_id and target_title MUST be provided
+            - confidence: 0.0-1.0 (how certain you are about this decision)
+
+            IMPORTANT:
+            - Output exactly ONE JSON object per line
+            - Each line MUST end with a newline character
+            - Do NOT wrap in a top-level array
+        """).strip()
+
+        # Format knowledge block and candidates
+        kb_text = f"Knowledge: {knowledge_block['content']}\nHierarchy: {knowledge_block.get('hierarchical_text', '')}"
+
+        candidates_text = "\n\n".join([
+            f"Page: {p['page_name']} (similarity: {p['similarity_score']:.2f})\nBlocks:\n" +
+            "\n".join([f"  - [{c['target_id']}] {c['title']}: {c['content'][:100]}" for c in p.get('chunks', [])])
+            for p in candidate_pages
+        ])
+
+        user_prompt = f"{kb_text}\n\nCandidate Pages:\n{candidates_text}"
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        # Stream HTTP response and parse NDJSON
+        async for obj in parse_ndjson_stream(self._stream_http_ndjson(messages)):
+            yield obj
+
+    async def stream_rewording_ndjson(self, decisions: List[dict]) -> AsyncIterator[dict]:
+        """Stream reworded content for accepted integration decisions.
+
+        Phase 3.2 (Reworder): Transform journal-specific knowledge into clean,
+        evergreen content suitable for integration into permanent pages.
+
+        Args:
+            decisions: Accepted decisions from Phase 3.1
+
+        Yields:
+            dict: Reworded results as they arrive
+
+        Raises:
+            LLMError: Network error, API failure, or timeout
+        """
+        # Build prompt for rewording
+        system_prompt = dedent("""
+            You are a content rewording assistant for a knowledge management system.
+
+            Your task is to transform journal-specific knowledge into clean, evergreen content.
+
+            Remove:
+            - Temporal references ("Today", "This week", dates)
+            - Journal-specific context ("Had meeting with X")
+            - First-person narrative ("I learned", "I discovered")
+
+            Preserve:
+            - [[Page Links]] and ((block refs))
+            - Technical terminology and specifics
+            - Core insights and knowledge
+
+            For each decision, return ONE JSON object per line (NDJSON format):
+            {"knowledge_block_id": "...", "page": "...", "refined_text": "..."}
+
+            IMPORTANT:
+            - refined_text should be PLAIN BLOCK CONTENT (no bullet markers, no indentation)
+            - Output exactly ONE JSON object per line
+            - Each line MUST end with a newline character
+            - Do NOT wrap in a top-level array
+        """).strip()
+
+        # Format decisions for rewording
+        decisions_text = "\n\n".join([
+            f"Block ID: {d['knowledge_block_id']}\nPage: {d['page']}\nAction: {d['action']}\n"
+            f"Original: {d['full_text']}\nHierarchy: {d.get('hierarchical_text', '')}"
+            for d in decisions
+        ])
+
+        user_prompt = f"Rephrase these knowledge blocks:\n\n{decisions_text}"
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        # Stream HTTP response and parse NDJSON
+        async for obj in parse_ndjson_stream(self._stream_http_ndjson(messages)):
+            yield obj

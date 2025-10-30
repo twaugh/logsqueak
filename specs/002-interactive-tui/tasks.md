@@ -35,28 +35,28 @@ Single project structure:
 
 ---
 
-## Phase 2: Foundational (Blocking Prerequisites)
+## Phase 2: Foundational (Blocking Prerequisites) ✅ COMPLETE
 
 **Purpose**: Core infrastructure that MUST be complete before ANY user story screen can be implemented
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
 - [X] T004 Implement generic NDJSON stream parser in src/logsqueak/llm/streaming.py
-- [ ] T005 Add HTTP streaming protocol handling to src/logsqueak/llm/providers/openai_compat.py (Ollama + OpenAI formats)
+- [X] T005 Add HTTP streaming protocol handling to src/logsqueak/llm/providers/openai_compat.py (Ollama + OpenAI formats)
 - [X] T006 [P] Define ScreenState dataclass in src/logsqueak/tui/models.py (current_phase, journal_entry, block_states, candidates, decisions, config, llm_client)
 - [X] T007 [P] Define BlockState dataclass in src/logsqueak/tui/models.py (block_id, classification, confidence, source, llm_classification, llm_confidence)
 - [X] T008 [P] Define CandidatePage dataclass in src/logsqueak/tui/models.py (page_name, similarity_score, included, blocks, search_method)
 - [X] T009 [P] Define IntegrationDecision dataclass in src/logsqueak/tui/models.py (knowledge_block_id, target_page, action, target_block_id, target_block_title, confidence, refined_text, source, skip_reason)
-- [ ] T010 Add stream_extract_ndjson() method to LLMClient abstract class in src/logsqueak/llm/client.py
-- [ ] T011 Add stream_decisions_ndjson() method to LLMClient abstract class in src/logsqueak/llm/client.py
-- [ ] T012 Add stream_rewording_ndjson() method to LLMClient abstract class in src/logsqueak/llm/client.py
-- [ ] T013 Implement stream_extract_ndjson() in OpenAICompatibleProvider (src/logsqueak/llm/providers/openai_compat.py)
-- [ ] T014 Implement stream_decisions_ndjson() in OpenAICompatibleProvider (src/logsqueak/llm/providers/openai_compat.py)
-- [ ] T015 Implement stream_rewording_ndjson() in OpenAICompatibleProvider (src/logsqueak/llm/providers/openai_compat.py)
-- [ ] T016 Create ExtractionApp main Textual app in src/logsqueak/tui/app.py (initializes ScreenState, handles navigation)
-- [ ] T017 Update CLI entry point in src/logsqueak/cli/main.py to launch ExtractionApp for extract command
+- [X] T010 Add stream_extract_ndjson() method to LLMClient abstract class in src/logsqueak/llm/client.py
+- [X] T011 Add stream_decisions_ndjson() method to LLMClient abstract class in src/logsqueak/llm/client.py
+- [X] T012 Add stream_rewording_ndjson() method to LLMClient abstract class in src/logsqueak/llm/client.py
+- [X] T013 Implement stream_extract_ndjson() in OpenAICompatibleProvider (src/logsqueak/llm/providers/openai_compat.py)
+- [X] T014 Implement stream_decisions_ndjson() in OpenAICompatibleProvider (src/logsqueak/llm/providers/openai_compat.py)
+- [X] T015 Implement stream_rewording_ndjson() in OpenAICompatibleProvider (src/logsqueak/llm/providers/openai_compat.py)
+- [X] T016 Create ExtractionApp main Textual app in src/logsqueak/tui/app.py (initializes ScreenState, handles navigation)
+- [X] T017 Update CLI entry point in src/logsqueak/cli/main.py to launch ExtractionApp for extract command
 
-**Checkpoint**: Foundation ready - user story screen implementation can now begin in parallel
+**Checkpoint**: ✅ Foundation ready - user story screen implementation can now begin in parallel
 
 ---
 

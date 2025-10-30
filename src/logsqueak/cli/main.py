@@ -168,6 +168,11 @@ def process_journal_date(
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     help="Override Logseq graph path (default: from config)",
 )
+@click.option(
+    "--tui",
+    is_flag=True,
+    help="Launch interactive TUI mode (only for single dates, not ranges)",
+)
 @click.pass_context
 def extract(
     ctx: click.Context,
@@ -175,6 +180,7 @@ def extract(
     prompt_log_file: Optional[Path],
     model: Optional[str],
     graph: Optional[Path],
+    tui: bool,
 ):
     """Extract knowledge from journal entries and integrate into pages.
 
@@ -184,7 +190,8 @@ def extract(
       - Relative: today, yesterday, last-week
 
     Examples:
-      logsqueak extract                    # Extract from today
+      logsqueak extract                    # Extract from today (batch mode)
+      logsqueak extract --tui              # Extract from today (interactive TUI)
       logsqueak extract 2025-01-15        # Extract from specific date
 
     Note: Changes are written immediately. Journal blocks are marked with
@@ -253,6 +260,47 @@ def extract(
         )
         ctx.exit(1)
 
+    # Handle TUI mode
+    if tui:
+        # TUI mode only supports single dates
+        if len(dates) > 1:
+            click.echo(
+                "Error: TUI mode only supports single dates, not ranges",
+                err=True,
+            )
+            click.echo(
+                f"Hint: Remove --tui flag to process {len(dates)} dates in batch mode",
+                err=True,
+            )
+            ctx.exit(1)
+
+        # Launch interactive TUI
+        from logsqueak.tui.app import ExtractionApp
+
+        journal_date = dates[0]
+        if verbose:
+            click.echo(f"Launching TUI for {journal_date.isoformat()}...")
+
+        app = ExtractionApp(
+            journal_date=journal_date,
+            config=config,
+            prompt_log_file=prompt_log_file,
+        )
+
+        # Run the TUI app (blocks until user exits)
+        try:
+            app.run()
+        except Exception as e:
+            click.echo(f"Error: TUI crashed: {e}", err=True)
+            if verbose:
+                import traceback
+                traceback.print_exc()
+            ctx.exit(1)
+
+        # TUI exited normally
+        return
+
+    # Batch mode (original behavior)
     if verbose:
         click.echo(f"Processing dates: {[d.isoformat() for d in dates]}")
 

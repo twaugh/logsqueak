@@ -7,7 +7,7 @@ during the interactive knowledge extraction workflow.
 from dataclasses import dataclass, field
 from typing import Literal
 
-from logsqueak.config.settings import Config
+from logsqueak.models.config import Configuration
 from logsqueak.llm.client import LLMClient
 from logsqueak.models.journal import JournalEntry
 
@@ -327,7 +327,7 @@ class ScreenState:
     Multiple decisions can share same knowledge_block_id (multi-page integration).
     """
 
-    config: Config
+    config: Configuration
     """
     User configuration (from ~/.config/logsqueak/config.yaml).
 
