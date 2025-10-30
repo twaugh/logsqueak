@@ -48,3 +48,30 @@ def find_block_by_id(blocks: list[LogseqBlock], block_id: str) -> Optional[Logse
         return None
 
     return search(blocks)
+
+
+def get_block_hierarchy(blocks: list[LogseqBlock], block_id: str) -> list[LogseqBlock]:
+    """
+    Get hierarchical path from root to target block.
+
+    Args:
+        blocks: List of root LogseqBlocks to search
+        block_id: Hybrid ID of target block
+
+    Returns:
+        List of blocks from root to target (inclusive), or empty list if not found
+    """
+    def search(blocks_to_search: list[LogseqBlock], path: list[LogseqBlock]) -> Optional[list[LogseqBlock]]:
+        for block in blocks_to_search:
+            current_path = path + [block]
+            # Get block's hybrid ID
+            current_block_id = block.block_id or generate_content_hash(block)
+            if current_block_id == block_id:
+                return current_path
+            result = search(block.children, current_path)
+            if result:
+                return result
+        return None
+
+    result = search(blocks, [])
+    return result if result else []

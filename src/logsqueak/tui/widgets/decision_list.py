@@ -6,7 +6,6 @@ destination page with expandable/collapsible sections for each page.
 
 from textual.app import ComposeResult
 from textual.containers import Container, Vertical
-from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Collapsible, Label, Static
 
@@ -36,13 +35,12 @@ class DecisionList(Widget):
     ```
 
     State Management:
-    - Reactive: decisions dict updates trigger re-render
+    - Decisions dict passed to constructor
+    - Widget recreated on each update (no reactive updates)
     - Decisions grouped by target_page
     - Each page gets a Collapsible container
     - Pages with all skips are collapsed by default
     """
-
-    decisions: reactive[dict[tuple[str, str], IntegrationDecision]] = reactive(dict)
 
     CSS = """
     DecisionList {
@@ -107,8 +105,7 @@ class DecisionList(Widget):
             decisions: Map of (knowledge_block_id, target_page) -> IntegrationDecision
         """
         super().__init__()
-        if decisions:
-            self.decisions = decisions
+        self.decisions = decisions or {}
 
     def compose(self) -> ComposeResult:
         """Compose widget layout with grouped decisions."""
@@ -267,47 +264,3 @@ class DecisionList(Widget):
             return f"[confidence-low]{percentage}%[/]"
         else:
             return f"[confidence-high]{percentage}%[/]"
-
-    async def watch_decisions(
-        self, new_decisions: dict[tuple[str, str], IntegrationDecision]
-    ) -> None:
-        """
-        React to decisions dict updates by re-rendering.
-
-        This is called automatically by Textual when self.decisions changes.
-
-        Args:
-            new_decisions: Updated decisions dict
-        """
-        # Trigger full re-render by removing and re-adding children
-        await self.remove_children()
-
-        if not new_decisions:
-            await self.mount(Label("No decisions yet. Waiting for Phase 3 streaming..."))
-            return
-
-        # Group decisions by target page
-        page_groups = self._group_by_page(new_decisions)
-
-        for page_name, page_decisions in page_groups.items():
-            # Count decision types
-            skip_count = sum(1 for d in page_decisions if d.action == "skip")
-            total_count = len(page_decisions)
-            active_count = total_count - skip_count
-
-            # Determine if page should be collapsed
-            collapsed = (skip_count == total_count)
-
-            # Build page section
-            collapsible = Collapsible(
-                title=self._format_page_header(page_name, active_count, total_count),
-                collapsed=collapsed,
-                classes="page-section",
-            )
-
-            await self.mount(collapsible)
-
-            # Add decision items to the collapsible
-            for decision in page_decisions:
-                widgets = list(self._render_decision(decision))
-                await collapsible.mount(*widgets)

@@ -228,6 +228,12 @@ class Phase3Screen(Screen):
                         knowledge_block_id=block_id,
                     )
 
+                    # Log the decision
+                    logger.info(
+                        f"Decision for {decision.target_page}: {decision.action} "
+                        f"(confidence: {decision.confidence:.0%})"
+                    )
+
                     # Store in state.decisions
                     key = (block_id, decision.target_page)
                     self.state.decisions[key] = decision
@@ -310,6 +316,11 @@ class Phase3Screen(Screen):
                 knowledge_block_id = reworded_dict["knowledge_block_id"]
                 target_page = reworded_dict["page"]
                 refined_text = reworded_dict["refined_text"]
+
+                # Log the rewording
+                logger.info(
+                    f"Reworded for {target_page}: {refined_text[:80]}..."
+                )
 
                 # Update decision in state
                 key = (knowledge_block_id, target_page)
@@ -403,8 +414,13 @@ class Phase3Screen(Screen):
 
         This forces the widget to re-render with updated decisions.
         """
-        decision_list = self.query_one(DecisionList)
-        decision_list.decisions = dict(self.state.decisions)  # Trigger reactive update
+        # Remove the old widget and mount a new one with updated data
+        old_list = self.query_one(DecisionList)
+        old_list.remove()
+
+        new_list = DecisionList(decisions=self.state.decisions)
+        container = self.query_one("#decisions-container")
+        container.mount(new_list)
 
     async def action_continue(self) -> None:
         """
