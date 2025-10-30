@@ -879,38 +879,48 @@ class OpenAICompatibleProvider(LLMClient):
         system_prompt = dedent("""
             You are a knowledge extraction assistant for a personal knowledge management system.
 
-            Your task is to classify journal blocks as either "knowledge" (lasting information)
-            or "activity" (temporary logs).
+            Your task is to identify which journal blocks contain lasting knowledge.
 
             EXTRACT knowledge like:
             - Key decisions and rationale
             - Important insights or learnings
             - Project updates with meaningful context
             - Ideas worth preserving
+            - Meeting outcomes and action items with context
 
             IGNORE activity logs like:
             - "Worked on X"
             - "Had meeting with Y"
+            - "Completed task Z"
             - Routine todos without context
             - Temporary status updates
 
-            For each block, return ONE JSON object per line (NDJSON format):
-            {"block_id": "...", "is_knowledge": true/false, "confidence": 0.0-1.0}
+            You will receive the full journal entry with all blocks labeled with their block IDs.
+
+            Your response should START with the blocks that ARE knowledge blocks.
+            For EACH knowledge block you identify, return ONE JSON object per line (NDJSON format):
+            {"block_id": "...", "is_knowledge": true, "confidence": 0.0-1.0}
+
+            Then, for completeness, you MAY list the activity blocks:
+            {"block_id": "...", "is_knowledge": false, "confidence": 0.0-1.0}
 
             IMPORTANT:
+            - START your response with knowledge blocks (is_knowledge: true)
             - Output exactly ONE JSON object per line
             - Each line MUST end with a newline character
             - Do NOT wrap in a top-level array
-            - Process blocks in any order (parallel processing is fine)
+            - Use confidence < 0.5 for borderline cases
         """).strip()
 
-        # Format blocks for the prompt
-        blocks_text = "\n\n".join([
-            f"Block ID: {b['block_id']}\nHierarchy: {b.get('hierarchy', '')}\nContent: {b['content']}"
-            for b in blocks
-        ])
+        # Format the full journal entry with block IDs
+        journal_lines = []
+        for b in blocks:
+            journal_lines.append(f"[Block: {b['block_id']}]")
+            journal_lines.append(b['content'])
+            if b.get('hierarchy'):
+                journal_lines.append(f"  Context: {b['hierarchy']}")
 
-        user_prompt = f"Classify these journal blocks:\n\n{blocks_text}"
+        user_prompt = f"Full journal entry:\n\n" + "\n".join(journal_lines)
 
         messages = [
             {"role": "system", "content": system_prompt},
