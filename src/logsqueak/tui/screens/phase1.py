@@ -197,7 +197,7 @@ class Phase1Screen(Screen):
         """
         Stream LLM classification results and update UI.
 
-        Calls LLMClient.stream_extract_ndjson() with all journal blocks
+        Calls LLMClient.stream_extract_ndjson() with full journal content
         and updates block_states as results arrive.
 
         Handles:
@@ -206,20 +206,20 @@ class Phase1Screen(Screen):
         - User overrides (skip updates for source="user")
         - UI refresh (post message to update tree)
         """
+        classified_count = 0
         try:
-            # Prepare blocks for LLM
-            blocks_payload = self._prepare_blocks_for_llm()
+            # Prepare journal content with IDs injected
+            journal_content = self._prepare_journal_with_ids()
 
-            logger.info(f"Starting LLM extraction stream for {len(blocks_payload)} blocks")
-            logger.debug(f"Sending {len(blocks_payload)} blocks to LLM for classification")
+            logger.info(f"Starting LLM extraction stream for journal")
+            logger.debug(f"Journal content length: {len(journal_content)} chars")
 
             # Update status
             status = self.query_one("#llm-status", Static)
-            status.update(f"Classifying {len(blocks_payload)} blocks...")
+            status.update("Classifying journal blocks...")
 
             # Stream classifications
-            classified_count = 0
-            async for result in self.state.llm_client.stream_extract_ndjson(blocks_payload):
+            async for result in self.state.llm_client.stream_extract_ndjson(journal_content):
                 # Log received JSON block
                 logger.debug(f"Received NDJSON block: {result}")
 
@@ -285,39 +285,37 @@ class Phase1Screen(Screen):
             status = self.query_one("#llm-status", Static)
             status.update(f"Error: {str(e)}")
 
-    def _prepare_blocks_for_llm(self) -> list[dict]:
+    def _prepare_journal_with_ids(self) -> str:
         """
-        Convert journal blocks to LLM API format.
+        Render journal entry as Logseq markdown with IDs injected.
+
+        Ensures every block has an id:: property (using hash-based IDs where missing).
 
         Returns:
-            List of dicts with block_id, content, and hierarchy fields
+            Full journal content as Logseq markdown string
         """
-        blocks = []
+        def inject_ids(block: LogseqBlock) -> None:
+            """Recursively inject id:: properties where missing."""
+            # If block doesn't have an id:: property, add hash-based ID
+            if not block.block_id:
+                hash_id = self._generate_content_hash(block)
+                # Use set_property to add id:: property
+                block.set_property("id", hash_id)
 
-        def walk_blocks(block: LogseqBlock, parents: list[str] = []) -> None:
-            """Recursively walk blocks and collect data."""
-            block_id = block.block_id or self._generate_content_hash(block)
-            content = block.get_full_content()
-
-            # Build hierarchical context (parent bullets)
-            hierarchy = "\n".join(f"  - {p}" for p in parents)
-
-            blocks.append({
-                "block_id": block_id,
-                "content": content,
-                "hierarchy": hierarchy,
-            })
-
-            # Recurse with current content added to parents
-            first_line = block.content[0] if block.content else "(empty)"
+            # Recurse to children
             for child in block.children:
-                walk_blocks(child, parents + [first_line])
+                inject_ids(child)
 
-        # Walk all root blocks
-        for root_block in self.state.journal_entry.outline.blocks:
-            walk_blocks(root_block)
+        # Clone the outline to avoid mutating the original
+        import copy
+        outline_copy = copy.deepcopy(self.state.journal_entry.outline)
 
-        return blocks
+        # Inject IDs in all blocks
+        for root_block in outline_copy.blocks:
+            inject_ids(root_block)
+
+        # Render to markdown
+        return outline_copy.render()
 
     def action_cursor_down(self) -> None:
         """Move cursor down (j or ↓)."""

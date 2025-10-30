@@ -204,17 +204,15 @@ class LLMClient(ABC):
         pass
 
     @abstractmethod
-    async def stream_extract_ndjson(self, blocks: List[dict]) -> AsyncIterator[dict]:
+    async def stream_extract_ndjson(self, journal_content: str) -> AsyncIterator[dict]:
         """Stream knowledge extraction results as NDJSON.
 
         Phase 1 of the extraction pipeline: Classify each journal block
         as either "knowledge" (lasting information) or "activity" (temporary log).
 
         Args:
-            blocks: List of journal blocks to classify. Each dict contains:
-                - block_id: str - Hybrid ID (id:: property or content hash)
-                - content: str - Block text content
-                - hierarchy: str - Full hierarchical context (parent blocks)
+            journal_content: Full Logseq journal markdown with id:: properties.
+                Each block must have an id:: property for identification.
 
         Yields:
             dict: One classification result per block:
@@ -232,6 +230,7 @@ class LLMClient(ABC):
             - Objects arrive in arbitrary order (not necessarily input order)
             - Malformed lines are logged and skipped (parser handles gracefully)
             - Stream may end early on network errors (partial results preserved)
+            - block_id values come from id:: properties in the journal
         """
         pass
 

@@ -860,14 +860,14 @@ class OpenAICompatibleProvider(LLMClient):
                     status_code=e.response.status_code,
                 )
 
-    async def stream_extract_ndjson(self, blocks: List[dict]) -> AsyncIterator[dict]:
+    async def stream_extract_ndjson(self, journal_content: str) -> AsyncIterator[dict]:
         """Stream knowledge extraction results as NDJSON.
 
         Phase 1 of the extraction pipeline: Classify each journal block
         as either "knowledge" (lasting information) or "activity" (temporary log).
 
         Args:
-            blocks: List of journal blocks to classify
+            journal_content: Full Logseq journal markdown with id:: properties
 
         Yields:
             dict: Classification results as they arrive
@@ -880,6 +880,12 @@ class OpenAICompatibleProvider(LLMClient):
             You are a knowledge extraction assistant for a personal knowledge management system.
 
             Your task is to identify which journal blocks contain lasting knowledge.
+
+            FORMAT: The journal is in Logseq-flavored Markdown with these conventions:
+            - Bullets start with "- " and can be nested with indentation
+            - Page links use [[Page Name]] syntax
+            - Properties use key:: value syntax (especially id:: for block IDs)
+            - Indentation indicates hierarchy
 
             EXTRACT knowledge like:
             - Key decisions and rationale
@@ -895,32 +901,26 @@ class OpenAICompatibleProvider(LLMClient):
             - Routine todos without context
             - Temporary status updates
 
-            You will receive the full journal entry with all blocks labeled with their block IDs.
+            You will receive the full journal entry in its original Logseq format.
+            Each block has an id:: property - use this to identify blocks in your response.
 
             Your response should START with the blocks that ARE knowledge blocks.
             For EACH knowledge block you identify, return ONE JSON object per line (NDJSON format):
-            {"block_id": "...", "is_knowledge": true, "confidence": 0.0-1.0}
+            {"block_id": "id-value-from-id-property", "is_knowledge": true, "confidence": 0.0-1.0}
 
             Then, for completeness, you MAY list the activity blocks:
-            {"block_id": "...", "is_knowledge": false, "confidence": 0.0-1.0}
+            {"block_id": "id-value-from-id-property", "is_knowledge": false, "confidence": 0.0-1.0}
 
             IMPORTANT:
             - START your response with knowledge blocks (is_knowledge: true)
+            - Use the EXACT value from the id:: property for block_id
             - Output exactly ONE JSON object per line
             - Each line MUST end with a newline character
             - Do NOT wrap in a top-level array
             - Use confidence < 0.5 for borderline cases
         """).strip()
 
-        # Format the full journal entry with block IDs
-        journal_lines = []
-        for b in blocks:
-            journal_lines.append(f"[Block: {b['block_id']}]")
-            journal_lines.append(b['content'])
-            if b.get('hierarchy'):
-                journal_lines.append(f"  Context: {b['hierarchy']}")
-
-        user_prompt = f"Full journal entry:\n\n" + "\n".join(journal_lines)
+        user_prompt = f"Journal entry:\n\n{journal_content}"
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -933,7 +933,7 @@ class OpenAICompatibleProvider(LLMClient):
                 stage="extraction_streaming",
                 messages=messages,
                 model=self.model,
-                metadata={"block_count": len(blocks)},
+                metadata={"journal_length": len(journal_content)},
             )
 
         # Stream HTTP response and parse NDJSON
