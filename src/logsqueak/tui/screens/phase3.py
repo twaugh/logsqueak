@@ -376,11 +376,16 @@ class Phase3Screen(Screen):
 
         action = action_map.get(decision_dict["action"], "skip")
 
+        # Clean target_id: LLM may return it wrapped in brackets like "[abc123]"
+        target_id = decision_dict.get("target_id")
+        if target_id and isinstance(target_id, str):
+            target_id = target_id.strip("[]")
+
         return IntegrationDecision(
             knowledge_block_id=knowledge_block_id,
             target_page=decision_dict["page"],
             action=action,
-            target_block_id=decision_dict.get("target_id"),
+            target_block_id=target_id,
             target_block_title=decision_dict.get("target_title"),
             confidence=decision_dict.get("confidence", 0.0),
             refined_text="",  # Populated by rewording task
@@ -454,6 +459,8 @@ class Phase3Screen(Screen):
         # Target page preview
         lines.append(f"[bold]Target Page: {target_page}[/bold]")
         lines.append(f"Action: {self._format_action_label(decision)} (Confidence: {decision.confidence:.0%})")
+        if decision.target_block_id:
+            lines.append(f"[dim]Target Block ID: {decision.target_block_id[:16]}...[/dim]")
         lines.append("")
 
         if decision.action == "skip":
@@ -505,11 +512,11 @@ class Phase3Screen(Screen):
         Render target page preview with visual diff highlighting.
 
         Shows the REFINED (reworded) content, not the original journal entry.
-        Displays hierarchical structure with proper indentation.
+        Uses candidate blocks data for proper hybrid ID matching.
         """
         lines = []
 
-        # Get candidate to show existing page blocks
+        # Get candidate to access block IDs
         candidate = None
         for cand in self.state.candidates.get(decision.knowledge_block_id, []):
             if cand.page_name == decision.target_page:
@@ -519,7 +526,7 @@ class Phase3Screen(Screen):
         if not candidate:
             # No candidate data - just show action description
             if decision.action == "add_section":
-                lines.append("[dim]Adding as new section:[/dim]")
+                lines.append("[dim]New page - adding first block:[/dim]")
                 if decision.refined_text:
                     for refined_line in decision.refined_text.split('\n'):
                         lines.append(f"[green]┃[/green] {refined_line}")
@@ -527,24 +534,156 @@ class Phase3Screen(Screen):
                     lines.append("[dim]┃ (Refining...)[/dim]")
             return lines
 
-        # Build hierarchical tree structure
-        blocks = candidate.blocks if candidate.blocks else []
+        # Build ID map from candidate blocks
+        id_to_block_info = {block_info["id"]: block_info for block_info in candidate.blocks}
 
-        # Render blocks with hierarchy
-        for i, block_info in enumerate(blocks):
+        # Debug: Log candidate blocks and target
+        logger.info(f"Rendering {decision.target_page}: {len(candidate.blocks)} blocks, target_id={decision.target_block_id}")
+        for i, block_info in enumerate(candidate.blocks[:5]):
+            logger.info(f"  Block {i}: id={block_info.get('id', 'N/A')[:16]}..., content={block_info.get('content', '')[:50]}")
+
+        # Render blocks from candidate data with hierarchy
+        lines.extend(self._render_candidate_blocks(
+            candidate.blocks,
+            decision,
+            depth=0
+        ))
+
+        # If add_section, append new content at the end
+        if decision.action == "add_section":
+            if decision.refined_text:
+                for refined_line in decision.refined_text.split('\n'):
+                    lines.append(f"[green]┃[/green] {refined_line}")
+            else:
+                lines.append("[dim]┃ (Refining...)[/dim]")
+
+        return lines
+
+    def _render_candidate_blocks(
+        self,
+        blocks: list[dict],
+        decision: IntegrationDecision,
+        depth: int
+    ) -> list[str]:
+        """
+        Render blocks from candidate data with proper hierarchy.
+
+        Args:
+            blocks: List of block info dicts from candidate
+            decision: Current integration decision
+            depth: Starting depth (usually 0)
+
+        Returns:
+            List of formatted lines
+        """
+        lines = []
+
+        # Group blocks by parent to build hierarchy
+        root_blocks = [b for b in blocks if b.get("parent_id") is None]
+        children_map = {}
+        for block in blocks:
+            parent_id = block.get("parent_id")
+            if parent_id:
+                if parent_id not in children_map:
+                    children_map[parent_id] = []
+                children_map[parent_id].append(block)
+
+        def render_block_and_children(block_info: dict, current_depth: int):
+            block_lines = []
             block_id = block_info.get("id")
             content = block_info.get("content", "")
-            depth = block_info.get("depth", 0)
 
             # Truncate long content
             if len(content) > 80:
                 content = content[:80] + "..."
 
-            # Calculate indentation (2 spaces per depth level)
-            indent = "  " * depth
+            indent = "  " * current_depth
 
             # Check if this block is being replaced
             if decision.action == "replace" and block_id == decision.target_block_id:
+                # Show strikethrough for old content
+                block_lines.append(f"{indent}• [strike]{content}[/strike]")
+                # Show new refined content below with green bar
+                if decision.refined_text:
+                    for refined_line in decision.refined_text.split('\n'):
+                        block_lines.append(f"{indent}[green]┃[/green] {refined_line}")
+                else:
+                    block_lines.append(f"{indent}[dim]┃ (Refining...)[/dim]")
+            else:
+                # Normal block display
+                block_lines.append(f"{indent}• {content}")
+
+            # Render children
+            if block_id in children_map:
+                for child in children_map[block_id]:
+                    block_lines.extend(render_block_and_children(child, current_depth + 1))
+
+            # If adding under this block, show new REFINED content as child AFTER children
+            if decision.action == "add_under" and block_id == decision.target_block_id:
+                child_indent = "  " * (current_depth + 1)
+                logger.info(f"Found target block for add_under: block_id={block_id}, refined_text_length={len(decision.refined_text) if decision.refined_text else 0}")
+                if decision.refined_text:
+                    for refined_line in decision.refined_text.split('\n'):
+                        block_lines.append(f"{child_indent}[green]┃[/green] {refined_line}")
+                else:
+                    block_lines.append(f"{child_indent}[dim]┃ (Refining...)[/dim]")
+
+            return block_lines
+
+        # Render all root blocks
+        for root_block in root_blocks:
+            lines.extend(render_block_and_children(root_block, depth))
+
+        return lines
+
+    def _render_blocks_recursive(
+        self,
+        blocks: list,
+        decision: IntegrationDecision,
+        block_id_map: dict,
+        depth: int,
+        parents: list
+    ) -> list[str]:
+        """
+        Recursively render blocks with proper indentation and modifications.
+
+        Args:
+            blocks: List of LogseqBlock objects
+            decision: Current integration decision
+            block_id_map: Map of hybrid_id -> block (for reverse lookup)
+            depth: Current nesting depth
+            parents: List of parent blocks (for hybrid ID generation)
+
+        Returns:
+            List of formatted lines
+        """
+        from logsqueak.logseq.context import generate_full_context, generate_content_hash
+
+        lines = []
+        indent = "  " * depth
+
+        for block in blocks:
+            # Generate hybrid ID for this block
+            if block.block_id:
+                hybrid_id = block.block_id
+            else:
+                full_context = generate_full_context(block, parents)
+                hybrid_id = generate_content_hash(full_context, decision.target_page)
+
+            # Debug: Log hybrid ID comparison
+            if decision.action == "add_under":
+                is_match = hybrid_id == decision.target_block_id
+                logger.info(f"Block hybrid_id={hybrid_id[:16]}..., target={decision.target_block_id[:16] if decision.target_block_id else None}..., match={is_match}")
+
+            # Get first line of content for display
+            content = block.content[0] if block.content else "(empty)"
+
+            # Truncate long content
+            if len(content) > 80:
+                content = content[:80] + "..."
+
+            # Check if this block is being replaced
+            if decision.action == "replace" and hybrid_id == decision.target_block_id:
                 # Show strikethrough for old content
                 lines.append(f"{indent}• [strike]{content}[/strike]")
                 # Show new refined content below with green bar
@@ -557,22 +696,26 @@ class Phase3Screen(Screen):
                 # Normal block display
                 lines.append(f"{indent}• {content}")
 
-            # If adding under this block, show new REFINED content as child
-            if decision.action == "add_under" and block_id == decision.target_block_id:
+            # Render children first
+            if block.children:
+                new_parents = parents + [block]
+                lines.extend(self._render_blocks_recursive(
+                    block.children,
+                    decision,
+                    block_id_map,
+                    depth + 1,
+                    new_parents
+                ))
+
+            # If adding under this block, show new REFINED content as child AFTER children
+            if decision.action == "add_under" and hybrid_id == decision.target_block_id:
                 child_indent = "  " * (depth + 1)
+                logger.info(f"Found target block for add_under: {hybrid_id}, refined_text={decision.refined_text[:50] if decision.refined_text else None}")
                 if decision.refined_text:
                     for refined_line in decision.refined_text.split('\n'):
                         lines.append(f"{child_indent}[green]┃[/green] {refined_line}")
                 else:
                     lines.append(f"{child_indent}[dim]┃ (Refining...)[/dim]")
-
-        # If add_section, show new REFINED content at root level
-        if decision.action == "add_section":
-            if decision.refined_text:
-                for refined_line in decision.refined_text.split('\n'):
-                    lines.append(f"[green]┃[/green] {refined_line}")
-            else:
-                lines.append("[dim]┃ (Refining...)[/dim]")
 
         return lines
 
