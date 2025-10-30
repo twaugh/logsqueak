@@ -29,9 +29,9 @@ Single project structure:
 
 **Purpose**: Project initialization and TUI framework setup
 
-- [ ] T001 Add Textual \^0.47.0 to pyproject.toml dependencies
-- [ ] T002 [P] Create TUI module structure (src/logsqueak/tui/__init__.py, screens/, widgets/)
-- [ ] T003 [P] Create TUI models module (src/logsqueak/tui/models.py)
+- [X] T001 Add Textual \^0.47.0 to pyproject.toml dependencies
+- [X] T002 [P] Create TUI module structure (src/logsqueak/tui/__init__.py, screens/, widgets/)
+- [X] T003 [P] Create TUI models module (src/logsqueak/tui/models.py)
 
 ---
 
@@ -41,12 +41,12 @@ Single project structure:
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Implement generic NDJSON stream parser in src/logsqueak/llm/streaming.py
+- [X] T004 Implement generic NDJSON stream parser in src/logsqueak/llm/streaming.py
 - [ ] T005 Add HTTP streaming protocol handling to src/logsqueak/llm/providers/openai_compat.py (Ollama + OpenAI formats)
-- [ ] T006 [P] Define ScreenState dataclass in src/logsqueak/tui/models.py (current_phase, journal_entry, block_states, candidates, decisions, config, llm_client)
-- [ ] T007 [P] Define BlockState dataclass in src/logsqueak/tui/models.py (block_id, classification, confidence, source, llm_classification, llm_confidence)
-- [ ] T008 [P] Define CandidatePage dataclass in src/logsqueak/tui/models.py (page_name, similarity_score, included, blocks, search_method)
-- [ ] T009 [P] Define IntegrationDecision dataclass in src/logsqueak/tui/models.py (knowledge_block_id, target_page, action, target_block_id, target_block_title, confidence, refined_text, source, skip_reason)
+- [X] T006 [P] Define ScreenState dataclass in src/logsqueak/tui/models.py (current_phase, journal_entry, block_states, candidates, decisions, config, llm_client)
+- [X] T007 [P] Define BlockState dataclass in src/logsqueak/tui/models.py (block_id, classification, confidence, source, llm_classification, llm_confidence)
+- [X] T008 [P] Define CandidatePage dataclass in src/logsqueak/tui/models.py (page_name, similarity_score, included, blocks, search_method)
+- [X] T009 [P] Define IntegrationDecision dataclass in src/logsqueak/tui/models.py (knowledge_block_id, target_page, action, target_block_id, target_block_title, confidence, refined_text, source, skip_reason)
 - [ ] T010 Add stream_extract_ndjson() method to LLMClient abstract class in src/logsqueak/llm/client.py
 - [ ] T011 Add stream_decisions_ndjson() method to LLMClient abstract class in src/logsqueak/llm/client.py
 - [ ] T012 Add stream_rewording_ndjson() method to LLMClient abstract class in src/logsqueak/llm/client.py
