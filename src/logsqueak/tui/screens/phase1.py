@@ -262,11 +262,12 @@ class Phase1Screen(Screen):
                         f"  Block ID: {block_id[:8]}... | Full classification: {result}"
                     )
 
-                    # Update UI - find and refresh the tree node
+                    # Update UI - find and refresh the tree node and ancestors
                     if self.block_tree:
                         node = self._find_tree_node(self.block_tree.root, block_id)
                         if node:
                             self._refresh_tree_node(node)
+                            self._refresh_ancestors(node)
                         else:
                             logger.warning(f"Could not find tree node for block {block_id[:8]}... (classification: {classification})")
 
@@ -362,8 +363,9 @@ class Phase1Screen(Screen):
         # Apply smart defaults: cascade to children
         self._cascade_classification(cursor_node, "knowledge")
 
-        # Refresh tree node label
+        # Refresh tree node label and all ancestors (knowledge counts changed)
         self._refresh_tree_node(cursor_node)
+        self._refresh_ancestors(cursor_node)
 
     def action_mark_activity(self) -> None:
         """
@@ -399,8 +401,9 @@ class Phase1Screen(Screen):
         # Apply smart defaults: cascade to children
         self._cascade_classification(cursor_node, "activity")
 
-        # Refresh tree node label
+        # Refresh tree node label and all ancestors (knowledge counts changed)
         self._refresh_tree_node(cursor_node)
+        self._refresh_ancestors(cursor_node)
 
     def action_reset(self) -> None:
         """
@@ -444,8 +447,9 @@ class Phase1Screen(Screen):
             block_state.source = "llm"
             logger.info(f"Reset block {block_id[:8]}... to pending (no LLM classification)")
 
-        # Refresh tree node label
+        # Refresh tree node label and all ancestors (knowledge counts changed)
         self._refresh_tree_node(cursor_node)
+        self._refresh_ancestors(cursor_node)
 
     async def action_continue(self) -> None:
         """
@@ -538,6 +542,7 @@ class Phase1Screen(Screen):
         Refresh a tree node's label after state change.
 
         Re-generates the label based on current BlockState and updates the tree node.
+        Also recalculates knowledge count for the subtree.
 
         Args:
             node: Tree node to refresh
@@ -560,12 +565,28 @@ class Phase1Screen(Screen):
             logger.warning(f"Could not find LogseqBlock for ID {block_id}")
             return
 
-        # Format new label
+        # Format new label with updated knowledge count
         if self.block_tree:
-            new_label = self.block_tree.format_block_label(logseq_block, block_state)
+            knowledge_count = self.block_tree._count_knowledge_in_subtree(logseq_block)
+            new_label = self.block_tree.format_block_label(logseq_block, block_state, knowledge_count)
             old_label = str(node.label)
             node.set_label(new_label)
             logger.debug(f"Refreshed tree node {block_id[:8]}: '{old_label[:50]}' -> '{new_label[:50]}'")
+
+    def _refresh_ancestors(self, node: "TreeNode") -> None:
+        """
+        Refresh all ancestor nodes' labels after a classification change.
+
+        When a block's classification changes, all ancestor knowledge counts
+        need to be updated.
+
+        Args:
+            node: Tree node whose ancestors should be refreshed
+        """
+        current = node.parent
+        while current is not None and current != self.block_tree.root:
+            self._refresh_tree_node(current)
+            current = current.parent
 
     def _find_tree_node(self, node: TreeNode, block_id: str) -> Optional[TreeNode]:
         """

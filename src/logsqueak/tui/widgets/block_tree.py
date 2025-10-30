@@ -85,8 +85,11 @@ class BlockTree(Tree):
             ),
         )
 
-        # Format label with classification icon and confidence
-        label = self.format_block_label(block, block_state)
+        # Count knowledge blocks in this subtree
+        knowledge_count = self._count_knowledge_in_subtree(block)
+
+        # Format label with knowledge count, classification icon and confidence
+        label = self.format_block_label(block, block_state, knowledge_count)
 
         # Add to tree (use the generated block_id, not block.block_id)
         if parent_node is None:
@@ -100,11 +103,16 @@ class BlockTree(Tree):
 
         return node
 
-    def format_block_label(self, block: LogseqBlock, block_state: BlockState) -> str:
+    def format_block_label(self, block: LogseqBlock, block_state: BlockState, knowledge_count: int) -> str:
         """
-        Format a block label with classification icon, content, and confidence.
+        Format a block label with knowledge count, classification icon, content, and confidence.
 
-        Format: [icon] content (confidence%) [warning]
+        Format: [count] [icon] content (confidence%) [warning]
+
+        Knowledge count:
+        - Shows number of knowledge blocks in this subtree (including self)
+        - [0] = no knowledge in subtree
+        - [N] = N knowledge blocks found
 
         Icons:
         - ✓ : Knowledge (green)
@@ -125,6 +133,7 @@ class BlockTree(Tree):
         Args:
             block: LogseqBlock to format
             block_state: Current classification state
+            knowledge_count: Number of knowledge blocks in subtree
 
         Returns:
             Formatted label string with markup
@@ -160,7 +169,30 @@ class BlockTree(Tree):
                 llm_pct = int(block_state.llm_confidence * 100)
                 confidence_str = f" (was {llm_pct}%)"
 
-        return f"{icon} {first_line}{confidence_str}{warning}{user_marker}"
+        return f"[{knowledge_count}] {icon} {first_line}{confidence_str}{warning}{user_marker}"
+
+    def _count_knowledge_in_subtree(self, block: LogseqBlock) -> int:
+        """
+        Count knowledge blocks in this block's subtree (including self).
+
+        Args:
+            block: LogseqBlock to count from
+
+        Returns:
+            Number of knowledge blocks in subtree
+        """
+        # Generate block ID
+        block_id = block.block_id or self._generate_content_hash(block)
+
+        # Check if this block is knowledge
+        block_state = self.block_states.get(block_id)
+        count = 1 if (block_state and block_state.classification == "knowledge") else 0
+
+        # Recursively count children
+        for child in block.children:
+            count += self._count_knowledge_in_subtree(child)
+
+        return count
 
     def _generate_content_hash(self, block: LogseqBlock) -> str:
         """
