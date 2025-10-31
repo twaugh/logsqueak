@@ -383,10 +383,14 @@ class Phase1Screen(Screen):
         """
         Toggle knowledge selection for current block (Space key).
 
-        If block is currently "knowledge" → mark as "activity"
+        If block is currently "knowledge" → deselect (restore to LLM suggestion or activity)
         If block is currently "activity" or "pending" → mark as "knowledge"
 
-        Sets source="user" and cascades to children.
+        When deselecting:
+        - If block has LLM suggestion, restore to pending state (shows blue background)
+        - If no LLM suggestion, mark as activity
+
+        Only affects the selected block (no cascading).
         """
         if not self.block_tree:
             return
@@ -401,129 +405,59 @@ class Phase1Screen(Screen):
 
         block_state = self.state.block_states[block_id]
 
-        # Toggle: if currently knowledge, switch to activity; otherwise to knowledge
+        # Toggle logic
         if block_state.classification == "knowledge":
-            new_classification = "activity"
+            # Deselecting knowledge block
+            if block_state.llm_classification:
+                # Has LLM suggestion - restore to pending (will show suggestion background)
+                block_state.classification = "pending"
+                block_state.source = "llm"
+                block_state.confidence = None
+                logger.info(f"User deselected block {block_id[:8]}..., restored to LLM suggestion (pending)")
+            else:
+                # No LLM suggestion - mark as activity
+                block_state.classification = "activity"
+                block_state.source = "user"
+                block_state.confidence = None
+                logger.info(f"User toggled block {block_id[:8]}... to activity")
         else:
-            new_classification = "knowledge"
+            # Selecting as knowledge (from activity or pending)
+            block_state.classification = "knowledge"
+            block_state.source = "user"
+            block_state.confidence = None
+            logger.info(f"User toggled block {block_id[:8]}... to knowledge")
 
-        block_state.classification = new_classification
-        block_state.source = "user"
-        block_state.confidence = None
-
-        logger.info(f"User toggled block {block_id[:8]}... to {new_classification}")
-
-        # Cascade to children
-        self._cascade_classification(cursor_node, new_classification)
-
-        # Refresh tree display
+        # Refresh tree display (only this node and ancestors for knowledge count)
         self._refresh_tree_node(cursor_node)
         self._refresh_ancestors(cursor_node)
         self._update_reason_bar()
 
     def action_clear_all(self) -> None:
         """
-        Clear all selections - mark all blocks as activity (c key).
+        Clear all selections (c key).
 
-        Sets all blocks to:
-        - classification = "activity"
-        - source = "user"
+        Resets all blocks back to pending state, preserving AI suggestions.
+        - Affects both user-selected blocks (source="user") and accepted AI blocks
+        - Resets classification to "pending" (AI suggestions will still show with blue background)
         - Preserves llm_classification and llm_confidence
         """
         cleared_count = 0
 
         for block_id, block_state in self.state.block_states.items():
-            if block_state.classification != "activity":
-                block_state.classification = "activity"
-                block_state.source = "user"
+            # Clear any block that's not already in pending state
+            if block_state.classification != "pending":
+                block_state.classification = "pending"
+                block_state.source = "llm"
                 block_state.confidence = None
                 cleared_count += 1
 
-        logger.info(f"Cleared all selections ({cleared_count} blocks marked as activity)")
+        logger.info(f"Cleared {cleared_count} selections (AI suggestions preserved)")
 
         # Refresh entire tree
         if self.block_tree:
             self._refresh_entire_tree()
         self._update_reason_bar()
 
-    def action_mark_knowledge(self) -> None:
-        """
-        Mark current block as knowledge (K key).
-
-        Sets:
-        - classification = "knowledge"
-        - source = "user"
-        - Preserves llm_classification and llm_confidence if present
-        - Cascades to children unless they have user overrides
-        """
-        if not self.block_tree:
-            return
-
-        # Get current node
-        cursor_node = self.block_tree.cursor_node
-        if cursor_node is None or cursor_node.data is None:
-            return
-
-        block_id = cursor_node.data
-
-        if block_id not in self.state.block_states:
-            return
-
-        block_state = self.state.block_states[block_id]
-
-        # Mark as user-classified knowledge
-        block_state.classification = "knowledge"
-        block_state.source = "user"
-        block_state.confidence = None  # User classifications don't have confidence
-
-        logger.info(f"User marked block {block_id[:8]}... as knowledge")
-
-        # Apply smart defaults: cascade to children
-        self._cascade_classification(cursor_node, "knowledge")
-
-        # Refresh tree node label and all ancestors (knowledge counts changed)
-        self._refresh_tree_node(cursor_node)
-        self._refresh_ancestors(cursor_node)
-        self._update_reason_bar()
-
-    def action_mark_activity(self) -> None:
-        """
-        Mark current block as activity (A key).
-
-        Sets:
-        - classification = "activity"
-        - source = "user"
-        - Preserves llm_classification and llm_confidence if present
-        - Cascades to children unless they have user overrides
-        """
-        if not self.block_tree:
-            return
-
-        cursor_node = self.block_tree.cursor_node
-        if cursor_node is None or cursor_node.data is None:
-            return
-
-        block_id = cursor_node.data
-
-        if block_id not in self.state.block_states:
-            return
-
-        block_state = self.state.block_states[block_id]
-
-        # Mark as user-classified activity
-        block_state.classification = "activity"
-        block_state.source = "user"
-        block_state.confidence = None
-
-        logger.info(f"User marked block {block_id[:8]}... as activity")
-
-        # Apply smart defaults: cascade to children
-        self._cascade_classification(cursor_node, "activity")
-
-        # Refresh tree node label and all ancestors (knowledge counts changed)
-        self._refresh_tree_node(cursor_node)
-        self._refresh_ancestors(cursor_node)
-        self._update_reason_bar()
 
     def action_reset(self) -> None:
         """
@@ -663,48 +597,6 @@ class Phase1Screen(Screen):
         from logsqueak.tui.screens.phase2 import Phase2Screen
         await self.app.push_screen(Phase2Screen(self.state))
 
-    def _cascade_classification(
-        self,
-        parent_node: "TreeNode",
-        classification: str,
-    ) -> None:
-        """
-        Cascade classification from parent to all children.
-
-        Only updates children that don't have user overrides (source != "user").
-        Recursively applies to all descendants.
-
-        Args:
-            parent_node: Tree node whose children should inherit classification
-            classification: Classification to cascade ("knowledge" or "activity")
-        """
-        for child_node in parent_node.children:
-            if child_node.data is None:
-                continue
-
-            child_block_id = child_node.data
-
-            if child_block_id not in self.state.block_states:
-                continue
-
-            child_state = self.state.block_states[child_block_id]
-
-            # Only cascade if child hasn't been user-overridden
-            if child_state.source != "user":
-                child_state.classification = classification
-                child_state.confidence = None
-                # Don't change source - keep as "llm" to allow LLM to override later
-                # unless parent was explicitly user-marked
-
-                logger.debug(
-                    f"Cascaded {classification} to child block {child_block_id[:8]}..."
-                )
-
-                # Refresh child node label
-                self._refresh_tree_node(child_node)
-
-            # Recurse to grandchildren
-            self._cascade_classification(child_node, classification)
 
     def _refresh_tree_node(self, node: "TreeNode") -> None:
         """
