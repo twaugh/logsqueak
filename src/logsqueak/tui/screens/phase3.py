@@ -213,8 +213,7 @@ class Phase3Screen(Screen):
                     chunks = [
                         {
                             "target_id": block_info["id"],
-                            "content": block_info["content"],
-                            "title": block_info["content"][:50] + "..." if len(block_info["content"]) > 50 else block_info["content"],
+                            "hierarchical_text": block_info.get("hierarchical_text", block_info["content"]),
                         }
                         for block_info in filtered_blocks
                     ]

@@ -1033,11 +1033,20 @@ class OpenAICompatibleProvider(LLMClient):
         # Format knowledge block and candidates
         kb_text = f"Knowledge: {knowledge_block['content']}\nHierarchy: {knowledge_block.get('hierarchical_text', '')}"
 
-        candidates_text = "\n\n".join([
-            f"Page: {p['page_name']} (similarity: {p['similarity_score']:.2f})\nBlocks:\n" +
-            "\n".join([f"  - [{c['target_id']}] {c['title']}: {c['content']}" for c in p.get('chunks', [])])
-            for p in candidate_pages
-        ])
+        # Format candidate pages with hierarchical blocks (from ChromaDB)
+        page_sections = []
+        for p in candidate_pages:
+            chunks = p.get('chunks', [])
+            if not chunks:
+                page_sections.append(f"<page name=\"{p['page_name']}\" similarity=\"{p['similarity_score']:.2f}\">\n(No blocks)\n</page>")
+            else:
+                blocks_xml = "\n\n".join([
+                    f"<block id=\"{c['target_id']}\">\n{c.get('hierarchical_text') or '(no context available)'}\n</block>"
+                    for c in chunks
+                ])
+                page_sections.append(f"<page name=\"{p['page_name']}\" similarity=\"{p['similarity_score']:.2f}\">\n{blocks_xml}\n</page>")
+
+        candidates_text = "\n\n".join(page_sections)
 
         user_prompt = f"{kb_text}\n\nCandidate Pages:\n{candidates_text}"
 

@@ -306,15 +306,30 @@ class Phase2Screen(Screen):
                 # Use highest similarity score for the page
                 max_similarity = max(sim for sim, _, _ in chunks)
 
-                # Extract matched block content from semantic search (for matching)
+                # Extract matched block info from semantic search
                 # ChromaDB chunk IDs are sequential numbers, not hybrid IDs
-                # Use block_content from metadata to match blocks later
-                matched_block_contents = set()
+                # Store both block_content for matching AND chroma:document for LLM context
+                matched_blocks_data = []
                 for _, chunk_id, metadata in chunks:
                     block_content = metadata.get("block_content", "")
+                    hierarchical_text = metadata.get("chroma:document", "")
+
+                    # Debug: Check what we're getting from ChromaDB
+                    if not hierarchical_text:
+                        logger.warning(
+                            f"Empty chroma:document for chunk {chunk_id} in {page_name}. "
+                            f"Metadata keys: {list(metadata.keys())}"
+                        )
+
                     if block_content:
-                        # Normalize whitespace for matching
-                        matched_block_contents.add(block_content.strip())
+                        matched_blocks_data.append({
+                            "content": block_content.strip(),
+                            "hierarchical_text": hierarchical_text
+                        })
+                        logger.debug(
+                            f"Matched block in {page_name}: content_len={len(block_content)}, "
+                            f"hierarchical_len={len(hierarchical_text)}"
+                        )
 
                 # Load ALL blocks from the page (not just matching chunks)
                 # This ensures proper hierarchy display in Phase 3
@@ -325,11 +340,28 @@ class Phase2Screen(Screen):
                     blocks = self._extract_blocks_from_outline(outline)
 
                     # Now match blocks by content to get their hybrid IDs
+                    # Keep the hierarchical_text from generate_full_context (already set)
+                    # ChromaDB's chroma:document should match, but if it's empty, keep ours
                     matched_block_ids = []
                     for block_info in blocks:
                         block_content = block_info["content"].strip()
-                        if block_content in matched_block_contents:
-                            matched_block_ids.append(block_info["id"])
+                        # Find matching data
+                        for matched_data in matched_blocks_data:
+                            if block_content == matched_data["content"]:
+                                matched_block_ids.append(block_info["id"])
+                                # Only override if ChromaDB has non-empty hierarchical text
+                                if matched_data["hierarchical_text"]:
+                                    logger.debug(
+                                        f"Using ChromaDB hierarchical text for {block_info['id'][:8]}... "
+                                        f"(len={len(matched_data['hierarchical_text'])})"
+                                    )
+                                    block_info["hierarchical_text"] = matched_data["hierarchical_text"]
+                                else:
+                                    logger.warning(
+                                        f"ChromaDB hierarchical text empty for {block_info['id'][:8]}..., "
+                                        f"keeping generated text (len={len(block_info['hierarchical_text'])})"
+                                    )
+                                break
 
                 except Exception as e:
                     logger.warning(f"Failed to load full page {page_name}: {e}")
@@ -469,21 +501,34 @@ class Phase2Screen(Screen):
             outline: Parsed Logseq page outline
 
         Returns:
-            List of block dicts with id, content, depth, parent_id
+            List of block dicts with id, content, depth, parent_id, hierarchical_text
         """
+        from logsqueak.logseq.context import generate_full_context
+
         blocks = []
 
-        def walk(block: LogseqBlock, depth: int = 0, parent_id: str | None = None):
+        def walk(block: LogseqBlock, depth: int = 0, parent_id: str | None = None, parents: list[LogseqBlock] = None):
+            if parents is None:
+                parents = []
+
             # Get hybrid ID (block_id property or content hash)
             block_hybrid_id = block.block_id or generate_content_hash(block)
+
+            # Generate hierarchical context (same as what's in ChromaDB)
+            hierarchical_text = generate_full_context(block, parents, outline.indent_str)
+
             blocks.append({
                 "id": block_hybrid_id,
                 "content": "\n".join(block.content) if block.content else "",  # Include all lines
                 "depth": depth,
                 "parent_id": parent_id,
+                "hierarchical_text": hierarchical_text,
             })
+
+            # Recurse to children with updated parent list
+            new_parents = parents + [block]
             for child in block.children:
-                walk(child, depth + 1, parent_id=block_hybrid_id)
+                walk(child, depth + 1, parent_id=block_hybrid_id, parents=new_parents)
 
         for root_block in outline.blocks:
             walk(root_block)
