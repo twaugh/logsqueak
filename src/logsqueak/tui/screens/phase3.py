@@ -409,10 +409,38 @@ class Phase3Screen(Screen):
     def _get_hierarchical_text(self, block) -> str:
         """
         Get hierarchical markdown representation of block with parent context.
+
+        Shows the full outline hierarchy from root to this block:
+        - Parent block
+          - Child block
+            - This block (knowledge)
         """
-        # For now, just return block content
-        # TODO: Add parent context in future if needed
-        return "\n".join(block.content)
+        from logsqueak.logseq.context import generate_full_context
+        from logsqueak.tui.utils import get_block_hierarchy, generate_content_hash
+
+        # Get hybrid ID for this block
+        hybrid_id = block.block_id or generate_content_hash(block)
+
+        # Get full hierarchy from root to this block
+        hierarchy = get_block_hierarchy(self.state.journal_entry.outline.blocks, hybrid_id)
+
+        if not hierarchy:
+            # Fallback to just block content if hierarchy lookup fails
+            return "\n".join(block.content)
+
+        # The last block in hierarchy is our target block
+        # Parents are everything before it
+        parents = hierarchy[:-1]
+        target_block = hierarchy[-1]
+
+        # Generate hierarchical context using the same function as indexing
+        hierarchical_text = generate_full_context(
+            target_block,
+            parents,
+            self.state.journal_entry.outline.indent_str
+        )
+
+        return hierarchical_text
 
     def _get_original_block_content(self, block_id: str) -> str:
         """

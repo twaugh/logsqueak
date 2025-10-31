@@ -1030,8 +1030,13 @@ class OpenAICompatibleProvider(LLMClient):
             - Do NOT wrap in a top-level array
         """).strip()
 
-        # Format knowledge block and candidates
-        kb_text = f"Knowledge: {knowledge_block['content']}\nHierarchy: {knowledge_block.get('hierarchical_text', '')}"
+        # Format knowledge block with hierarchical context
+        hierarchical_text = knowledge_block.get('hierarchical_text', '')
+        if hierarchical_text:
+            kb_text = f"Knowledge from journal:\n{hierarchical_text}"
+        else:
+            # Fallback if hierarchical text unavailable
+            kb_text = f"Knowledge: {knowledge_block['content']}"
 
         # Format candidate pages with hierarchical blocks (from ChromaDB)
         page_sections = []
