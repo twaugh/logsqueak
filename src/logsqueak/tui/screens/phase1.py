@@ -8,8 +8,9 @@ import asyncio
 import logging
 from typing import Optional
 
-from textual import on
+from textual import events, on
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Container, Vertical
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Label, Static, Tree
@@ -47,13 +48,13 @@ class Phase1Screen(Screen):
     Keyboard Bindings:
     - j/↓: Navigate down
     - k/↑: Navigate up
-    - Enter: Expand/collapse node
-    - K: Mark current block as knowledge
-    - A: Mark current block as activity
-    - R: Reset to pending
-    - Shift+A: Accept all LLM suggestions
-    - n: Proceed when ready (validate at least one knowledge block exists)
+    - Space: Toggle knowledge selection for current block
+    - a: Accept all AI suggestions
+    - r: Reset current block to AI suggestion
+    - c: Clear all selections (mark all as activity)
+    - Enter: Continue to Phase 2
     - q: Quit application
+    - ?: Show help
     """
 
     BINDINGS = [
@@ -61,11 +62,11 @@ class Phase1Screen(Screen):
         ("k", "cursor_up", "Up"),
         ("down", "cursor_down", "Down"),
         ("up", "cursor_up", "Up"),
-        ("K", "mark_knowledge", "Mark Knowledge"),
-        ("A", "mark_activity", "Mark Activity"),
-        ("R", "reset", "Reset"),
-        ("shift+a", "accept_all", "Accept All"),
-        ("n", "continue", "Next →"),
+        Binding("space", "toggle_selection", "Toggle", priority=True),  # Override Tree's space binding
+        ("a", "accept_all", "Accept AI"),
+        ("r", "reset", "Reset"),
+        ("c", "clear_all", "Clear All"),
+        Binding("enter", "continue", "Continue →", priority=True),  # Override Tree's enter binding
     ]
 
     CSS = """
@@ -377,6 +378,73 @@ class Phase1Screen(Screen):
         if self.block_tree:
             self.block_tree.action_cursor_up()
             self._update_reason_bar()
+
+    def action_toggle_selection(self) -> None:
+        """
+        Toggle knowledge selection for current block (Space key).
+
+        If block is currently "knowledge" → mark as "activity"
+        If block is currently "activity" or "pending" → mark as "knowledge"
+
+        Sets source="user" and cascades to children.
+        """
+        if not self.block_tree:
+            return
+
+        cursor_node = self.block_tree.cursor_node
+        if cursor_node is None or cursor_node.data is None:
+            return
+
+        block_id = cursor_node.data
+        if block_id not in self.state.block_states:
+            return
+
+        block_state = self.state.block_states[block_id]
+
+        # Toggle: if currently knowledge, switch to activity; otherwise to knowledge
+        if block_state.classification == "knowledge":
+            new_classification = "activity"
+        else:
+            new_classification = "knowledge"
+
+        block_state.classification = new_classification
+        block_state.source = "user"
+        block_state.confidence = None
+
+        logger.info(f"User toggled block {block_id[:8]}... to {new_classification}")
+
+        # Cascade to children
+        self._cascade_classification(cursor_node, new_classification)
+
+        # Refresh tree display
+        self._refresh_tree_node(cursor_node)
+        self._refresh_ancestors(cursor_node)
+        self._update_reason_bar()
+
+    def action_clear_all(self) -> None:
+        """
+        Clear all selections - mark all blocks as activity (c key).
+
+        Sets all blocks to:
+        - classification = "activity"
+        - source = "user"
+        - Preserves llm_classification and llm_confidence
+        """
+        cleared_count = 0
+
+        for block_id, block_state in self.state.block_states.items():
+            if block_state.classification != "activity":
+                block_state.classification = "activity"
+                block_state.source = "user"
+                block_state.confidence = None
+                cleared_count += 1
+
+        logger.info(f"Cleared all selections ({cleared_count} blocks marked as activity)")
+
+        # Refresh entire tree
+        if self.block_tree:
+            self._refresh_entire_tree()
+        self._update_reason_bar()
 
     def action_mark_knowledge(self) -> None:
         """

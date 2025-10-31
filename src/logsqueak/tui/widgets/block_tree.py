@@ -11,6 +11,7 @@ This widget displays a hierarchical tree of journal blocks with:
 from typing import Optional
 
 from rich.text import Text
+from textual import events
 from textual.widgets import Tree
 from textual.widgets.tree import TreeNode
 
@@ -34,9 +35,12 @@ class BlockTree(Tree):
     Keyboard Navigation:
     - j/↓: Move down
     - k/↑: Move up
-    - Space: Expand/collapse node
-    - Enter: Select node
+
+    Note: Space and Enter are handled by the parent screen (Phase1Screen)
+    for toggle selection and continue actions. Tree expand/collapse is
+    disabled since the tree starts fully expanded.
     """
+
 
     def __init__(
         self,

@@ -32,19 +32,28 @@ class Phase3Screen(Screen):
     - Navigation controls
 
     Keyboard Bindings:
-    - n: Next decision
-    - p: Previous decision
-    - a: Accept decision
-    - s: Skip decision
+    - j/↓/n: Next decision
+    - k/↑/p: Previous decision
+    - Space: Toggle accept/skip for current decision
+    - a: Accept all remaining decisions
+    - s: Skip all remaining decisions
     - e: Edit refined text (future)
-    - q: Quit application
+    - Enter: Continue to Phase 4
+    - q: Back to Phase 1
+    - ?: Show help
     """
 
     BINDINGS = [
+        ("j", "next_decision", "Down"),
+        ("k", "prev_decision", "Up"),
+        ("down", "next_decision", "Down"),
+        ("up", "prev_decision", "Up"),
         ("n", "next_decision", "Next →"),
         ("p", "prev_decision", "← Previous"),
-        ("a", "accept_decision", "Accept"),
-        ("s", "skip_decision", "Skip"),
+        ("space", "toggle_decision", "Toggle"),
+        ("a", "accept_all", "Accept All"),
+        ("s", "skip_all", "Skip All"),
+        ("enter", "continue", "Continue →"),
     ]
 
     CSS = """
@@ -822,13 +831,74 @@ class Phase3Screen(Screen):
             self.current_decision_index -= 1
             self._update_decision_display()
 
+    async def action_toggle_decision(self) -> None:
+        """
+        Toggle accept/skip for current decision (Space key).
+
+        If decision is currently accepted (action != "skip") → mark as skip
+        If decision is currently skipped → restore original action
+        """
+        if not self.decision_list:
+            return
+
+        key, decision = self.decision_list[self.current_decision_index]
+
+        if decision.action == "skip":
+            # Restore to original action (we don't track original, so default to add_under)
+            # This is a limitation - ideally we'd track the LLM's original decision
+            decision.action = "add_under"  # Safe default
+            decision.skip_reason = None
+            logger.info(f"User toggled decision for {key} to accepted")
+        else:
+            # Mark as skipped
+            decision.action = "skip"
+            decision.skip_reason = "User toggled to skip"
+            logger.info(f"User toggled decision for {key} to skip")
+
+        # Refresh display
+        self._update_decision_display()
+
+    async def action_accept_all(self) -> None:
+        """Accept all remaining decisions (a key)."""
+        if not self.decision_list:
+            return
+
+        # Accept all decisions from current index onwards
+        accepted_count = 0
+        for i in range(self.current_decision_index, len(self.decision_list)):
+            key, decision = self.decision_list[i]
+            if decision.action == "skip":
+                decision.action = "add_under"  # Restore to safe default
+                decision.skip_reason = None
+                accepted_count += 1
+
+        logger.info(f"Accepted all remaining decisions ({accepted_count} restored)")
+        self._update_decision_display()
+
+    async def action_skip_all(self) -> None:
+        """Skip all remaining decisions (s key)."""
+        if not self.decision_list:
+            return
+
+        # Skip all decisions from current index onwards
+        skipped_count = 0
+        for i in range(self.current_decision_index, len(self.decision_list)):
+            key, decision = self.decision_list[i]
+            if decision.action != "skip":
+                decision.action = "skip"
+                decision.skip_reason = "User skipped all"
+                skipped_count += 1
+
+        logger.info(f"Skipped all remaining decisions ({skipped_count} marked as skip)")
+        self._update_decision_display()
+
     async def action_accept_decision(self) -> None:
-        """Accept current decision and move to next."""
+        """Accept current decision and move to next (legacy binding)."""
         # Mark as accepted (already in state)
         await self.action_next_decision()
 
     async def action_skip_decision(self) -> None:
-        """Skip current decision and move to next."""
+        """Skip current decision and move to next (legacy binding)."""
         if self.decision_list:
             key, decision = self.decision_list[self.current_decision_index]
             decision.action = "skip"

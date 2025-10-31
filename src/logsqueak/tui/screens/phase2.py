@@ -47,12 +47,15 @@ class Phase2Screen(Screen):
     4. Otherwise: Auto-proceed to Phase 3 when retrieval completes
 
     Keyboard Bindings:
-    - R: Enter review mode (optional - US4)
-    - q: Quit application
+    - q: Back to Phase 1
+    - ?: Show help
+
+    Note: This is an interstitial screen that auto-proceeds to Phase 3 when complete.
     """
 
     BINDINGS = [
-        ("R", "review_mode", "Review Candidates"),
+        # Interstitial screen - no active bindings needed
+        # Auto-proceeds to Phase 3 when retrieval completes
     ]
 
     CSS = """
