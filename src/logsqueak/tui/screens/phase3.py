@@ -122,7 +122,7 @@ class Phase3Screen(Screen):
                 id="status-label",
             )
         with ScrollableContainer(id="content-container"):
-            yield Static("Waiting for decisions...", id="decision-content")
+            yield Static("Waiting for decisions...", id="decision-content", markup=True)
         yield Footer()
 
     async def on_mount(self) -> None:
@@ -546,10 +546,12 @@ class Phase3Screen(Screen):
             else:
                 # Parent context - show dimmed, just first line
                 content_preview = block.content[0] if block.content else "(empty)"
-                # Truncate long content
-                if len(content_preview) > 80:
-                    content_preview = content_preview[:80] + "..."
+                # Render markdown first, then truncate the result
                 rendered_preview = render_markdown_to_markup(content_preview, strip_id=True)
+                # Truncate rendered markup if too long (accounting for markup tags)
+                # Use a generous limit since markup tags add extra characters
+                if len(rendered_preview) > 150:  # Higher limit to account for markup
+                    rendered_preview = rendered_preview[:150] + "..."
                 lines.append(f"{indent}• [dim]{rendered_preview}[/dim]")
 
         return lines
@@ -633,12 +635,12 @@ class Phase3Screen(Screen):
             block_id = block_info.get("id")
             content = block_info.get("content", "")
 
-            # Truncate long content
-            if len(content) > 80:
-                content = content[:80] + "..."
-
-            # Apply markdown rendering
+            # Apply markdown rendering first
             rendered_content = render_markdown_to_markup(content, strip_id=True)
+
+            # Truncate rendered markup if too long (accounting for markup tags)
+            if len(rendered_content) > 150:  # Higher limit to account for markup
+                rendered_content = rendered_content[:150] + "..."
 
             indent = "  " * current_depth
 
@@ -713,12 +715,12 @@ class Phase3Screen(Screen):
             # Get first line of content for display
             content = block.content[0] if block.content else "(empty)"
 
-            # Truncate long content
-            if len(content) > 80:
-                content = content[:80] + "..."
-
-            # Apply markdown rendering
+            # Apply markdown rendering first
             rendered_content = render_markdown_to_markup(content, strip_id=True)
+
+            # Truncate rendered markup if too long (accounting for markup tags)
+            if len(rendered_content) > 150:  # Higher limit to account for markup
+                rendered_content = rendered_content[:150] + "..."
 
             # Check if this block is being replaced
             if decision.action == "replace" and hybrid_id == decision.target_block_id:

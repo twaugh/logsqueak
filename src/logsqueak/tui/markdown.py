@@ -54,8 +54,18 @@ def _markdown_to_markup(content: str) -> str:
 
         # Check for [markdown](url) style links
         if content[i] == "[":
-            bracket_end = content.find("]", i+1)
-            if bracket_end != -1 and bracket_end + 1 < len(content) and content[bracket_end + 1] == "(":
+            # Find matching closing bracket, accounting for nested brackets
+            bracket_count = 1
+            bracket_end = i + 1
+            while bracket_end < len(content) and bracket_count > 0:
+                if content[bracket_end] == "[":
+                    bracket_count += 1
+                elif content[bracket_end] == "]":
+                    bracket_count -= 1
+                bracket_end += 1
+            bracket_end -= 1  # Point to the closing bracket, not past it
+
+            if bracket_count == 0 and bracket_end + 1 < len(content) and content[bracket_end + 1] == "(":
                 paren_end = content.find(")", bracket_end + 2)
                 if paren_end != -1:
                     link_text = content[i+1:bracket_end]
@@ -183,8 +193,18 @@ def _render_markdown_to_text(content: str, text: Text) -> None:
 
         # Check for [markdown](url) style links
         if content[i] == "[":
-            bracket_end = content.find("]", i+1)
-            if bracket_end != -1 and bracket_end + 1 < len(content) and content[bracket_end + 1] == "(":
+            # Find matching closing bracket, accounting for nested brackets
+            bracket_count = 1
+            bracket_end = i + 1
+            while bracket_end < len(content) and bracket_count > 0:
+                if content[bracket_end] == "[":
+                    bracket_count += 1
+                elif content[bracket_end] == "]":
+                    bracket_count -= 1
+                bracket_end += 1
+            bracket_end -= 1  # Point to the closing bracket, not past it
+
+            if bracket_count == 0 and bracket_end + 1 < len(content) and content[bracket_end + 1] == "(":
                 paren_end = content.find(")", bracket_end + 2)
                 if paren_end != -1:
                     link_text = content[i+1:bracket_end]

@@ -310,7 +310,7 @@ class Phase2Screen(Screen):
                 blocks = [
                     {
                         "id": chunk_id,
-                        "content": metadata.get("block_content", "")[:100],
+                        "content": metadata.get("block_content", ""),  # Don't truncate - let Phase 3 rendering handle it
                         "depth": metadata.get("depth", 0),
                         "parent_id": metadata.get("parent_id"),
                     }
@@ -448,7 +448,7 @@ class Phase2Screen(Screen):
             block_hybrid_id = block.block_id or generate_content_hash(block)
             blocks.append({
                 "id": block_hybrid_id,
-                "content": block.content[0][:100] if block.content else "",
+                "content": "\n".join(block.content) if block.content else "",  # Include all lines
                 "depth": depth,
                 "parent_id": parent_id,
             })
