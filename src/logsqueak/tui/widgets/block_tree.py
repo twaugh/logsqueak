@@ -17,6 +17,7 @@ from textual.widgets.tree import TreeNode
 from logsqueak.logseq.parser import LogseqBlock
 from logsqueak.tui.models import BlockState
 from logsqueak.tui.utils import generate_content_hash
+from logsqueak.tui.markdown import render_markdown
 
 
 class BlockTree(Tree):
@@ -165,8 +166,8 @@ class BlockTree(Tree):
         text.append(f"{icon} ", style=icon_style)
 
         # Render markdown content (excluding 'id' property)
-        content_to_render = self._strip_id_property(first_line)
-        self._render_markdown_to_text(content_to_render, text)
+        rendered = render_markdown(first_line, strip_id=True)
+        text.append(rendered)
 
         # Truncate if needed (after rendering)
         if len(text) > max_length:
@@ -248,117 +249,6 @@ class BlockTree(Tree):
             "pending": "yellow",
         }
         return styles.get(classification, "")
-
-    def _strip_id_property(self, content: str) -> str:
-        """
-        Remove 'id::' property from content if present.
-
-        Args:
-            content: Block content line
-
-        Returns:
-            Content with id:: property removed
-        """
-        # Check if this line is an id:: property
-        stripped = content.lstrip()
-        if stripped.startswith("id::"):
-            return ""  # Don't show id properties
-        return content
-
-    def _render_markdown_to_text(self, content: str, text: Text) -> None:
-        """
-        Render Logseq markdown to Rich Text with styles.
-
-        Supports:
-        - **bold**
-        - *italic*
-        - `code`
-        - [[page links]]
-        - TODO/DONE/CANCELLED markers (with checkboxes)
-        - ~~strikethrough~~
-
-        Args:
-            content: Raw markdown content
-            text: Rich Text object to append styled text to
-        """
-        if not content or content == "":
-            return
-
-        # Handle TODO/DONE/CANCELLED markers with checkbox indicators
-        if content.startswith("TODO "):
-            text.append("☐ ", style="bold yellow")
-            text.append("TODO ", style="yellow")
-            content = content[5:]
-        elif content.startswith("DONE "):
-            text.append("☑ ", style="bold green")
-            text.append("DONE ", style="green")
-            content = content[5:]
-        elif content.startswith("CANCELLED ") or content.startswith("CANCELED "):
-            prefix_len = 10 if content.startswith("CANCELLED ") else 9
-            text.append("☒ ", style="bold dim")
-            text.append(content[:prefix_len], style="dim strike")
-            content = content[prefix_len:]
-
-        # Process the rest with simple parser
-        i = 0
-        while i < len(content):
-            # Check for [[page links]]
-            if content[i:i+2] == "[[":
-                end = content.find("]]", i+2)
-                if end != -1:
-                    link_text = content[i+2:end]
-                    text.append(link_text, style="bold blue underline")
-                    i = end + 2
-                    continue
-
-            # Check for **bold**
-            if content[i:i+2] == "**":
-                end = content.find("**", i+2)
-                if end != -1:
-                    bold_text = content[i+2:end]
-                    text.append(bold_text, style="bold")
-                    i = end + 2
-                    continue
-
-            # Check for *italic*
-            if content[i] == "*" and (i == 0 or content[i-1] != "*"):
-                end = content.find("*", i+1)
-                if end != -1 and (end+1 >= len(content) or content[end+1] != "*"):
-                    italic_text = content[i+1:end]
-                    text.append(italic_text, style="italic")
-                    i = end + 1
-                    continue
-
-            # Check for `code`
-            if content[i] == "`":
-                end = content.find("`", i+1)
-                if end != -1:
-                    code_text = content[i+1:end]
-                    text.append(code_text, style="bold cyan on #222222")
-                    i = end + 1
-                    continue
-
-            # Check for ~~strikethrough~~
-            if content[i:i+2] == "~~":
-                end = content.find("~~", i+2)
-                if end != -1:
-                    strike_text = content[i+2:end]
-                    text.append(strike_text, style="strike dim")
-                    i = end + 2
-                    continue
-
-            # Check for ~strikethrough~
-            if content[i] == "~" and (i == 0 or content[i-1] != "~"):
-                end = content.find("~", i+1)
-                if end != -1 and (end+1 >= len(content) or content[end+1] != "~"):
-                    strike_text = content[i+1:end]
-                    text.append(strike_text, style="strike dim")
-                    i = end + 1
-                    continue
-
-            # Regular character
-            text.append(content[i])
-            i += 1
 
     def update_block_label(self, block_id: str) -> None:
         """
