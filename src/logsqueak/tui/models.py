@@ -80,6 +80,19 @@ class BlockState:
     Always paired with llm_classification (both None or both set).
     """
 
+    reason: str | None = None
+    """
+    Brief explanation (7-10 words) of why this block is knowledge.
+
+    - None: Block is activity, or LLM hasn't classified yet
+    - str: LLM's explanation for knowledge classification
+
+    Example: "documents decision to use ChromaDB for vector storage"
+
+    Used for UI display when block is highlighted (shown at bottom of screen).
+    Only populated for knowledge blocks.
+    """
+
 
 @dataclass
 class CandidatePage:

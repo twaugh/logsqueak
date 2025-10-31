@@ -12,7 +12,7 @@ from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, Vertical
 from textual.screen import Screen
-from textual.widgets import Footer, Header, Label, Static
+from textual.widgets import Footer, Header, Label, Static, Tree
 from textual.widgets.tree import TreeNode
 
 from logsqueak.logseq.parser import LogseqBlock
@@ -83,6 +83,19 @@ class Phase1Screen(Screen):
     BlockTree {
         height: 100%;
     }
+
+    #reason-bar {
+        dock: bottom;
+        height: auto;
+        min-height: 3;
+        background: $boost;
+        border-top: solid $primary;
+        padding: 1;
+    }
+
+    #reason-text {
+        color: $text;
+    }
     """
 
     def __init__(self, state: ScreenState):
@@ -110,6 +123,11 @@ class Phase1Screen(Screen):
         with Container(id="tree-container"):
             # Will be populated in on_mount with actual block data
             yield Label("Loading journal blocks...")
+
+        # Reason bar (shows why highlighted block is knowledge)
+        # Must come before Footer to be visible
+        with Container(id="reason-bar"):
+            yield Static("Select a knowledge block to see why it was classified as knowledge", id="reason-text")
 
         yield Footer()
 
@@ -208,10 +226,10 @@ class Phase1Screen(Screen):
                 # Log received JSON block
                 logger.debug(f"Received NDJSON block: {result}")
 
-                # Parse result
+                # Parse result - LLM only outputs knowledge blocks now
                 block_id = result.get("block_id")
-                is_knowledge = result.get("is_knowledge", False)
                 confidence = result.get("confidence", 0.0)
+                reason = result.get("reason", None)
 
                 if block_id not in self.state.block_states:
                     logger.warning(f"Received classification for unknown block: {block_id}")
@@ -222,11 +240,13 @@ class Phase1Screen(Screen):
 
                 # Only update if not user-overridden
                 if block_state.source != "user":
-                    classification = "knowledge" if is_knowledge else "activity"
+                    # LLM only outputs knowledge blocks (no is_knowledge field needed)
+                    classification = "knowledge"
 
                     # Store LLM classification
                     block_state.classification = classification
                     block_state.confidence = confidence
+                    block_state.reason = reason
                     block_state.llm_classification = classification
                     block_state.llm_confidence = confidence
 
@@ -239,9 +259,10 @@ class Phase1Screen(Screen):
                         first_line = logseq_block.content[0] if logseq_block.content else "(empty)"
                         block_content = first_line[:100]  # First 100 chars
 
-                    # Log classification with content
+                    # Log classification with content and reason
+                    reason_text = f" - {reason}" if reason else ""
                     logger.info(
-                        f"Classified as {classification.upper()} ({confidence:.0%}): {block_content}"
+                        f"Classified as {classification.upper()} ({confidence:.0%}){reason_text}: {block_content}"
                     )
                     logger.debug(
                         f"  Block ID: {block_id[:8]}... | Full classification: {result}"
@@ -253,6 +274,9 @@ class Phase1Screen(Screen):
                         if node:
                             self._refresh_tree_node(node)
                             self._refresh_ancestors(node)
+                            # Update reason bar if this is the currently highlighted block
+                            if self.block_tree.cursor_node == node:
+                                self._update_reason_bar()
                         else:
                             logger.warning(f"Could not find tree node for block {block_id[:8]}... (classification: {classification})")
 
@@ -340,11 +364,13 @@ class Phase1Screen(Screen):
         """Move cursor down (j or ↓)."""
         if self.block_tree:
             self.block_tree.action_cursor_down()
+            self._update_reason_bar()
 
     def action_cursor_up(self) -> None:
         """Move cursor up (k or ↑)."""
         if self.block_tree:
             self.block_tree.action_cursor_up()
+            self._update_reason_bar()
 
     def action_mark_knowledge(self) -> None:
         """
@@ -384,6 +410,7 @@ class Phase1Screen(Screen):
         # Refresh tree node label and all ancestors (knowledge counts changed)
         self._refresh_tree_node(cursor_node)
         self._refresh_ancestors(cursor_node)
+        self._update_reason_bar()
 
     def action_mark_activity(self) -> None:
         """
@@ -422,6 +449,7 @@ class Phase1Screen(Screen):
         # Refresh tree node label and all ancestors (knowledge counts changed)
         self._refresh_tree_node(cursor_node)
         self._refresh_ancestors(cursor_node)
+        self._update_reason_bar()
 
     def action_reset(self) -> None:
         """
@@ -468,6 +496,7 @@ class Phase1Screen(Screen):
         # Refresh tree node label and all ancestors (knowledge counts changed)
         self._refresh_tree_node(cursor_node)
         self._refresh_ancestors(cursor_node)
+        self._update_reason_bar()
 
     async def action_continue(self) -> None:
         """
@@ -624,6 +653,45 @@ class Phase1Screen(Screen):
                 return result
 
         return None
+
+    def _update_reason_bar(self) -> None:
+        """
+        Update the reason bar to show why the current highlighted block is knowledge.
+
+        Shows the LLM's brief explanation (7-10 words) for classifying the block as knowledge.
+        Only displays for knowledge blocks; clears for activity/pending blocks.
+        """
+        if not self.block_tree:
+            return
+
+        # Get current cursor node
+        cursor_node = self.block_tree.cursor_node
+        if cursor_node is None or cursor_node.data is None:
+            # Clear reason bar if no node selected
+            reason_text = self.query_one("#reason-text", Static)
+            reason_text.update("")
+            return
+
+        block_id = cursor_node.data
+        block_state = self.state.block_states.get(block_id)
+
+        if not block_state:
+            return
+
+        # Update reason bar based on classification and reason
+        reason_text = self.query_one("#reason-text", Static)
+
+        if block_state.classification == "knowledge" and block_state.reason:
+            # Show reason with label
+            reason_text.update(f"💡 Why knowledge: {block_state.reason}")
+        else:
+            # Clear for activity/pending blocks
+            reason_text.update("")
+
+    @on(Tree.NodeHighlighted)
+    def on_tree_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
+        """Handle tree node highlight event - update reason bar."""
+        self._update_reason_bar()
 
     async def on_unmount(self) -> None:
         """Cancel LLM task on screen unmount."""

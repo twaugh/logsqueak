@@ -927,20 +927,18 @@ class OpenAICompatibleProvider(LLMClient):
             You will receive the full journal entry in its original Logseq format.
             Each block has an id:: property - use this to identify blocks in your response.
 
-            Your response should START with the blocks that ARE knowledge blocks.
+            ONLY output blocks that contain lasting knowledge (ignore activity logs).
             For EACH knowledge block you identify, return ONE JSON object per line (NDJSON format):
-            {"block_id": "id-value-from-id-property", "is_knowledge": true, "confidence": 0.0-1.0}
-
-            Then, for completeness, you MAY list the activity blocks:
-            {"block_id": "id-value-from-id-property", "is_knowledge": false, "confidence": 0.0-1.0}
+            {"block_id": "id-value-from-id-property", "confidence": 0.0-1.0, "reason": "brief 7-10 word explanation"}
 
             IMPORTANT:
-            - START your response with knowledge blocks (is_knowledge: true)
+            - ONLY output knowledge blocks (do NOT output activity blocks)
             - Use the EXACT value from the id:: property for block_id
             - Output exactly ONE JSON object per line
             - Each line MUST end with a newline character
             - Do NOT wrap in a top-level array
             - Use confidence < 0.5 for borderline cases
+            - "reason" field MUST be 7-10 words explaining WHY this is knowledge (e.g., "documents decision to use ChromaDB for vector storage")
         """).strip()
 
         user_prompt = f"Journal entry:\n\n{journal_content}"
