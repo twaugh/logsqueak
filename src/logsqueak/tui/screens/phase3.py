@@ -401,6 +401,49 @@ class Phase3Screen(Screen):
         # TODO: Add parent context in future if needed
         return "\n".join(block.content)
 
+    def _get_original_block_content(self, block_id: str) -> str:
+        """
+        Get the original journal content for a knowledge block.
+
+        Args:
+            block_id: Hybrid ID of the knowledge block
+
+        Returns:
+            Original block content as a string
+        """
+        block = find_block_by_id(self.state.journal_entry.outline.blocks, block_id)
+        if block and block.content:
+            return "\n".join(block.content)
+        return "(empty block)"
+
+    def _render_new_content(self, decision: IntegrationDecision, indent: str = "") -> list[str]:
+        """
+        Render new content with appropriate styling.
+
+        Shows content with dim green bar and green text, regardless of whether
+        it's refined text or original journal content.
+
+        Args:
+            decision: Integration decision containing refined_text and knowledge_block_id
+            indent: Indentation string to prepend to each line
+
+        Returns:
+            List of formatted lines with green bars
+        """
+        lines = []
+
+        # Get content to display (refined if available, otherwise original)
+        if decision.refined_text:
+            content_to_show = decision.refined_text
+        else:
+            content_to_show = self._get_original_block_content(decision.knowledge_block_id)
+
+        # Render with consistent green styling
+        for content_line in content_to_show.split('\n'):
+            lines.append(f"{indent}[dim green]┃[/dim green] [green]{content_line}[/green]")
+
+        return lines
+
     def _update_status(self, message: str) -> None:
         """
         Update status message display.
@@ -511,7 +554,8 @@ class Phase3Screen(Screen):
         """
         Render target page preview with visual diff highlighting.
 
-        Shows the REFINED (reworded) content, not the original journal entry.
+        Shows the REFINED (reworded) content when available, or the original
+        journal content in dark green while rewording is in progress.
         Uses candidate blocks data for proper hybrid ID matching.
         """
         lines = []
@@ -527,11 +571,7 @@ class Phase3Screen(Screen):
             # No candidate data - just show action description
             if decision.action == "add_section":
                 lines.append("[dim]New page - adding first block:[/dim]")
-                if decision.refined_text:
-                    for refined_line in decision.refined_text.split('\n'):
-                        lines.append(f"[green]┃[/green] {refined_line}")
-                else:
-                    lines.append("[dim]┃ (Refining...)[/dim]")
+                lines.extend(self._render_new_content(decision))
             return lines
 
         # Build ID map from candidate blocks
@@ -551,11 +591,7 @@ class Phase3Screen(Screen):
 
         # If add_section, append new content at the end
         if decision.action == "add_section":
-            if decision.refined_text:
-                for refined_line in decision.refined_text.split('\n'):
-                    lines.append(f"[green]┃[/green] {refined_line}")
-            else:
-                lines.append("[dim]┃ (Refining...)[/dim]")
+            lines.extend(self._render_new_content(decision))
 
         return lines
 
@@ -604,11 +640,7 @@ class Phase3Screen(Screen):
                 # Show strikethrough for old content
                 block_lines.append(f"{indent}• [strike]{content}[/strike]")
                 # Show new refined content below with green bar
-                if decision.refined_text:
-                    for refined_line in decision.refined_text.split('\n'):
-                        block_lines.append(f"{indent}[green]┃[/green] {refined_line}")
-                else:
-                    block_lines.append(f"{indent}[dim]┃ (Refining...)[/dim]")
+                block_lines.extend(self._render_new_content(decision, indent))
             else:
                 # Normal block display
                 block_lines.append(f"{indent}• {content}")
@@ -622,11 +654,7 @@ class Phase3Screen(Screen):
             if decision.action == "add_under" and block_id == decision.target_block_id:
                 child_indent = "  " * (current_depth + 1)
                 logger.info(f"Found target block for add_under: block_id={block_id}, refined_text_length={len(decision.refined_text) if decision.refined_text else 0}")
-                if decision.refined_text:
-                    for refined_line in decision.refined_text.split('\n'):
-                        block_lines.append(f"{child_indent}[green]┃[/green] {refined_line}")
-                else:
-                    block_lines.append(f"{child_indent}[dim]┃ (Refining...)[/dim]")
+                block_lines.extend(self._render_new_content(decision, child_indent))
 
             return block_lines
 
@@ -687,11 +715,7 @@ class Phase3Screen(Screen):
                 # Show strikethrough for old content
                 lines.append(f"{indent}• [strike]{content}[/strike]")
                 # Show new refined content below with green bar
-                if decision.refined_text:
-                    for refined_line in decision.refined_text.split('\n'):
-                        lines.append(f"{indent}[green]┃[/green] {refined_line}")
-                else:
-                    lines.append(f"{indent}[dim]┃ (Refining...)[/dim]")
+                lines.extend(self._render_new_content(decision, indent))
             else:
                 # Normal block display
                 lines.append(f"{indent}• {content}")
@@ -711,11 +735,7 @@ class Phase3Screen(Screen):
             if decision.action == "add_under" and hybrid_id == decision.target_block_id:
                 child_indent = "  " * (depth + 1)
                 logger.info(f"Found target block for add_under: {hybrid_id}, refined_text={decision.refined_text[:50] if decision.refined_text else None}")
-                if decision.refined_text:
-                    for refined_line in decision.refined_text.split('\n'):
-                        lines.append(f"{child_indent}[green]┃[/green] {refined_line}")
-                else:
-                    lines.append(f"{child_indent}[dim]┃ (Refining...)[/dim]")
+                lines.extend(self._render_new_content(decision, child_indent))
 
         return lines
 
