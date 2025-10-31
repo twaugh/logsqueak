@@ -308,7 +308,8 @@ class Phase2Screen(Screen):
 
                 # Load ALL blocks from the page (not just matching chunks)
                 # This ensures proper hierarchy display in Phase 3
-                page_path = self.state.journal_entry.outline.graph.pages_dir / f"{page_name}.md"
+                graph_path = Path(self.state.config.logseq.graph_path)
+                page_path = graph_path / "pages" / f"{page_name}.md"
                 try:
                     outline = LogseqOutline.parse(page_path.read_text())
                     blocks = self._extract_blocks_from_outline(outline)
