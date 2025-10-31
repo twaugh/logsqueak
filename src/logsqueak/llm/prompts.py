@@ -264,12 +264,13 @@ def build_reworder_messages(knowledge_full_text: str) -> List[dict]:
         - Possibly journal-specific language like "today", "this morning", etc.
 
         Your job is to:
-        1. Remove journal-specific temporal context ("today", "this morning" -> use past tense or timeless phrasing)
-        2. PRESERVE ALL page links ([[Page Name]]) and block references (((block-id))) - these are critical
-        3. Preserve technical details, decisions, and rationale
-        4. Create standalone, timeless content that makes sense without the journal context
-        5. Keep the content concise and focused on the lasting knowledge
-        6. Output plain text content suitable for a single bullet point (no bullet marker needed)
+        1. Use parent context to create STANDALONE content that makes sense in isolation
+        2. Avoid vague pronouns ("it", "this", "that") - be specific using context from parent bullets
+        3. Remove journal-specific temporal context ("today", "this morning" -> use past tense or timeless phrasing)
+        4. PRESERVE ALL page links ([[Page Name]]) and block references (((block-id))) - these are critical
+        5. Preserve technical details, decisions, and rationale
+        6. Keep the content concise and focused on the lasting knowledge
+        7. Output plain text content suitable for a single bullet point (no bullet marker needed)
 
         DO NOT:
         - Add new information not present in the source
@@ -307,6 +308,14 @@ def build_reworder_messages(knowledge_full_text: str) -> List[dict]:
           - Pipeline refactoring
             - Decided to use 5-phase approach instead of 2-stage
         Output: [[logsqueak]] pipeline: Decided to use 5-phase approach instead of 2-stage
+
+        Example 5 - CRITICAL: Use parent context to avoid vague pronouns:
+        Input:
+        - Reviewed design for [[Project Alpha]]
+          - [[Project Alpha]] uses read-only database connections
+            - This means it won't modify any data! It's a pure consumer, not a producer.
+        GOOD Output: [[Project Alpha]] won't modify any data - it's a pure consumer using read-only database connections
+        BAD Output: This means it won't modify any data! (WRONG - missing subject, "it" is vague)
     """).strip()
 
     user_prompt = f"Rephrase this knowledge into clean, evergreen content:\n\n{knowledge_full_text}"

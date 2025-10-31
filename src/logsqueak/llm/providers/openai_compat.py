@@ -1117,20 +1117,33 @@ class OpenAICompatibleProvider(LLMClient):
         system_prompt = dedent("""
             You are a content rewording assistant for a knowledge management system.
 
-            Your task is to transform journal-specific knowledge into clean, evergreen content.
+            Your task is to transform journal-specific knowledge into clean, evergreen content
+            that makes sense in isolation.
 
-            Remove:
-            - Temporal references ("Today", "This week", dates)
-            - Journal-specific context ("Had meeting with X")
-            - First-person narrative ("I learned", "I discovered")
+            You will receive knowledge blocks in hierarchical Logseq format:
+            - The deepest nested bullet is the knowledge to extract
+            - Parent bullets provide context for understanding
+            - Use the parent context to create STANDALONE content
 
-            Preserve:
-            - [[Page Links]] and ((block refs))
-            - Technical terminology and specifics
-            - Core insights and knowledge
+            Your rephrased content MUST:
+            - Make sense without the journal context (avoid pronouns like "it", "this", "that")
+            - Use parent context to clarify what you're talking about
+            - Be specific and complete (e.g., "[[Mercury]] won't publish to Kafka topics", not "it won't publish")
+            - Preserve [[Page Links]] and ((block refs)) exactly
+            - Remove temporal references ("Today", "This week", dates)
+            - Remove first-person narrative ("I learned", "I discovered")
 
-            For each decision, return ONE JSON object per line (NDJSON format):
-            {"knowledge_block_id": "...", "page": "...", "refined_text": "..."}
+            EXAMPLE:
+            Input Knowledge:
+            - Reviewed design for [[Project Alpha]]
+              - [[Project Alpha]] uses read-only database connections
+                - This means it won't modify any data! It's a pure consumer, not a producer.
+
+            GOOD OUTPUT: "[[Project Alpha]] won't modify any data - it's a pure consumer using read-only database connections"
+            BAD OUTPUT: "This means it won't modify any data!" (missing subject - what is "it"?)
+
+            For each knowledge block, return ONE JSON object per line (NDJSON format):
+            {"block_id": "...", "refined_text": "..."}
 
             IMPORTANT:
             - refined_text should be PLAIN BLOCK CONTENT (no bullet markers, no indentation)
@@ -1140,9 +1153,10 @@ class OpenAICompatibleProvider(LLMClient):
         """).strip()
 
         # Format decisions for rewording
+        # Each decision represents one knowledge block to rephrase
         decisions_text = "\n\n".join([
-            f"Block ID: {d['knowledge_block_id']}\nPage: {d['page']}\nAction: {d['action']}\n"
-            f"Original: {d['full_text']}\nHierarchy: {d.get('hierarchical_text', '')}"
+            f"Block ID: {d.get('block_id', d.get('knowledge_block_id'))}\n"
+            f"Knowledge:\n{d.get('hierarchical_text', d.get('full_text', ''))}"
             for d in decisions
         ])
 
