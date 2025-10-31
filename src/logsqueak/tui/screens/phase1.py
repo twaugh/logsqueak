@@ -517,6 +517,7 @@ class Phase1Screen(Screen):
         - Updates confidence and source appropriately
         """
         accepted_count = 0
+        knowledge_count = 0
 
         for block_id, block_state in self.state.block_states.items():
             # Skip user-overridden blocks
@@ -533,7 +534,11 @@ class Phase1Screen(Screen):
             block_state.source = "llm"
             accepted_count += 1
 
-        logger.info(f"Accepted {accepted_count} LLM suggestions")
+            # Count knowledge blocks specifically
+            if block_state.llm_classification == "knowledge":
+                knowledge_count += 1
+
+        logger.info(f"Accepted {accepted_count} LLM suggestions ({knowledge_count} knowledge)")
 
         # Refresh entire tree to show accepted classifications
         if self.block_tree:
@@ -542,8 +547,8 @@ class Phase1Screen(Screen):
         # Update reason bar
         self._update_reason_bar()
 
-        # Show notification
-        self.app.notify(f"Accepted {accepted_count} LLM suggestions")
+        # Show notification - only show knowledge count to user
+        self.app.notify(f"Accepted {knowledge_count} knowledge block{'s' if knowledge_count != 1 else ''}")
 
     def _refresh_entire_tree(self) -> None:
         """Refresh all nodes in the tree after bulk changes."""
