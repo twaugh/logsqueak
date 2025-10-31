@@ -1035,7 +1035,7 @@ class OpenAICompatibleProvider(LLMClient):
 
         candidates_text = "\n\n".join([
             f"Page: {p['page_name']} (similarity: {p['similarity_score']:.2f})\nBlocks:\n" +
-            "\n".join([f"  - [{c['target_id']}] {c['title']}: {c['content'][:100]}" for c in p.get('chunks', [])])
+            "\n".join([f"  - [{c['target_id']}] {c['title']}: {c['content']}" for c in p.get('chunks', [])])
             for p in candidate_pages
         ])
 
