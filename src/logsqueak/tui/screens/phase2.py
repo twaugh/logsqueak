@@ -306,16 +306,24 @@ class Phase2Screen(Screen):
                 # Use highest similarity score for the page
                 max_similarity = max(sim for sim, _, _ in chunks)
 
-                # Extract block info for targeting
-                blocks = [
-                    {
-                        "id": chunk_id,
-                        "content": metadata.get("block_content", ""),  # Don't truncate - let Phase 3 rendering handle it
-                        "depth": metadata.get("depth", 0),
-                        "parent_id": metadata.get("parent_id"),
-                    }
-                    for _, chunk_id, metadata in chunks
-                ]
+                # Load ALL blocks from the page (not just matching chunks)
+                # This ensures proper hierarchy display in Phase 3
+                page_path = self.state.journal_entry.outline.graph.pages_dir / f"{page_name}.md"
+                try:
+                    outline = LogseqOutline.parse(page_path.read_text())
+                    blocks = self._extract_blocks_from_outline(outline)
+                except Exception as e:
+                    logger.warning(f"Failed to load full page {page_name}: {e}")
+                    # Fallback to just the matching chunks
+                    blocks = [
+                        {
+                            "id": chunk_id,
+                            "content": metadata.get("block_content", ""),
+                            "depth": metadata.get("depth", 0),
+                            "parent_id": metadata.get("parent_id"),
+                        }
+                        for _, chunk_id, metadata in chunks
+                    ]
 
                 candidates.append(
                     CandidatePage(
