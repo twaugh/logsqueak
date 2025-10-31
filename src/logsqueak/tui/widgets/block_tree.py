@@ -142,6 +142,10 @@ class BlockTree(Tree):
         - Bold/highlighted to indicate manual classification
         - Shows original LLM confidence if available
 
+        Background colors:
+        - LLM-suggested knowledge (pending): Dark blue background
+        - User-selected knowledge: Dark green background
+
         Args:
             block: LogseqBlock to format
             block_state: Current classification state
@@ -160,40 +164,46 @@ class BlockTree(Tree):
         icon = self._get_classification_icon(block_state.classification)
         icon_style = self._get_icon_style(block_state.classification)
 
+        # Determine background color based on state
+        # Priority: User-selected knowledge > LLM-suggested knowledge > No background
+        background_style = ""
+        if block_state.classification == "knowledge":
+            # User-selected knowledge blocks get green background
+            if block_state.source == "user":
+                background_style = "on dark_green"
+            # LLM-classified knowledge blocks get lighter green background
+            else:
+                background_style = "on #004400"  # Very dark green
+        elif block_state.classification == "pending" and block_state.llm_classification == "knowledge":
+            # LLM-suggested but not yet accepted knowledge blocks get blue background
+            background_style = "on dark_blue"
+
         # Build Rich Text object
         text = Text()
 
         # Knowledge count
-        text.append(f"[{knowledge_count}] ", style="dim")
-
-        # Classification icon
-        text.append(f"{icon} ", style=icon_style)
+        text.append(f"[{knowledge_count}] ", style=f"dim {background_style}".strip())
 
         # Render markdown content (excluding 'id' property)
         rendered = render_markdown(first_line, strip_id=True)
+        # Apply background to rendered content
+        if background_style:
+            rendered.stylize(background_style)
         text.append(rendered)
 
         # Truncate if needed (after rendering)
         if len(text) > max_length:
             text = text[:max_length - 3]
-            text.append("...")
+            text.append("...", style=background_style if background_style else "")
 
         # Format confidence if present
         if block_state.confidence is not None:
             confidence_pct = int(block_state.confidence * 100)
-            text.append(f" ({confidence_pct}%)", style="dim")
+            text.append(f" ({confidence_pct}%)", style=f"dim {background_style}".strip())
 
             # Add warning for low confidence
             if block_state.confidence < 0.60:
-                text.append(" ⚠", style="bold yellow")
-
-        # User override indicator
-        if block_state.source == "user":
-            text.append(" [USER]", style="bold magenta")
-            # If user overrode LLM, show original LLM confidence
-            if block_state.llm_confidence is not None:
-                llm_pct = int(block_state.llm_confidence * 100)
-                text.append(f" (was {llm_pct}%)", style="dim")
+                text.append(" ⚠", style=f"bold yellow {background_style}".strip())
 
         return text
 
