@@ -197,13 +197,26 @@ class Phase3Screen(Screen):
                 # Build candidate_pages list for LLM
                 candidate_pages_list = []
                 for candidate in included_candidates:
+                    # Filter blocks to only matched ones (for semantic search)
+                    # For hinted search (matched_block_ids=[]), use all blocks
+                    if candidate.matched_block_ids:
+                        # Semantic search: only send matched blocks
+                        matched_set = set(candidate.matched_block_ids)
+                        filtered_blocks = [
+                            block_info for block_info in candidate.blocks
+                            if block_info["id"] in matched_set
+                        ]
+                    else:
+                        # Hinted search: send all blocks (whole page is relevant)
+                        filtered_blocks = candidate.blocks
+
                     chunks = [
                         {
                             "target_id": block_info["id"],
                             "content": block_info["content"],
                             "title": block_info["content"][:50] + "..." if len(block_info["content"]) > 50 else block_info["content"],
                         }
-                        for block_info in candidate.blocks
+                        for block_info in filtered_blocks
                     ]
 
                     candidate_pages_list.append({

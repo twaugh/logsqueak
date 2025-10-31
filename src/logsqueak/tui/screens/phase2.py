@@ -306,6 +306,9 @@ class Phase2Screen(Screen):
                 # Use highest similarity score for the page
                 max_similarity = max(sim for sim, _, _ in chunks)
 
+                # Extract matched block IDs from semantic search
+                matched_block_ids = [chunk_id for _, chunk_id, _ in chunks]
+
                 # Load ALL blocks from the page (not just matching chunks)
                 # This ensures proper hierarchy display in Phase 3
                 graph_path = Path(self.state.config.logseq.graph_path)
@@ -332,6 +335,7 @@ class Phase2Screen(Screen):
                         similarity_score=max_similarity,
                         included=True,
                         blocks=blocks,
+                        matched_block_ids=matched_block_ids,
                         search_method="semantic",
                     )
                 )
@@ -384,6 +388,7 @@ class Phase2Screen(Screen):
                         similarity_score=1.0,  # Explicit reference = highest priority
                         included=True,
                         blocks=blocks,
+                        matched_block_ids=[],  # Empty = whole page is contextually relevant
                         search_method="hinted",
                     )
                 )

@@ -137,7 +137,7 @@ class CandidatePage:
 
     blocks: list[dict] = field(default_factory=list)
     """
-    Blocks within the page available for targeting.
+    ALL blocks within the page (for UI display and targeting).
 
     Each block dict contains:
     {
@@ -148,11 +148,22 @@ class CandidatePage:
     }
 
     Used for:
-    - Phase 3 UI: "Pick location" dialog shows these blocks
-    - Phase 3 Decider: LLM selects target_block_id from this list
+    - Phase 3 UI: Full page preview showing hierarchy
     - Phase 4 Execution: find_block_by_id() looks up these IDs
 
     Empty list is valid (page has no blocks yet, only APPEND_ROOT allowed).
+    """
+
+    matched_block_ids: list[str] = field(default_factory=list)
+    """
+    Block IDs that were actually matched by RAG semantic search.
+
+    Subset of blocks (by ID). Used to send focused context to LLM instead
+    of entire page content. For hinted search, may be empty (entire page
+    is contextually relevant).
+
+    Example: If semantic search matched 3 blocks out of 50 on the page,
+    this list contains those 3 block IDs.
     """
 
     search_method: Literal["semantic", "hinted"] = "semantic"
