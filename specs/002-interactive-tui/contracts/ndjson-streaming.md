@@ -232,9 +232,11 @@ class LLMClient(ABC):
 **Expected Output Format** (NDJSON):
 
 ```json
-{"knowledge_block_id": "abc123", "page": "Software Architecture", "refined_text": "Bounded contexts matter more than service size.\nEach context should have clear ownership."}
-{"knowledge_block_id": "def456", "page": "Microservices", "refined_text": "HNSW provides O(log n) nearest neighbor search.\nTrade-off between recall and speed via ef_construction parameter."}
+{"block_id": "abc123", "refined_text": "Bounded contexts matter more than service size.\nEach context should have clear ownership."}
+{"block_id": "def456", "refined_text": "HNSW provides O(log n) nearest neighbor search.\nTrade-off between recall and speed via ef_construction parameter."}
 ```
+
+**Note**: Each knowledge block is reworded only once, then the refined text is applied to all decisions that reference that block. The `page` field has been removed since rewording is independent of the target page.
 
 **Refinement Rules**:
 
@@ -371,7 +373,7 @@ async def parse_ndjson_stream(
 {"page": "Microservices", "action": "skip", "target_id": null, "target_title": null, "confidence": 0.95, "reasoning": "..."}
 
 # Phase 3.2 rewording:
-{"knowledge_block_id": "abc123", "page": "Software Architecture", "refined_text": "- Bounded contexts..."}
+{"block_id": "abc123", "refined_text": "- Bounded contexts..."}
 ```
 
 ### 2.4 Performance Characteristics
@@ -524,15 +526,11 @@ async def parse_ndjson_stream(
 ```json
 {
   "type": "object",
-  "required": ["knowledge_block_id", "page", "refined_text"],
+  "required": ["block_id", "refined_text"],
   "properties": {
-    "knowledge_block_id": {
+    "block_id": {
       "type": "string",
-      "description": "Source block ID from Phase 1"
-    },
-    "page": {
-      "type": "string",
-      "description": "Target page name (matches Phase 3.1 decision)"
+      "description": "Source block ID from Phase 1 (each unique block is reworded once)"
     },
     "refined_text": {
       "type": "string",
@@ -542,22 +540,23 @@ async def parse_ndjson_stream(
 }
 ```
 
+**Note**: The `page` field has been removed. Each knowledge block is reworded only once, and the refined text is then applied to all decisions that reference that block ID. This avoids redundant rewording requests when the same knowledge is being integrated into multiple pages.
+
 **Example**:
 
 ```json
 {
-  "knowledge_block_id": "abc123",
-  "page": "Software Architecture",
+  "block_id": "abc123",
   "refined_text": "Bounded contexts matter more than service size.\nEach context should have clear ownership.\nAvoid sharing databases across contexts."
 }
 ```
 
 **Validation Rules**:
 
-- `knowledge_block_id` must match a block from Phase 1
-- `page` must match a page from an accepted Phase 3.1 decision
+- `block_id` must match a block from Phase 1
 - `refined_text` should be plain block content (no bullet markers or indentation)
 - Preserve `[[Page Links]]` and `((block-refs))` from original content
+- The same refined text will be applied to all decisions that reference this block ID
 
 **Error Handling**:
 

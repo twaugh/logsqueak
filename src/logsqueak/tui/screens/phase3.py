@@ -153,23 +153,24 @@ class Phase3Screen(Screen):
                 await asyncio.sleep(1.5)
                 return
 
-            total_pairs = 0
-            processed_pairs = 0
+            total_blocks = len(knowledge_blocks)
+            processed_blocks = 0
 
-            # Count total (block, page) pairs
+            # Check if we have any candidates
+            total_candidates = 0
             for block_id, _ in knowledge_blocks:
                 candidates = self.state.candidates.get(block_id, [])
                 included_candidates = [c for c in candidates if c.included]
-                total_pairs += len(included_candidates)
+                total_candidates += len(included_candidates)
 
-            if total_pairs == 0:
+            if total_candidates == 0:
                 logger.warning("No candidate pages to evaluate in Phase 3")
                 self._update_status("No candidate pages found. Skipping to Phase 4.")
                 self.decisions_complete = True
                 await asyncio.sleep(1.5)
                 return
 
-            # Process each (knowledge block, candidate page) pair
+            # Process each knowledge block
             for block_id, block_state in knowledge_blocks:
                 # Get block content from journal
                 block = find_block_by_id(self.state.journal_entry.outline.blocks, block_id)
@@ -225,10 +226,12 @@ class Phase3Screen(Screen):
                     })
 
                 # Stream decisions from LLM
+                num_candidates = len(candidate_pages_list)
                 self._update_status(
-                    f"Deciding actions for block {block_id[:8]}... ({processed_pairs + 1}/{total_pairs})"
+                    f"Deciding actions for block {processed_blocks + 1}/{total_blocks} ({num_candidates} candidate pages)..."
                 )
 
+                decisions_for_block = 0
                 async for decision_dict in self.state.llm_client.stream_decisions_ndjson(
                     knowledge_block=knowledge_block_dict,
                     candidate_pages=candidate_pages_list,
@@ -242,9 +245,11 @@ class Phase3Screen(Screen):
                         knowledge_block_id=block_id,
                     )
 
+                    decisions_for_block += 1
+
                     # Log the decision with details
                     logger.info(
-                        f"Decision {processed_pairs + 1}/{total_pairs}:\n"
+                        f"Decision for block {processed_blocks + 1}/{total_blocks}, page {decisions_for_block}/{num_candidates}:\n"
                         f"  Block ID: {block_id}\n"
                         f"  Target Page: {decision.target_page}\n"
                         f"  Action: {decision.action}\n"
@@ -260,14 +265,15 @@ class Phase3Screen(Screen):
                     # Update display
                     self._update_decision_display()
 
-                    processed_pairs += 1
+                processed_blocks += 1
 
                 # Allow UI to update
                 await asyncio.sleep(0.05)
 
             # All decisions complete
             self.decisions_complete = True
-            self._update_status(f"Decisions complete ({processed_pairs} evaluations). Starting rewording...")
+            total_decisions = len(self.state.decisions)
+            self._update_status(f"Decisions complete ({processed_blocks} blocks, {total_decisions} decisions). Starting rewording...")
 
             # Start rewording task
             self.rewording_task = asyncio.create_task(self._stream_rewording())
@@ -295,9 +301,16 @@ class Phase3Screen(Screen):
                 self.rewording_complete = True
                 return
 
-            # Build decisions list for rewording
-            decisions_to_reword = []
+            # Build decisions list for rewording - deduplicate by knowledge_block_id
+            # We only need to reword each unique knowledge block once
+            seen_blocks = set()
+            blocks_to_reword = []
+
             for (knowledge_block_id, target_page), decision in accepted_decisions:
+                if knowledge_block_id in seen_blocks:
+                    continue
+                seen_blocks.add(knowledge_block_id)
+
                 # Get block content from journal
                 block = find_block_by_id(self.state.journal_entry.outline.blocks, knowledge_block_id)
                 if not block:
@@ -306,58 +319,57 @@ class Phase3Screen(Screen):
                 block_text = "\n".join(block.content)
                 hierarchical_text = self._get_hierarchical_text(block)
 
-                decisions_to_reword.append({
-                    "knowledge_block_id": knowledge_block_id,
-                    "page": target_page,
-                    "action": decision.action,
+                blocks_to_reword.append({
+                    "block_id": knowledge_block_id,
                     "full_text": block_text,
                     "hierarchical_text": hierarchical_text,
                 })
 
-            total = len(decisions_to_reword)
+            total = len(blocks_to_reword)
             processed = 0
 
-            logger.info(f"Starting rewording for {total} decisions")
+            logger.info(f"Starting rewording for {total} unique knowledge blocks (from {len(accepted_decisions)} decisions)")
 
             # Stream rewording results from LLM
             async for reworded_dict in self.state.llm_client.stream_rewording_ndjson(
-                decisions=decisions_to_reword
+                decisions=blocks_to_reword
             ):
                 # Log the full raw response
                 logger.info(f"Rewording response received: {reworded_dict}")
 
-                # Extract fields
-                knowledge_block_id = reworded_dict["knowledge_block_id"]
-                target_page = reworded_dict["page"]
+                # Extract fields (using block_id, not knowledge_block_id)
+                knowledge_block_id = reworded_dict.get("block_id", reworded_dict.get("knowledge_block_id"))
                 refined_text = reworded_dict["refined_text"]
 
                 # Log the full rewording with details
                 logger.info(
-                    f"Rewording complete for decision {processed + 1}/{total}:\n"
+                    f"Rewording complete for block {processed + 1}/{total}:\n"
                     f"  Block ID: {knowledge_block_id}\n"
-                    f"  Target Page: {target_page}\n"
-                    f"  Original: {decisions_to_reword[processed].get('full_text', '')[:100]}...\n"
+                    f"  Original: {blocks_to_reword[processed].get('full_text', '')[:100]}...\n"
                     f"  Refined: {refined_text}"
                 )
 
-                # Update decision in state
-                key = (knowledge_block_id, target_page)
-                if key in self.state.decisions:
-                    original_action = self.state.decisions[key].action
-                    self.state.decisions[key].refined_text = refined_text
+                # Update ALL decisions that reference this knowledge block
+                updated_count = 0
+                for key, decision in self.state.decisions.items():
+                    block_id, target_page = key
+                    if block_id == knowledge_block_id and decision.action != "skip":
+                        decision.refined_text = refined_text
+                        updated_count += 1
+                        logger.info(
+                            f"Updated decision for ({knowledge_block_id[:8]}..., {target_page}): "
+                            f"action={decision.action}, refined_text_length={len(refined_text)}"
+                        )
 
-                    logger.info(
-                        f"Updated decision state for ({knowledge_block_id[:8]}..., {target_page}): "
-                        f"action={original_action}, refined_text_length={len(refined_text)}"
-                    )
+                logger.info(f"Updated {updated_count} decisions with refined text for block {knowledge_block_id[:8]}...")
 
-                    # Update display
-                    self._update_decision_display()
+                # Update display
+                self._update_decision_display()
 
-                    processed += 1
-                    self._update_status(
-                        f"Rewording complete for {processed}/{total} decisions"
-                    )
+                processed += 1
+                self._update_status(
+                    f"Rewording complete for {processed}/{total} unique blocks"
+                )
 
                 # Allow UI to update
                 await asyncio.sleep(0.05)
