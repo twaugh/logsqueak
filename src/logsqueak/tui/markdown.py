@@ -48,9 +48,21 @@ def _markdown_to_markup(content: str) -> str:
             end = content.find("]]", i+2)
             if end != -1:
                 link_text = content[i+2:end]
-                result.append(f"[bold blue underline]{link_text}[/bold blue underline]")
+                result.append(f"[bold cyan underline]{link_text}[/bold cyan underline]")
                 i = end + 2
                 continue
+
+        # Check for [markdown](url) style links
+        if content[i] == "[":
+            bracket_end = content.find("]", i+1)
+            if bracket_end != -1 and bracket_end + 1 < len(content) and content[bracket_end + 1] == "(":
+                paren_end = content.find(")", bracket_end + 2)
+                if paren_end != -1:
+                    link_text = content[i+1:bracket_end]
+                    url = content[bracket_end+2:paren_end]
+                    result.append(f"[bold cyan underline]{link_text}[/bold cyan underline]")
+                    i = paren_end + 1
+                    continue
 
         # Check for **bold**
         if content[i:i+2] == "**":
@@ -165,9 +177,21 @@ def _render_markdown_to_text(content: str, text: Text) -> None:
             end = content.find("]]", i+2)
             if end != -1:
                 link_text = content[i+2:end]
-                text.append(link_text, style="bold blue underline")
+                text.append(link_text, style="bold cyan underline")
                 i = end + 2
                 continue
+
+        # Check for [markdown](url) style links
+        if content[i] == "[":
+            bracket_end = content.find("]", i+1)
+            if bracket_end != -1 and bracket_end + 1 < len(content) and content[bracket_end + 1] == "(":
+                paren_end = content.find(")", bracket_end + 2)
+                if paren_end != -1:
+                    link_text = content[i+1:bracket_end]
+                    url = content[bracket_end+2:paren_end]
+                    text.append(link_text, style="bold cyan underline")
+                    i = paren_end + 1
+                    continue
 
         # Check for **bold**
         if content[i:i+2] == "**":

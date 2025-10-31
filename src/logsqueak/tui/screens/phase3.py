@@ -439,9 +439,10 @@ class Phase3Screen(Screen):
         else:
             content_to_show = self._get_original_block_content(decision.knowledge_block_id)
 
-        # Render with consistent green styling
+        # Render with consistent green styling and markdown formatting
         for content_line in content_to_show.split('\n'):
-            lines.append(f"{indent}[dim green]┃[/dim green] [green]{content_line}[/green]")
+            rendered_line = render_markdown_to_markup(content_line, strip_id=True)
+            lines.append(f"{indent}[dim green]┃[/dim green] [green]{rendered_line}[/green]")
 
         return lines
 
