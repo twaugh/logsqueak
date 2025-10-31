@@ -117,7 +117,7 @@ class Phase3Screen(Screen):
         yield Header()
         with Container(id="header-container"):
             yield Static(
-                "Phase 3: Streaming integration decisions...",
+                "Deciding where to integrate your knowledge...",
                 id="status-label",
             )
         with ScrollableContainer(id="content-container"):

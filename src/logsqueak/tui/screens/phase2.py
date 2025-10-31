@@ -96,7 +96,7 @@ class Phase2Screen(Screen):
         """Compose screen layout."""
         yield Header()
         with Container(id="status-container"):
-            yield Label("Phase 2: Retrieving candidate pages...")
+            yield Label("Finding relevant pages for your knowledge...")
         with Container(id="progress-container"):
             yield Static(id="progress-display")
         yield Footer()

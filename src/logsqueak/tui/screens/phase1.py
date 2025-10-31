@@ -103,7 +103,7 @@ class Phase1Screen(Screen):
 
         # Status bar showing progress
         with Vertical(id="status-bar"):
-            yield Label(f"Phase 1: Knowledge Classification - {self.state.journal_entry.date}")
+            yield Label(f"Pick blocks to integrate into pages - {self.state.journal_entry.date}")
             yield Static("Waiting for LLM...", id="llm-status")
 
         # Block tree container
