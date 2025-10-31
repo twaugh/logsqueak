@@ -74,6 +74,11 @@ def _markdown_to_markup(content: str) -> str:
                     i = paren_end + 1
                     continue
 
+            # Not a markdown link - escape the bracket for Rich markup
+            result.append("\\[")
+            i += 1
+            continue
+
         # Check for **bold**
         if content[i:i+2] == "**":
             end = content.find("**", i+2)
@@ -118,6 +123,12 @@ def _markdown_to_markup(content: str) -> str:
                 result.append(f"[strike dim]{strike_text}[/strike dim]")
                 i = end + 1
                 continue
+
+        # Check for unmatched closing bracket ] - escape it for Rich markup
+        if content[i] == "]":
+            result.append("\\]")
+            i += 1
+            continue
 
         # Regular character
         result.append(content[i])
