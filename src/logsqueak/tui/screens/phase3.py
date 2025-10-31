@@ -17,6 +17,7 @@ from textual.widgets import Footer, Header, Static
 
 from logsqueak.tui.models import IntegrationDecision, ScreenState
 from logsqueak.tui.utils import find_block_by_id, get_block_hierarchy
+from logsqueak.tui.markdown import render_markdown_to_markup
 
 logger = logging.getLogger(__name__)
 
@@ -536,17 +537,19 @@ class Phase3Screen(Screen):
             if depth == len(hierarchy) - 1:
                 # This is the knowledge block - show in bold with full content
                 for i, line in enumerate(block.content):
+                    rendered_line = render_markdown_to_markup(line, strip_id=True)
                     if i == 0:
-                        lines.append(f"{indent}• [bold]{line}[/bold]")
+                        lines.append(f"{indent}• [bold]{rendered_line}[/bold]")
                     else:
-                        lines.append(f"{indent}  [bold]{line}[/bold]")
+                        lines.append(f"{indent}  [bold]{rendered_line}[/bold]")
             else:
                 # Parent context - show dimmed, just first line
                 content_preview = block.content[0] if block.content else "(empty)"
                 # Truncate long content
                 if len(content_preview) > 80:
                     content_preview = content_preview[:80] + "..."
-                lines.append(f"{indent}• [dim]{content_preview}[/dim]")
+                rendered_preview = render_markdown_to_markup(content_preview, strip_id=True)
+                lines.append(f"{indent}• [dim]{rendered_preview}[/dim]")
 
         return lines
 
@@ -633,17 +636,20 @@ class Phase3Screen(Screen):
             if len(content) > 80:
                 content = content[:80] + "..."
 
+            # Apply markdown rendering
+            rendered_content = render_markdown_to_markup(content, strip_id=True)
+
             indent = "  " * current_depth
 
             # Check if this block is being replaced
             if decision.action == "replace" and block_id == decision.target_block_id:
                 # Show strikethrough for old content
-                block_lines.append(f"{indent}• [strike]{content}[/strike]")
+                block_lines.append(f"{indent}• [strike]{rendered_content}[/strike]")
                 # Show new refined content below with green bar
                 block_lines.extend(self._render_new_content(decision, indent))
             else:
                 # Normal block display
-                block_lines.append(f"{indent}• {content}")
+                block_lines.append(f"{indent}• {rendered_content}")
 
             # Render children
             if block_id in children_map:
@@ -710,15 +716,18 @@ class Phase3Screen(Screen):
             if len(content) > 80:
                 content = content[:80] + "..."
 
+            # Apply markdown rendering
+            rendered_content = render_markdown_to_markup(content, strip_id=True)
+
             # Check if this block is being replaced
             if decision.action == "replace" and hybrid_id == decision.target_block_id:
                 # Show strikethrough for old content
-                lines.append(f"{indent}• [strike]{content}[/strike]")
+                lines.append(f"{indent}• [strike]{rendered_content}[/strike]")
                 # Show new refined content below with green bar
                 lines.extend(self._render_new_content(decision, indent))
             else:
                 # Normal block display
-                lines.append(f"{indent}• {content}")
+                lines.append(f"{indent}• {rendered_content}")
 
             # Render children first
             if block.children:

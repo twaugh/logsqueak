@@ -7,6 +7,103 @@ Used across multiple screens and widgets for consistent formatting.
 from rich.text import Text
 
 
+def render_markdown_to_markup(content: str, strip_id: bool = True) -> str:
+    """
+    Render Logseq markdown to Textual markup string.
+
+    This version returns a markup string (e.g., "[bold]text[/bold]") suitable
+    for use with Static widgets that accept markup strings.
+
+    Args:
+        content: Raw markdown content
+        strip_id: If True, hide 'id::' properties (default: True)
+
+    Returns:
+        Markup string with Textual markup tags
+    """
+    if strip_id and content.lstrip().startswith("id::"):
+        return ""  # Don't show id properties
+
+    # Handle TODO/DONE/CANCELLED markers with checkbox indicators
+    if content.startswith("TODO "):
+        return f"[bold yellow]☐ TODO[/bold yellow] {_markdown_to_markup(content[5:])}"
+    elif content.startswith("DONE "):
+        return f"[bold green]☑ DONE[/bold green] {_markdown_to_markup(content[5:])}"
+    elif content.startswith("CANCELLED ") or content.startswith("CANCELED "):
+        prefix_len = 10 if content.startswith("CANCELLED ") else 9
+        prefix = content[:prefix_len]
+        rest = content[prefix_len:]
+        return f"[bold dim]☒[/bold dim] [dim strike]{prefix}[/dim strike]{_markdown_to_markup(rest)}"
+
+    return _markdown_to_markup(content)
+
+
+def _markdown_to_markup(content: str) -> str:
+    """Convert markdown syntax to Textual markup."""
+    result = []
+    i = 0
+    while i < len(content):
+        # Check for [[page links]]
+        if content[i:i+2] == "[[":
+            end = content.find("]]", i+2)
+            if end != -1:
+                link_text = content[i+2:end]
+                result.append(f"[bold blue underline]{link_text}[/bold blue underline]")
+                i = end + 2
+                continue
+
+        # Check for **bold**
+        if content[i:i+2] == "**":
+            end = content.find("**", i+2)
+            if end != -1:
+                bold_text = content[i+2:end]
+                result.append(f"[bold]{bold_text}[/bold]")
+                i = end + 2
+                continue
+
+        # Check for *italic*
+        if content[i] == "*" and (i == 0 or content[i-1] != "*"):
+            end = content.find("*", i+1)
+            if end != -1 and (end+1 >= len(content) or content[end+1] != "*"):
+                italic_text = content[i+1:end]
+                result.append(f"[italic]{italic_text}[/italic]")
+                i = end + 1
+                continue
+
+        # Check for `code`
+        if content[i] == "`":
+            end = content.find("`", i+1)
+            if end != -1:
+                code_text = content[i+1:end]
+                result.append(f"[bold cyan on #222222]{code_text}[/bold cyan on #222222]")
+                i = end + 1
+                continue
+
+        # Check for ~~strikethrough~~
+        if content[i:i+2] == "~~":
+            end = content.find("~~", i+2)
+            if end != -1:
+                strike_text = content[i+2:end]
+                result.append(f"[strike dim]{strike_text}[/strike dim]")
+                i = end + 2
+                continue
+
+        # Check for ~strikethrough~
+        if content[i] == "~" and (i == 0 or content[i-1] != "~"):
+            end = content.find("~", i+1)
+            if end != -1 and (end+1 >= len(content) or content[end+1] != "~"):
+                strike_text = content[i+1:end]
+                result.append(f"[strike dim]{strike_text}[/strike dim]")
+                i = end + 1
+                continue
+
+        # Regular character
+        result.append(content[i])
+        i += 1
+
+    return "".join(result)
+
+
 def render_markdown(content: str, strip_id: bool = True) -> Text:
     """
     Render Logseq markdown content to Rich Text with formatting.
