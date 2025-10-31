@@ -306,8 +306,15 @@ class Phase2Screen(Screen):
                 # Use highest similarity score for the page
                 max_similarity = max(sim for sim, _, _ in chunks)
 
-                # Extract matched block IDs from semantic search
-                matched_block_ids = [chunk_id for _, chunk_id, _ in chunks]
+                # Extract matched block content from semantic search (for matching)
+                # ChromaDB chunk IDs are sequential numbers, not hybrid IDs
+                # Use block_content from metadata to match blocks later
+                matched_block_contents = set()
+                for _, chunk_id, metadata in chunks:
+                    block_content = metadata.get("block_content", "")
+                    if block_content:
+                        # Normalize whitespace for matching
+                        matched_block_contents.add(block_content.strip())
 
                 # Load ALL blocks from the page (not just matching chunks)
                 # This ensures proper hierarchy display in Phase 3
@@ -316,6 +323,14 @@ class Phase2Screen(Screen):
                 try:
                     outline = LogseqOutline.parse(page_path.read_text())
                     blocks = self._extract_blocks_from_outline(outline)
+
+                    # Now match blocks by content to get their hybrid IDs
+                    matched_block_ids = []
+                    for block_info in blocks:
+                        block_content = block_info["content"].strip()
+                        if block_content in matched_block_contents:
+                            matched_block_ids.append(block_info["id"])
+
                 except Exception as e:
                     logger.warning(f"Failed to load full page {page_name}: {e}")
                     # Fallback to just the matching chunks
@@ -328,6 +343,7 @@ class Phase2Screen(Screen):
                         }
                         for _, chunk_id, metadata in chunks
                     ]
+                    matched_block_ids = [chunk_id for _, chunk_id, _ in chunks]
 
                 candidates.append(
                     CandidatePage(
