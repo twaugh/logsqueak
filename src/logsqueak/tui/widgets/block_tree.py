@@ -5,10 +5,12 @@ This widget displays a hierarchical tree of journal blocks with:
 - Confidence percentages for LLM classifications
 - Low-confidence warnings for scores below thresholds
 - User override indicators
+- Rich markdown rendering (links, bold, code, TODO/DONE checkboxes, etc.)
 """
 
 from typing import Optional
 
+from rich.text import Text
 from textual.widgets import Tree
 from textual.widgets.tree import TreeNode
 
@@ -108,7 +110,7 @@ class BlockTree(Tree):
 
         return node
 
-    def format_block_label(self, block: LogseqBlock, block_state: BlockState, knowledge_count: int) -> str:
+    def format_block_label(self, block: LogseqBlock, block_state: BlockState, knowledge_count: int) -> Text:
         """
         Format a block label with knowledge count, classification icon, content, and confidence.
 
@@ -141,40 +143,54 @@ class BlockTree(Tree):
             knowledge_count: Number of knowledge blocks in subtree
 
         Returns:
-            Formatted label string with markup
+            Formatted label as Rich Text with markdown rendering
         """
-        # Get first line of block content (truncate if too long)
+        # Get first line of block content
         first_line = block.content[0] if block.content else "(empty block)"
-        if len(first_line) > 80:
-            first_line = first_line[:77] + "..."
+
+        # Truncate if too long (but after markdown parsing so we preserve formatting)
+        max_length = 100
 
         # Choose icon based on classification
         icon = self._get_classification_icon(block_state.classification)
+        icon_style = self._get_icon_style(block_state.classification)
+
+        # Build Rich Text object
+        text = Text()
+
+        # Knowledge count
+        text.append(f"[{knowledge_count}] ", style="dim")
+
+        # Classification icon
+        text.append(f"{icon} ", style=icon_style)
+
+        # Render markdown content (excluding 'id' property)
+        content_to_render = self._strip_id_property(first_line)
+        self._render_markdown_to_text(content_to_render, text)
+
+        # Truncate if needed (after rendering)
+        if len(text) > max_length:
+            text = text[:max_length - 3]
+            text.append("...")
 
         # Format confidence if present
-        confidence_str = ""
-        warning = ""
         if block_state.confidence is not None:
             confidence_pct = int(block_state.confidence * 100)
-            confidence_str = f" ({confidence_pct}%)"
+            text.append(f" ({confidence_pct}%)", style="dim")
 
             # Add warning for low confidence
             if block_state.confidence < 0.60:
-                warning = " ⚠"
-            elif block_state.confidence < 0.75:
-                # Yellow color applied via CSS/styling
-                pass
+                text.append(" ⚠", style="bold yellow")
 
         # User override indicator
-        user_marker = ""
         if block_state.source == "user":
-            user_marker = " [USER]"
+            text.append(" [USER]", style="bold magenta")
             # If user overrode LLM, show original LLM confidence
             if block_state.llm_confidence is not None:
                 llm_pct = int(block_state.llm_confidence * 100)
-                confidence_str = f" (was {llm_pct}%)"
+                text.append(f" (was {llm_pct}%)", style="dim")
 
-        return f"[{knowledge_count}] {icon} {first_line}{confidence_str}{warning}{user_marker}"
+        return text
 
     def _count_knowledge_in_subtree(self, block: LogseqBlock) -> int:
         """
@@ -215,6 +231,134 @@ class BlockTree(Tree):
             "pending": "⊙",
         }
         return icons.get(classification, "?")
+
+    def _get_icon_style(self, classification: str) -> str:
+        """
+        Get Rich style for classification icon.
+
+        Args:
+            classification: One of "knowledge", "activity", "pending"
+
+        Returns:
+            Rich style string
+        """
+        styles = {
+            "knowledge": "bold green",
+            "activity": "dim",
+            "pending": "yellow",
+        }
+        return styles.get(classification, "")
+
+    def _strip_id_property(self, content: str) -> str:
+        """
+        Remove 'id::' property from content if present.
+
+        Args:
+            content: Block content line
+
+        Returns:
+            Content with id:: property removed
+        """
+        # Check if this line is an id:: property
+        stripped = content.lstrip()
+        if stripped.startswith("id::"):
+            return ""  # Don't show id properties
+        return content
+
+    def _render_markdown_to_text(self, content: str, text: Text) -> None:
+        """
+        Render Logseq markdown to Rich Text with styles.
+
+        Supports:
+        - **bold**
+        - *italic*
+        - `code`
+        - [[page links]]
+        - TODO/DONE/CANCELLED markers (with checkboxes)
+        - ~~strikethrough~~
+
+        Args:
+            content: Raw markdown content
+            text: Rich Text object to append styled text to
+        """
+        if not content or content == "":
+            return
+
+        # Handle TODO/DONE/CANCELLED markers with checkbox indicators
+        if content.startswith("TODO "):
+            text.append("☐ ", style="bold yellow")
+            text.append("TODO ", style="yellow")
+            content = content[5:]
+        elif content.startswith("DONE "):
+            text.append("☑ ", style="bold green")
+            text.append("DONE ", style="green")
+            content = content[5:]
+        elif content.startswith("CANCELLED ") or content.startswith("CANCELED "):
+            prefix_len = 10 if content.startswith("CANCELLED ") else 9
+            text.append("☒ ", style="bold dim")
+            text.append(content[:prefix_len], style="dim strike")
+            content = content[prefix_len:]
+
+        # Process the rest with simple parser
+        i = 0
+        while i < len(content):
+            # Check for [[page links]]
+            if content[i:i+2] == "[[":
+                end = content.find("]]", i+2)
+                if end != -1:
+                    link_text = content[i+2:end]
+                    text.append(link_text, style="bold blue underline")
+                    i = end + 2
+                    continue
+
+            # Check for **bold**
+            if content[i:i+2] == "**":
+                end = content.find("**", i+2)
+                if end != -1:
+                    bold_text = content[i+2:end]
+                    text.append(bold_text, style="bold")
+                    i = end + 2
+                    continue
+
+            # Check for *italic*
+            if content[i] == "*" and (i == 0 or content[i-1] != "*"):
+                end = content.find("*", i+1)
+                if end != -1 and (end+1 >= len(content) or content[end+1] != "*"):
+                    italic_text = content[i+1:end]
+                    text.append(italic_text, style="italic")
+                    i = end + 1
+                    continue
+
+            # Check for `code`
+            if content[i] == "`":
+                end = content.find("`", i+1)
+                if end != -1:
+                    code_text = content[i+1:end]
+                    text.append(code_text, style="bold cyan on #222222")
+                    i = end + 1
+                    continue
+
+            # Check for ~~strikethrough~~
+            if content[i:i+2] == "~~":
+                end = content.find("~~", i+2)
+                if end != -1:
+                    strike_text = content[i+2:end]
+                    text.append(strike_text, style="strike dim")
+                    i = end + 2
+                    continue
+
+            # Check for ~strikethrough~
+            if content[i] == "~" and (i == 0 or content[i-1] != "~"):
+                end = content.find("~", i+1)
+                if end != -1 and (end+1 >= len(content) or content[end+1] != "~"):
+                    strike_text = content[i+1:end]
+                    text.append(strike_text, style="strike dim")
+                    i = end + 1
+                    continue
+
+            # Regular character
+            text.append(content[i])
+            i += 1
 
     def update_block_label(self, block_id: str) -> None:
         """
