@@ -35,11 +35,14 @@ class Phase1Screen(Screen):
 
     Workflow:
     1. On mount: Initialize all blocks as "pending"
-    2. Start LLM streaming task (classify each block asynchronously)
-    3. Update UI in real-time as classifications arrive
-    4. User can override any classification (K=knowledge, A=activity, R=reset)
-    5. User-marked blocks are locked (LLM cannot override)
-    6. Press Enter to continue to Phase 2 when satisfied
+    2. Start LLM streaming task (suggest classification for each block)
+    3. LLM suggestions shown as "[LLM: ✓ 92%]" but blocks remain "pending"
+    4. User must explicitly accept suggestions:
+       - K: Accept as knowledge (or use LLM suggestion if available)
+       - A: Accept as activity
+       - Shift+A: Accept all LLM suggestions at once
+    5. User can reset accepted blocks (R=reset to pending)
+    6. Press Enter to continue when at least one knowledge block is accepted
 
     Keyboard Bindings:
     - j/↓: Navigate down
@@ -47,7 +50,8 @@ class Phase1Screen(Screen):
     - Enter: Expand/collapse node
     - K: Mark current block as knowledge
     - A: Mark current block as activity
-    - R: Reset to LLM classification (or pending if LLM hasn't classified yet)
+    - R: Reset to pending
+    - Shift+A: Accept all LLM suggestions
     - n: Proceed when ready (validate at least one knowledge block exists)
     - q: Quit application
     """
@@ -60,6 +64,7 @@ class Phase1Screen(Screen):
         ("K", "mark_knowledge", "Mark Knowledge"),
         ("A", "mark_activity", "Mark Activity"),
         ("R", "reset", "Reset"),
+        ("shift+a", "accept_all", "Accept All"),
         ("n", "continue", "Next →"),
     ]
 
@@ -241,14 +246,14 @@ class Phase1Screen(Screen):
                 # Only update if not user-overridden
                 if block_state.source != "user":
                     # LLM only outputs knowledge blocks (no is_knowledge field needed)
-                    classification = "knowledge"
-
-                    # Store LLM classification
-                    block_state.classification = classification
-                    block_state.confidence = confidence
-                    block_state.reason = reason
-                    block_state.llm_classification = classification
+                    # Store LLM suggestion but keep block as "pending" until user accepts
+                    block_state.llm_classification = "knowledge"
                     block_state.llm_confidence = confidence
+                    block_state.reason = reason
+                    # Keep classification as "pending" - user must explicitly accept
+                    # block_state.classification remains "pending"
+                    # block_state.confidence remains None
+                    # block_state.source remains "llm"
 
                     classified_count += 1
 
@@ -259,13 +264,13 @@ class Phase1Screen(Screen):
                         first_line = logseq_block.content[0] if logseq_block.content else "(empty)"
                         block_content = first_line[:100]  # First 100 chars
 
-                    # Log classification with content and reason
+                    # Log LLM suggestion with content and reason
                     reason_text = f" - {reason}" if reason else ""
                     logger.info(
-                        f"Classified as {classification.upper()} ({confidence:.0%}){reason_text}: {block_content}"
+                        f"LLM suggests KNOWLEDGE ({confidence:.0%}){reason_text}: {block_content}"
                     )
                     logger.debug(
-                        f"  Block ID: {block_id[:8]}... | Full classification: {result}"
+                        f"  Block ID: {block_id[:8]}... | Full result: {result}"
                     )
 
                     # Update UI - find and refresh the tree node and ancestors
@@ -278,15 +283,15 @@ class Phase1Screen(Screen):
                             if self.block_tree.cursor_node == node:
                                 self._update_reason_bar()
                         else:
-                            logger.warning(f"Could not find tree node for block {block_id[:8]}... (classification: {classification})")
+                            logger.warning(f"Could not find tree node for block {block_id[:8]}... (LLM suggestion: knowledge)")
 
-            # Streaming complete - mark remaining pending blocks as activity
+            # Streaming complete - mark remaining pending blocks with activity suggestion
             unclassified_count = self._mark_unclassified_as_activity()
 
-            logger.info(f"LLM classification complete: {classified_count} blocks classified")
+            logger.info(f"LLM suggestions complete: {classified_count} knowledge suggestions")
             if unclassified_count > 0:
-                logger.info(f"Marked {unclassified_count} unclassified blocks as activity")
-            status.update(f"Classification complete ({classified_count} blocks, {unclassified_count} inferred as activity)")
+                logger.info(f"Marked {unclassified_count} remaining blocks with activity suggestion")
+            status.update(f"Suggestions complete: {classified_count} knowledge, {unclassified_count} activity (use Shift+A to accept all)")
 
         except asyncio.CancelledError:
             logger.info("LLM streaming task cancelled by user")
@@ -301,22 +306,23 @@ class Phase1Screen(Screen):
 
     def _mark_unclassified_as_activity(self) -> int:
         """
-        Mark all remaining pending blocks as activity after LLM streaming completes.
+        Mark all remaining pending blocks with LLM suggestion of activity.
 
-        The LLM was instructed to output knowledge blocks first. Any blocks not
-        explicitly classified are assumed to be activity logs.
+        The LLM was instructed to output knowledge blocks only. Any blocks not
+        explicitly identified are inferred to be activity logs (as suggestions).
 
         Returns:
-            Number of blocks marked as activity
+            Number of blocks marked with activity suggestion
         """
         count = 0
 
         for block_id, block_state in self.state.block_states.items():
-            # Only mark blocks that are still pending
-            if block_state.classification == "pending":
-                block_state.classification = "activity"
-                block_state.source = "llm"
-                block_state.confidence = None  # Inferred, not explicitly classified
+            # Only update blocks that are still pending and have no LLM classification yet
+            if block_state.classification == "pending" and not block_state.llm_classification:
+                # Set LLM suggestion to activity (but keep classification as pending)
+                block_state.llm_classification = "activity"
+                block_state.llm_confidence = 0.95  # High confidence - inferred from absence
+                # classification remains "pending" - user must still accept
                 count += 1
 
                 # Update UI for this block
@@ -498,6 +504,58 @@ class Phase1Screen(Screen):
         self._refresh_ancestors(cursor_node)
         self._update_reason_bar()
 
+    def action_accept_all(self) -> None:
+        """
+        Accept all LLM suggestions (Shift+A).
+
+        Converts all blocks with LLM suggestions to their suggested classification.
+        - Blocks with llm_classification="knowledge" → classification="knowledge"
+        - Blocks with llm_classification="activity" → classification="activity"
+        - Preserves user-marked blocks (source="user")
+        - Updates confidence and source appropriately
+        """
+        accepted_count = 0
+
+        for block_id, block_state in self.state.block_states.items():
+            # Skip user-overridden blocks
+            if block_state.source == "user":
+                continue
+
+            # Skip blocks without LLM suggestions
+            if not block_state.llm_classification:
+                continue
+
+            # Accept the LLM suggestion
+            block_state.classification = block_state.llm_classification
+            block_state.confidence = block_state.llm_confidence
+            block_state.source = "llm"
+            accepted_count += 1
+
+        logger.info(f"Accepted {accepted_count} LLM suggestions")
+
+        # Refresh entire tree to show accepted classifications
+        if self.block_tree:
+            self._refresh_entire_tree()
+
+        # Update reason bar
+        self._update_reason_bar()
+
+        # Show notification
+        self.app.notify(f"Accepted {accepted_count} LLM suggestions")
+
+    def _refresh_entire_tree(self) -> None:
+        """Refresh all nodes in the tree after bulk changes."""
+        if not self.block_tree:
+            return
+
+        # Recursively refresh all nodes
+        def refresh_node_and_children(node: TreeNode) -> None:
+            self._refresh_tree_node(node)
+            for child in node.children:
+                refresh_node_and_children(child)
+
+        refresh_node_and_children(self.block_tree.root)
+
     async def action_continue(self) -> None:
         """
         Continue to Phase 2 (Enter key).
@@ -678,14 +736,28 @@ class Phase1Screen(Screen):
         if not block_state:
             return
 
-        # Update reason bar based on classification and reason
+        # Update reason bar based on classification and LLM suggestion
         reason_text = self.query_one("#reason-text", Static)
 
-        if block_state.classification == "knowledge" and block_state.reason:
-            # Show reason with label
+        # Show LLM suggestion if block is pending
+        if block_state.classification == "pending" and block_state.llm_classification:
+            llm_label = "knowledge" if block_state.llm_classification == "knowledge" else "activity"
+            llm_conf = int(block_state.llm_confidence * 100) if block_state.llm_confidence else 0
+
+            if block_state.reason:
+                # Show LLM suggestion with reason
+                reason_text.update(f"🤖 LLM suggests {llm_label} ({llm_conf}%): {block_state.reason}")
+            else:
+                # Show LLM suggestion without reason
+                reason_text.update(f"🤖 LLM suggests {llm_label} ({llm_conf}%)")
+
+        # Show accepted classification
+        elif block_state.classification == "knowledge" and block_state.reason:
+            # Show reason for accepted knowledge
             reason_text.update(f"💡 Why knowledge: {block_state.reason}")
+
         else:
-            # Clear for activity/pending blocks
+            # Clear for activity or blocks without info
             reason_text.update("")
 
     @on(Tree.NodeHighlighted)
