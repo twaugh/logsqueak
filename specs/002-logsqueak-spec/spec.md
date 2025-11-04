@@ -14,6 +14,10 @@
 - Q: What should the log file retention and rotation policy be? → A: No automatic cleanup - logs accumulate indefinitely (user manually deletes if needed)
 - Q: How should the system handle concurrent file modifications (user edits journal/page externally while TUI is running)? → A: Automatically reload modified files and re-validate current operation before proceeding
 - Q: What timeout value should be used for AI service requests? → A: 60s
+- Q: How should the configuration file be initialized on first run? → A: Require user to create the configuration file before first run (show helpful error with example if missing); file specifies AI server endpoint, credentials, model, num_ctx, and Logseq graph location
+- Q: What format should the configuration file use? → A: YAML format with explicit structure (sections: llm:, logseq:, rag:) matching existing Logsqueak config format
+- Q: When should configuration validation occur (startup vs lazy)? → A: Validate configuration lazily (only when each setting is first used)
+- Q: How should the system respond to configuration validation failures? → A: Show error message and exit immediately (user must manually edit config file and restart)
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -118,6 +122,8 @@ The user wants to see where each refined knowledge block will be integrated in t
 
 ### Edge Cases
 
+- What happens if configuration file is missing on first run? (System displays error message with expected path `~/.config/logsqueak/config.yaml` and example YAML format, then exits with non-zero status)
+- What happens if a configuration setting is invalid when first accessed? (System displays clear error message indicating which setting is invalid and expected format/value, then exits immediately with non-zero status; user must manually edit config file and restart)
 - What happens when a journal entry has no blocks identified as knowledge by the LLM? (System shows "No knowledge blocks identified" message, user can manually select blocks anyway)
 - How does the system handle streaming interruptions (network issues, LLM API errors)? (Shows error message, preserves partial state, allows user to retry or cancel)
 - What happens if page indexing fails? (Shows error, offers to retry, blocks progression to Phase 3)
@@ -234,6 +240,16 @@ The user wants to see where each refined knowledge block will be integrated in t
 - **FR-071b**: System MUST automatically reload files that have been modified externally since initial load
 - **FR-071c**: System MUST re-validate that target blocks and structure referenced in integration decisions still exist after reloading modified files
 - **FR-071d**: If validation succeeds after reload, system MUST proceed with write operation; if validation fails (target block deleted, structure changed), system MUST mark operation as failed with descriptive error message
+
+#### Configuration Management
+
+- **FR-072a**: System MUST require configuration file at `~/.config/logsqueak/config.yaml` to exist before first run
+- **FR-072b**: If configuration file is missing, system MUST display helpful error message with expected file path and example YAML format with structured sections (llm:, logseq:, rag:) showing required fields: llm.endpoint, llm.api_key, llm.model, llm.num_ctx (optional), logseq.graph_path, and rag.top_k (optional)
+- **FR-072c**: System MUST NOT automatically create configuration file with default or placeholder values
+- **FR-072d**: Configuration file MUST use YAML format with explicit hierarchical structure matching existing Logsqueak config conventions (llm: section for AI service settings, logseq: section for graph settings, rag: section for search settings)
+- **FR-072e**: System MUST validate configuration settings lazily (only when each setting is first accessed during operation), not eagerly at startup
+- **FR-072f**: When lazy validation fails for a setting (e.g., invalid graph path, missing required field), system MUST display clear error message indicating which setting is invalid and what the valid format or expected value should be, then exit immediately with non-zero status
+- **FR-072g**: System MUST NOT provide in-TUI configuration editing or retry mechanisms; user must manually edit configuration file and restart application after validation failures
 
 #### Security & Privacy
 
