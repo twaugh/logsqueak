@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "GPL-3.0-or-later"}
 authors = [
-    {name = "Tom Waugh", email = "twaugh@redhat.com"}
+    {name = "Tim Waugh", email = "twaugh@redhat.com"}
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
