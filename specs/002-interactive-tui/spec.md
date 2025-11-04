@@ -292,6 +292,12 @@ As a Logsqueak user, I want to see the progress of write operations to my knowle
 ## Dependencies
 
 - **Textual Framework**: The feature requires the Textual Python library (version 0.47.0+) for building the TUI interface. **Note**: Not currently installed; will be added to pyproject.toml dependencies during implementation.
+- **logseq-outline-parser Package**: The feature MUST use the existing `logseq-outline-parser` package (located in `src/logseq-outline-parser/`) for all Logseq markdown parsing, rendering, and block manipulation. This package provides:
+  - `LogseqOutline.parse()` and `LogseqOutline.render()` for parsing/rendering markdown
+  - `LogseqBlock` data structures with property order preservation
+  - Hybrid ID system (`id::` properties and content hashing)
+  - `find_block_by_id()` for precise block targeting
+  - `GraphPaths` for navigating Logseq directory structure
 - **Existing 5-Phase Pipeline**: The feature depends on the current extraction, RAG, decision, and write pipeline infrastructure remaining functionally stable. **Validated 2025-10-29**: All pipeline components (extraction, integration, RAG, LLM client) are importable and functional.
 - **LLM Streaming APIs**: The feature requires LLM providers to support streaming responses (OpenAI-compatible streaming endpoints)
 - **Async Support**: The feature requires Python 3.11+ with async/await support for concurrent LLM streaming and UI updates
