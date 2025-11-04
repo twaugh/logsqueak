@@ -54,11 +54,11 @@ After selecting knowledge blocks, the user wants to review and refine the conten
 **Acceptance Scenarios**:
 
 1. **Given** 5 knowledge blocks were selected in the previous screen, **When** user enters the editing screen, **Then** system displays a list of those blocks with each block's original full hierarchical context (showing parent blocks with proper indentation) in a read-only display area
-2. **Given** the LLM is generating reworded versions in the background, **When** a reworded version becomes available, **Then** the reworded content is displayed alongside the original hierarchical context with an "Accept LLM version" button
+2. **Given** the LLM is generating reworded versions in the background, **When** a reworded version becomes available, **Then** the reworded content is displayed alongside the original hierarchical context
 3. **Given** the LLM-reworded version is displayed, **When** user reviews it, **Then** they can see the original hierarchical context, the LLM-reworded text, and the current editable version to compare before choosing
-4. **Given** a knowledge block is displayed, **When** user clicks in the text field, **Then** they can directly edit the content that will be integrated
-5. **Given** the LLM has provided a reworded version, **When** user clicks "Accept LLM version", **Then** the text field is updated with the reworded content
-6. **Given** the user has edited a block, **When** they click "Revert to original", **Then** the text field returns to the original block content from the journal
+4. **Given** a knowledge block is displayed, **When** user presses Tab to focus the text editor, **Then** the editor border highlights and cursor appears, allowing them to directly edit the content that will be integrated
+5. **Given** the LLM has provided a reworded version and editor is unfocused, **When** user presses 'a' (Accept LLM version), **Then** the text field is updated with the reworded content
+6. **Given** the user has edited a block and editor is unfocused, **When** they press 'r' (Revert to original), **Then** the text field returns to the original block content from the journal
 7. **Given** background tasks are running, **When** user views the status widget, **Then** it shows which tasks are active: "Refining knowledge content: 3/5 complete", "Building page index: 78%", "Finding relevant pages: 2/5 complete"
 8. **Given** page indexing is still running, **When** user tries to proceed, **Then** system shows "Waiting for page index..." message and blocks progression
 9. **Given** page indexing completes, **When** RAG search begins for the selected blocks, **Then** status widget shows "Finding relevant pages: 0/5 complete" with progress updates
@@ -66,9 +66,10 @@ After selecting knowledge blocks, the user wants to review and refine the conten
 
 **Keyboard Controls**:
 
-- `j` / `k` / `↓` / `↑`: Navigate between knowledge blocks
-- `Enter`: Focus text field for editing
-- `Tab`: Cycle between text field and action buttons
+- `j` / `k` / `↓` / `↑`: Navigate between knowledge blocks (auto-saves current edits, only when editor unfocused)
+- `Tab`: Focus text editor for editing (or unfocus to enable navigation)
+- `a`: Accept LLM reworded version (replaces editor content, only available when LLM response received and editor unfocused)
+- `r`: Revert to original content (restores journal content, only when editor unfocused)
 - `n`: Continue to next screen (only enabled when RAG search complete)
 - `q`: Back to block selection screen
 
@@ -135,7 +136,7 @@ The user wants to see where each refined knowledge block will be integrated in t
 - **FR-004c**: System MUST store the manifest as JSON with format `{"page_name": mtime_timestamp}` and save atomically after each indexing operation
 - **FR-005**: System MUST display a status widget showing which background tasks are active and their progress (percentage when calculable, on/off status otherwise)
 - **FR-006**: System MUST visually highlight blocks identified as knowledge by the LLM with a distinct color (different from user-selected highlight) as they arrive via streaming
-- **FR-006a**: System MUST display a robot emoji (🤖) indicator next to LLM-suggested blocks, positioned far left or far right without shifting the block text
+- **FR-006a**: System MUST display a robot emoji (🤖) indicator next to LLM-suggested blocks, positioned in a fixed-width reserved space (minimum 2 characters) at the far left of each tree line, ensuring all block text aligns consistently regardless of emoji presence
 - **FR-006b**: System MUST keep the robot emoji indicator visible even after user manually selects the block, showing that it was originally an LLM suggestion
 - **FR-007**: System MUST allow users to manually select/deselect any block as knowledge using keyboard controls, independent of LLM suggestions
 - **FR-008**: System MUST use a different highlight color for user-selected blocks vs LLM-suggested blocks
@@ -151,13 +152,17 @@ The user wants to see where each refined knowledge block will be integrated in t
 - **FR-015**: System MUST display a list of all selected knowledge blocks from Phase 1
 - **FR-016**: System MUST display each block's original full hierarchical context (including parent blocks with proper indentation) in a read-only display area, showing the block in its journal context
 - **FR-017**: System MUST display each block's content in an editable text field, starting with the original block content (without parent context)
-- **FR-018**: System MUST run three background tasks when this screen loads: (1) LLM streaming reworded versions of each block, (2) continue page indexing if not yet complete from Phase 1, (3) RAG search after indexing completes
-- **FR-019**: System MUST display the LLM-reworded content alongside the original hierarchical context when a reworded version becomes available, allowing user to compare before choosing
-- **FR-020**: System MUST display "Accept LLM version" and "Revert to original" buttons for each knowledge block
-- **FR-021**: System MUST enable "Accept LLM version" button only when the LLM-reworded version is available and visible for that block
-- **FR-022**: System MUST allow users to directly edit the text field content for any block
-- **FR-023**: System MUST update the text field with LLM-reworded content when user clicks "Accept LLM version"
-- **FR-024**: System MUST restore the original block content (without parent context) when user clicks "Revert to original"
+- **FR-018**: System MUST run three background tasks using non-blocking workers when this screen loads: (1) LLM streaming reworded versions of each block, (2) continue page indexing if not yet complete from Phase 1, (3) RAG search after indexing completes
+- **FR-019**: System MUST display a waiting indicator (e.g., "⏳ Waiting for LLM response...") in the LLM reworded section before the reworded version is available, then display the LLM-reworded content alongside the original hierarchical context when a reworded version becomes available, allowing user to compare before choosing
+- **FR-020**: System MUST provide keyboard shortcuts to accept LLM version ('a' key) and revert to original ('r' key) for each knowledge block
+- **FR-021**: System MUST visually indicate when "Accept LLM version" action is available (normal display) versus unavailable (dimmed with "waiting..." indicator) based on whether the LLM-reworded version has arrived
+- **FR-022**: System MUST allow users to directly edit the text field content for any block using a multi-line text editor with cursor movement, selection, and standard editing features
+- **FR-023**: System MUST update the text field with LLM-reworded content when user presses 'a' (accept LLM version)
+- **FR-024**: System MUST restore the original block content (without parent context) when user presses 'r' (revert to original)
+- **FR-024a**: System MUST preserve user edits to the text field when navigating between blocks (edits auto-saved on navigation)
+- **FR-024b**: System MUST visually indicate the current state of the editable content: "(LLM version)" when matching the LLM reworded text, "(modified)" when manually edited, or no label when unchanged from original
+- **FR-024c**: System MUST require explicit focus on the text editor (via Tab key) before accepting text input, and MUST visually indicate when the editor has focus (e.g., border highlight, cursor visible)
+- **FR-024d**: System MUST disable navigation keys (j/k/↓/↑) and action keys (a/r) when the text editor has focus, allowing Tab or Escape to unfocus and re-enable those controls
 - **FR-025**: System MUST display status widget showing progress for all active background tasks: "Refining knowledge content: X/Y complete", "Building page index: Z%", "Finding relevant pages: X/Y complete"
 - **FR-026**: System MUST block progression to Phase 3 until page indexing is complete
 - **FR-027**: System MUST start RAG search for selected blocks (using original hierarchical context) when page indexing completes
@@ -202,9 +207,9 @@ The user wants to see where each refined knowledge block will be integrated in t
 - **FR-057**: System MUST display consistent keyboard shortcuts in a footer area on all screens
 - **FR-058**: System MUST support both standard (arrow keys, Enter) and vim-style (j/k) navigation
 - **FR-059**: System MUST allow users to quit at any phase using Ctrl+C or 'q' key
-- **FR-060**: System MUST maintain responsive UI performance while streaming LLM responses (UI updates should not block user input)
+- **FR-060**: System MUST execute all background tasks (LLM streaming, page indexing, RAG search) using non-blocking workers that allow UI interaction to continue uninterrupted, maintaining responsive UI performance where keyboard input is processed within 100ms
 - **FR-061**: System MUST notify users when malformed JSON is encountered during LLM streaming while continuing to process remaining items
-- **FR-062**: System MUST use consistent key bindings across all phases for similar actions (e.g., 'j/k' for navigation, 'q' for back/quit)
+- **FR-062**: System MUST use consistent key bindings across all phases for similar actions (e.g., 'j/k' for navigation, 'q' for back/quit, 'a' for accept)
 
 #### Logging & Debugging
 
