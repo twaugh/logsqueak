@@ -10,7 +10,7 @@ import hashlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from logsqueak.logseq.parser import LogseqBlock, LogseqOutline
+    from logseq_outline.parser import LogseqBlock, LogseqOutline
 
 
 def generate_full_context(block: "LogseqBlock", parents: list["LogseqBlock"], indent_str: str = "  ") -> str:

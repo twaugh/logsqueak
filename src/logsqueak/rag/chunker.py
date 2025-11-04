@@ -2,15 +2,14 @@
 
 This module provides chunking functionality for converting Logseq pages into
 block-level chunks for vector storage. It reuses the full-context generation
-infrastructure from logsqueak.logseq.context.
+infrastructure from logseq_outline.
 """
 
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
-from logsqueak.logseq.context import generate_chunks
-from logsqueak.logseq.parser import LogseqOutline
+from logseq_outline import generate_chunks, LogseqOutline
 
 
 @dataclass
@@ -35,7 +34,7 @@ class Chunk:
 def chunk_page(outline: LogseqOutline, page_name: str) -> List[Chunk]:
     """Convert page outline into block-level chunks.
 
-    Reuses generate_chunks() from logsqueak.logseq.context to build
+    Reuses generate_chunks() from logseq_outline to build
     full-context text and hybrid IDs, then wraps results in Chunk dataclass
     with page metadata.
 

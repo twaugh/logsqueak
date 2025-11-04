@@ -10,7 +10,7 @@ from rich.text import Text
 from textual.widgets import ListView, ListItem, Static
 from textual.containers import Horizontal
 
-from logsqueak.logseq.parser import LogseqBlock
+from logseq_outline import LogseqBlock
 from logsqueak.tui.models import BlockState
 from logsqueak.tui.markdown_renderer import render_block_for_display
 from logsqueak.tui.utils import generate_content_hash

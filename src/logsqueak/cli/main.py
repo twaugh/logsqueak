@@ -18,7 +18,7 @@ from logsqueak.config.loader import load_config
 from logsqueak.extraction.extractor import Extractor
 from logsqueak.llm.prompt_logger import PromptLogger
 from logsqueak.llm.providers.openai_compat import OpenAICompatibleProvider
-from logsqueak.logseq.graph import GraphPaths
+from logseq_outline import GraphPaths
 from logsqueak.models.journal import JournalEntry
 
 

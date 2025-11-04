@@ -170,7 +170,7 @@ class LogseqBlock:
             return self.block_id
 
         # Generate hash from full context
-        from logsqueak.logseq.context import generate_full_context, generate_content_hash
+        from logseq_outline.context import generate_full_context, generate_content_hash
 
         parents = parents or []
         full_context = generate_full_context(self, parents, indent_str)
@@ -266,7 +266,7 @@ class LogseqOutline:
             >>> outline.find_block_by_id("a1b2c3d4...", page_name="My Page")
             <LogseqBlock matching that hash for "My Page">
         """
-        from logsqueak.logseq.context import generate_chunks
+        from logseq_outline.context import generate_chunks
 
         # Generate all chunks with pre-computed hybrid IDs (single pass)
         # Pass page_name to ensure content hashes match global IDs

@@ -17,7 +17,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 
 from logsqueak.llm.client import LLMClient
-from logsqueak.logseq.parser import LogseqBlock
+from logseq_outline import LogseqBlock
 from logsqueak.models.block_locator import BlockLocator
 from logsqueak.models.journal import JournalEntry
 from logsqueak.models.knowledge import ActionType, KnowledgePackage
@@ -316,7 +316,7 @@ class Extractor:
         Returns:
             Tuple of (page_name, block) if found, None otherwise
         """
-        from logsqueak.logseq.graph import GraphPaths
+        from logseq_outline import GraphPaths
 
         graph_paths = GraphPaths(graph_path)
 
@@ -755,7 +755,7 @@ class Extractor:
               - Updated documentation
                 - Added API examples
         """
-        from logsqueak.logseq.parser import LogseqOutline
+        from logseq_outline import LogseqOutline
 
         # Find parent chain by walking up the tree
         parents = self._find_parent_chain(block, root_blocks)

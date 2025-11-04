@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-from logsqueak.logseq.parser import LogseqBlock, LogseqOutline
+from logseq_outline import LogseqBlock, LogseqOutline
 
 logger = logging.getLogger(__name__)
 

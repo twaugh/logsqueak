@@ -20,7 +20,7 @@ from textual.widgets import Footer, Header, Label, Static
 if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer
 
-from logsqueak.logseq.parser import LogseqBlock, LogseqOutline
+from logseq_outline import LogseqBlock, LogseqOutline
 from logsqueak.rag.vector_store import VectorStore
 from logsqueak.rag.vector_store import ChromaDBStore
 from logsqueak.tui.models import CandidatePage, ScreenState
@@ -506,7 +506,7 @@ class Phase2Screen(Screen):
         Returns:
             List of block dicts with id, content, depth, parent_id, hierarchical_text
         """
-        from logsqueak.logseq.context import generate_full_context
+        from logseq_outline import generate_full_context
 
         blocks = []
 

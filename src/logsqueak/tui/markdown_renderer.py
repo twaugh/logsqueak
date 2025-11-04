@@ -4,7 +4,7 @@ This module provides functions to render LogseqBlock objects as markdown
 suitable for display in the TUI, with optional property filtering.
 """
 
-from logsqueak.logseq.parser import LogseqBlock
+from logseq_outline import LogseqBlock
 
 
 def render_block_for_display(

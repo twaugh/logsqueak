@@ -9,7 +9,7 @@ This module handles:
 
 import uuid
 
-from logsqueak.logseq.parser import LogseqBlock, LogseqOutline
+from logseq_outline import LogseqBlock, LogseqOutline
 
 
 def _generate_block_id() -> str:

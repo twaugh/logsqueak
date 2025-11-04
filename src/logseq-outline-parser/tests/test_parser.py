@@ -4,7 +4,7 @@ from textwrap import dedent
 
 import pytest
 
-from logsqueak.logseq.parser import LogseqBlock, LogseqOutline
+from logseq_outline.parser import LogseqBlock, LogseqOutline
 
 
 class TestLogseqBlock:
@@ -433,7 +433,7 @@ class TestHybridID:
 
     def test_get_hybrid_id_with_parents(self):
         """Test get_hybrid_id uses parent context for hash."""
-        from logsqueak.logseq.parser import LogseqBlock
+        from logseq_outline import LogseqBlock
 
         parent = LogseqBlock(content=["Parent"], indent_level=0)
         child = LogseqBlock(content=["Child"], indent_level=1)

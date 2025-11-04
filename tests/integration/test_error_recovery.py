@@ -17,7 +17,7 @@ import pytest
 from logsqueak.extraction.extractor import Extractor
 from logsqueak.integration.executor import execute_write_list
 from logsqueak.llm.client import LLMClient, LLMAPIError, LLMResponseError, LLMTimeoutError
-from logsqueak.logseq.parser import LogseqOutline
+from logseq_outline import LogseqOutline
 from logsqueak.models.journal import JournalEntry
 from logsqueak.models.knowledge import ActionType
 from logsqueak.rag.indexer import IndexBuilder

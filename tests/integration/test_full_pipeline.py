@@ -23,8 +23,7 @@ import pytest
 
 from logsqueak.extraction.extractor import Extractor
 from logsqueak.llm.client import LLMClient, DecisionResult, RephrasedContent, ExtractionResult
-from logsqueak.logseq.graph import GraphPaths
-from logsqueak.logseq.parser import LogseqOutline
+from logseq_outline import GraphPaths, LogseqOutline
 from logsqueak.models.journal import JournalEntry
 from logsqueak.models.knowledge import ActionType
 from logsqueak.rag.indexer import IndexBuilder

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from logsqueak.integration.journal_cleanup import _add_processed_marker, _format_block_link
 from logsqueak.integration.writer import append_to_block, append_to_root, update_block
-from logsqueak.logseq.parser import LogseqOutline
+from logseq_outline import LogseqOutline
 from logsqueak.models.knowledge import ActionType
 
 if TYPE_CHECKING:

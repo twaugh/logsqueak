@@ -15,7 +15,7 @@ from textual import events
 from textual.widgets import Tree
 from textual.widgets.tree import TreeNode
 
-from logsqueak.logseq.parser import LogseqBlock
+from logseq_outline import LogseqBlock
 from logsqueak.tui.models import BlockState
 from logsqueak.tui.utils import generate_content_hash
 from logsqueak.tui.markdown import render_markdown

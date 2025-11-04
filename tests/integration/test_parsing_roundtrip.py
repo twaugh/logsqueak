@@ -10,7 +10,7 @@ from textwrap import dedent
 
 import pytest
 
-from logsqueak.logseq.parser import LogseqOutline
+from logseq_outline import LogseqOutline
 
 
 class TestParsingRoundTrip:

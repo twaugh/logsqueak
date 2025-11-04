@@ -1,7 +1,7 @@
 [project]
-name = "logsqueak"
+name = "logseq-outline-parser"
 version = "0.1.0"
-description = "Extract lasting knowledge from Logseq journal entries using LLM-powered analysis"
+description = "Parse and manipulate Logseq outline markdown files"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "GPL-3.0-or-later"}
@@ -10,24 +10,14 @@ authors = [
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
-    "Topic :: Office/Business",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "logseq-outline-parser @ file:src/logseq-outline-parser",
-    "httpx>=0.27.0",
-    "markdown-it-py>=3.0.0",
-    "PyYAML>=6.0.1",
-    "pydantic>=2.0.0",
-    "click>=8.1.0",
-    "python-dateutil>=2.8.0",
-    "sentence-transformers>=2.2.0",
-    "numpy>=1.24.0",
-    "chromadb>=0.4.0",
-    "textual>=0.47.0",
+    # Minimal dependencies - only what parsing needs
 ]
 
 [project.optional-dependencies]
@@ -38,9 +28,6 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.7.0",
 ]
-
-[project.scripts]
-logsqueak = "logsqueak.cli.main:main"
 
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
@@ -64,7 +51,7 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "src/logseq-outline-parser/tests"]
+testpaths = ["tests"]
 pythonpath = ["src"]
 python_files = "test_*.py"
 python_classes = "Test*"

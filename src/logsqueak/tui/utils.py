@@ -6,7 +6,7 @@ Common helpers used across multiple TUI screens.
 import hashlib
 from typing import Optional
 
-from logsqueak.logseq.parser import LogseqBlock
+from logseq_outline import LogseqBlock
 
 
 def generate_content_hash(block: LogseqBlock) -> str:

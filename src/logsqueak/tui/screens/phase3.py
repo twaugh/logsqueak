@@ -436,7 +436,7 @@ class Phase3Screen(Screen):
           - Child block
             - This block (knowledge)
         """
-        from logsqueak.logseq.context import generate_full_context
+        from logseq_outline import generate_full_context
         from logsqueak.tui.utils import get_block_hierarchy, generate_content_hash
 
         # Get hybrid ID for this block
@@ -747,7 +747,7 @@ class Phase3Screen(Screen):
         Returns:
             List of formatted lines
         """
-        from logsqueak.logseq.context import generate_full_context, generate_content_hash
+        from logseq_outline import generate_full_context, generate_content_hash
 
         lines = []
         indent = "  " * depth

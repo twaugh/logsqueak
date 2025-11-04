@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
-from logsqueak.logseq.parser import LogseqOutline
+from logseq_outline import LogseqOutline
 from logsqueak.rag.chunker import chunk_page
 from logsqueak.rag.manifest import CacheManifest
 from logsqueak.rag.vector_store import VectorStore

@@ -1,16 +1,16 @@
-"""Unit tests for full-context generation and hashing (M1.2)."""
+"""Unit tests for full-context generation and hashing."""
 
 import hashlib
 from textwrap import dedent
 
 import pytest
 
-from logsqueak.logseq.context import (
+from logseq_outline.context import (
     generate_chunks,
     generate_content_hash,
     generate_full_context,
 )
-from logsqueak.logseq.parser import LogseqBlock, LogseqOutline
+from logseq_outline.parser import LogseqBlock, LogseqOutline
 
 
 class TestGenerateFullContext:

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from logsqueak.logseq.parser import LogseqBlock, LogseqOutline
+    from logseq_outline import LogseqBlock, LogseqOutline
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class TargetPage:
         Returns:
             TargetPage instance if found, None otherwise (FR-009)
         """
-        from logsqueak.logseq.parser import LogseqOutline
+        from logseq_outline import LogseqOutline
 
         # Logseq stores pages as "Page Name.md"
         file_path = graph_path / "pages" / f"{page_name}.md"

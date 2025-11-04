@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from logsqueak.logseq.parser import LogseqOutline
+    from logseq_outline import LogseqOutline
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class JournalEntry:
             FileNotFoundError: If journal file doesn't exist
             ValueError: If file is malformed (FR-018 - logged and re-raised)
         """
-        from logsqueak.logseq.parser import LogseqOutline
+        from logseq_outline import LogseqOutline
 
         if not file_path.exists():
             raise FileNotFoundError(f"Journal file not found: {file_path}")

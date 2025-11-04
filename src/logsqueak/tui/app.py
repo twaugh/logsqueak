@@ -15,8 +15,7 @@ from logsqueak.models.config import Configuration
 from logsqueak.llm.client import LLMClient
 from logsqueak.llm.providers.openai_compat import OpenAICompatibleProvider
 from logsqueak.llm.prompt_logger import PromptLogger
-from logsqueak.logseq.graph import GraphPaths
-from logsqueak.logseq.parser import LogseqOutline
+from logseq_outline import GraphPaths, LogseqOutline
 from logsqueak.models.journal import JournalEntry
 from logsqueak.tui.models import ScreenState
 

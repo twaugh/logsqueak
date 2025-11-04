@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from logsqueak.logseq.parser import LogseqBlock, LogseqOutline
+    from logseq_outline import LogseqBlock, LogseqOutline
 
 
 @dataclass

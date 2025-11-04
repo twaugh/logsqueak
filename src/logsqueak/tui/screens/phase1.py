@@ -16,7 +16,7 @@ from textual.screen import Screen
 from textual.widgets import Footer, Header, Label, Static, Tree
 from textual.widgets.tree import TreeNode
 
-from logsqueak.logseq.parser import LogseqBlock
+from logseq_outline import LogseqBlock
 from logsqueak.tui.models import BlockState, ScreenState
 from logsqueak.tui.utils import find_block_by_id, generate_content_hash
 from logsqueak.tui.widgets.block_tree import BlockTree
