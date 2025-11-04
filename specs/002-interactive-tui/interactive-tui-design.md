@@ -69,11 +69,13 @@ Users can select **individual blocks** at any level of the hierarchy:
 ```
 
 **Smart Defaults with Override:**
+
 - Marking a parent block defaults all children to the same state
 - Users can override individual children after setting parent
 - Maximum flexibility while maintaining intuitive behavior
 
 **Example:**
+
 1. User marks parent as "activity" → all children default to "activity"
 2. User then marks one child as "knowledge" → only that child changes
 3. LLM won't override any user-marked blocks
@@ -151,6 +153,7 @@ The UI updates progressively as LLM responses stream in:
 - **<60%**: `⚠` warning indicator (definitely review)
 
 Example:
+
 ```
 │ ⚠ "Read the paper"                                               [2] │
 │   Skip (too vague)                                              58%  │
@@ -638,6 +641,7 @@ If errors occur, continue with remaining pages and show summary:
 - CSS-like styling
 
 **Dependencies:**
+
 ```python
 # Add to pyproject.toml
 textual = "^0.47.0"  # Latest stable version

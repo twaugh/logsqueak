@@ -19,6 +19,7 @@
 ## Path Conventions
 
 Single project structure:
+
 - Source: `src/logsqueak/`
 - Tests: `tests/`
 - Specs: `specs/002-interactive-tui/`

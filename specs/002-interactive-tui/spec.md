@@ -33,6 +33,7 @@ As a Logsqueak user, I want to see what the system suggests as "lasting knowledg
 4. **Given** the LLM is still analyzing some blocks, **When** I press Enter to continue, **Then** the system proceeds to the next phase with currently accepted knowledge blocks (blocks not suggested by LLM are not included in integration)
 
 **Keyboard Controls (Phase 1)**:
+
 - `j` / `k` / `↓` / `↑`: Navigate up/down through blocks
 - `Space`: Toggle knowledge selection for current block
 - `a`: Accept all AI knowledge suggestions
@@ -59,6 +60,7 @@ As a Logsqueak user, I want to see how the LLM rewords my knowledge blocks to re
 4. **Given** I have multiple knowledge blocks with reworded versions, **When** I press 'a' (Accept all rewording), **Then** all tree nodes update their main labels to show reworded content with ✓ indicators
 
 **Keyboard Controls (Phase 2)**:
+
 - `j` / `k` / `↓` / `↑`: Navigate between knowledge blocks (skips parent nodes and version children)
 - `Enter`: Expand/collapse knowledge block to see both original and reworded versions
 - `Space`: Toggle between original and reworded version
@@ -85,6 +87,7 @@ As a Logsqueak user, I want to see in real-time how the system decides where to 
 4. **Given** the LLM suggests an action with low confidence, **When** the decision appears in the UI, **Then** I see the confidence percentage displayed and can review the reasoning
 
 **Keyboard Controls (Phase 3)**:
+
 - `j` / `k` / `↓` / `↑` / `n` / `p`: Navigate between decisions (next/previous)
 - `Space`: Toggle accept/skip for current decision
 - `a`: Accept all remaining decisions

@@ -118,6 +118,7 @@ Output ONLY NDJSON, one JSON object per knowledge block.
 ### Malformed JSON
 
 If a line cannot be parsed as JSON:
+
 1. Log error with line number and content
 2. Skip that line
 3. Continue processing remaining lines
@@ -125,6 +126,7 @@ If a line cannot be parsed as JSON:
 ### Incomplete Streams
 
 If stream ends mid-line:
+
 1. Log warning about incomplete final line
 2. Discard incomplete line
 3. Return all successfully parsed objects
