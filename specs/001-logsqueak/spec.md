@@ -208,13 +208,16 @@ The user wants to see where each refined knowledge block will be integrated in t
 - **FR-058**: System MUST support both standard (arrow keys, Enter) and vim-style (j/k) navigation
 - **FR-059**: System MUST allow users to quit at any phase using Ctrl+C or 'q' key
 - **FR-060**: System MUST execute all background tasks (LLM streaming, page indexing, RAG search) using non-blocking workers that allow UI interaction to continue uninterrupted, maintaining responsive UI performance where keyboard input is processed within 100ms
+- **FR-060a**: Phase 1 screen MUST display immediately upon application start, showing the journal block tree BEFORE sending the LLM classification request (LLM streaming starts in background after UI is visible)
+- **FR-060b**: Phase 2 screen MUST display immediately when user presses 'n' to continue from Phase 1, showing the selected knowledge blocks BEFORE sending the LLM rewording request (LLM streaming starts in background after UI is visible)
+- **FR-060c**: Phase 3 screen MUST display immediately when user presses 'n' to continue from Phase 2, showing waiting message BEFORE sending the LLM decision request (LLM streaming starts in background after UI is visible)
 - **FR-061**: System MUST notify users when malformed JSON is encountered during LLM streaming while continuing to process remaining items
 - **FR-062**: System MUST use consistent key bindings across all phases for similar actions (e.g., 'j/k' for navigation, 'q' for back/quit, 'a' for accept)
 
 #### Logging & Debugging
 
-- **FR-063**: System MUST log complete raw LLM prompts and responses to `~/.cache/logsqueak/prompts/*.log` for all phases
-- **FR-064**: System MUST capture partial LLM responses when user cancels streaming for debugging purposes
+- **FR-063**: System MUST log complete raw LLM prompts to `~/.cache/logsqueak/prompts/*.log` at the start of each LLM request for all phases
+- **FR-064**: System MUST log raw LLM response chunks incrementally as they arrive (streaming mode), appending to the log file in real-time so partial responses are captured even if streaming is interrupted or cancelled
 - **FR-065**: System MUST log detailed structured information to `~/.cache/logsqueak/logs/tui_*.log` including block IDs, confidence scores, reasoning, and before/after text
 - **FR-066**: System MUST use try/finally patterns to ensure logging occurs even on errors or cancellation
 
@@ -235,6 +238,348 @@ The user wants to see where each refined knowledge block will be integrated in t
 - **IntegrationDecision**: Represents a decision about integrating a knowledge block (knowledge_block_id: str, target_page: str, action: Literal["skip", "add_section", "add_under", "replace"], target_block_id: str | None, target_block_title: str | None, confidence: float, refined_text: str, source: Literal["user", "llm"], skip_reason: str | None, write_status: Literal["pending", "completed", "failed", "skipped"])
 
 - **BackgroundTask**: Represents a long-running background task (task_type: Literal["llm_classification", "page_indexing", "rag_search", "llm_rewording", "llm_decisions"], status: Literal["running", "completed", "failed"], progress_percentage: float | None)
+
+## NDJSON Streaming Protocol
+
+The system uses NDJSON (Newline-Delimited JSON) for real-time streaming of LLM responses. This enables incremental UI updates as results arrive, improving perceived responsiveness and allowing graceful handling of network interruptions.
+
+### Protocol Overview
+
+**Format**: Each complete JSON object is written on a single line, terminated by `\n`. Multiple objects are separated by newlines.
+
+**Example stream**:
+
+```
+{"block_id": "abc123", "confidence": 0.85, "reason": "documents key architectural decision"}
+{"block_id": "def456", "confidence": 0.92, "reason": "captures important insight about system behavior"}
+```
+
+**Key Properties**:
+
+- Each line is a complete, independently parseable JSON object
+- Objects arrive in arbitrary order (not necessarily input order)
+- Stream may end early on network errors (partial results are preserved)
+- Empty lines are skipped silently
+- Malformed lines are logged and skipped (doesn't break the stream)
+
+### Parser Implementation
+
+The NDJSON parser must implement line-buffering with incremental parsing:
+
+```python
+async def parse_ndjson_stream(stream: AsyncIterator[str]) -> AsyncIterator[dict]:
+    """
+    Parse NDJSON from chunked async stream.
+
+    Args:
+        stream: Async iterator yielding string chunks (token-by-token)
+
+    Yields:
+        Complete JSON objects as they become parseable
+
+    Error Handling:
+        - Invalid JSON on a line → Log warning, skip line, continue
+        - Incomplete line at stream end → Log warning, discard
+        - Empty lines → Skip silently
+    """
+    buffer = ""
+    line_number = 0
+
+    async for chunk in stream:
+        buffer += chunk
+
+        # Process all complete lines in buffer
+        while '\n' in buffer:
+            line_end = buffer.index('\n')
+            complete_line = buffer[:line_end].strip()
+            buffer = buffer[line_end + 1:]
+            line_number += 1
+
+            if not complete_line:
+                continue
+
+            try:
+                obj = json.loads(complete_line)
+                if not isinstance(obj, dict):
+                    logger.warning(f"Line {line_number}: Expected dict, got {type(obj)}")
+                    continue
+                yield obj
+            except json.JSONDecodeError as e:
+                logger.warning(f"Line {line_number}: Malformed JSON at position {e.pos}: {e.msg}")
+                continue
+
+    # Handle incomplete final line
+    if buffer.strip():
+        line_number += 1
+        try:
+            obj = json.loads(buffer.strip())
+            if isinstance(obj, dict):
+                yield obj
+        except json.JSONDecodeError as e:
+            logger.warning(f"Line {line_number} (incomplete): {e.msg}")
+```
+
+**Performance Characteristics**:
+
+- Memory usage: O(longest line), typically <1KB per line
+- Latency: Yields immediately upon line completion (no batching)
+
+### Phase 1: Knowledge Extraction Stream
+
+**LLM Client Method**:
+
+```python
+async def stream_extract_ndjson(self, journal_content: str) -> AsyncIterator[dict]
+```
+
+**Input**: Full journal markdown with `id::` properties injected for all blocks
+
+**Output Schema** (per line):
+```json
+{
+  "block_id": "string (id:: property value or content hash)",
+  "confidence": "float (0.0-1.0)",
+  "reason": "string (7-10 words explaining why this is knowledge)"
+}
+```
+
+**Example**:
+
+```json
+{"block_id": "abc123", "confidence": 0.85, "reason": "documents key architectural decision"}
+{"block_id": "def456", "confidence": 0.92, "reason": "captures important insight about system behavior"}
+```
+
+**Required Fields**: `block_id`, `confidence`, `reason`
+
+**Behavior**:
+
+- LLM outputs ONLY blocks classified as knowledge (no activity logs)
+- Objects may arrive in any order
+- `confidence < 0.5` indicates borderline cases
+- `reason` should be 7-10 words explaining the classification
+
+**Error Handling**:
+
+- Unknown `block_id` → Log warning, skip object
+- Missing required field → Log warning, skip object
+- Invalid `confidence` range → Log warning, clamp to [0.0, 1.0]
+
+### Phase 2: Content Rewording Stream
+
+**LLM Client Method**:
+
+```python
+async def stream_rewording_ndjson(self, decisions: List[dict]) -> AsyncIterator[dict]
+```
+
+**Input**:
+
+- `decisions`: List of dicts with `block_id`, `full_text`, `hierarchical_text`
+
+**Output Schema** (per line):
+
+```json
+{
+  "block_id": "string (source block ID from Phase 1)",
+  "refined_text": "string (reworded content as plain block text)"
+}
+```
+
+**Example**:
+
+```json
+{
+  "block_id": "abc123",
+  "refined_text": "Bounded contexts matter more than service size.\nEach context should have clear ownership.\nAvoid sharing databases across contexts."
+}
+```
+
+**Required Fields**: `block_id`, `refined_text`
+
+**Format Requirements**:
+
+- `refined_text` MUST be plain block content (no bullet markers like `- `, no indentation)
+- Multi-line content uses `\n` for continuation lines
+- Preserve `[[Page Links]]` and `((block-refs))` from original
+- Remove temporal references ("Today", dates, "I learned")
+- Remove first-person narrative
+- Make content standalone (no pronouns like "it", "this" without context)
+
+**Behavior**:
+
+- Each unique knowledge block is reworded once
+- The same refined text is applied to all decisions referencing that `block_id`
+- Results may arrive in any order
+
+**Error Handling**:
+
+- Missing required field → Log warning, skip object
+- Unmatched `block_id` → Log warning, skip object
+- Empty `refined_text` → Log warning, skip object
+
+### Phase 3: Integration Decisions Stream
+
+**LLM Client Method**:
+
+```python
+async def stream_decisions_ndjson(
+    self,
+    knowledge_block: dict,
+    candidate_pages: List[dict]
+) -> AsyncIterator[dict]
+```
+
+**Input**:
+
+- `knowledge_block`: Dict with `block_id`, `content`, `hierarchical_text`
+- `candidate_pages`: List of dicts with `page_name`, `similarity_score`, `chunks` (list of blocks with `target_id` and `hierarchical_text`)
+
+**Output Schema** (per line):
+
+```json
+{
+  "page": "string (target page name)",
+  "action": "string (skip | add_section | add_under | replace)",
+  "target_id": "string | null (hybrid ID of target block)",
+  "target_title": "string | null (human-readable block name)",
+  "confidence": "float (0.0-1.0)",
+  "reasoning": "string (LLM explanation for decision)"
+}
+```
+
+**Example (add_section)**:
+
+```json
+{
+  "page": "Software Architecture",
+  "action": "add_section",
+  "target_id": null,
+  "target_title": null,
+  "confidence": 0.88,
+  "reasoning": "Core architectural principle deserving its own section"
+}
+```
+
+**Example (add_under)**:
+
+```json
+{
+  "page": "Microservices",
+  "action": "add_under",
+  "target_id": "block-uuid-123",
+  "target_title": "Benefits and Tradeoffs",
+  "confidence": 0.91,
+  "reasoning": "Fits naturally under existing Benefits discussion"
+}
+```
+
+**Example (skip)**:
+
+```json
+{
+  "page": "Docker",
+  "action": "skip",
+  "target_id": null,
+  "target_title": null,
+  "confidence": 0.95,
+  "reasoning": "Already covered in this page"
+}
+```
+
+**Required Fields**: `page`, `action`, `confidence`, `reasoning`
+
+**Conditional Fields**:
+
+- If `action` is `"skip"` or `"add_section"`: `target_id` and `target_title` MUST be `null`
+- If `action` is `"add_under"` or `"replace"`: `target_id` and `target_title` MUST be non-null strings
+
+**Behavior**:
+
+- One decision per candidate page (order may not match input)
+- LLM may decide "skip" for all pages (valid outcome)
+- Results stream in as soon as each decision is made
+
+**Error Handling**:
+
+- Invalid `action` value → Log warning, default to "skip"
+- Missing `target_id` when required → Log warning, change action to "add_section"
+- Invalid `confidence` range → Log warning, clamp to [0.0, 1.0]
+
+### Network Error Handling
+
+**Retry Strategy** (automatic, transparent to user):
+
+```python
+async def stream_with_retry(endpoint, payload, max_retries=3) -> AsyncIterator[str]:
+    for attempt in range(max_retries):
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                async with client.stream("POST", endpoint, json=payload) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        yield line
+                    return  # Success
+        except (httpx.TimeoutException, httpx.RequestError) as e:
+            if attempt < max_retries - 1:
+                backoff = 1.0 * (2 ** attempt)  # 1s, 2s, 4s
+                await asyncio.sleep(backoff)
+            else:
+                raise LLMTimeoutError(f"Failed after {max_retries} attempts: {e}")
+        except httpx.HTTPStatusError as e:
+            # Don't retry 4xx/5xx errors
+            raise LLMAPIError(f"HTTP {e.response.status_code}", status_code=e.response.status_code)
+```
+
+**Automatic Retries** (transient errors):
+
+- Network timeout: 3 retries with exponential backoff (1s, 2s, 4s)
+- Connection refused: 3 retries
+- Transient HTTP errors (502, 503, 504): 3 retries
+
+**No Retry** (permanent errors):
+
+- HTTP 4xx client errors (invalid request, auth failure)
+- HTTP 500 server errors (unless 502/503/504)
+
+**Manual Retries** (user-initiated):
+
+- User can press `R` key to retry failed blocks
+- TUI sends only failed blocks to LLM (not all blocks)
+- Results merged with existing successful classifications
+
+### Incomplete Stream Handling
+
+**Scenario**: Stream ends before all expected objects are received.
+
+**Causes**:
+
+- Network interruption mid-stream
+- LLM stops generating (API timeout, rate limit)
+- Incomplete final line (no trailing newline)
+
+**Handling**:
+
+- Parser attempts to parse incomplete final line (if valid JSON without newline)
+- Otherwise discards and logs warning
+- UI compares expected vs received objects
+- Shows user summary: "Classified 8/10 blocks. 2 blocks need retry."
+- User can continue with partial results or retry failed blocks
+
+**Example**:
+
+```
+# Stream received:
+{"block_id": "abc123", "confidence": 0.85, "reason": "..."}
+{"block_id": "def456", "confidence": 0.92, "reason": "..."}
+# Network timeout here - blocks 3-5 never received
+```
+
+UI response:
+
+```
+Classified 2/5 blocks. 3 pending. Press R to retry or Enter to continue.
+```
 
 ## Success Criteria *(mandatory)*
 
