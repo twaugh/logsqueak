@@ -38,11 +38,13 @@ A Logseq user has been journaling daily and wants to identify which blocks from 
 4. **Given** the LLM has suggested a block as knowledge, **When** user views the tree, **Then** that block shows a robot emoji (🤖) indicator (positioned far left or far right without shifting the block text) and LLM-suggested highlight color
 5. **Given** several blocks have been suggested by the LLM, **When** user presses Space on a block, **Then** the block is marked as user-selected (different highlight color) for extraction, and the robot emoji remains visible
 6. **Given** background tasks are running, **When** the user views the screen, **Then** a status widget shows which tasks are active ("Analyzing knowledge blocks...", "Building page index: 45%")
-7. **Given** the user has selected at least one block, **When** they press 'n' (next), **Then** the system proceeds to the content editing screen
+7. **Given** the LLM has identified 5 knowledge blocks scattered among 20 total blocks, **When** user presses Shift+j repeatedly, **Then** the selection jumps directly to each of the 5 LLM-identified knowledge blocks in sequence, skipping all non-knowledge blocks, and wraps back to the first knowledge block after the last one
+8. **Given** the user has selected at least one block, **When** they press 'n' (next), **Then** the system proceeds to the content editing screen
 
 **Keyboard Controls**:
 
 - `j` / `k` / `↓` / `↑`: Navigate blocks
+- `Shift+j` / `Shift+k` / `Shift+↓` / `Shift+↑`: Jump to next/previous LLM-identified knowledge block (skips non-knowledge blocks, wraps around)
 - `Space`: Toggle knowledge selection for current block
 - `a`: Accept all LLM knowledge suggestions
 - `r`: Reset current block to LLM suggestion (clear user selection)
@@ -154,6 +156,7 @@ The user wants to see where each refined knowledge block will be integrated in t
 - **FR-007**: System MUST allow users to manually select/deselect any block as knowledge using keyboard controls, independent of LLM suggestions
 - **FR-008**: System MUST use a different highlight color for user-selected blocks vs LLM-suggested blocks
 - **FR-009**: Users MUST be able to navigate between blocks using keyboard controls (arrow keys, j/k)
+- **FR-009a**: Users MUST be able to jump to next/previous LLM-identified knowledge blocks using Shift+j/k/↓/↑, skipping non-knowledge blocks, with wrap-around behavior
 - **FR-010**: Users MUST be able to accept all LLM suggestions at once using 'a' key
 - **FR-011**: System MUST allow users to reset a user-selected block back to LLM suggestion state using 'r' key
 - **FR-012**: System MUST allow users to clear all selections using 'c' key

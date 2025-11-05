@@ -7,7 +7,7 @@
 
 ## Summary
 
-Build an interactive TUI application for extracting lasting knowledge from Logseq journal entries using LLM-powered analysis. The application provides three interactive phases: block selection (users select knowledge blocks with LLM assistance), content editing (users refine content with LLM-suggested rewordings), and integration decisions (users review and approve where knowledge should be integrated). All operations are keyboard-driven, streaming-enabled, and non-destructive with atomic provenance tracking.
+Build an interactive TUI application for extracting lasting knowledge from Logseq journal entries using LLM-powered analysis. The application provides three interactive phases: block selection (users select knowledge blocks with LLM assistance, with Shift+navigation to jump between LLM suggestions), content editing (users refine content with LLM-suggested rewordings), and integration decisions (users review and approve where knowledge should be integrated). All operations are keyboard-driven, streaming-enabled, and non-destructive with atomic provenance tracking.
 
 ## Technical Context
 
@@ -66,6 +66,7 @@ Build an interactive TUI application for extracting lasting knowledge from Logse
 - FR-003: Display LLM reasoning for why a block was identified as knowledge in the bottom panel
 - FR-052: Display LLM reasoning for each integration decision
 - FR-005: Status widget showing which background tasks are active and their progress
+- FR-009a: Shift+navigation keyboard shortcuts to efficiently review LLM knowledge suggestions
 - Single Python application, keyboard-driven only (no web UI complexity)
 - YAML configuration file with explicit structure (FR-072d)
 
