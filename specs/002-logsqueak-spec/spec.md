@@ -163,8 +163,9 @@ The user wants to review integration suggestions for each knowledge block, see w
 - **FR-006**: System MUST visually highlight blocks identified as knowledge by the LLM with a distinct color (different from user-selected highlight) as they arrive via streaming
 - **FR-007**: System MUST allow users to manually select/deselect any block as knowledge using keyboard controls, independent of LLM suggestions
 - **FR-008**: System MUST use a different highlight color for user-selected blocks vs LLM-suggested blocks
-- **FR-009**: Users MUST be able to navigate between blocks using keyboard controls (arrow keys, j/k)
-- **FR-009a**: Users MUST be able to jump to next/previous LLM-identified knowledge blocks using Shift+j/k/↓/↑, skipping non-knowledge blocks, with wrap-around behavior
+- **FR-009**: Users MUST be able to navigate between blocks using keyboard controls:
+  - **(a)** Basic navigation: arrow keys (↑/↓) or vim-style (j/k) to move sequentially between blocks
+  - **(b)** Jump-to-knowledge navigation: Shift+j/k/↓/↑ to jump to next/previous LLM-identified knowledge blocks, skipping non-knowledge blocks, with wrap-around behavior
 - **FR-010**: Users MUST be able to accept all LLM suggestions at once using 'a' key
 - **FR-011**: System MUST allow users to reset a user-selected block back to LLM suggestion state using 'r' key
 - **FR-012**: System MUST allow users to clear all selections using 'c' key
