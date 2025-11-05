@@ -88,7 +88,7 @@ After selecting knowledge blocks, the user wants to review and refine the conten
 
 ### User Story 3 - Review Integration Decisions and Write to Pages (Priority: P1)
 
-The user wants to see where each refined knowledge block will be integrated in the context of the target page, understand the LLM's reasoning, and approve each integration. When approved, the system writes immediately and shows the result.
+The user wants to review integration suggestions for each knowledge block, see where each will be integrated in the context of the target page, and approve integrations. The user focuses on one knowledge block at a time, seeing all relevant page suggestions for that block together.
 
 **Why this priority**: This is the core value delivery - actually integrating knowledge into pages. Without this, no knowledge gets added to the knowledge base. Must be P1 alongside block selection because it's the essential outcome.
 
@@ -96,30 +96,33 @@ The user wants to see where each refined knowledge block will be integrated in t
 
 **Acceptance Scenarios**:
 
-1. **Given** 5 knowledge blocks need integration, **When** the LLM evaluates candidate pages from RAG search, **Then** decisions stream in one at a time, showing the action (e.g., "Add as new section", "Add under 'Project Timeline'"), confidence score, and reasoning
-2. **Given** a decision is displayed, **When** user reviews it, **Then** they see:
+1. **Given** 5 knowledge blocks need integration and the LLM is evaluating candidate pages from RAG search, **When** the user enters Phase 3, **Then** they see a "Processing knowledge blocks..." status while the system waits for ALL decisions for the first knowledge block to arrive (the system does NOT display any decisions until all decisions for that block are ready)
+2. **Given** all decisions for a knowledge block have arrived from the LLM, **When** the system displays them, **Then** the user sees only the active/relevant decisions (e.g., if 10 candidate pages were searched but only 2 are relevant, only 2 decisions are shown; if no pages are relevant, the block shows "No relevant pages found")
+3. **Given** a knowledge block has multiple relevant target pages, **When** displaying decisions, **Then** the system shows at most 2 decisions per (knowledge block, target page) pair (the LLM filters to the most relevant integration points)
+4. **Given** a knowledge block is displayed with its decisions, **When** user reviews it, **Then** they see:
 
+   - The knowledge block number and total (e.g., "Knowledge Block 1 of 5")
    - Hierarchical journal context (where the knowledge came from, shown dimmed)
    - The refined content from Phase 2 (what will be integrated)
-   - Target page preview showing existing page structure
-   - New content shown with green bar (`┃`) in its target location
-   - If replacing: old content shown with strikethrough, new content below it with green bar
-3. **Given** a decision shows "Add under 'Project Timeline'" with the target page preview visible, **When** user presses 'y' (accept), **Then** system immediately writes that knowledge block to the target page at the specified location and atomically adds to the `processed::` property on the journal block (creating it if it doesn't exist, or appending to the comma-separated list if it does), where each link uses the target page name as link text (with '___' converted to '/' for hierarchical pages) and block reference `((uuid))` as the link target
-4. **Given** a write operation succeeds, **When** the system updates the display, **Then** that decision is marked as completed with a checkmark and the next decision is shown
-5. **Given** a write operation fails, **When** the error occurs, **Then** system shows error details (e.g., "Target block not found"), marks that decision as failed, and allows user to continue with remaining decisions
-6. **Given** the status display shows "Decision 3 of 8 (✓ 2 completed, ⊙ 5 pending, ✗ 0 skipped)", **When** user views the screen, **Then** they can see progress at a glance and available actions are shown in the footer
-7. **Given** user navigates to a decision with status ⊙ PENDING, **When** they press 'n', **Then** that decision is marked as skipped (✗), auto-advances to next decision, and status count updates
-8. **Given** user navigates to a decision with status ✓ COMPLETED, **When** they view it, **Then** the 'y' action is not shown in the footer (cannot re-write), only navigation keys are available
-9. **Given** all decisions are reviewed and processed, **When** the last decision completes, **Then** system shows completion summary with total blocks integrated, failed count, and link to journal entry with provenance markers
+   - A list of suggested target pages with decisions (e.g., "Projects/Acme", "Reading Notes")
+   - For the currently selected decision: target page preview showing existing page structure with new content highlighted with green bar (`┃`) in its target location
+   - Action description, confidence score, and LLM reasoning for the selected decision
+5. **Given** a knowledge block has 3 relevant pages with decisions, **When** user presses 'j' or 'k', **Then** they navigate between the different page decisions for this knowledge block, and the preview panel updates to show the selected decision's target page context
+6. **Given** a decision shows "Add under 'Project Timeline'" with the target page preview visible, **When** user presses 'y' (accept), **Then** system immediately writes that knowledge block to the target page at the specified location and atomically adds to the `processed::` property on the journal block (creating it if it doesn't exist, or appending to the comma-separated list if it does), where each link uses the target page name as link text (with '___' converted to '/' for hierarchical pages) and block reference `((uuid))` as the link target
+7. **Given** a write operation succeeds, **When** the system updates the display, **Then** that decision is marked as completed with a checkmark (✓) and remains visible in the list
+8. **Given** user has accepted one decision for a knowledge block and other decisions remain, **When** they press 'y' on another decision for the same block, **Then** system writes to that additional page as well (the user can integrate the same knowledge block to multiple pages)
+9. **Given** a write operation fails, **When** the error occurs, **Then** system shows error details (e.g., "Target block not found"), marks that decision as failed (⚠), and allows user to continue with remaining decisions
+10. **Given** user has reviewed all decisions for a knowledge block, **When** they press 'n' (next block), **Then** system advances to the next knowledge block and waits for all its decisions to arrive before displaying (same batching behavior)
+11. **Given** the status display shows "Block 2 of 5 (3 decisions: ✓ 1 completed, ⊙ 2 pending)", **When** user views the screen, **Then** they can see progress at a glance and available actions are shown in the footer
+12. **Given** all knowledge blocks are reviewed and processed, **When** the last block completes, **Then** system shows completion summary with total blocks integrated, total writes performed, failed count, and link to journal entry with provenance markers
 
 **Keyboard Controls**:
 
-- `y`: Accept current decision and write immediately, auto-advance to next (hidden for already-written decisions)
-- `n`: Skip current decision (no write), auto-advance to next
-- `j` / `k` / `↓` / `↑`: Navigate between decisions without taking action
-- `a`: Accept and write all remaining pending decisions sequentially
-- `s`: Skip all remaining pending decisions
-- `Enter`: View completion summary when all decisions processed
+- `j` / `k` / `↓` / `↑`: Navigate between decisions for the current knowledge block
+- `y`: Accept current decision and write immediately (can accept multiple decisions for same block)
+- `n`: Skip to next knowledge block without writing any more decisions for current block
+- `a`: Accept and write all pending decisions for current knowledge block, then advance to next block
+- `Enter`: Advance to next knowledge block (when current block processing complete)
 - `q`: Back to content editing screen
 
 ---
@@ -131,7 +134,7 @@ The user wants to see where each refined knowledge block will be integrated in t
 - What happens when a journal entry has no blocks identified as knowledge by the LLM? (System shows "No knowledge blocks identified" message, user can manually select blocks anyway)
 - How does the system handle streaming interruptions (network issues, LLM API errors)? (Shows error message, preserves partial state, allows user to retry or cancel)
 - What happens if page indexing fails? (Shows error, offers to retry, blocks progression to Phase 3)
-- What happens if RAG search returns no candidate pages? (Phase 3 shows "No relevant pages found" message, can skip or wait for more decisions to stream in)
+- What happens if RAG search returns candidate pages but LLM determines none are relevant for a knowledge block? (Phase 3 shows "No relevant pages found" message for that block, user presses 'n' to skip to next knowledge block)
 - What happens when AI service request fails due to network error? (System automatically retries once after 2-second delay; if still failing, prompts user to retry or cancel)
 - What if a target block specified in an integration decision no longer exists when user presses 'y'? (Write operation fails for that decision, error shown with details, decision marked as failed (⚠), user can continue with remaining decisions)
 - How does the system handle very large journal entries (approaching 2000-line limit)? (UI remains responsive with virtualized scrolling; warns user if limit approached)
@@ -139,7 +142,8 @@ The user wants to see where each refined knowledge block will be integrated in t
 - What if the LLM response includes malformed JSON during streaming? (Logs error, shows user-friendly message, skips that item, continues with remaining items)
 - What happens if user edits journal or target page file externally (e.g., in Logseq app) while TUI session is active? (System detects file modification timestamp changes before write operations, automatically reloads modified files, re-validates that target blocks/structure still exist, and either proceeds with write or shows error if validation fails)
 - What happens if user accepts a decision ('y') but the write takes a long time? (UI shows "Writing..." status, blocks navigation until write completes or fails, then auto-advances to next decision)
-- What if all decisions are skipped or fail? (Completion summary shows "0 blocks integrated, X skipped, Y failed" with link to journal entry - no processed:: markers added since nothing was written)
+- What if user skips all knowledge blocks without accepting any decisions? (Completion summary shows "0 blocks integrated, 5 blocks skipped" with link to journal entry - no processed:: markers added since nothing was written)
+- What happens if user advances to next knowledge block ('n' or 'a') while decisions are still streaming in for that next block? (System shows "Processing knowledge blocks..." status and blocks interaction until all decisions for that block arrive)
 
 ## Requirements *(mandatory)*
 
@@ -185,28 +189,30 @@ The user wants to see where each refined knowledge block will be integrated in t
 #### Phase 3: Integration Decisions
 
 - **FR-031**: System MUST perform semantic search (combining similarity search and explicit page link hints) using the original hierarchical context of each knowledge block
-- **FR-032**: System MUST deliver AI integration decisions incrementally for each (knowledge block, candidate page) pair as they become available
-- **FR-033**: System MUST display decisions one at a time in single-decision-per-screen format with status indicators (⊙ PENDING, ✓ COMPLETED, ✗ SKIPPED, ⚠ FAILED)
+- **FR-032**: System MUST batch AI integration decisions by knowledge block - all decisions for a given knowledge block must arrive before displaying any decisions for that block
+- **FR-032a**: LLM MUST return only active/relevant decisions (e.g., if 10 candidate pages are searched but only 2 are relevant, return only 2 decisions)
+- **FR-032b**: LLM MUST return at most 2 decisions per (knowledge block, target page) pair
+- **FR-033**: System MUST display all decisions for a knowledge block together in a list format, with one knowledge block visible at a time
 - **FR-034**: System MUST show confidence scores as percentages for each integration decision
 - **FR-035**: System MUST display hierarchical journal context with proper indentation, all markdown rendered and displayed in dimmed style
 - **FR-036**: System MUST display the refined content from Phase 2 (not the original journal content) as the content that will be integrated
-- **FR-037**: System MUST display target page preview showing the existing page structure with the new content visually integrated
+- **FR-037**: System MUST display target page preview showing the existing page structure with the new content visually integrated for the currently selected decision
 - **FR-038**: System MUST show new content with green bar (`┃`) visual indicator in its target location
 - **FR-039**: System MUST show replaced content with strikethrough styling, with new content shown below it with green bar
-- **FR-040**: System MUST provide navigation controls to move between decisions without taking action
+- **FR-040**: System MUST provide navigation controls (j/k/arrows) to move between decisions for the current knowledge block
 - **FR-041**: System MUST write the knowledge block to the target page immediately when user presses 'y' on a pending decision
-- **FR-042**: System MUST automatically advance to the next decision after accepting or skipping the current decision
-- **FR-043**: System MUST atomically add to the `processed::` property on the journal block only after successful page write
-- **FR-044**: System MUST mark completed integrations with checkmark and update the status count display
-- **FR-045**: System MUST display error details if a write operation fails and allow continuation with remaining decisions
-- **FR-046**: System MUST allow skipping a decision using 'n' key without writing
-- **FR-047**: System MUST provide batch action to accept and write all remaining pending decisions using 'a' key
-- **FR-048**: System MUST provide batch action to skip all remaining pending decisions using 's' key
-- **FR-049**: System MUST display status summary showing decision count and breakdown
-- **FR-050**: System MUST hide 'y' action from footer when viewing a completed decision
-- **FR-051**: System MUST display context-sensitive footer showing available actions based on current decision state
-- **FR-052**: System MUST display LLM reasoning for each decision
-- **FR-053**: System MUST support full Logseq markdown rendering in all displayed content
+- **FR-042**: System MUST allow user to accept multiple decisions for the same knowledge block (integrating the same content to multiple pages)
+- **FR-043**: System MUST atomically add to the `processed::` property on the journal block after each successful page write (appending to comma-separated list)
+- **FR-044**: System MUST mark completed integrations with checkmark (✓) and keep them visible in the decision list
+- **FR-045**: System MUST display error details if a write operation fails, mark decision as failed (⚠), and allow continuation with remaining decisions
+- **FR-046**: System MUST allow advancing to next knowledge block using 'n' key (skipping remaining decisions for current block)
+- **FR-047**: System MUST provide batch action to accept and write all pending decisions for current knowledge block using 'a' key, then advance to next block
+- **FR-048**: System MUST display status showing current knowledge block number, total blocks, and decision status breakdown for current block
+- **FR-049**: System MUST display context-sensitive footer showing available actions based on current decision state
+- **FR-050**: System MUST display LLM reasoning for the currently selected decision
+- **FR-051**: System MUST support full Logseq markdown rendering in all displayed content
+- **FR-052**: System MUST show "Processing knowledge blocks..." status while waiting for all decisions for a knowledge block to arrive
+- **FR-053**: System MUST show "No relevant pages found" message if LLM returns no active decisions for a knowledge block
 
 #### Completion & Error Handling
 
@@ -276,7 +282,7 @@ The user wants to see where each refined knowledge block will be integrated in t
 
 - **EditedContent**: Represents the edited content for a knowledge block in Phase 2 (block_id: str, original_content: str, reworded_content: str | None, current_content: str, rewording_complete: bool)
 
-- **IntegrationDecision**: Represents a decision about integrating a knowledge block (knowledge_block_id: str, target_page: str, action: Literal["skip", "add_section", "add_under", "replace"], target_block_id: str | None, target_block_title: str | None, confidence: float, refined_text: str, source: Literal["user", "llm"], skip_reason: str | None, write_status: Literal["pending", "completed", "failed", "skipped"])
+- **IntegrationDecision**: Represents a decision about integrating a knowledge block to a specific page (knowledge_block_id: str, target_page: str, action: Literal["add_section", "add_under", "replace"], target_block_id: str | None, target_block_title: str | None, confidence: float, refined_text: str, reasoning: str, write_status: Literal["pending", "completed", "failed"])
 
 - **BackgroundTask**: Represents a long-running background task (task_type: Literal["llm_classification", "page_indexing", "rag_search", "llm_rewording", "llm_decisions"], status: Literal["running", "completed", "failed"], progress_percentage: float | None)
 
@@ -287,7 +293,7 @@ The user wants to see where each refined knowledge block will be integrated in t
 - **SC-001**: Users can navigate through all phases of knowledge extraction without requiring external documentation for basic operations
 - **SC-002**: Users see visual feedback within 500ms of any interaction (keyboard input, phase transition)
 - **SC-003**: Users can override any LLM suggestion at any phase before final write operations
-- **SC-004**: System completes the extraction workflow for a typical journal entry (11 avg root blocks, 22 avg total blocks, ~5 knowledge blocks, 3 candidate pages per block) in under 3 minutes
+- **SC-004**: System completes the extraction workflow for a typical journal entry (11 avg root blocks, 22 avg total blocks, ~5 knowledge blocks, ~2 relevant decisions per block) in under 3 minutes
 - **SC-005**: Users can identify LLM-suggested knowledge blocks vs user-selected blocks through visual indicators
 - **SC-006**: When write operations fail for one page, other integrations still complete successfully
 - **SC-007**: The UI remains responsive (accepts user input within 100ms) even while background analysis is running
