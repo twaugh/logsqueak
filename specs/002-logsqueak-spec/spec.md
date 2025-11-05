@@ -155,7 +155,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 
 #### Phase 1: Block Selection
 
-- **FR-001**: System MUST display journal blocks in a hierarchical tree view fully expanded, showing all parent-child relationships from the original journal entries, with multiple journal entries grouped by date as top-level nodes (e.g., "2025-10-15", "2025-10-16") and rich markdown rendering of the first line only of each block
+- **FR-001**: System MUST display journal blocks in a hierarchical tree view fully expanded, showing all parent-child relationships from the original journal entries, with multiple journal entries grouped by date as top-level nodes (e.g., "2025-10-15", "2025-10-16") with markdown rendering of the first line only of each block (see FR-014 for supported markdown features)
 - **FR-002**: System MUST display the selected block's full content at the bottom of the screen in rendered markdown with text wrapping, showing all lines in the block content without indentation
 - **FR-003**: System MUST display LLM reasoning for why a block was identified as knowledge in the bottom panel when that block is selected
 - **FR-004**: System MUST run two background tasks in parallel when this screen loads: (1) AI classification of knowledge blocks with incremental results, (2) page index building for semantic search
