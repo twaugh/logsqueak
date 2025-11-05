@@ -463,7 +463,7 @@ This section walks through a complete knowledge extraction session, showing what
 ┌─────────────────────────────────────────────────────────────────────┐
 │ Phase 3: Integration Decisions                                      │
 ├─────────────────────────────────────────────────────────────────────┤
-│ Knowledge Block 1 of 3 (2 decisions: ⊙ 2 pending)                   │
+│ Knowledge Block 1 of 3 (Decision 1 of 2: ⊙ pending)                 │
 │                                                                     │
 │ Journal Context (source):                                           │
 │ ┌─────────────────────────────────────────────────────────────────┐ │
@@ -477,22 +477,18 @@ This section walks through a complete knowledge extraction session, showing what
 │ │ Python, unlike await which executes sequentially.               │ │
 │ └─────────────────────────────────────────────────────────────────┘ │
 │                                                                     │
-│ Decisions:                                                          │
-│ ┌─────────────────────────────────────────────────────────────────┐ │
-│ │ ▶ Programming Notes/Python (Confidence: 87%)                    │ │
-│ │   Projects/API Redesign (Confidence: 65%)                       │ │
-│ └─────────────────────────────────────────────────────────────────┘ │
-│                                                                     │
-│ Target Page Preview (Programming Notes/Python):                     │
+│ Target Page: Programming Notes/Python (Confidence: 87%)             │
 │ ┌─────────────────────────────────────────────────────────────────┐ │
 │ │ - Async Patterns                                                │ │
 │ │   - Event loops handle concurrent tasks                         │ │
 │ │   - Use async/await for I/O-bound operations                    │ │
 │ │  ┃- Using asyncio.create_task() enables concurrent operations   │ │
 │ │  ┃  in Python, unlike await which executes sequentially.        │ │
+│ │   - Common pitfalls with asyncio                                │ │
+│ │ - Type Hints                                                     │ │
+│ │   ...                                                            │ │
 │ └─────────────────────────────────────────────────────────────────┘ │
 │                                                                     │
-│ Action: Add under "Async Patterns"                                  │
 │ Reasoning: This insight fits well under the 'Async Patterns'        │
 │ section as it directly explains task concurrency.                   │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -500,6 +496,13 @@ This section walks through a complete knowledge extraction session, showing what
 └─────────────────────────────────────────────────────────────────────┘
 
 ```
+
+**Note on Target Page Preview:**
+- Preview automatically scrolls to show the insertion point (green bar `┃`)
+- For long pages, press `Tab` to focus the preview widget
+- When focused, use `↑`/`↓` arrows to scroll and see more context
+- Press `Tab` again to return focus to decision navigation
+- `j`/`k` navigate between decisions (different target pages/insertion points)
 
 #### Visual Indicators
 
@@ -513,8 +516,10 @@ This section walks through a complete knowledge extraction session, showing what
 
 | Key | Action |
 |-----|--------|
-| `j` or `↓` | Navigate to next decision for current knowledge block |
-| `k` or `↑` | Navigate to previous decision for current knowledge block |
+| `j` | Navigate to next decision for current knowledge block |
+| `k` | Navigate to previous decision for current knowledge block |
+| `Tab` | Toggle focus on target page preview (enables scrolling with arrows) |
+| `↑`/`↓` | Scroll preview when focused (otherwise same as `k`/`j`) |
 | `y` | Accept current decision and write immediately |
 | `n` | Skip to next knowledge block (leaves remaining decisions unwritten) |
 | `a` | Accept and write ALL pending decisions for current block, then advance |
@@ -525,13 +530,19 @@ This section walks through a complete knowledge extraction session, showing what
 
 1. **Wait for processing**: Status shows "Processing knowledge blocks..." while LLM evaluates candidate pages
 2. **Review knowledge block**: See journal context (where it came from) and refined content (what will be written)
-3. **Review decisions**: See list of suggested target pages with confidence scores
-4. **Navigate decisions**: Press `j`/`k` to browse different integration options
-5. **Preview changes**: Target page preview updates to show selected decision's context
-6. **Accept decision**: Press `y` to write to the selected target page
-   - Decision is marked ✓ Completed
-   - Journal block gets `processed::` property with link to integrated block
-7. **Multiple integrations**: You can press `y` on multiple decisions to integrate the same knowledge to different pages
+3. **View first decision**: Display shows "Decision 1 of 2" with target page preview
+4. **Review preview**: Target page automatically scrolls to show insertion point (green bar `┃`)
+   - If you need more context, press `Tab` to focus the preview
+   - Use `↑`/`↓` arrows to scroll and see surrounding content
+   - Press `Tab` again to return to decision navigation
+5. **Accept or navigate**:
+   - Press `y` to accept this decision and write immediately
+   - Press `j` to see the next decision (same block, different page or location)
+6. **Multiple decisions for same block**:
+   - Each `j`/`k` press cycles through decisions for current knowledge block
+   - Preview automatically updates and scrolls to show each decision's insertion point
+   - You can accept multiple decisions to integrate same knowledge to different pages
+7. **Track progress**: Decision status shows ⊙ pending → ✓ completed (or ⚠ failed)
 8. **Next block**: Press `n` to advance to next knowledge block
 
 #### Integration Actions
