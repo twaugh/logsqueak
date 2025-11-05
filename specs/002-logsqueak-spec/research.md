@@ -57,7 +57,263 @@ This document captures research findings for technical decisions needed to imple
 
 ---
 
-## 2. NDJSON Streaming for LLM Responses
+## 2. Textual Testing Strategy with Pilot API
+
+**Question**: How should we test Textual TUI components to ensure keyboard navigation, streaming updates, and user interactions work correctly?
+
+**Research Findings**:
+
+### Why Test TUI Components
+
+- **Regression prevention**: Catch UI breakage early without manual testing every change
+- **Keyboard navigation complexity**: Many key combinations (j/k, Shift+j/k, Space, Tab, etc.) need verification
+- **Streaming behavior**: LLM results arriving incrementally must update UI correctly
+- **State management**: Selection state, background tasks, screen transitions need validation
+- **Refactoring confidence**: Tests allow safe refactoring of widgets and screens
+
+### Textual Pilot API
+
+Textual provides a built-in testing framework (`pilot`) that runs apps headlessly and simulates user interactions:
+
+```python
+import pytest
+from textual.pilot import Pilot
+from logsqueak.tui.screens.block_selection import Phase1Screen
+
+@pytest.mark.asyncio
+async def test_block_navigation():
+    """Test j/k keyboard navigation through blocks."""
+    app = Phase1Screen(blocks=sample_blocks())
+
+    async with app.run_test() as pilot:
+        # Wait for app to be ready
+        await pilot.pause()
+
+        # Simulate keypresses
+        await pilot.press("j", "j", "k")
+
+        # Query widgets
+        tree = app.query_one("#block-tree")
+        assert tree.cursor_line == 1
+```
+
+**Key Pilot Methods**:
+
+- `app.run_test()`: Run app in headless test mode
+- `pilot.pause()`: Wait for async messages to process
+- `pilot.press(*keys)`: Simulate keyboard input
+- `pilot.click(selector)`: Simulate mouse clicks
+- `app.query_one(selector)`: Find widget by CSS selector
+- `app.query(selector)`: Find multiple widgets
+
+### Test-Driven Development Workflow
+
+**Critical**: Write tests FIRST, verify they FAIL, then implement features.
+
+**Step 1: Write Failing Tests**
+
+```python
+# tests/ui/test_phase1_navigation.py
+@pytest.mark.asyncio
+async def test_navigate_with_j_k_keys():
+    """Test j/k keys navigate through block tree."""
+    app = Phase1Screen(blocks=[
+        create_block("Block 1"),
+        create_block("Block 2"),
+        create_block("Block 3"),
+    ])
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        tree = app.query_one("#block-tree")
+
+        # Initially at line 0
+        assert tree.cursor_line == 0
+
+        # Press j twice
+        await pilot.press("j", "j")
+        assert tree.cursor_line == 2
+
+        # Press k once
+        await pilot.press("k")
+        assert tree.cursor_line == 1
+```
+
+Run: `pytest tests/ui/test_phase1_navigation.py -v`
+
+Expected: **Test FAILS** (Phase1Screen not implemented yet)
+
+**Step 2: Implement Feature**
+
+```python
+# src/logsqueak/tui/screens/block_selection.py
+class Phase1Screen(Screen):
+    def on_key(self, event: Key) -> None:
+        tree = self.query_one("#block-tree")
+
+        if event.key == "j":
+            tree.cursor_line += 1
+        elif event.key == "k":
+            tree.cursor_line = max(0, tree.cursor_line - 1)
+```
+
+**Step 3: Verify Tests Pass**
+
+Run: `pytest tests/ui/test_phase1_navigation.py -v`
+
+Expected: **Test PASSES** (implementation correct)
+
+**Step 4: Manual Verification**
+
+Run actual TUI: `logsqueak extract` and manually test j/k navigation
+
+### Snapshot Testing for Visual Regression
+
+Use `pytest-textual-snapshot` to capture and compare rendered UI:
+
+```python
+def test_phase1_initial_render(snap_compare):
+    """Test Phase 1 screen initial appearance."""
+    assert snap_compare(
+        "logsqueak/tui/screens/block_selection.py",
+        terminal_size=(120, 40)
+    )
+```
+
+**How it works**:
+
+1. First run: Generates SVG snapshot of rendered UI
+2. Subsequent runs: Compares current render to saved snapshot
+3. Detects visual regressions (layout changes, missing elements, styling issues)
+
+**When to use**:
+
+- Initial screen render for each phase
+- After major UI changes (verify visual appearance)
+- Before/after keyboard interactions (verify state changes are visible)
+
+### Testing Patterns for Each Phase
+
+**Phase 1 (Block Selection) Tests**:
+
+- Navigation: `j`/`k` moves cursor, `Shift+j`/`Shift+k` jumps to knowledge blocks
+- Selection: `Space` toggles selection, `a` accepts all, `c` clears all
+- Streaming: LLM classifications appear incrementally, visual indicators update
+- Status: Background task progress updates in status widget
+- Transition: `n` key enabled only when blocks selected
+
+**Phase 2 (Content Editing) Tests**:
+
+- Navigation: `j`/`k` moves between blocks, auto-saves on navigation
+- Focus: `Tab` focuses/unfocuses text editor
+- Actions: `a` accepts LLM version, `r` reverts to original
+- Blocking: `n` key disabled until RAG search completes
+- Status: Multi-task progress (rewording, indexing, RAG search)
+
+**Phase 3 (Integration Review) Tests**:
+
+- Navigation: `j`/`k` navigates decisions, preview updates
+- Actions: `y` accepts decision, `n` skips to next block, `a` accepts all
+- Write status: Decisions marked ⊙ pending → ✓ completed → ⚠ failed
+- Preview: Target page preview scrolls to insertion point
+- Error handling: Write failures show errors, allow continuation
+
+### Mocking LLM Responses in Tests
+
+```python
+@pytest.fixture
+def mock_llm_stream():
+    """Mock LLM streaming responses for testing."""
+    async def stream_classifications():
+        yield {"block_id": "abc123", "confidence": 0.92, "reason": "..."}
+        yield {"block_id": "def456", "confidence": 0.85, "reason": "..."}
+
+    return stream_classifications
+
+@pytest.mark.asyncio
+async def test_llm_streaming_updates(mock_llm_stream):
+    """Test UI updates as LLM results stream in."""
+    app = Phase1Screen(blocks=sample_blocks())
+    app.llm_stream = mock_llm_stream  # Inject mock
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        # Trigger LLM classification
+        app.start_classification()
+        await pilot.pause()  # Let stream process
+
+        # Verify blocks updated with LLM suggestions
+        tree = app.query_one("#block-tree")
+        first_node = tree.get_node_at_line(0)
+        assert first_node.data.llm_classification == "knowledge"
+        assert "🤖" in first_node.label
+```
+
+### Test Organization
+
+```
+tests/
+├── ui/
+│   ├── test_phase1_navigation.py      # j/k, Shift+j/k navigation
+│   ├── test_phase1_selection.py       # Space, a, c, r actions
+│   ├── test_phase1_llm_streaming.py   # LLM results appearing
+│   ├── test_phase1_status.py          # Status widget updates
+│   ├── test_phase1_snapshots.py       # Visual regression
+│   ├── test_phase2_navigation.py      # Navigation with auto-save
+│   ├── test_phase2_editing.py         # Tab focus, text editing
+│   ├── test_phase2_llm_accept.py      # Accept LLM version
+│   ├── test_phase2_rag_blocking.py    # RAG search blocks 'n'
+│   ├── test_phase3_navigation.py      # Decision navigation
+│   ├── test_phase3_accept.py          # Accept decisions, writes
+│   └── test_phase3_errors.py          # Write failures
+├── unit/
+│   ├── test_models.py                 # Pydantic models
+│   ├── test_llm_client.py             # LLM streaming
+│   └── test_file_monitor.py           # File tracking
+└── integration/
+    ├── test_workflow.py               # Full Phase 1→2→3 flow
+    └── test_rag_pipeline.py           # Indexing + search
+```
+
+### Running Tests
+
+```bash
+# Run all UI tests for Phase 1
+pytest tests/ui/test_phase1_*.py -v
+
+# Run all tests with coverage
+pytest --cov=logsqueak --cov-report=html -v
+
+# Update snapshots after intentional UI changes
+pytest tests/ui/test_phase1_snapshots.py --snapshot-update
+
+# Run specific test
+pytest tests/ui/test_phase1_navigation.py::test_navigate_with_j_k_keys -v
+```
+
+**Decision**: Use Textual pilot for all TUI component testing with Test-Driven Development approach (write tests first, verify failures, implement, verify passes).
+
+**Rationale**:
+
+- **Automation**: Pilot enables automated testing of keyboard interactions and UI state
+- **Fast feedback**: Tests run in milliseconds vs manual testing in minutes
+- **Regression prevention**: Catches UI breakage immediately
+- **TDD workflow**: Writing tests first clarifies requirements and edge cases
+- **Refactoring safety**: Can refactor widgets confidently with test coverage
+- **Snapshot testing**: Visual regression detection catches layout/styling issues
+- **Mock-friendly**: Easy to mock LLM streams and background tasks
+
+**Alternatives Considered**:
+
+- Manual testing only: Rejected because too slow and error-prone for complex keyboard interactions
+- Selenium/browser testing: Not applicable (Textual is terminal-based, not web)
+- Custom test harness: Rejected because Textual pilot is built-in and well-designed
+
+---
+
+## 3. NDJSON Streaming for LLM Responses
 
 **Question**: How should we handle streaming LLM responses with incremental updates to UI?
 
