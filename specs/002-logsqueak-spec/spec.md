@@ -236,8 +236,9 @@ The user wants to review integration suggestions for each knowledge block, see w
 
 #### Logging & Debugging
 
-- **FR-063**: System MUST log complete LLM requests for debugging and audit purposes at the start of each request
-- **FR-064**: System MUST log LLM response data incrementally as it arrives for troubleshooting interrupted sessions
+- **FR-063**: System MUST log complete LLM request/response lifecycle for debugging and troubleshooting:
+  - **(a)** Log complete LLM requests at the start of each request for debugging and audit purposes
+  - **(b)** Log LLM response data incrementally as it arrives for troubleshooting interrupted sessions
 - **FR-065**: System MUST log detailed structured information including block IDs, confidence scores, and reasoning
 - **FR-066**: System MUST ensure logging occurs even on errors or cancellation
 - **FR-067a**: System MUST NOT automatically delete or rotate log files (logs accumulate indefinitely until user manually cleans up cache directory)
