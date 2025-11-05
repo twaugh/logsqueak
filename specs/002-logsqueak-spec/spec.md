@@ -298,7 +298,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 ### Measurable Outcomes
 
 - **SC-001**: Users can navigate through all phases of knowledge extraction without requiring external documentation for basic operations
-- **SC-002**: Users see visual feedback within 500ms of any interaction (keyboard input, phase transition)
+- **SC-002**: Users see visual feedback within 500ms of any interaction (keyboard input, phase transition), where visual feedback includes: cursor movement, highlight changes, widget state updates, status messages, or screen transitions
 - **SC-003**: Users can override any LLM suggestion at any phase before final write operations
 - **SC-004**: System completes the extraction workflow for a typical journal entry (11 avg root blocks, 22 avg total blocks, ~5 knowledge blocks, ~2 relevant decisions per block) in under 3 minutes
 - **SC-005**: Users can identify LLM-suggested knowledge blocks vs user-selected blocks through visual indicators
