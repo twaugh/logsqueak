@@ -339,6 +339,20 @@ All AI-assisted commits MUST include:
 Assisted-by: Claude Code
 ```
 
+### Commit Workflow with User Approval
+
+When the user says **"Add and stage"** or **"Add it and stage for review"**, this means:
+
+1. Make the requested changes to the codebase
+2. Stage the changes with `git add`
+3. Prepare a commit message following the project's commit message format
+4. Show the user the proposed commit message for review
+5. **Wait for user approval** before running `git commit`
+
+The user will either say "Proceed" to commit, or request changes to the commit message.
+
+**Never commit without explicit user approval of the commit message.**
+
 ## Working with Logseq Outline Format
 
 Logseq uses indented bullets (2 spaces per level) with special features:
