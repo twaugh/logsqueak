@@ -14,11 +14,11 @@
 
 - Q: Can the system handle multiple journal entries in a single session? → A: Yes - the hierarchical tree view naturally supports multiple journal entries by using date nodes (e.g., "2025-10-15", "2025-10-16") as top-level grouping nodes with journal blocks nested underneath. This requires minimal changes to the existing design.
 - Q: How should API credentials (keys, tokens) be stored and accessed by the application? → A: User manages credentials in dedicated config file with file permissions (600), application reads on startup
-- Q: What should the automatic retry behavior be for AI service network failures? → A: Auto-retry once (2s delay), then prompt user
+- Q: What should the automatic retry behavior be for LLM service network failures? → A: Auto-retry once (2s delay), then prompt user
 - Q: What should the log file retention and rotation policy be? → A: No automatic cleanup - logs accumulate indefinitely (user manually deletes if needed)
 - Q: How should the system handle concurrent file modifications (user edits journal/page externally while TUI is running)? → A: Automatically reload modified files and re-validate current operation before proceeding
-- Q: What timeout value should be used for AI service requests? → A: 60s
-- Q: How should the configuration file be initialized on first run? → A: Require user to create the configuration file before first run (show helpful error with example if missing); file specifies AI server endpoint, credentials, model, num_ctx, and Logseq graph location
+- Q: What timeout value should be used for LLM service requests? → A: 60s
+- Q: How should the configuration file be initialized on first run? → A: Require user to create the configuration file before first run (show helpful error with example if missing); file specifies LLM server endpoint, credentials, model, num_ctx, and Logseq graph location
 - Q: What format should the configuration file use? → A: YAML format with explicit structure (sections: llm:, logseq:, rag:) matching existing Logsqueak config format
 - Q: When should configuration validation occur (startup vs lazy)? → A: Validate configuration lazily (only when each setting is first used)
 - Q: How should the system respond to configuration validation failures? → A: Show error message and exit immediately (user must manually edit config file and restart)
@@ -139,7 +139,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 - How does the system handle streaming interruptions (network issues, LLM API errors)? (Shows error message, preserves partial state, allows user to retry or cancel)
 - What happens if page indexing fails? (Shows error, offers to retry, blocks progression to Phase 3)
 - What happens if RAG search returns candidate pages but LLM determines none are relevant for a knowledge block? (Phase 3 shows "No relevant pages found" message for that block, user presses 'n' to skip to next knowledge block)
-- What happens when AI service request fails due to network error? (System automatically retries once after 2-second delay; if still failing, prompts user to retry or cancel)
+- What happens when LLM service request fails due to network error? (System automatically retries once after 2-second delay; if still failing, prompts user to retry or cancel)
 - What if a target block specified in an integration decision no longer exists when user presses 'y'? (Write operation fails for that decision, error shown with details, decision marked as failed (⚠), user can continue with remaining decisions)
 - How does the system handle very large journal entries (approaching 2000-line limit)? (UI remains responsive with virtualized scrolling; warns user if limit approached)
 - What happens when user tries to cancel (Ctrl+C) during a write operation in Phase 3? (Shows warning about potential partial journal state with some blocks already marked as processed, asks for confirmation)
@@ -158,7 +158,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 - **FR-001**: System MUST display journal blocks in a hierarchical tree view fully expanded, showing all parent-child relationships from the original journal entries, with multiple journal entries grouped by date as top-level nodes (e.g., "2025-10-15", "2025-10-16") with markdown rendering of the first line only of each block (see FR-014 for supported markdown features)
 - **FR-002**: System MUST display the selected block's full content at the bottom of the screen in rendered markdown with text wrapping, showing all lines in the block content without indentation
 - **FR-003**: System MUST display LLM reasoning for why a block was identified as knowledge in the bottom panel when that block is selected
-- **FR-004**: System MUST run two background tasks in parallel when this screen loads: (1) AI classification of knowledge blocks with incremental results, (2) page index building for semantic search
+- **FR-004**: System MUST run two background tasks in parallel when this screen loads: (1) LLM classification of knowledge blocks with incremental results, (2) page index building for semantic search
 - **FR-005**: System MUST display a status widget showing which background tasks are active and their progress (percentage when calculable, on/off status otherwise)
 - **FR-006**: System MUST visually highlight blocks identified as knowledge by the LLM with a distinct color (different from user-selected highlight) as they arrive via streaming
 - **FR-007**: System MUST allow users to manually select/deselect any block as knowledge using keyboard controls, independent of LLM suggestions
@@ -177,7 +177,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 - **FR-015**: System MUST display a list of all selected knowledge blocks from Phase 1
 - **FR-016**: System MUST display each block's original full hierarchical context (including parent blocks with proper indentation) in a read-only display area
 - **FR-017**: System MUST display each block's content in an editable text field, starting with the original block content (without parent context)
-- **FR-018**: System MUST run three background tasks in parallel when this screen loads: (1) AI generation of reworded versions with incremental results, (2) continue page indexing if not complete, (3) semantic search after indexing completes
+- **FR-018**: System MUST run three background tasks in parallel when this screen loads: (1) LLM generation of reworded versions with incremental results, (2) continue page indexing if not complete, (3) semantic search after indexing completes
 - **FR-019**: System MUST display a waiting indicator before reworded version is available, then display the LLM-reworded content alongside the original hierarchical context
 - **FR-020**: System MUST provide keyboard shortcuts to accept LLM version ('a' key) and revert to original ('r' key)
 - **FR-021**: System MUST visually indicate when "Accept LLM version" action is available versus unavailable based on whether the LLM-reworded version has arrived
@@ -194,7 +194,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 #### Phase 3: Integration Decisions
 
 - **FR-031**: System MUST perform semantic search (combining similarity search and explicit page link hints) using the original hierarchical context of each knowledge block
-- **FR-032**: System MUST batch AI integration decisions by knowledge block - all decisions for a given knowledge block must arrive before displaying any decisions for that block
+- **FR-032**: System MUST batch LLM integration decisions by knowledge block - all decisions for a given knowledge block must arrive before displaying any decisions for that block
 - **FR-032a**: LLM MUST return only active/relevant decisions via prompt-based filtering (e.g., if 10 candidate pages are searched but only 2 are relevant, return only 2 decisions). See contracts/llm-api.md Phase 3 "Relevance Filtering" section for filtering criteria (confidence ≥ 30%, clear semantic connection).
 - **FR-032b**: LLM MUST return at most 2 decisions per (knowledge block, target page) pair
 - **FR-033**: System MUST display all decisions for a knowledge block together in a list format, with one knowledge block visible at a time
@@ -231,13 +231,13 @@ The user wants to review integration suggestions for each knowledge block, see w
 - **FR-058**: System MUST support both standard (arrow keys, Enter) and vim-style (j/k) navigation
 - **FR-059**: System MUST allow users to quit at any phase using Ctrl+C or 'q' key
 - **FR-060**: System MUST execute all background tasks in a way that allows UI interaction to continue uninterrupted
-- **FR-061**: System MUST notify users when malformed data is encountered during AI streaming while continuing to process remaining items
+- **FR-061**: System MUST notify users when malformed data is encountered during LLM streaming while continuing to process remaining items
 - **FR-062**: System MUST use consistent key bindings across all phases for similar actions
 
 #### Logging & Debugging
 
-- **FR-063**: System MUST log complete AI requests for debugging and audit purposes at the start of each request
-- **FR-064**: System MUST log AI response data incrementally as it arrives for troubleshooting interrupted sessions
+- **FR-063**: System MUST log complete LLM requests for debugging and audit purposes at the start of each request
+- **FR-064**: System MUST log LLM response data incrementally as it arrives for troubleshooting interrupted sessions
 - **FR-065**: System MUST log detailed structured information including block IDs, confidence scores, and reasoning
 - **FR-066**: System MUST ensure logging occurs even on errors or cancellation
 - **FR-067a**: System MUST NOT automatically delete or rotate log files (logs accumulate indefinitely until user manually cleans up cache directory)
@@ -262,7 +262,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 - **FR-072a**: System MUST require configuration file at `~/.config/logsqueak/config.yaml` to exist before first run
 - **FR-072b**: If configuration file is missing, system MUST display helpful error message with expected file path and example YAML format with structured sections (llm:, logseq:, rag:) showing required fields: llm.endpoint, llm.api_key, llm.model, llm.num_ctx (optional), logseq.graph_path, and rag.top_k (optional)
 - **FR-072c**: System MUST NOT automatically create configuration file with default or placeholder values
-- **FR-072d**: Configuration file MUST use YAML format with explicit hierarchical structure matching existing Logsqueak config conventions (llm: section for AI service settings, logseq: section for graph settings, rag: section for search settings)
+- **FR-072d**: Configuration file MUST use YAML format with explicit hierarchical structure matching existing Logsqueak config conventions (llm: section for LLM service settings, logseq: section for graph settings, rag: section for search settings)
 - **FR-072e**: System MUST validate configuration settings lazily (only when each setting is first accessed during operation), not eagerly at startup
 - **FR-072f**: When lazy validation fails for a setting (e.g., invalid graph path, missing required field), system MUST display clear error message indicating which setting is invalid and what the valid format or expected value should be, then exit immediately with non-zero status
 - **FR-072g**: System MUST NOT provide in-TUI configuration editing or retry mechanisms; user must manually edit configuration file and restart application after validation failures
@@ -275,10 +275,10 @@ The user wants to review integration suggestions for each knowledge block, see w
 
 #### Network Resilience
 
-- **FR-075**: System MUST automatically retry failed AI service requests once after a 2-second delay for transient network errors (connection timeout, connection refused, temporary service unavailability)
+- **FR-075**: System MUST automatically retry failed LLM service requests once after a 2-second delay for transient network errors (connection timeout, connection refused, temporary service unavailability)
 - **FR-076**: System MUST preserve partial results received before network failure and allow user to continue with available data or retry the failed operation
 - **FR-077**: After automatic retry fails, system MUST prompt user with options to: retry manually, cancel operation, or continue with partial results (where applicable)
-- **FR-078**: System MUST apply a 60-second timeout to all AI service requests (for initial connection and ongoing streaming response)
+- **FR-078**: System MUST apply a 60-second timeout to all LLM service requests (for initial connection and ongoing streaming response)
 - **FR-079**: When timeout is reached, system MUST treat it as a network failure and follow the retry behavior specified in FR-075 through FR-077
 
 ### Key Entities
@@ -307,7 +307,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 
 ## Assumptions
 
-1. **AI Analysis Support**: The system can leverage AI services that support incremental result streaming for responsive user experience.
+1. **LLM Analysis Support**: The system can leverage LLM services that support incremental result streaming for responsive user experience.
 
 2. **Terminal Capabilities**: Users have modern terminal emulators supporting 256 colors and Unicode characters. Fallback ASCII characters available for limited environments.
 
@@ -325,9 +325,9 @@ The user wants to review integration suggestions for each knowledge block, see w
 
 - **Logseq Parser**: Depends on existing Logseq markdown parsing and rendering capabilities for reading and writing Logseq files.
 
-- **Existing Pipeline Infrastructure**: Depends on extraction, semantic search, integration, and AI client modules remaining functionally stable.
+- **Existing Pipeline Infrastructure**: Depends on extraction, semantic search, integration, and LLM client modules remaining functionally stable.
 
-- **AI Service APIs**: Requires AI services that support streaming responses for incremental results.
+- **LLM Service APIs**: Requires LLM services that support streaming responses for incremental results.
 
 - **Async Runtime**: Requires async/await support for concurrent background tasks and UI updates.
 
