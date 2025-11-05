@@ -112,7 +112,7 @@ The user wants to review integration suggestions for each knowledge block, see w
    - Action description, confidence score, and LLM reasoning for the selected decision
 
 5. **Given** a knowledge block has 3 relevant pages with decisions, **When** user presses 'j' or 'k', **Then** they navigate between the different page decisions for this knowledge block, and the preview panel updates to show the selected decision's target page context
-6. **Given** a decision shows "Add under 'Project Timeline'" with the target page preview visible, **When** user presses 'y' (accept), **Then** system immediately writes that knowledge block to the target page at the specified location and atomically adds to the `processed::` property on the journal block (creating it if it doesn't exist, or appending to the comma-separated list if it does), where each link uses the target page name as link text (with '___' converted to '/' for hierarchical pages) and block reference `((uuid))` as the link target
+6. **Given** a decision shows "Add under 'Project Timeline'" with the target page preview visible, **When** user presses 'y' (accept), **Then** system immediately writes that knowledge block to the target page at the specified location and atomically adds to the `processed::` property on the journal block (creating it if it doesn't exist, or appending to the comma-separated list if it does), where each link uses markdown link format `[Page Name](((uuid)))` with the target page name as link text (with '___' converted to '/' for hierarchical pages) and Logseq block reference `((uuid))` as the link target
 7. **Given** a write operation succeeds, **When** the system updates the display, **Then** that decision is marked as completed with a checkmark (✓) and remains visible in the list
 8. **Given** user has accepted one decision for a knowledge block and other decisions remain, **When** they press 'y' on another decision for the same block, **Then** system writes to that additional page as well (the user can integrate the same knowledge block to multiple pages)
 9. **Given** a write operation fails, **When** the error occurs, **Then** system shows error details (e.g., "Target block not found"), marks that decision as failed (⚠), and allows user to continue with remaining decisions
@@ -246,7 +246,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 - **FR-067**: System MUST use existing Logseq parsing capabilities for all Logseq markdown reading, writing, and block manipulation
 - **FR-068**: System MUST preserve exact property order when reading and writing Logseq files (property order is significant in Logseq)
 - **FR-069**: System MUST use stable block identifiers (explicit ID properties OR content-based identifiers) for consistent block targeting
-- **FR-070**: System MUST generate unique identifiers for all integrated blocks to enable precise future references
+- **FR-070**: System MUST generate deterministic identifiers (UUID v5) for all integrated blocks to enable precise future references and idempotent retry operations
 - **FR-071**: System MUST maintain provenance links from journal to integrated blocks via property that lists target page and block references
 
 #### Concurrent Modification Handling
@@ -364,7 +364,8 @@ Key principles:
 - All operations traceable via `processed::` markers in journal entries
 - UPDATE operations replace content but preserve structure/IDs
 - APPEND operations add new blocks without modifying existing content
-- Every integrated block generates unique `id::` property (UUID)
+- Every integrated block generates deterministic `id::` property (UUID v5 based on knowledge_block_id + target_page + action)
+- Deterministic IDs enable idempotent retry (same inputs → same UUID → detectable duplicate)
 - Journal entries atomically marked with block references to integrated knowledge
 
 ### III. Simplicity and Transparency

@@ -104,6 +104,55 @@ property_value = block.get_property("processed")  # Get property value
 
 ## Write Operations
 
+### Deterministic UUID Generation
+
+All integration operations use deterministic UUIDs to ensure idempotency. This allows retry operations to detect existing blocks reliably.
+
+```python
+import hashlib
+import uuid
+
+def generate_integration_id(
+    knowledge_block_id: str,
+    target_page: str,
+    action: str,
+    target_block_id: str | None = None
+) -> str:
+    """
+    Generate deterministic UUID for integration block.
+
+    Same inputs always produce the same UUID, enabling idempotent operations.
+
+    Args:
+        knowledge_block_id: ID of knowledge block being integrated
+        target_page: Target page name
+        action: Integration action type
+        target_block_id: Target block ID (for add_under/replace actions)
+
+    Returns:
+        str: Deterministic UUID string
+    """
+    # Logsqueak namespace UUID
+    namespace = uuid.UUID('6ba7b810-9dad-11d1-80b4-00c04fd430c8')
+
+    # Combine inputs to create reproducible identifier
+    parts = [knowledge_block_id, target_page, action]
+    if target_block_id:
+        parts.append(target_block_id)
+
+    # Generate UUID v5 (SHA-1 based, deterministic)
+    name = ":".join(parts)
+    return str(uuid.uuid5(namespace, name))
+
+```
+
+**Contract**:
+
+- Same inputs → same UUID (deterministic)
+- Enables retry detection (search by UUID finds existing block)
+- Prevents duplicate blocks on journal write failure
+- UUID v5 uses SHA-1 hash of namespace + name
+
 ### Integration Actions
 
 Three types of write operations for integrating knowledge blocks:
@@ -111,11 +160,11 @@ Three types of write operations for integrating knowledge blocks:
 #### 1. Add Section (New Top-Level Block)
 
 ```python
-import uuid
-
 def write_add_section(
     page_outline: LogseqOutline,
-    refined_text: str
+    refined_text: str,
+    knowledge_block_id: str,
+    target_page: str
 ) -> str:
     """
     Add knowledge as new root-level block.
@@ -123,13 +172,20 @@ def write_add_section(
     Args:
         page_outline: Target page outline
         refined_text: Content to add
+        knowledge_block_id: ID of knowledge block being integrated
+        target_page: Target page name
 
     Returns:
-        str: UUID of newly created block (for provenance)
+        str: Deterministic UUID of newly created block (for provenance)
     """
     from logseq_outline.parser import LogseqBlock
 
-    new_block_id = str(uuid.uuid4())
+    # Generate deterministic UUID
+    new_block_id = generate_integration_id(
+        knowledge_block_id=knowledge_block_id,
+        target_page=target_page,
+        action="add_section"
+    )
 
     # Create new block with id:: property
     new_block = LogseqBlock(
@@ -151,9 +207,9 @@ def write_add_section(
 **Contract**:
 
 - New block added at end of root-level blocks
-- `id::` property added to enable provenance tracking
+- `id::` property uses deterministic UUID (same knowledge + target → same UUID)
 - Content and property are separate lines in `content` list
-- Property order preserved (single property, no order issue)
+- Idempotent: Retry with same inputs produces same UUID (detectable duplicate)
 
 #### 2. Add Under (Child Block)
 
@@ -161,7 +217,9 @@ def write_add_section(
 def write_add_under(
     page_outline: LogseqOutline,
     target_block_id: str,
-    refined_text: str
+    refined_text: str,
+    knowledge_block_id: str,
+    target_page: str
 ) -> str:
     """
     Add knowledge as child of existing block.
@@ -170,14 +228,22 @@ def write_add_under(
         page_outline: Target page outline
         target_block_id: ID of parent block
         refined_text: Content to add
+        knowledge_block_id: ID of knowledge block being integrated
+        target_page: Target page name
 
     Returns:
-        str: UUID of newly created block (for provenance)
+        str: Deterministic UUID of newly created block (for provenance)
 
     Raises:
         ValueError: If target block not found
     """
-    new_block_id = str(uuid.uuid4())
+    # Generate deterministic UUID
+    new_block_id = generate_integration_id(
+        knowledge_block_id=knowledge_block_id,
+        target_page=target_page,
+        action="add_under",
+        target_block_id=target_block_id
+    )
 
     # Find target block
     target_block, _ = page_outline.find_block_by_id(target_block_id)
@@ -198,8 +264,9 @@ def write_add_under(
 
 - `add_child()` automatically calculates correct indentation
 - New child added at end of existing children
-- `set_property()` preserves order (new property appended)
+- `id::` property uses deterministic UUID (includes target_block_id for uniqueness)
 - Target block ID can be explicit `id::` or content hash
+- Idempotent: Retry with same inputs produces same UUID (detectable duplicate)
 
 #### 3. Replace (Update Existing Block)
 
@@ -207,7 +274,9 @@ def write_add_under(
 def write_replace(
     page_outline: LogseqOutline,
     target_block_id: str,
-    refined_text: str
+    refined_text: str,
+    knowledge_block_id: str,
+    target_page: str
 ) -> str:
     """
     Replace existing block content while preserving properties and children.
@@ -216,6 +285,8 @@ def write_replace(
         page_outline: Target page outline
         target_block_id: ID of block to replace
         refined_text: New content (may contain multiple lines)
+        knowledge_block_id: ID of knowledge block being integrated
+        target_page: Target page name
 
     Returns:
         str: UUID of block (existing or newly added)
@@ -240,9 +311,14 @@ def write_replace(
     new_content_lines = refined_text.split("\n") if "\n" in refined_text else [refined_text]
     target_block.content = new_content_lines + property_lines
 
-    # Ensure block has id:: property (add if missing, preserve if exists)
+    # Ensure block has id:: property (add deterministic UUID if missing)
     if target_block.block_id is None:
-        new_block_id = str(uuid.uuid4())
+        new_block_id = generate_integration_id(
+            knowledge_block_id=knowledge_block_id,
+            target_page=target_page,
+            action="replace",
+            target_block_id=target_block_id
+        )
         target_block.set_property("id", new_block_id)
         return new_block_id
     else:
@@ -256,9 +332,10 @@ def write_replace(
 - All content lines (first line + continuation lines) are replaced
 - All properties preserved in their original order
 - Children blocks preserved unchanged
-- If block lacks `id::`, add it (for provenance)
-- Existing `id::` preserved if present
+- If block lacks `id::`, add deterministic UUID (for provenance)
+- Existing `id::` preserved if present (block already had identity)
 - Multi-line `refined_text` is split and each line added to content
+- Idempotent: Retry adds same deterministic UUID if missing
 
 ---
 
@@ -448,27 +525,47 @@ def write_integration_atomic(
     else:
         page_outline = LogseqOutline.parse(page_path.read_text())
 
-    # Step 2: Apply integration to page outline
-    new_block_id = apply_integration(decision, page_outline)
+    # Step 2: Check if block already exists (idempotency / retry detection)
+    # Generate deterministic UUID to check for existing integration
+    expected_block_id = generate_integration_id(
+        knowledge_block_id=decision.knowledge_block_id,
+        target_page=decision.target_page,
+        action=decision.action,
+        target_block_id=decision.target_block_id
+    )
 
-    # Step 3: Write page (FIRST WRITE)
-    try:
-        page_path.write_text(page_outline.render())
-        file_monitor.refresh(page_path)
+    existing_block, _ = page_outline.find_block_by_id(expected_block_id)
+    if existing_block is not None:
         logger.info(
-            "page_write_success",
+            "block_already_exists",
             page=decision.target_page,
-            block_id=new_block_id
+            block_id=expected_block_id,
+            message="Skipping page write (idempotent retry)"
         )
-    except Exception as e:
-        logger.error(
-            "page_write_failed",
-            page=decision.target_page,
-            error=str(e)
-        )
-        raise
+        new_block_id = expected_block_id
+        # Skip to journal update (Step 4)
+    else:
+        # Step 3: Apply integration to page outline
+        new_block_id = apply_integration(decision, page_outline)
 
-    # Step 4: Check and reload journal if modified
+        # Step 4: Write page (FIRST WRITE)
+        try:
+            page_path.write_text(page_outline.render())
+            file_monitor.refresh(page_path)
+            logger.info(
+                "page_write_success",
+                page=decision.target_page,
+                block_id=new_block_id
+            )
+        except Exception as e:
+            logger.error(
+                "page_write_failed",
+                page=decision.target_page,
+                error=str(e)
+            )
+            raise
+
+    # Step 5: Check and reload journal if modified
     if file_monitor.is_modified(journal_path):
         logger.info("file_modified_reload", path=str(journal_path))
         journal_outline = LogseqOutline.parse(journal_path.read_text())
@@ -476,7 +573,7 @@ def write_integration_atomic(
     else:
         journal_outline = LogseqOutline.parse(journal_path.read_text())
 
-    # Step 5: Add provenance to journal
+    # Step 6: Add provenance to journal
     journal_block, _ = journal_outline.find_block_by_id(decision.knowledge_block_id)
     if journal_block is None:
         raise ValueError(
@@ -485,7 +582,7 @@ def write_integration_atomic(
 
     add_provenance(journal_block, decision.target_page, new_block_id)
 
-    # Step 6: Write journal (SECOND WRITE - only if page write succeeded)
+    # Step 7: Write journal (SECOND WRITE - only if page write succeeded)
     try:
         journal_path.write_text(journal_outline.render())
         file_monitor.refresh(journal_path)
@@ -544,26 +641,35 @@ def apply_integration(
         page_outline: Page outline to modify (mutated in-place)
 
     Returns:
-        str: UUID of newly created/updated block (for provenance)
+        str: Deterministic UUID of newly created/updated block (for provenance)
 
     Raises:
         ValueError: If action invalid or target block not found
     """
     if decision.action == "add_section":
-        return write_add_section(page_outline, decision.refined_text)
+        return write_add_section(
+            page_outline,
+            decision.refined_text,
+            knowledge_block_id=decision.knowledge_block_id,
+            target_page=decision.target_page
+        )
 
     elif decision.action == "add_under":
         return write_add_under(
             page_outline,
             decision.target_block_id,
-            decision.refined_text
+            decision.refined_text,
+            knowledge_block_id=decision.knowledge_block_id,
+            target_page=decision.target_page
         )
 
     elif decision.action == "replace":
         return write_replace(
             page_outline,
             decision.target_block_id,
-            decision.refined_text
+            decision.refined_text,
+            knowledge_block_id=decision.knowledge_block_id,
+            target_page=decision.target_page
         )
 
     else:
@@ -573,9 +679,11 @@ def apply_integration(
 
 **Contract**:
 
-- Page written BEFORE journal marked
+- Deterministic UUID generated first to check for existing integration (idempotency)
+- If block already exists (UUID match), skip page write and proceed to journal update
+- Page written BEFORE journal marked (for new integrations)
 - If page write fails, journal NOT marked
-- If journal write fails, page write already succeeded (partial state)
+- If journal write fails, page write already succeeded (partial state - recoverable via retry)
 - File modification checks before both writes
 - Reload and re-validate if files modified externally
 
@@ -588,7 +696,7 @@ If journal write fails after successful page write:
 
 Page: Python/Concurrency
 
-- New knowledge block with id:: uuid1  ← Successfully written
+- New knowledge block with id:: deterministic-uuid  ← Successfully written
 
 Journal: 2025-11-05
 
@@ -599,9 +707,13 @@ Journal: 2025-11-05
 
 **Recovery**: User can re-run integration. System will:
 
-1. Detect block already exists in page (by ID)
-2. Skip page write
-3. Add provenance marker to journal
+1. Generate same deterministic UUID (same knowledge_block_id + target_page + action)
+2. Search page for block with that UUID
+3. Detect block already exists (UUID match)
+4. Skip page write (idempotent)
+5. Add provenance marker to journal (completing the atomic operation)
+
+**Key insight**: Deterministic UUIDs enable true idempotency. The same integration inputs always produce the same UUID, allowing reliable duplicate detection on retry.
 
 ---
 
@@ -777,11 +889,29 @@ def test_atomic_write_failure_recovery():
 
 File operations in Logsqueak adhere to strict contracts:
 
-1. **Property order preservation (NON-NEGOTIABLE)**: Never reorder properties
-2. **Atomic writes**: Page written before journal marked
-3. **Concurrent modification detection**: Check mtimes before all writes
-4. **Non-destructive operations**: All changes traceable via `processed::` markers
-5. **Validation before writes**: Ensure targets exist before modifying files
-6. **Descriptive errors**: All errors include context and remediation suggestions
+1. **Deterministic UUIDs (NEW)**: Integration blocks use UUID v5 (deterministic) for true idempotency
+2. **Property order preservation (NON-NEGOTIABLE)**: Never reorder properties
+3. **Atomic writes**: Page written before journal marked
+4. **Idempotent operations**: Retry detection via deterministic UUIDs prevents duplicate blocks
+5. **Concurrent modification detection**: Check mtimes before all writes
+6. **Non-destructive operations**: All changes traceable via `processed::` markers
+7. **Validation before writes**: Ensure targets exist before modifying files
+8. **Descriptive errors**: All errors include context and remediation suggestions
 
-These contracts ensure data integrity and traceability while respecting Logseq's property order requirements.
+These contracts ensure data integrity, traceability, and reliable recovery from partial failures while respecting Logseq's property order requirements.
+
+### Why Deterministic UUIDs?
+
+The deterministic UUID approach solves a critical problem with retry/recovery:
+
+**Problem**: Random UUIDs make retry impossible to detect
+- First attempt generates `uuid-1`, writes page, journal write fails
+- Retry generates `uuid-2` (different!), can't find existing block
+- Result: Duplicate blocks on page
+
+**Solution**: Deterministic UUIDs based on integration inputs
+- Same knowledge_block_id + target_page + action → same UUID every time
+- Retry generates identical UUID, finds existing block via `find_block_by_id()`
+- Result: Skip page write, complete journal update only (true idempotency)
+
+This enables **partial state recovery**: If journal write fails, user can safely retry the integration without creating duplicates.
