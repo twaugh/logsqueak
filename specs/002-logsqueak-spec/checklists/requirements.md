@@ -36,6 +36,7 @@
 All checklist items pass validation. The specification is ready for `/speckit.clarify` or `/speckit.plan`.
 
 **Changes made during validation**:
+
 - Removed highly technical NDJSON Streaming Protocol section (implementation detail)
 - Removed Active Technologies section (framework/library specifics)
 - Updated Dependencies section to be technology-agnostic (e.g., "TUI library" instead of "Textual 0.47.0+")

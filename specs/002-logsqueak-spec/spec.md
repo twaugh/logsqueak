@@ -9,6 +9,7 @@
 
 ### Session 2025-11-04
 
+- Q: Can the system handle multiple journal entries in a single session? → A: Yes - the hierarchical tree view naturally supports multiple journal entries by using date nodes (e.g., "2025-10-15", "2025-10-16") as top-level grouping nodes with journal blocks nested underneath. This requires minimal changes to the existing design.
 - Q: How should API credentials (keys, tokens) be stored and accessed by the application? → A: User manages credentials in dedicated config file with file permissions (600), application reads on startup
 - Q: What should the automatic retry behavior be for AI service network failures? → A: Auto-retry once (2s delay), then prompt user
 - Q: What should the log file retention and rotation policy be? → A: No automatic cleanup - logs accumulate indefinitely (user manually deletes if needed)
@@ -31,7 +32,7 @@ A Logseq user has been journaling daily and wants to identify which blocks from 
 
 **Acceptance Scenarios**:
 
-1. **Given** a journal entry with 15 blocks (mix of tasks, activities, and knowledge), **When** user opens the extraction screen, **Then** system displays all blocks in a tree view (fully expanded) showing the original journal hierarchy
+1. **Given** one or more journal entries with blocks (mix of tasks, activities, and knowledge), **When** user opens the extraction screen, **Then** system displays all blocks in a tree view (fully expanded) showing the original journal hierarchy, with multiple journal entries grouped by date as top-level nodes
 2. **Given** the tree view is displayed, **When** user navigates with arrow keys, **Then** the selected block's full content is shown at the bottom in rendered markdown with text wrapping
 3. **Given** the LLM is analyzing blocks in the background, **When** the LLM identifies a block as knowledge, **Then** that block is highlighted with a distinct color (different from user-selected highlight) and the bottom panel shows the LLM's reasoning
 4. **Given** the LLM has suggested a block as knowledge, **When** user views the tree, **Then** that block shows a robot emoji (🤖) indicator (positioned far left or far right without shifting the block text) and LLM-suggested highlight color
@@ -95,6 +96,7 @@ The user wants to see where each refined knowledge block will be integrated in t
 
 1. **Given** 5 knowledge blocks need integration, **When** the LLM evaluates candidate pages from RAG search, **Then** decisions stream in one at a time, showing the action (e.g., "Add as new section", "Add under 'Project Timeline'"), confidence score, and reasoning
 2. **Given** a decision is displayed, **When** user reviews it, **Then** they see:
+
    - Hierarchical journal context (where the knowledge came from, shown dimmed)
    - The refined content from Phase 2 (what will be integrated)
    - Target page preview showing existing page structure
@@ -143,7 +145,7 @@ The user wants to see where each refined knowledge block will be integrated in t
 
 #### Phase 1: Block Selection
 
-- **FR-001**: System MUST display journal blocks in a hierarchical tree view fully expanded, showing all parent-child relationships from the original journal entry, with rich markdown rendering of the first line only of each block
+- **FR-001**: System MUST display journal blocks in a hierarchical tree view fully expanded, showing all parent-child relationships from the original journal entries, with multiple journal entries grouped by date as top-level nodes (e.g., "2025-10-15", "2025-10-16") and rich markdown rendering of the first line only of each block
 - **FR-002**: System MUST display the selected block's full content at the bottom of the screen in rendered markdown with text wrapping, showing all lines in the block content without indentation
 - **FR-003**: System MUST display LLM reasoning for why a block was identified as knowledge in the bottom panel when that block is selected
 - **FR-004**: System MUST run two background tasks in parallel when this screen loads: (1) AI classification of knowledge blocks with incremental results, (2) page index building for semantic search
@@ -299,7 +301,7 @@ The user wants to see where each refined knowledge block will be integrated in t
 
 4. **User Familiarity**: Users are comfortable with keyboard-driven interfaces (similar to vim, htop, other TUIs).
 
-5. **Single Extraction Session**: Users process one journal entry at a time. No batch processing multiple dates.
+5. **Multiple Journal Entries**: Users can process multiple journal entries in a single session. Tree view displays entries grouped by date (e.g., "2025-10-15", "2025-10-16") with journal blocks nested underneath, enabling efficient batch processing of date ranges.
 
 6. **Error Recovery**: Users can resolve errors by following suggested actions and re-running extraction. Mid-session retry not required initially.
 
