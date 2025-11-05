@@ -194,7 +194,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 
 - **FR-031**: System MUST perform semantic search (combining similarity search and explicit page link hints) using the original hierarchical context of each knowledge block
 - **FR-032**: System MUST batch AI integration decisions by knowledge block - all decisions for a given knowledge block must arrive before displaying any decisions for that block
-- **FR-032a**: LLM MUST return only active/relevant decisions (e.g., if 10 candidate pages are searched but only 2 are relevant, return only 2 decisions)
+- **FR-032a**: LLM MUST return only active/relevant decisions via prompt-based filtering (e.g., if 10 candidate pages are searched but only 2 are relevant, return only 2 decisions). See contracts/llm-api.md Phase 3 "Relevance Filtering" section for filtering criteria (confidence ≥ 30%, clear semantic connection).
 - **FR-032b**: LLM MUST return at most 2 decisions per (knowledge block, target page) pair
 - **FR-033**: System MUST display all decisions for a knowledge block together in a list format, with one knowledge block visible at a time
 - **FR-034**: System MUST show confidence scores as percentages for each integration decision

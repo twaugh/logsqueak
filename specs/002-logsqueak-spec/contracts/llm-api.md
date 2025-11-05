@@ -267,7 +267,7 @@ Each line is a complete JSON object representing one reworded knowledge block.
   "messages": [
     {
       "role": "system",
-      "content": "You are an AI assistant that decides where to integrate knowledge into a Logseq knowledge base. You will receive knowledge blocks with their original journal context and candidate target pages with their structure.\n\nFor each knowledge block, analyze the candidate pages and suggest integrations where the knowledge is relevant. Omit pages that are not good fits.\n\nFor each relevant integration, choose the best action:\n- 'add_section': Create new top-level section on the page\n- 'add_under': Add as child under an existing block (provide target_block_id)\n- 'replace': Replace an existing block's content (provide target_block_id)\n\nOutput one JSON object per line (NDJSON format), not a JSON array. Each object must have: knowledge_block_id (string), target_page (string), action (string), target_block_id (string or null), target_block_title (string or null), confidence (float 0-1), reasoning (string explaining why this integration makes sense)."
+      "content": "You are an AI assistant that decides where to integrate knowledge into a Logseq knowledge base. You will receive knowledge blocks with their original journal context and candidate target pages with their structure.\n\nRELEVANCE FILTERING (FR-032a):\n- Only output decisions where confidence ≥ 0.30 (30%)\n- Only output decisions where semantic connection is clear and actionable\n- Maximum 2 decisions per (knowledge_block, target_page) pair - choose the 2 best integration points if multiple locations are relevant\n- If a candidate page is not relevant, omit it entirely (do not output a decision for it)\n- If NO candidate pages meet the threshold, output nothing (empty stream)\n\nFor each relevant integration, choose the best action:\n- 'add_section': Create new top-level section on the page\n- 'add_under': Add as child under an existing block (provide target_block_id)\n- 'replace': Replace an existing block's content (provide target_block_id)\n\nOutput one JSON object per line (NDJSON format), not a JSON array. Each object must have: knowledge_block_id (string), target_page (string), action (string), target_block_id (string or null), target_block_title (string or null), confidence (float 0-1), reasoning (string explaining why this integration makes sense)."
     },
     {
       "role": "user",
@@ -368,6 +368,36 @@ Each line is a complete JSON object representing one integration decision (one k
 - In this example, `Textual/Architecture` is omitted because it's not a strong fit
 
 **Stream End**: Connection closes
+
+### Relevance Filtering (FR-032a, FR-032b)
+
+**Filtering Strategy**: Prompt-based (LLM performs filtering before outputting decisions)
+
+The system prompt instructs the LLM to apply these filters:
+
+1. **Confidence threshold**: Only output decisions with confidence ≥ 30%
+2. **Semantic relevance**: Only output decisions where there's a clear, actionable connection between the knowledge block and target page
+3. **Max decisions per (knowledge_block, target_page) pair**: At most 2 decisions per pair
+   - If multiple integration points on same page are relevant, LLM selects the 2 best locations
+   - Rationale: Prevents overwhelming user with too many options for same page
+
+**Example Scenario**:
+- RAG search returns 10 candidate pages
+- LLM evaluates all 10 pages
+- Only 2 pages have strong semantic relevance (confidence ≥ 30%)
+- One page has 3 potential integration points (LLM returns only the 2 best)
+- **Result**: 3 IntegrationDecisionChunk objects total (2 from first page, 1 from second page)
+
+**Edge Case - No Relevant Pages**:
+- If no candidate pages meet the confidence/relevance threshold
+- LLM outputs empty stream (connection closes with no chunks)
+- Client handles via FR-053 ("No relevant pages found" message)
+
+**Rationale for Prompt-Based Filtering**:
+- Simpler than client-side filtering (no duplicate logic)
+- LLM has full semantic context to judge relevance
+- User sees only actionable decisions (better UX)
+- Aligns with Constitution Principle III (Simplicity)
 
 ---
 

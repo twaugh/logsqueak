@@ -183,7 +183,7 @@ pyproject.toml                  # Dependencies and entry points
 - ✅ **research.md**: Technical decisions for Textual, NDJSON streaming, ChromaDB, configuration
 - ✅ **data-model.md**: Pydantic models for BlockState, EditedContent, IntegrationDecision, Config
 - ✅ **contracts/**:
-  - `llm-streaming.md`: NDJSON formats for knowledge classification, rewording, integration decisions
+  - `llm-api.md`: NDJSON formats for knowledge classification, rewording, integration decisions
   - `service-interfaces.md`: LLMClient, PageIndexer, RAGSearch, FileMonitor interfaces
   - `file-operations.md`: logseq-outline-parser operations, atomic write guarantees
 
