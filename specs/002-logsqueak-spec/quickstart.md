@@ -36,7 +36,6 @@ Check your Python version:
 ```bash
 python3 --version
 # Should show: Python 3.11.x or higher
-
 ```
 
 If you need to install Python 3.11+, visit [python.org](https://www.python.org/downloads/).
@@ -72,7 +71,6 @@ Choose one of the following:
 ```bash
 git clone https://github.com/yourusername/logsqueak.git
 cd logsqueak
-
 ```
 
 ### 2. Set Up Virtual Environment
@@ -88,7 +86,6 @@ source venv/bin/activate
 
 # Activate on Windows
 venv\Scripts\activate
-
 ```
 
 Your terminal prompt should now show `(venv)` prefix.
@@ -99,7 +96,6 @@ Install Logsqueak and all dependencies from `pyproject.toml`:
 
 ```bash
 pip install -e .
-
 ```
 
 This will install:
@@ -121,7 +117,6 @@ Check that the `logsqueak` command is available:
 
 ```bash
 logsqueak --help
-
 ```
 
 You should see usage information.
@@ -134,7 +129,6 @@ You should see usage information.
 
 ```bash
 mkdir -p ~/.config/logsqueak
-
 ```
 
 ### 2. Create Configuration File
@@ -154,7 +148,6 @@ logseq:
 
 rag:
   top_k: 10  # Optional: Number of candidate pages for RAG search
-
 ```
 
 #### Option B: Ollama Configuration
@@ -171,7 +164,6 @@ logseq:
 
 rag:
   top_k: 10  # Optional
-
 ```
 
 **Configuration Fields**:
@@ -191,7 +183,6 @@ rag:
 
 ```bash
 chmod 600 ~/.config/logsqueak/config.yaml
-
 ```
 
 Verify permissions:
@@ -199,7 +190,6 @@ Verify permissions:
 ```bash
 ls -l ~/.config/logsqueak/config.yaml
 # Should show: -rw------- (600)
-
 ```
 
 If permissions are too open (e.g., 644), Logsqueak will refuse to start with a permission error.
@@ -210,7 +200,6 @@ Test your configuration:
 
 ```bash
 logsqueak --version
-
 ```
 
 If there are any configuration errors, Logsqueak will display a clear error message indicating which setting is invalid.
@@ -230,14 +219,12 @@ logsqueak extract 2025-01-15
 
 # Extract from a date range
 logsqueak extract 2025-01-10..2025-01-15
-
 ```
 
 ### Example: Extract from Today's Journal
 
 ```bash
 logsqueak extract
-
 ```
 
 **What happens on first run**:
@@ -256,7 +243,6 @@ Graph path: /home/user/Documents/logseq-graph
 Loading journal: 2025-11-05
 
 [Interactive TUI launches - see Phase 1 below]
-
 ```
 
 ### Common First-Run Issues
@@ -310,7 +296,6 @@ This section walks through a complete knowledge extraction session, showing what
 ├──────────────────────────────────────────────────────────────────────┤
 │ j/k: Navigate | Space: Select | a: Accept all | n: Next | q: Quit    │
 └──────────────────────────────────────────────────────────────────────┘
-
 ```
 
 **Note on display**:
@@ -401,7 +386,6 @@ This section walks through a complete knowledge extraction session, showing what
 ├─────────────────────────────────────────────────────────────────────┤
 │ j/k: Navigate | Tab: Edit | a: Accept LLM | r: Revert | n: Next     │
 └─────────────────────────────────────────────────────────────────────┘
-
 ```
 
 #### Sections Explained
@@ -482,11 +466,11 @@ This section walks through a complete knowledge extraction session, showing what
 │ │ - Async Patterns                                                │ │
 │ │   - Event loops handle concurrent tasks                         │ │
 │ │   - Use async/await for I/O-bound operations                    │ │
+│ │   - Common pitfalls with asyncio                                │ │
 │ │  ┃- Using asyncio.create_task() enables concurrent operations   │ │
 │ │  ┃  in Python, unlike await which executes sequentially.        │ │
-│ │   - Common pitfalls with asyncio                                │ │
-│ │ - Type Hints                                                     │ │
-│ │   ...                                                            │ │
+│ │ - Type Hints                                                    │ │
+│ │   ...                                                           │ │
 │ └─────────────────────────────────────────────────────────────────┘ │
 │                                                                     │
 │ Reasoning: This insight fits well under the 'Async Patterns'        │
@@ -494,10 +478,10 @@ This section walks through a complete knowledge extraction session, showing what
 ├─────────────────────────────────────────────────────────────────────┤
 │ j/k: Navigate decisions | y: Accept | n: Next block | a: Accept all │
 └─────────────────────────────────────────────────────────────────────┘
-
 ```
 
 **Note on Target Page Preview:**
+
 - Preview automatically scrolls to show the insertion point (green bar `┃`)
 - For long pages, press `Tab` to focus the preview widget
 - When focused, use `↑`/`↓` arrows to scroll and see more context
@@ -580,7 +564,6 @@ When all knowledge blocks are processed, you'll see:
 │                                                                     │
 │ Press Enter to exit                                                 │
 └─────────────────────────────────────────────────────────────────────┘
-
 ```
 
 #### Tips
