@@ -71,7 +71,7 @@ Build an interactive TUI application for extracting lasting knowledge from Logse
 
 - All journal modifications are APPEND-only (adding `processed::` property)
 - Target page modifications require explicit user approval (Phase 3 'y' key)
-- Every integrated block gets unique `id::` UUID for traceability
+- Every integrated block gets deterministic `id::` (UUID v5) for traceability and idempotent retries
 - Provenance links from journal to integrated blocks via `processed::` property
 - Property order preservation enforced (FR-068)
 - Atomic writes: journal marked only after successful page write (FR-043)
