@@ -189,6 +189,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 - **FR-027**: System MUST start RAG search for selected blocks when page indexing completes
 - **FR-028**: System MUST block progression to Phase 3 until RAG search is complete
 - **FR-029**: System MUST display status messages when blocking progression
+- **FR-029a**: When a background task fails (page indexing, LLM classification, RAG search), system MUST display error details and offer user options to retry the failed task or cancel the operation
 - **FR-030**: Users MUST be able to navigate between knowledge blocks using keyboard controls
 
 #### Phase 3: Integration Decisions
