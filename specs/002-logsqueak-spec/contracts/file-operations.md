@@ -291,7 +291,7 @@ if processed_value is None:
 ```python
 # Set property (preserves order if exists, appends if new)
 block.set_property("id", "abc123-def456-...")
-block.set_property("processed", "[[Page]]((uuid))")
+block.set_property("processed", "[Page](((uuid)))")
 
 ```
 
@@ -312,7 +312,7 @@ def add_provenance(
     """
     Add processed:: property to journal block.
 
-    Format: processed:: [[Page Name]]((uuid)), [[Other Page]]((uuid2))
+    Format: processed:: [Page Name](((uuid))), [Other Page](((uuid2)))
 
     Args:
         journal_block: Journal block that was processed
@@ -321,7 +321,7 @@ def add_provenance(
     """
     # Convert hierarchical page names (Projects___Logsqueak -> Projects/Logsqueak)
     display_name = target_page.replace("___", "/")
-    provenance_link = f"[[{display_name}]](({target_block_id}))"
+    provenance_link = f"[{display_name}]((({target_block_id})))"
 
     # Get existing processed:: value or empty string
     existing = journal_block.get_property("processed") or ""
@@ -340,7 +340,7 @@ def add_provenance(
 **Contract**:
 
 - Multiple integrations append to same `processed::` property (comma-separated)
-- Link format: `[[Display Name]]((block-uuid))`
+- Link format: `[Display Name](((block-uuid)))` (markdown link with Logseq block reference)
 - Display name uses `/` for hierarchical pages
 - Property order preserved (existing `processed::` stays in same position)
 
@@ -351,7 +351,7 @@ def add_provenance(
 ```markdown
 
 - Knowledge block content
-  processed:: [[Python/Concurrency]]((550e8400-e29b-41d4-a716-446655440000))
+  processed:: [Python/Concurrency](((550e8400-e29b-41d4-a716-446655440000)))
   id:: abc123-def456-...
 
 ```
@@ -361,7 +361,7 @@ def add_provenance(
 ```markdown
 
 - Knowledge block content
-  processed:: [[Python/Concurrency]]((550e8400-e29b-41d4-a716-446655440000)), [[Textual/Architecture]]((6ba7b810-9dad-11d1-80b4-00c04fd430c8))
+  processed:: [Python/Concurrency](((550e8400-e29b-41d4-a716-446655440000))), [Textual/Architecture](((6ba7b810-9dad-11d1-80b4-00c04fd430c8)))
   id:: abc123-def456-...
 
 ```
@@ -372,7 +372,7 @@ def add_provenance(
 
 - Knowledge block content
   tags:: #python #async
-  processed:: [[Python/Concurrency]]((uuid))
+  processed:: [Python/Concurrency](((uuid)))
   id:: abc123-def456-...
   author:: User Name
 
@@ -384,7 +384,7 @@ If new integration added, `processed::` line updates but stays in same position:
 
 - Knowledge block content
   tags:: #python #async
-  processed:: [[Python/Concurrency]]((uuid)), [[Textual/Workers]]((uuid2))
+  processed:: [Python/Concurrency](((uuid))), [Textual/Workers](((uuid2)))
   id:: abc123-def456-...
   author:: User Name
 
