@@ -1,8 +1,11 @@
 # Feature Specification: Logsqueak - Interactive TUI for Knowledge Extraction
 
 **Feature Branch**: `002-logsqueak-spec`
+
 **Created**: 2025-11-04
+
 **Status**: Specification
+
 **Input**: User description: "Logsqueak. Use specs/001-logsqueak/spec.md as the specification/design."
 
 ## Clarifications
@@ -107,6 +110,7 @@ The user wants to review integration suggestions for each knowledge block, see w
    - A list of suggested target pages with decisions (e.g., "Projects/Acme", "Reading Notes")
    - For the currently selected decision: target page preview showing existing page structure with new content highlighted with green bar (`┃`) in its target location
    - Action description, confidence score, and LLM reasoning for the selected decision
+
 5. **Given** a knowledge block has 3 relevant pages with decisions, **When** user presses 'j' or 'k', **Then** they navigate between the different page decisions for this knowledge block, and the preview panel updates to show the selected decision's target page context
 6. **Given** a decision shows "Add under 'Project Timeline'" with the target page preview visible, **When** user presses 'y' (accept), **Then** system immediately writes that knowledge block to the target page at the specified location and atomically adds to the `processed::` property on the journal block (creating it if it doesn't exist, or appending to the comma-separated list if it does), where each link uses the target page name as link text (with '___' converted to '/' for hierarchical pages) and block reference `((uuid))` as the link target
 7. **Given** a write operation succeeds, **When** the system updates the display, **Then** that decision is marked as completed with a checkmark (✓) and remains visible in the list
@@ -376,4 +380,5 @@ All AI-assisted commits MUST include:
 
 ```
 Assisted-by: Claude Code
+
 ```

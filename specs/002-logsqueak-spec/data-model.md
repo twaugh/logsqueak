@@ -1,7 +1,9 @@
 # Data Model: Logsqueak Interactive TUI
 
 **Date**: 2025-11-05
+
 **Feature**: 002-logsqueak-spec
+
 **Status**: Specification
 
 This document defines all data models used in the Logsqueak Interactive TUI application. All models use Pydantic for validation and serialization.
@@ -15,14 +17,17 @@ This document defines all data models used in the Logsqueak Interactive TUI appl
    - [EditedContent](#editedcontent)
    - [IntegrationDecision](#integrationdecision)
    - [BackgroundTask](#backgroundtask)
+
 2. [Configuration Models](#configuration-models)
    - [LLMConfig](#llmconfig)
    - [LogseqConfig](#logseqconfig)
    - [RAGConfig](#ragconfig)
    - [Config](#config)
+
 3. [Supporting Models](#supporting-models)
    - [FileTracker](#filetracker)
    - [TaskProgress](#taskprogress)
+
 4. [Model Relationships](#model-relationships)
 5. [State Transitions](#state-transitions)
 
@@ -86,6 +91,7 @@ class BlockState(BaseModel):
 
     class Config:
         frozen = False  # Allow mutation during user interaction
+
 ```
 
 **Field Descriptions**:
@@ -110,6 +116,7 @@ class BlockState(BaseModel):
   "llm_confidence": 0.92,
   "reason": "Contains a reusable insight about Python async patterns that would be valuable in the 'Programming Notes' page."
 }
+
 ```
 
 **Example JSON (User Override)**:
@@ -124,6 +131,7 @@ class BlockState(BaseModel):
   "llm_confidence": null,
   "reason": null
 }
+
 ```
 
 ---
@@ -170,6 +178,7 @@ class EditedContent(BaseModel):
 
     class Config:
         frozen = False  # Allow mutation during editing
+
 ```
 
 **Field Descriptions**:
@@ -190,6 +199,7 @@ class EditedContent(BaseModel):
   "current_content": "Using `asyncio.create_task()` enables concurrent operations in Python, unlike `await` which executes sequentially.",
   "rewording_complete": true
 }
+
 ```
 
 ---
@@ -263,6 +273,7 @@ class IntegrationDecision(BaseModel):
 
     class Config:
         frozen = False  # Allow mutation when user accepts/writes
+
 ```
 
 **Field Descriptions**:
@@ -273,6 +284,7 @@ class IntegrationDecision(BaseModel):
   - `add_section`: Create new top-level section
   - `add_under`: Add as child under specific block
   - `replace`: Replace existing block content
+
 - `target_block_id`: Identifies target block for `add_under` or `replace` (None for `add_section`)
 - `target_block_title`: Human-readable description (e.g., "Under 'Project Timeline'")
 - `confidence`: LLM's confidence (shown as percentage in UI)
@@ -296,6 +308,7 @@ class IntegrationDecision(BaseModel):
   "write_status": "pending",
   "error_message": null
 }
+
 ```
 
 ---
@@ -355,6 +368,7 @@ class BackgroundTask(BaseModel):
 
     class Config:
         frozen = False  # Allow mutation as task progresses
+
 ```
 
 **Field Descriptions**:
@@ -365,6 +379,7 @@ class BackgroundTask(BaseModel):
   - `rag_search`: Semantic search for candidate pages
   - `llm_rewording`: Phase 2 content refinement
   - `llm_decisions`: Phase 3 integration decision generation
+
 - `status`: Current state - "running", "completed", or "failed"
 - `progress_percentage`: Optional percentage (e.g., 45.5 for page indexing)
 - `progress_current`: Optional current count (e.g., 3 for "3 blocks reworded")
@@ -382,6 +397,7 @@ class BackgroundTask(BaseModel):
   "progress_total": null,
   "error_message": null
 }
+
 ```
 
 **Example JSON (With Count)**:
@@ -395,6 +411,7 @@ class BackgroundTask(BaseModel):
   "progress_total": 5,
   "error_message": null
 }
+
 ```
 
 ---
@@ -438,6 +455,7 @@ class LLMConfig(BaseModel):
 
     class Config:
         frozen = True  # Immutable after loading
+
 ```
 
 **Field Descriptions**:
@@ -456,6 +474,7 @@ class LLMConfig(BaseModel):
   "model": "gpt-4-turbo-preview",
   "num_ctx": 32768
 }
+
 ```
 
 ---
@@ -498,6 +517,7 @@ class LogseqConfig(BaseModel):
 
     class Config:
         frozen = True  # Immutable after loading
+
 ```
 
 **Field Descriptions**:
@@ -510,6 +530,7 @@ class LogseqConfig(BaseModel):
 {
   "graph_path": "/home/user/Documents/logseq-graph"
 }
+
 ```
 
 ---
@@ -537,6 +558,7 @@ class RAGConfig(BaseModel):
 
     class Config:
         frozen = True  # Immutable after loading
+
 ```
 
 **Field Descriptions**:
@@ -549,6 +571,7 @@ class RAGConfig(BaseModel):
 {
   "top_k": 10
 }
+
 ```
 
 ---
@@ -599,6 +622,7 @@ class Config(BaseModel):
 
     class Config:
         frozen = True  # Immutable after loading
+
 ```
 
 **Field Descriptions**:
@@ -621,6 +645,7 @@ logseq:
 
 rag:
   top_k: 10  # Optional, defaults to 10
+
 ```
 
 **Validation Rules**:
@@ -667,6 +692,7 @@ class FileTracker:
     def refresh(self, path: Path) -> None:
         """Update recorded mtime after successful reload."""
         self._mtimes[path] = path.stat().st_mtime
+
 ```
 
 **Usage Pattern**:
@@ -690,6 +716,7 @@ if tracker.is_modified(journal_path):
     tracker.refresh(journal_path)
 
 # Proceed with write
+
 ```
 
 ---
@@ -756,6 +783,7 @@ class TaskProgress(BaseModel):
             fraction=fraction,
             is_complete=is_complete
         )
+
 ```
 
 ---
@@ -802,6 +830,7 @@ class TaskProgress(BaseModel):
 │ FileTracker  │ (Write operations)
 │  _mtimes     │ Detects concurrent modifications
 └──────────────┘
+
 ```
 
 ### Key Relationships
@@ -833,6 +862,7 @@ class TaskProgress(BaseModel):
                                            source="user"
                                            confidence=1.0
                                            (llm_* fields may or may not be set)
+
 ```
 
 **State Rules**:
@@ -854,6 +884,7 @@ class TaskProgress(BaseModel):
     │
     └─ Task fails ─────────► status="failed"
                              error_message="..."
+
 ```
 
 **State Rules**:
@@ -874,6 +905,7 @@ class TaskProgress(BaseModel):
     │
     └─ Write fails ─────────────► write_status="failed"
                                   error_message="Target block not found"
+
 ```
 
 **State Rules**:
@@ -901,14 +933,17 @@ class TaskProgress(BaseModel):
 ### Phase-Specific Validation
 
 **Phase 1 → Phase 2 Transition**:
+
 - At least one BlockState must have `classification="knowledge"` and `source` (user or llm)
 
 **Phase 2 → Phase 3 Transition**:
+
 - BackgroundTask with `task_type="page_indexing"` must have `status="completed"`
 - BackgroundTask with `task_type="rag_search"` must have `status="completed"`
 - All EditedContent entries must have `current_content` (non-empty)
 
 **Phase 3 Write Operations**:
+
 - IntegrationDecision must have `write_status="pending"` to be writable
 - Target file must pass FileTracker modification check before write
 - Journal block must exist and be writable

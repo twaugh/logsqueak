@@ -1,7 +1,9 @@
 # Specification Quality Checklist: Logsqueak - Interactive TUI for Knowledge Extraction
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
+
 **Created**: 2025-11-04
+
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality

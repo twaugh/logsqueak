@@ -1,6 +1,7 @@
 # LLM API Contracts
 
 **Date**: 2025-11-04
+
 **Feature**: 002-logsqueak-spec
 
 ## Overview
@@ -219,6 +220,7 @@ Candidate Pages:
 
      - Threading uses locks for shared state
      - Asyncio uses coroutines
+
    - Common Patterns
      id:: pattern-section-123
 

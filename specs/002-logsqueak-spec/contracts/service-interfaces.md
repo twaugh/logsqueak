@@ -1,6 +1,7 @@
 # Service Interfaces Contract
 
 **Date**: 2025-11-05
+
 **Feature**: 002-logsqueak-spec
 
 ## Overview
@@ -8,6 +9,7 @@
 This document defines the Python service interfaces for the Logsqueak Interactive TUI application. All interfaces use async/await patterns with Pydantic models from `data-model.md` for type safety.
 
 **Key Principles**:
+
 - All LLM operations are async generators (streaming results)
 - All file operations check modification times (concurrent modification detection)
 - All services use Pydantic models for validation
@@ -396,6 +398,7 @@ async def plan_integrations(
             reasoning=chunk.reasoning,
             write_status="pending"
         )
+
 ```
 
 ---
@@ -574,6 +577,7 @@ class PageIndexer:
         """Close ChromaDB client."""
         # ChromaDB client closes automatically
         pass
+
 ```
 
 ---
@@ -713,6 +717,7 @@ class RAGSearch:
         """Close ChromaDB client."""
         # ChromaDB client closes automatically
         pass
+
 ```
 
 ---
@@ -794,6 +799,7 @@ class FileMonitor:
             self.refresh(path)
             return True
         return False
+
 ```
 
 ---
@@ -851,6 +857,7 @@ class Phase1Screen(Screen):
         except Exception as e:
             logger.error("indexing_worker_failed", error=str(e))
             self.show_error(f"Indexing failed: {e}")
+
 ```
 
 ---

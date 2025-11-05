@@ -1,6 +1,7 @@
 # LLM Streaming Contract
 
 **Date**: 2025-11-05
+
 **Feature**: 002-logsqueak-spec
 
 ## Overview
@@ -8,6 +9,7 @@
 This document defines the NDJSON streaming formats for all LLM responses in the Logsqueak Interactive TUI. All LLM interactions use **NDJSON (Newline-Delimited JSON)** format for streaming incremental results.
 
 **Decision Rationale** (from research.md):
+
 - NDJSON is simpler than SSE (no `data:` prefix parsing)
 - Each line is complete JSON object (easier to log and debug)
 - Error isolation: bad JSON on one line doesn't corrupt stream
@@ -21,6 +23,7 @@ This document defines the NDJSON streaming formats for all LLM responses in the 
 ### Structure
 
 Each line in the response stream is:
+
 1. A complete, valid JSON object
 2. Terminated by a newline character (`\n`)
 3. No special markers or prefixes required
@@ -42,6 +45,7 @@ async def parse_ndjson_stream(url, payload):
                     except json.JSONDecodeError as e:
                         logger.error("malformed_json_line", line=line, error=str(e))
                         continue  # Skip bad line, process remaining stream
+
 ```
 
 ### Error Handling
@@ -62,12 +66,15 @@ Stream incremental classification results as LLM analyzes journal blocks.
 **Endpoint**: `{config.llm.endpoint}` (OpenAI-compatible)
 
 **Headers**:
+
 ```
 Authorization: Bearer {config.llm.api_key}
 Content-Type: application/json
+
 ```
 
 **Request Body**:
+
 ```json
 {
   "model": "{config.llm.model}",
@@ -84,9 +91,11 @@ Content-Type: application/json
   "stream": true,
   "temperature": 0.3
 }
+
 ```
 
 **Formatted Blocks Example**:
+
 ```
 Block ID: abc123
 Content: - Learned that Python's asyncio.Queue is thread-safe
@@ -99,6 +108,7 @@ Content: - Had lunch with Sarah
 Block ID: ghi789
 Content: - Discovered that ChromaDB requires sentence-transformers
   It downloads a 90MB model on first run
+
 ```
 
 ### Response Format (NDJSON Stream)
@@ -107,10 +117,12 @@ Each line contains one classification result for blocks identified as knowledge:
 
 ```json
 {"block_id":"abc123","is_knowledge":true,"confidence":0.92,"reason":"Contains a reusable insight about Python's asyncio.Queue being thread-safe, which is evergreen knowledge applicable to any async Python development."}
+
 ```
 
 ```json
 {"block_id":"ghi789","is_knowledge":true,"confidence":0.85,"reason":"Documents an important technical detail about ChromaDB's dependencies that would be valuable for future reference when setting up projects."}
+
 ```
 
 **Note**: Activity blocks (like `def456`) are NOT included in the output stream.
@@ -144,6 +156,7 @@ class KnowledgeClassificationChunk(BaseModel):
         ...,
         description="Explanation for why this is knowledge"
     )
+
 ```
 
 ### Example NDJSON Stream
@@ -174,6 +187,7 @@ Stream reworded versions of knowledge blocks that remove temporal context.
 ### Request Format
 
 **Request Body**:
+
 ```json
 {
   "model": "{config.llm.model}",
@@ -190,9 +204,11 @@ Stream reworded versions of knowledge blocks that remove temporal context.
   "stream": true,
   "temperature": 0.5
 }
+
 ```
 
 **Formatted Blocks Example**:
+
 ```
 Block ID: abc123
 Original Content: - Learned today that Python's asyncio.Queue is thread-safe
@@ -202,6 +218,7 @@ Original Content: - Learned today that Python's asyncio.Queue is thread-safe
 Block ID: ghi789
 Original Content: - Yesterday discovered that ChromaDB requires sentence-transformers
   It downloads a 90MB model on first run
+
 ```
 
 ### Response Format (NDJSON Stream)
@@ -210,10 +227,12 @@ Each line contains one reworded result:
 
 ```json
 {"block_id":"abc123","reworded_content":"Python's asyncio.Queue is thread-safe, making it suitable for communication between background tasks and the main thread in Textual applications. This property is important when designing concurrent systems."}
+
 ```
 
 ```json
 {"block_id":"ghi789","reworded_content":"ChromaDB requires the sentence-transformers library as a dependency. The library downloads a 90MB model on first initialization."}
+
 ```
 
 ### Pydantic Model
@@ -234,6 +253,7 @@ class ContentRewordingChunk(BaseModel):
         min_length=1,
         description="Reworded content with temporal context removed"
     )
+
 ```
 
 ### Example NDJSON Stream
@@ -256,6 +276,7 @@ Stream integration decisions for where/how to integrate knowledge blocks into ta
 ### Request Format
 
 **Request Body**:
+
 ```json
 {
   "model": "{config.llm.model}",
@@ -272,9 +293,11 @@ Stream integration decisions for where/how to integrate knowledge blocks into ta
   "stream": true,
   "temperature": 0.4
 }
+
 ```
 
 **Formatted Knowledge and Candidates Example**:
+
 ```
 Knowledge Block ID: abc123
 Content: Python's asyncio.Queue is thread-safe, making it suitable for communication between background tasks and the main thread in Textual applications.
@@ -284,25 +307,31 @@ Candidate Pages:
 
 1. Page: Python/Concurrency
    Existing Structure:
+
    - Threading vs Asyncio
      - Threading uses locks for shared state
      - Asyncio uses coroutines
+
    - Common Patterns
      id:: pattern-section-123
 
 2. Page: Textual/Architecture
    Existing Structure:
+
    - Widget Lifecycle
    - Message Passing
      id:: message-section-456
+
    - Worker Threads
      id:: worker-section-789
 
 3. Page: Python/Data Structures
    Existing Structure:
+
    - Lists and Tuples
    - Dictionaries
    - Sets
+
 ```
 
 ### Response Format (NDJSON Stream)
@@ -311,10 +340,12 @@ Each line contains one integration decision (only for relevant pages):
 
 ```json
 {"knowledge_block_id":"abc123","target_page":"Python/Concurrency","action":"add_under","target_block_id":"pattern-section-123","target_block_title":"Common Patterns","confidence":0.92,"reasoning":"This knowledge about asyncio.Queue's thread-safety is a common pattern in Python concurrency. Adding it under the 'Common Patterns' section provides clear context and makes it discoverable."}
+
 ```
 
 ```json
 {"knowledge_block_id":"abc123","target_page":"Textual/Architecture","action":"add_under","target_block_id":"worker-section-789","target_block_title":"Worker Threads","confidence":0.78,"reasoning":"The thread-safety property is relevant for Textual's worker thread architecture. Adding it under 'Worker Threads' section connects it to the framework's design."}
+
 ```
 
 **Note**: The irrelevant page `Python/Data Structures` is omitted from output.
@@ -364,6 +395,7 @@ class IntegrationDecisionChunk(BaseModel):
         ...,
         description="LLM's explanation for this integration decision"
     )
+
 ```
 
 ### Example NDJSON Stream
@@ -379,6 +411,7 @@ Complete stream for 1 knowledge block with 3 candidate pages (2 relevant, 1 irre
 ### Batching Behavior (Phase 3 Specific)
 
 Per spec requirements (FR-032):
+
 - System waits for **all decisions** for a given knowledge block to arrive before displaying
 - LLM returns only active/relevant decisions (filters out irrelevant candidate pages)
 - At most 2 decisions per (knowledge block, target page) pair
@@ -401,6 +434,7 @@ logger.error(
     line='{"block_id":"abc123","is_knowledge":tru',  # Truncated
     error="Expecting value: line 1 column 37 (char 36)"
 )
+
 ```
 
 ### HTTP Error Response
@@ -414,9 +448,11 @@ If the HTTP request fails (non-streaming):
     "type": "invalid_request_error"
   }
 }
+
 ```
 
 **Error Types**:
+
 - `invalid_request_error`: 400/401 errors (bad request, auth failure)
 - `rate_limit_error`: 429 error (too many requests)
 - `api_error`: 500/503 errors (server-side failures)
@@ -434,6 +470,7 @@ timeout = httpx.Timeout(
     write=10.0,    # Write timeout
     pool=10.0      # Pool timeout
 )
+
 ```
 
 **Rationale** (from research.md): 60s read timeout allows for slow streaming responses from resource-constrained local models (e.g., Ollama on CPU).
@@ -462,6 +499,7 @@ All streaming requests must be logged for debugging.
     }
   ]
 }
+
 ```
 
 ### Streaming Chunk Received
@@ -479,6 +517,7 @@ All streaming requests must be logged for debugging.
     "reason": "..."
   }
 }
+
 ```
 
 ### Request Complete
@@ -491,6 +530,7 @@ All streaming requests must be logged for debugging.
   "total_chunks": 15,
   "duration_ms": 17666
 }
+
 ```
 
 ### Request Failed
@@ -504,6 +544,7 @@ All streaming requests must be logged for debugging.
   "error_message": "Read timeout after 60.0 seconds",
   "chunks_received": 5
 }
+
 ```
 
 ---
@@ -513,6 +554,7 @@ All streaming requests must be logged for debugging.
 ### Automatic Retry (FR-075 to FR-079)
 
 **Retry once** after 2-second delay for:
+
 - `httpx.ConnectError` (connection refused, network unreachable)
 - `httpx.ConnectTimeout` (connection timeout)
 - `httpx.ReadTimeout` (read timeout during streaming)
@@ -532,6 +574,7 @@ async def retry_request(func, max_retries=1, delay=2.0):
             await sleep(delay)
             return await func()
         raise
+
 ```
 
 **After retry fails**: Prompt user with options (Retry, Skip, Cancel)

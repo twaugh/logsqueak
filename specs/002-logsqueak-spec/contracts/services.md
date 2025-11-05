@@ -1,6 +1,7 @@
 # Internal Service Contracts
 
 **Date**: 2025-11-04
+
 **Feature**: 002-logsqueak-spec
 
 ## Overview
@@ -149,6 +150,7 @@ async def plan_integrations(
    - Block ID and refined content
    - Original context (parent blocks, explicit page links)
    - Candidate page structure with block IDs
+
 2. Send streaming request to LLM
 3. Parse each chunk into `IntegrationDecisionChunk`
 4. Create `IntegrationDecision` and yield
@@ -199,6 +201,7 @@ async def build_page_index(
      - Generate full hierarchical context
      - Generate embedding using sentence-transformers
      - Store in ChromaDB with metadata: page_name, block_id, hierarchy, mtime
+
 3. Call progress_callback after each page (if provided)
 4. Persist ChromaDB collection to db_path
 
@@ -253,6 +256,7 @@ async def find_candidate_pages(
    - Query ChromaDB for top_k similar blocks
    - Group results by page, rank by total similarity
    - Boost pages mentioned in explicit links (e.g., [[Page Name]])
+
 3. Return dict of block_id -> [page_name, ...]
 
 ---

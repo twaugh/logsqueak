@@ -1,6 +1,7 @@
 # Implementation Plan: Logsqueak - Interactive TUI for Knowledge Extraction
 
 **Branch**: `002-logsqueak-spec` | **Date**: 2025-11-05 | **Spec**: [spec.md](./spec.md)
+
 **Input**: Feature specification from `/specs/002-logsqueak-spec/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
@@ -12,7 +13,9 @@ Build an interactive TUI application for extracting lasting knowledge from Logse
 ## Technical Context
 
 **Language/Version**: Python 3.11+
+
 **Primary Dependencies**:
+
 - Textual >=0.47.0 (TUI framework)
 - httpx >=0.27.0 (async LLM client with streaming support)
 - pydantic >=2.0.0 (data validation)
@@ -23,15 +26,21 @@ Build an interactive TUI application for extracting lasting knowledge from Logse
 - logseq-outline-parser (existing, in src/logseq-outline-parser)
 
 **Storage**: File-based (Logseq markdown files) + ChromaDB (vector embeddings)
+
 **Testing**: pytest (unit/integration), Textual pilot for UI testing
+
 **Target Platform**: Linux/macOS/Windows terminal (modern terminal emulators with 256 colors + Unicode)
+
 **Project Type**: Single project (CLI application with TUI)
+
 **Performance Goals**:
+
 - UI responsiveness: <100ms input acceptance, <500ms visual feedback
 - Typical workflow completion: <3 minutes for ~5 knowledge blocks
 - Streaming LLM results: incremental display as responses arrive
 
 **Constraints**:
+
 - Non-destructive operations (constitutional requirement)
 - Property order preservation in Logseq files (MANDATORY)
 - Background tasks must not block UI interaction
@@ -39,6 +48,7 @@ Build an interactive TUI application for extracting lasting knowledge from Logse
 - File permissions: config file must be mode 600
 
 **Scale/Scope**:
+
 - POC for single-user local operation
 - Typical journal: 11 root blocks, 22 total blocks, ~5 knowledge blocks
 - RAG search: top-k=10 candidate pages, ~2 relevant decisions per block
@@ -76,6 +86,7 @@ Build an interactive TUI application for extracting lasting knowledge from Logse
   - Phase 1: Knowledge classification reasoning visible in bottom panel
   - Phase 2: Reworded content shown alongside original for comparison
   - Phase 3: Integration decisions with reasoning, confidence scores, and previews
+
 - NDJSON streaming for LLM responses (simple, debuggable format)
 - Logging of all LLM requests/responses (FR-063, FR-064)
 
@@ -93,6 +104,7 @@ specs/[###-feature]/
 ├── quickstart.md        # Phase 1 output (/speckit.plan command)
 ├── contracts/           # Phase 1 output (/speckit.plan command)
 └── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
+
 ```
 
 ### Source Code (repository root)
@@ -151,6 +163,7 @@ tests/
     └── test_screens.py         # Textual pilot tests
 
 pyproject.toml                  # Dependencies and entry points
+
 ```
 
 **Structure Decision**: Single project structure chosen. The application is a CLI tool with TUI interface, not a web or mobile app. Source organized by layer (models, services, tui) with clear separation between Textual UI components and business logic. Existing parser library kept isolated to avoid modifications.
@@ -173,6 +186,7 @@ pyproject.toml                  # Dependencies and entry points
   - `llm-streaming.md`: NDJSON formats for knowledge classification, rewording, integration decisions
   - `service-interfaces.md`: LLMClient, PageIndexer, RAGSearch, FileMonitor interfaces
   - `file-operations.md`: logseq-outline-parser operations, atomic write guarantees
+
 - ✅ **quickstart.md**: User-focused walkthrough for installation, configuration, and all three phases
 
 ### Post-Design Constitution Check
@@ -211,8 +225,10 @@ pyproject.toml                  # Dependencies and entry points
 **Command Complete**: `/speckit.plan` has finished Phase 0 (Research) and Phase 1 (Design).
 
 **To proceed with implementation**:
+
 1. Run `/speckit.tasks` to generate dependency-ordered task breakdown
 2. Run `/speckit.implement` to execute tasks from tasks.md
 
 **Branch**: `002-logsqueak-spec`
+
 **Plan Location**: `/home/twaugh/devel/logsqueak/specs/002-logsqueak-spec/plan.md`

@@ -1,6 +1,7 @@
 # File Operations Contract
 
 **Date**: 2025-11-05
+
 **Feature**: 002-logsqueak-spec
 
 ## Overview
@@ -8,6 +9,7 @@
 This document defines the contract for all Logseq file operations in the Logsqueak Interactive TUI. All file operations use the `logseq-outline-parser` library and adhere to strict property order preservation and atomic write guarantees.
 
 **Key Principles** (from constitution):
+
 - **Property Order Preservation (NON-NEGOTIABLE)**: Property insertion order is sacred in Logseq
 - **Non-Destructive Operations**: All operations traceable via `processed::` markers
 - **Atomic Writes**: Journal marked only when page write succeeds
@@ -46,9 +48,11 @@ journal_outline = LogseqOutline.parse(journal_text)
 page_path = Path("~/Documents/logseq-graph/pages/Python___Concurrency.md").expanduser()
 page_text = page_path.read_text()
 page_outline = LogseqOutline.parse(page_text)
+
 ```
 
 **Contract**:
+
 - Parser preserves exact structure and order
 - Property order is preserved (NON-NEGOTIABLE)
 - Indentation is auto-detected (default 2 spaces)
@@ -62,9 +66,11 @@ output_text = journal_outline.render()
 
 # Write to file
 journal_path.write_text(output_text)
+
 ```
 
 **Contract**:
+
 - Renders with exact property order from source
 - Uses detected indentation (2 spaces per level)
 - Preserves continuation line formatting
@@ -85,9 +91,11 @@ if block is None:
 block_id = block.block_id  # From id:: property or None
 full_content = block.get_full_content()  # All lines as string
 property_value = block.get_property("processed")  # Get property value
+
 ```
 
 **Contract**:
+
 - `find_block_by_id()` returns tuple: `(block, parents)` or `(None, [])` if not found
 - `parents` is list of ancestor blocks from root to immediate parent
 - `block.block_id` is explicit `id::` property value or `None`
@@ -137,9 +145,11 @@ def write_add_section(
     page_outline.blocks.append(new_block)
 
     return new_block_id
+
 ```
 
 **Contract**:
+
 - New block added at end of root-level blocks
 - `id::` property added to enable provenance tracking
 - Content and property are separate lines in `content` list
@@ -181,9 +191,11 @@ def write_add_under(
     new_child.set_property("id", new_block_id)
 
     return new_block_id
+
 ```
 
 **Contract**:
+
 - `add_child()` automatically calculates correct indentation
 - New child added at end of existing children
 - `set_property()` preserves order (new property appended)
@@ -226,9 +238,11 @@ def write_replace(
         return new_block_id
     else:
         return target_block.block_id
+
 ```
 
 **Contract**:
+
 - Only first line of `content` is replaced (content line)
 - Properties and children preserved
 - If block lacks `id::`, add it (for provenance)
@@ -252,9 +266,11 @@ processed_value = block.get_property("processed")
 if processed_value is None:
     # Property not set
     pass
+
 ```
 
 **Contract**:
+
 - Returns property value as string or `None`
 - Case-sensitive property key matching
 
@@ -264,9 +280,11 @@ if processed_value is None:
 # Set property (preserves order if exists, appends if new)
 block.set_property("id", "abc123-def456-...")
 block.set_property("processed", "[[Page]]((uuid))")
+
 ```
 
 **Contract**:
+
 - If property exists: value updated in-place, order preserved
 - If property new: appended to end of properties
 - **NEVER reorders existing properties**
@@ -304,9 +322,11 @@ def add_provenance(
 
     # Update property (preserves order)
     journal_block.set_property("processed", new_value)
+
 ```
 
 **Contract**:
+
 - Multiple integrations append to same `processed::` property (comma-separated)
 - Link format: `[[Display Name]]((block-uuid))`
 - Display name uses `/` for hierarchical pages
@@ -315,35 +335,47 @@ def add_provenance(
 ### Property Format Examples
 
 **Single integration**:
+
 ```markdown
+
 - Knowledge block content
   processed:: [[Python/Concurrency]]((550e8400-e29b-41d4-a716-446655440000))
   id:: abc123-def456-...
+
 ```
 
 **Multiple integrations**:
+
 ```markdown
+
 - Knowledge block content
   processed:: [[Python/Concurrency]]((550e8400-e29b-41d4-a716-446655440000)), [[Textual/Architecture]]((6ba7b810-9dad-11d1-80b4-00c04fd430c8))
   id:: abc123-def456-...
+
 ```
 
 **Property order preservation**:
+
 ```markdown
+
 - Knowledge block content
   tags:: #python #async
   processed:: [[Python/Concurrency]]((uuid))
   id:: abc123-def456-...
   author:: User Name
+
 ```
 
 If new integration added, `processed::` line updates but stays in same position:
+
 ```markdown
+
 - Knowledge block content
   tags:: #python #async
   processed:: [[Python/Concurrency]]((uuid)), [[Textual/Workers]]((uuid2))
   id:: abc123-def456-...
   author:: User Name
+
 ```
 
 ---
@@ -353,6 +385,7 @@ If new integration added, `processed::` line updates but stays in same position:
 ### Atomic Integration Operation
 
 Integration requires **TWO writes** to be atomic:
+
 1. Write knowledge block to target page
 2. Add provenance marker to journal entry
 
@@ -523,9 +556,11 @@ def apply_integration(
 
     else:
         raise ValueError(f"Unknown action: {decision.action}")
+
 ```
 
 **Contract**:
+
 - Page written BEFORE journal marked
 - If page write fails, journal NOT marked
 - If journal write fails, page write already succeeded (partial state)
@@ -540,14 +575,18 @@ If journal write fails after successful page write:
 # Partial state (page written, journal not marked)
 
 Page: Python/Concurrency
+
 - New knowledge block with id:: uuid1  ← Successfully written
 
 Journal: 2025-11-05
+
 - Original knowledge block
   id:: abc123  ← Missing processed:: property (journal write failed)
+
 ```
 
 **Recovery**: User can re-run integration. System will:
+
 1. Detect block already exists in page (by ID)
 2. Skip page write
 3. Add provenance marker to journal
@@ -577,9 +616,11 @@ if file_monitor.is_modified(path):
         raise FileModifiedError(
             f"File modified and validation failed: {e}"
         ) from e
+
 ```
 
 **Contract**:
+
 - Always check modification before write
 - Reload and re-validate if modified
 - Raise descriptive error if validation fails after reload
@@ -603,9 +644,11 @@ if decision.action == "add_under" and decision.target_block_id is None:
     raise ValueError(
         f"Action 'add_under' requires target_block_id, but it is None"
     )
+
 ```
 
 **Contract**:
+
 - Validation errors include context (page name, block ID, action)
 - Errors suggest possible causes and remediation
 - Validation happens BEFORE any file writes
@@ -629,9 +672,11 @@ except PermissionError as e:
         f"Cannot write to page: {page_path}\n"
         f"Check file permissions and ensure file is not open in another application."
     ) from e
+
 ```
 
 **Contract**:
+
 - File I/O errors include full path and suggested remediation
 - All errors preserve original exception chain (use `from e`)
 
@@ -647,7 +692,9 @@ def test_round_trip_preserves_structure():
     original = """- Block 1
   property1:: value1
   property2:: value2
+
   - Child block
+
 - Block 2
   id:: abc123
 """
@@ -656,6 +703,7 @@ def test_round_trip_preserves_structure():
     rendered = outline.render()
 
     assert rendered == original
+
 ```
 
 ### Property Order Test
@@ -684,6 +732,7 @@ def test_property_order_preservation():
     assert "processed::" in lines[2]
     assert "id::" in lines[3]
     assert "author::" in lines[4]
+
 ```
 
 ### Atomic Write Test
@@ -707,6 +756,7 @@ def test_atomic_write_failure_recovery():
     # Journal should NOT have processed:: marker
     journal_block, _ = journal_outline.find_block_by_id(knowledge_block_id)
     assert journal_block.get_property("processed") is None
+
 ```
 
 ---

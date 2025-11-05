@@ -1,6 +1,7 @@
 # Research: Interactive TUI for Knowledge Extraction
 
 **Date**: 2025-11-04
+
 **Feature**: 002-logsqueak-spec
 
 ## Research Questions
@@ -71,10 +72,12 @@ This document captures research findings for technical decisions needed to imple
 - Robust to errors: malformed JSON on one line doesn't corrupt remaining stream
 
 Example NDJSON stream:
+
 ```
 {"type":"classification","block_id":"abc123","is_knowledge":true,"confidence":0.92}
 {"type":"classification","block_id":"def456","is_knowledge":false,"confidence":0.15}
 {"type":"classification","block_id":"ghi789","is_knowledge":true,"confidence":0.87}
+
 ```
 
 ### httpx Streaming Pattern with NDJSON
@@ -94,11 +97,13 @@ async def stream_ndjson_response(url, payload):
                     except json.JSONDecodeError as e:
                         logger.error("Malformed JSON line", line=line, error=str(e))
                         continue  # Skip bad line, process remaining stream
+
 ```
 
 ### LLM API Configuration
 
 OpenAI-compatible APIs (including Ollama) support NDJSON streaming:
+
 - Request: Set `stream: true` in JSON payload
 - Response: Each line is complete JSON object with incremental results
 - Connection closes when stream complete
@@ -113,6 +118,7 @@ OpenAI-compatible APIs (including Ollama) support NDJSON streaming:
 **Decision**: Use NDJSON format for all LLM streaming responses with httpx line-by-line async iteration.
 
 **Rationale**:
+
 - NDJSON is simpler than SSE (no `data:` prefix parsing)
 - Each line is complete JSON object (easier to log and debug)
 - Error isolation: bad JSON on one line doesn't corrupt stream

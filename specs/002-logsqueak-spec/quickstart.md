@@ -1,7 +1,9 @@
 # Quickstart: Logsqueak Interactive TUI
 
 **Feature**: 002-logsqueak-spec
+
 **Status**: Specification
+
 **Date**: 2025-11-05
 
 This guide walks you through installing, configuring, and using the Logsqueak Interactive TUI for extracting lasting knowledge from your Logseq journal entries.
@@ -18,6 +20,7 @@ This guide walks you through installing, configuring, and using the Logsqueak In
    - [Phase 1: Block Selection](#phase-1-block-selection)
    - [Phase 2: Content Editing](#phase-2-content-editing)
    - [Phase 3: Integration Decisions](#phase-3-integration-decisions)
+
 6. [Troubleshooting](#troubleshooting)
 
 ---
@@ -33,6 +36,7 @@ Check your Python version:
 ```bash
 python3 --version
 # Should show: Python 3.11.x or higher
+
 ```
 
 If you need to install Python 3.11+, visit [python.org](https://www.python.org/downloads/).
@@ -48,11 +52,13 @@ If you need to install Python 3.11+, visit [python.org](https://www.python.org/d
 Choose one of the following:
 
 **Option A: OpenAI API** (Recommended for best quality)
+
 - Sign up at [platform.openai.com](https://platform.openai.com/)
 - Generate an API key
 - Recommended model: `gpt-4-turbo-preview` or `gpt-4o`
 
 **Option B: Ollama** (Local, free, privacy-focused)
+
 - Install Ollama from [ollama.ai](https://ollama.ai/)
 - Pull a model: `ollama pull llama2` or `ollama pull mistral`
 - Ollama runs on `http://localhost:11434/v1` by default
@@ -66,6 +72,7 @@ Choose one of the following:
 ```bash
 git clone https://github.com/yourusername/logsqueak.git
 cd logsqueak
+
 ```
 
 ### 2. Set Up Virtual Environment
@@ -81,6 +88,7 @@ source venv/bin/activate
 
 # Activate on Windows
 venv\Scripts\activate
+
 ```
 
 Your terminal prompt should now show `(venv)` prefix.
@@ -91,9 +99,11 @@ Install Logsqueak and all dependencies from `pyproject.toml`:
 
 ```bash
 pip install -e .
+
 ```
 
 This will install:
+
 - `textual` - TUI framework
 - `httpx` - HTTP client for LLM streaming
 - `pydantic` - Data validation
@@ -111,6 +121,7 @@ Check that the `logsqueak` command is available:
 
 ```bash
 logsqueak --help
+
 ```
 
 You should see usage information.
@@ -123,6 +134,7 @@ You should see usage information.
 
 ```bash
 mkdir -p ~/.config/logsqueak
+
 ```
 
 ### 2. Create Configuration File
@@ -142,6 +154,7 @@ logseq:
 
 rag:
   top_k: 10  # Optional: Number of candidate pages for RAG search
+
 ```
 
 #### Option B: Ollama Configuration
@@ -158,6 +171,7 @@ logseq:
 
 rag:
   top_k: 10  # Optional
+
 ```
 
 **Configuration Fields**:
@@ -177,6 +191,7 @@ rag:
 
 ```bash
 chmod 600 ~/.config/logsqueak/config.yaml
+
 ```
 
 Verify permissions:
@@ -184,6 +199,7 @@ Verify permissions:
 ```bash
 ls -l ~/.config/logsqueak/config.yaml
 # Should show: -rw------- (600)
+
 ```
 
 If permissions are too open (e.g., 644), Logsqueak will refuse to start with a permission error.
@@ -194,6 +210,7 @@ Test your configuration:
 
 ```bash
 logsqueak --version
+
 ```
 
 If there are any configuration errors, Logsqueak will display a clear error message indicating which setting is invalid.
@@ -213,12 +230,14 @@ logsqueak extract 2025-01-15
 
 # Extract from a date range
 logsqueak extract 2025-01-10..2025-01-15
+
 ```
 
 ### Example: Extract from Today's Journal
 
 ```bash
 logsqueak extract
+
 ```
 
 **What happens on first run**:
@@ -237,6 +256,7 @@ Graph path: /home/user/Documents/logseq-graph
 Loading journal: 2025-11-05
 
 [Interactive TUI launches - see Phase 1 below]
+
 ```
 
 ### Common First-Run Issues
@@ -291,6 +311,7 @@ This section walks through a complete knowledge extraction session, showing what
 ├─────────────────────────────────────────────────────────────────────┤
 │ j/k: Navigate | Space: Select | a: Accept all | n: Next | q: Quit  │
 └─────────────────────────────────────────────────────────────────────┘
+
 ```
 
 #### Visual Indicators
@@ -320,6 +341,7 @@ This section walks through a complete knowledge extraction session, showing what
 1. **Start**: TUI opens showing all blocks in tree view
 2. **Wait for LLM**: Watch as blocks are highlighted (yellow) as LLM identifies knowledge
    - Status widget shows: "Analyzing knowledge blocks (3/15)"
+
 3. **Navigate**: Press `j` to move down through blocks
 4. **Review**: Bottom panel shows full content and LLM reasoning
 5. **Quick navigation**: Press `Shift+j` to jump directly to next LLM-suggested block
@@ -373,6 +395,7 @@ This section walks through a complete knowledge extraction session, showing what
 ├─────────────────────────────────────────────────────────────────────┤
 │ j/k: Navigate | Tab: Edit | a: Accept LLM | r: Revert | n: Next    │
 └─────────────────────────────────────────────────────────────────────┘
+
 ```
 
 #### Sections Explained
@@ -394,6 +417,7 @@ This section walks through a complete knowledge extraction session, showing what
 | `q` | Back to Phase 1 |
 
 **While editing** (text editor focused):
+
 - Arrow keys, Home, End: Navigate within text
 - Standard text editing (insert, delete, copy/paste)
 - Enter: New line
@@ -406,9 +430,11 @@ This section walks through a complete knowledge extraction session, showing what
 3. **Accept or edit**:
    - Press `a` to accept LLM version (updates current content)
    - OR press `Tab` to manually edit the text
+
 4. **Manual editing** (if Tab pressed):
    - Type to modify content
    - Press `Tab` again to unfocus and return to navigation
+
 5. **Next block**: Press `j` to move to next knowledge block (auto-saves edits)
 6. **Wait for RAG**: Status shows "Finding relevant pages (2/3)"
 7. **Proceed**: Press `n` when RAG search completes
@@ -468,6 +494,7 @@ This section walks through a complete knowledge extraction session, showing what
 ├─────────────────────────────────────────────────────────────────────┤
 │ j/k: Navigate decisions | y: Accept | n: Next block | a: Accept all│
 └─────────────────────────────────────────────────────────────────────┘
+
 ```
 
 #### Visual Indicators
@@ -500,6 +527,7 @@ This section walks through a complete knowledge extraction session, showing what
 6. **Accept decision**: Press `y` to write to the selected target page
    - Decision is marked ✓ Completed
    - Journal block gets `processed::` property with link to integrated block
+
 7. **Multiple integrations**: You can press `y` on multiple decisions to integrate the same knowledge to different pages
 8. **Next block**: Press `n` to advance to next knowledge block
 
@@ -538,6 +566,7 @@ When all knowledge blocks are processed, you'll see:
 │                                                                      │
 │ Press Enter to exit                                                  │
 └─────────────────────────────────────────────────────────────────────┘
+
 ```
 
 #### Tips
@@ -572,6 +601,7 @@ logseq:
 
 rag:
   top_k: 10
+
 ```
 
 **Solution**: Create the config file with your settings (see [Configuration](#configuration) section above).
@@ -583,11 +613,14 @@ rag:
 ```
 Error: Config file has overly permissive permissions: 0o644
 Run: chmod 600 ~/.config/logsqueak/config.yaml
+
 ```
 
 **Solution**:
+
 ```bash
 chmod 600 ~/.config/logsqueak/config.yaml
+
 ```
 
 ---
@@ -597,6 +630,7 @@ chmod 600 ~/.config/logsqueak/config.yaml
 ```
 Error: Graph path does not exist: /home/user/Documents/logseq-graph
 Please create the directory or update config.yaml
+
 ```
 
 **Solution**: Update `logseq.graph_path` in config.yaml with the correct path to your Logseq graph.
@@ -612,11 +646,14 @@ Error: Failed to connect to LLM API at http://localhost:11434/v1
 Connection refused
 
 Auto-retrying in 2 seconds...
+
 ```
 
 **Solution**: Start Ollama:
+
 ```bash
 ollama serve
+
 ```
 
 If already running, check the endpoint in config matches Ollama's actual endpoint.
@@ -630,9 +667,11 @@ Error: LLM API request failed with status 401 Unauthorized
 Invalid API key provided
 
 Please check your API key in ~/.config/logsqueak/config.yaml
+
 ```
 
 **Solution**:
+
 1. Verify your API key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 2. Update `llm.api_key` in config.yaml
 3. Restart Logsqueak
@@ -645,9 +684,11 @@ Please check your API key in ~/.config/logsqueak/config.yaml
 Error: LLM request timed out after 60 seconds
 
 Auto-retrying in 2 seconds...
+
 ```
 
 **Solution**:
+
 - **Ollama**: Your model may be too slow - try a smaller model or increase VRAM allocation
 - **OpenAI**: Network issues - check your internet connection
 - **Both**: If retry also fails, you'll be prompted to retry manually or skip
@@ -661,9 +702,11 @@ Auto-retrying in 2 seconds...
 ```
 Error: Failed to parse configuration file
 YAML syntax error at line 5: mapping values are not allowed here
+
 ```
 
 **Solution**: Check your YAML syntax - common issues:
+
 - Missing spaces after colons (should be `key: value`, not `key:value`)
 - Incorrect indentation (use 2 spaces, not tabs)
 - Missing quotes around special characters
@@ -677,9 +720,11 @@ Error writing integration decision:
 Target block 'section-async-patterns' not found in page 'Programming Notes/Python'
 
 File may have been modified externally.
+
 ```
 
 **Solution**:
+
 - The target page was edited in Logseq while TUI was running
 - Logsqueak automatically reloaded the file but the target block no longer exists
 - Decision marked as failed (⚠) - you can continue with other decisions
@@ -700,9 +745,11 @@ grep ERROR ~/.cache/logsqueak/logs/logsqueak.log
 
 # View logs in JSON pretty-print
 cat ~/.cache/logsqueak/logs/logsqueak.log | jq .
+
 ```
 
 Log levels:
+
 - **DEBUG**: LLM response chunks, state changes
 - **INFO**: User actions, phase transitions, LLM requests
 - **WARNING**: Partial failures, retry attempts
@@ -714,8 +761,10 @@ Log levels:
 
 **Q: Can I process multiple journal entries at once?**
 A: Yes! Use date range syntax:
+
 ```bash
 logsqueak extract 2025-01-10..2025-01-15
+
 ```
 The tree view will show entries grouped by date.
 
