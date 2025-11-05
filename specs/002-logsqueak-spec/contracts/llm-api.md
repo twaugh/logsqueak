@@ -10,6 +10,13 @@ This document defines the expected request and response formats for LLM API inte
 
 All LLM requests use **streaming responses** with **NDJSON (Newline-Delimited JSON)** format for incremental results. Each response is a single JSON object per line, not wrapped in SSE or arrays.
 
+**Why NDJSON?**
+- Simpler than SSE (no `data:` prefix parsing)
+- Each line is complete JSON object (easier to log and debug)
+- Error isolation: bad JSON on one line doesn't corrupt stream
+- Perfect fit with httpx.aiter_lines()
+- Compatible with both OpenAI and Ollama APIs
+
 ### Template Variables
 
 Prompt templates use the following variables:
@@ -18,6 +25,30 @@ Prompt templates use the following variables:
 - `{journal_content}`: Full journal file content
 - `{xml_blocks}`: XML-wrapped blocks with context
 - `{xml_formatted_content}`: XML-wrapped knowledge blocks and candidate pages
+
+### NDJSON Parsing Pattern
+
+```python
+import httpx
+import json
+
+async def parse_ndjson_stream(url, payload):
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        async with client.stream("POST", url, json=payload) as response:
+            async for line in response.aiter_lines():
+                if line.strip():  # Skip empty lines
+                    try:
+                        data = json.loads(line)
+                        yield data
+                    except json.JSONDecodeError as e:
+                        logger.error("malformed_json_line", line=line, error=str(e))
+                        continue  # Skip bad line, process remaining stream
+```
+
+**Error Handling**:
+- **Malformed JSON**: Log error, skip line, continue with remaining stream
+- **Network timeout**: Preserve partial results, trigger retry logic
+- **Connection closed**: Treat as end-of-stream (no explicit marker needed)
 
 ---
 
@@ -371,6 +402,77 @@ Options: [Retry] [Skip] [Cancel]
 
 ```
 
+### Retry Logic
+
+**Automatic retry pattern** (retry once, 2-second delay):
+
+```python
+from asyncio import sleep
+
+async def retry_request(func, max_retries=1, delay=2.0):
+    """Retry async function once on transient errors."""
+    try:
+        return await func()
+    except (httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout) as e:
+        logger.warning("llm_request_retry", error=str(e), delay=delay)
+        if max_retries > 0:
+            await sleep(delay)
+            return await func()
+        raise
+```
+
+**After retry fails**: Prompt user with options (Retry, Skip, Cancel)
+
+**Partial Results**: Preserve all successfully parsed chunks before network failure. Never discard partial state on network errors.
+
+---
+
+## Pydantic Chunk Models
+
+All streaming responses are parsed into type-safe Pydantic models.
+
+### Phase 1: KnowledgeClassificationChunk
+
+```python
+from pydantic import BaseModel, Field
+
+class KnowledgeClassificationChunk(BaseModel):
+    """Single classification result from NDJSON stream."""
+
+    block_id: str = Field(..., description="Block identifier from input")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score (0.0-1.0)")
+    reason: str = Field(..., description="Explanation for why this is knowledge")
+```
+
+### Phase 2: ContentRewordingChunk
+
+```python
+class ContentRewordingChunk(BaseModel):
+    """Single rewording result from NDJSON stream."""
+
+    block_id: str = Field(..., description="Block identifier from input")
+    reworded_content: str = Field(..., min_length=1, description="Reworded content with temporal context removed")
+```
+
+### Phase 3: IntegrationDecisionChunk
+
+```python
+from typing import Literal, Optional
+
+class IntegrationDecisionChunk(BaseModel):
+    """Single integration decision from NDJSON stream."""
+
+    knowledge_block_id: str = Field(..., description="Block ID of the knowledge being integrated")
+    target_page: str = Field(..., description="Target page name (hierarchical pages use '/' separator)")
+    action: Literal["add_section", "add_under", "replace"] = Field(..., description="Type of integration action")
+    target_block_id: Optional[str] = Field(default=None, description="Target block ID for 'add_under' or 'replace' actions")
+    target_block_title: Optional[str] = Field(default=None, description="Human-readable title of target block (for display)")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="LLM's confidence score for this integration (0.0-1.0)")
+    reasoning: str = Field(..., description="LLM's explanation for this integration decision")
+```
+
+**Note**: Phase 3 batching (FR-032): System waits for all decisions for a given knowledge block to arrive before displaying. Application must buffer all decisions with matching `knowledge_block_id`.
+
 ---
 
 ## Timeout Configuration
@@ -464,16 +566,23 @@ Request completion logged as:
 
 All LLM interactions follow these principles:
 
-1. **Streaming-first**: All responses arrive incrementally
+1. **Streaming-first**: All responses arrive incrementally via NDJSON
 2. **NDJSON format**: LLM outputs one JSON object per line (not JSON arrays, not SSE-wrapped)
 3. **Selective output**: Phase 1 only returns identified knowledge blocks (not all blocks)
-4. **JSON-structured**: LLM outputs parsed JSON (validated with Pydantic)
-5. **Retryable**: Transient failures automatically retry once
-6. **Logged**: All requests and responses logged for debugging
-7. **Configurable**: Endpoint, model, and parameters from config file
+4. **Context-aware prompts**: Full parent context and page properties provided via XML
+5. **Pronoun resolution**: Phase 2 explicitly resolves references ("this" → actual subject)
+6. **Type-safe parsing**: Pydantic chunk models validate each streamed result
+7. **Error isolation**: Bad JSON on one line doesn't corrupt stream
+8. **Retryable**: Transient failures automatically retry once (2s delay)
+9. **Partial results**: Network failures preserve successfully parsed chunks
+10. **Logged**: All requests, chunks, and errors logged for debugging
+11. **Configurable**: Endpoint, model, and parameters from config file
+12. **Dynamic indentation**: Prompts use detected `{indent_style}` from graph
 
 ### NDJSON vs SSE Clarification
 
 - **What the LLM produces**: NDJSON (one JSON object per line in response content)
 - **How it's transmitted**: May be wrapped in SSE by some APIs (OpenAI), or raw NDJSON (Ollama native)
 - **What the client parses**: Always NDJSON after unwrapping any SSE envelope
+
+This contract ensures consistent, debuggable, and resilient LLM interactions across all phases of the TUI application.
