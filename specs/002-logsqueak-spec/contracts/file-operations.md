@@ -210,12 +210,12 @@ def write_replace(
     refined_text: str
 ) -> str:
     """
-    Replace existing block content.
+    Replace existing block content while preserving properties and children.
 
     Args:
         page_outline: Target page outline
         target_block_id: ID of block to replace
-        refined_text: New content
+        refined_text: New content (may contain multiple lines)
 
     Returns:
         str: UUID of block (existing or newly added)
@@ -228,25 +228,37 @@ def write_replace(
     if target_block is None:
         raise ValueError(f"Target block not found: {target_block_id}")
 
-    # Replace first line only (preserve properties and children)
-    target_block.content[0] = refined_text
+    # Separate properties from content lines
+    property_lines = []
+    for line in target_block.content:
+        # Property pattern: key:: value (not starting with bullet)
+        if "::" in line and not line.strip().startswith("-"):
+            property_lines.append(line)
 
-    # Ensure block has id:: property
+    # Replace all content lines, preserve all properties
+    # refined_text might be multi-line, so split it
+    new_content_lines = refined_text.split("\n") if "\n" in refined_text else [refined_text]
+    target_block.content = new_content_lines + property_lines
+
+    # Ensure block has id:: property (add if missing, preserve if exists)
     if target_block.block_id is None:
         new_block_id = str(uuid.uuid4())
         target_block.set_property("id", new_block_id)
         return new_block_id
     else:
+        # If id:: already exists, it's preserved in property_lines above
         return target_block.block_id
 
 ```
 
 **Contract**:
 
-- Only first line of `content` is replaced (content line)
-- Properties and children preserved
+- All content lines (first line + continuation lines) are replaced
+- All properties preserved in their original order
+- Children blocks preserved unchanged
 - If block lacks `id::`, add it (for provenance)
 - Existing `id::` preserved if present
+- Multi-line `refined_text` is split and each line added to content
 
 ---
 

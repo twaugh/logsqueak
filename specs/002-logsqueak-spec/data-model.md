@@ -283,7 +283,7 @@ class IntegrationDecision(BaseModel):
 - `action`: How to integrate:
   - `add_section`: Create new top-level section
   - `add_under`: Add as child under specific block
-  - `replace`: Replace existing block content
+  - `replace`: Replace existing block content (all content lines) while preserving properties and children
 
 - `target_block_id`: Identifies target block for `add_under` or `replace` (None for `add_section`)
 - `target_block_title`: Human-readable description (e.g., "Under 'Project Timeline'")
