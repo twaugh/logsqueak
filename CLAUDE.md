@@ -410,6 +410,11 @@ Logseq uses indented bullets (2 spaces per level) with special features:
 GPLv3 - All code is licensed under GPLv3 regardless of authorship method (including AI-assisted development).
 
 ## Recent Changes
+- 002-logsqueak-spec: Added Python 3.11+
 
 - 2025-11-04: Created hybrid CLAUDE.md reflecting current implementation (parser only) + planned TUI feature
 - 2025-11-04: Completed clarification session for 002-logsqueak-spec (configuration management, validation strategy)
+
+## Active Technologies
+- Python 3.11+ (002-logsqueak-spec)
+- File-based (Logseq markdown files) + ChromaDB (vector embeddings) (002-logsqueak-spec)

@@ -1,109 +1,85 @@
-# Implementation Plan: Interactive TUI for Knowledge Extraction
+# Implementation Plan: Logsqueak - Interactive TUI for Knowledge Extraction
 
-**Branch**: `002-logsqueak-spec` | **Date**: 2025-11-04 | **Spec**: [spec.md](./spec.md)
+**Branch**: `002-logsqueak-spec` | **Date**: 2025-11-05 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/002-logsqueak-spec/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
 ## Summary
 
-Build an interactive TUI application for extracting lasting knowledge from Logseq journal entries using LLM-powered analysis. The application provides three interactive phases: block selection (users select knowledge blocks with LLM assistance, with Shift+navigation to jump between LLM suggestions), content editing (users refine content with LLM-suggested rewordings), and integration decisions (users review and approve where knowledge should be integrated). All operations are keyboard-driven, streaming-enabled, and non-destructive with atomic provenance tracking.
+Build an interactive TUI application for extracting lasting knowledge from Logseq journal entries using LLM-powered analysis. Users progress through three phases: (1) block selection with LLM knowledge classification, (2) content editing with LLM rewording suggestions, and (3) integration decisions with LLM-suggested target pages. Uses Textual framework for the TUI, existing logseq-outline-parser for file operations, and NDJSON streaming for LLM responses.
 
 ## Technical Context
 
 **Language/Version**: Python 3.11+
-**Primary Dependencies**: Textual (TUI framework), httpx (HTTP client for LLM APIs), pydantic (data validation), click (CLI framework), chromadb (vector store for RAG), sentence-transformers (embeddings), markdown-it-py (markdown rendering), existing logseq-outline-parser library
-**Storage**: File-based I/O for Logseq files, ChromaDB for vector embeddings, YAML for configuration (~/.config/logsqueak/config.yaml)
-**Testing**: pytest (existing), coverage for new TUI components
-**Target Platform**: Linux/macOS/Windows terminal emulators with 256 color + Unicode support
-**Project Type**: Single Python application (CLI with interactive TUI)
-**Performance Goals**: UI responsiveness <100ms for input, <500ms visual feedback, complete typical workflow (11 root blocks, 22 total blocks, 5 knowledge blocks, 3 candidate pages each) in <3 minutes
-**Constraints**: Must handle journals approaching 2000-line parser limit, streaming LLM responses must update UI incrementally, background tasks must not block UI, file permissions mode 600 for config
-**Scale/Scope**: Multiple journal entries per session (naturally supported by tree view structure with date grouping nodes), ~100 blocks max per entry, 3 interactive phases (P1: block selection, P2: content editing, P3: integration decisions), keyboard-driven only
+**Primary Dependencies**:
+- Textual >=0.47.0 (TUI framework)
+- httpx >=0.27.0 (async LLM client with streaming support)
+- pydantic >=2.0.0 (data validation)
+- click >=8.1.0 (CLI framework)
+- chromadb >=0.4.0 (vector store for RAG)
+- sentence-transformers >=2.2.0 (embeddings)
+- markdown-it-py >=3.0.0 (markdown rendering in TUI)
+- logseq-outline-parser (existing, in src/logseq-outline-parser)
+
+**Storage**: File-based (Logseq markdown files) + ChromaDB (vector embeddings)
+**Testing**: pytest (unit/integration), Textual pilot for UI testing
+**Target Platform**: Linux/macOS/Windows terminal (modern terminal emulators with 256 colors + Unicode)
+**Project Type**: Single project (CLI application with TUI)
+**Performance Goals**:
+- UI responsiveness: <100ms input acceptance, <500ms visual feedback
+- Typical workflow completion: <3 minutes for ~5 knowledge blocks
+- Streaming LLM results: incremental display as responses arrive
+
+**Constraints**:
+- Non-destructive operations (constitutional requirement)
+- Property order preservation in Logseq files (MANDATORY)
+- Background tasks must not block UI interaction
+- 60s timeout for LLM API requests
+- File permissions: config file must be mode 600
+
+**Scale/Scope**:
+- POC for single-user local operation
+- Typical journal: 11 root blocks, 22 total blocks, ~5 knowledge blocks
+- RAG search: top-k=10 candidate pages, ~2 relevant decisions per block
+- Three interactive phases with 8-12 keyboard shortcuts total
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-### I. Proof-of-Concept First ✅
+### Principle I: Proof-of-Concept First
+**Status**: ✅ PASS
 
-**Alignment**: This feature is explicitly designed as a POC to demonstrate feasibility of LLM-driven knowledge extraction. The spec prioritizes working software over perfection, shipping iteratively across three independent phases (P1 block selection, P2 content editing, P3 integration decisions), each delivering standalone value.
+- Feature is scoped as POC (no backwards compatibility guarantees)
+- Iterative delivery: Phase 1 (block selection) → Phase 2 (editing) → Phase 3 (integration)
+- Focuses on demonstrating feasibility of LLM-driven knowledge extraction
+- Uses existing parser library, avoiding premature optimization
 
-**Evidence**:
+### Principle II: Non-Destructive Operations
+**Status**: ✅ PASS
 
-- Priority levels (P1/P2) allow incremental delivery
-- No backwards compatibility promises required
-- Success criteria focus on user experience metrics (responsiveness, override capability) not production readiness
-- Streaming LLM responses demonstrate feasibility, not optimize for scale
+- All journal modifications are APPEND-only (adding `processed::` property)
+- Target page modifications require explicit user approval (Phase 3 'y' key)
+- Every integrated block gets unique `id::` UUID for traceability
+- Provenance links from journal to integrated blocks via `processed::` property
+- Property order preservation enforced (FR-068)
+- Atomic writes: journal marked only after successful page write (FR-043)
+- External file modification detection and validation (FR-071a-d)
 
-**Status**: PASS - Feature designed for iterative POC development
+### Principle III: Simplicity and Transparency
+**Status**: ✅ PASS
 
-### II. Non-Destructive Operations (NON-NEGOTIABLE) ✅
+- File-based I/O for Logseq content (using existing parser)
+- ChromaDB for vector storage (only abstraction is for RAG, complexity justified)
+- LLM outputs shown to user in all phases:
+  - Phase 1: Knowledge classification reasoning visible in bottom panel
+  - Phase 2: Reworded content shown alongside original for comparison
+  - Phase 3: Integration decisions with reasoning, confidence scores, and previews
+- NDJSON streaming for LLM responses (simple, debuggable format)
+- Logging of all LLM requests/responses (FR-063, FR-064)
 
-**Alignment**: All operations follow non-destructive principles with atomic provenance tracking.
-
-**Evidence**:
-
-- FR-043: Atomically add `processed::` property on journal block only after successful page write
-- FR-071: Maintain provenance links from journal to integrated blocks via property that lists target page and block references
-- FR-067/FR-068: Use existing Logseq parsing capabilities, preserve exact property order (property order is significant in Logseq)
-- FR-070: Generate unique identifiers for all integrated blocks to enable precise future references
-- Phase 3 acceptance scenarios show APPEND operations (add new sections/blocks) without modifying existing content
-- User must explicitly approve all integrations via 'y' key (FR-041)
-- FR-071a-d: Concurrent modification detection and automatic reload before writes
-
-**Status**: PASS - Feature strictly adheres to non-destructive principles
-
-### III. Simplicity and Transparency ✅
-
-**Alignment**: Architecture favors simplicity and shows user what LLM is doing.
-
-**Evidence**:
-
-- File-based I/O for Logseq files (avoid database complexity)
-- ChromaDB only for RAG semantic search (unavoidable for vector embeddings)
-- JSON for structured LLM outputs (FR-063, FR-064)
-- FR-003: Display LLM reasoning for why a block was identified as knowledge in the bottom panel
-- FR-052: Display LLM reasoning for each integration decision
-- FR-005: Status widget showing which background tasks are active and their progress
-- FR-009a: Shift+navigation keyboard shortcuts to efficiently review LLM knowledge suggestions
-- Single Python application, keyboard-driven only (no web UI complexity)
-- YAML configuration file with explicit structure (FR-072d)
-
-**Status**: PASS - Feature embraces simplicity and transparency
-
-### Overall Gate Decision: ✅ PASS
-
-All three constitution principles are satisfied. No violations requiring justification. Proceed to Phase 0 research.
-
----
-
-### Post-Design Re-Evaluation: ✅ PASS
-
-After completing Phase 0 (research.md) and Phase 1 (data-model.md, contracts/, quickstart.md), the design still fully aligns with constitution principles:
-
-**I. Proof-of-Concept First**: ✅
-
-- Research decisions prioritize pragmatic over perfect (e.g., all-MiniLM-L6-v2 embeddings, simple retry logic)
-- Data models use Pydantic (no complex ORM)
-- Quickstart shows 4-week incremental timeline
-- Services use simple async functions, not frameworks
-
-**II. Non-Destructive Operations**: ✅
-
-- FileOperations service implements atomic writes (contracts/services.md)
-- Modification time tracking prevents stale writes
-- Provenance via `processed::` property is explicit
-- All actions (add_section, add_under, replace) preserve structure
-
-**III. Simplicity and Transparency**: ✅
-
-- LLM contracts show explicit JSON structures (contracts/llm-api.md)
-- Structured logging captures all LLM interactions (research.md #7)
-- File-based I/O dominates (ChromaDB only for vector search)
-- No abstraction layers added (direct LogseqOutline usage)
-
-**Status**: Design approved - ready for implementation (/speckit.tasks)
+**GATE RESULT**: ✅ ALL GATES PASS - Proceed to Phase 0
 
 ## Project Structure
 
@@ -117,82 +93,126 @@ specs/[###-feature]/
 ├── quickstart.md        # Phase 1 output (/speckit.plan command)
 ├── contracts/           # Phase 1 output (/speckit.plan command)
 └── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
-
 ```
 
 ### Source Code (repository root)
 
 ```text
-logsqueak/
-├── src/
-│   ├── logseq-outline-parser/        # Existing library (IMPLEMENTED)
-│   │   ├── src/logseq_outline/
-│   │   │   ├── parser.py             # Core parsing/rendering
-│   │   │   ├── context.py            # Full-context generation & hashing
-│   │   │   └── graph.py              # Graph path utilities
-│   │   └── tests/                    # Parser unit tests
-│   │
-│   └── logsqueak/                    # NEW: Main application
+src/
+├── logseq-outline-parser/     # Existing parser library (DO NOT MODIFY)
+│   └── src/logseq_outline/
+│       ├── parser.py
+│       ├── context.py
+│       └── graph.py
+├── logsqueak/                  # Main application (NEW)
+│   ├── __init__.py
+│   ├── cli.py                  # CLI entry point (click)
+│   ├── config.py               # Configuration management
+│   ├── models/                 # Pydantic data models
+│   │   ├── __init__.py
+│   │   ├── block_state.py
+│   │   ├── edited_content.py
+│   │   ├── integration_decision.py
+│   │   └── background_task.py
+│   ├── services/               # Business logic
+│   │   ├── __init__.py
+│   │   ├── llm_client.py       # NDJSON streaming LLM client
+│   │   ├── page_indexer.py     # ChromaDB indexing
+│   │   ├── rag_search.py       # Semantic search
+│   │   └── file_monitor.py     # External modification detection
+│   ├── tui/                    # Textual screens and widgets
+│   │   ├── __init__.py
+│   │   ├── app.py              # Main Textual app
+│   │   ├── screens/
+│   │   │   ├── __init__.py
+│   │   │   ├── block_selection.py    # Phase 1
+│   │   │   ├── content_editing.py    # Phase 2
+│   │   │   └── integration_review.py # Phase 3
+│   │   └── widgets/
+│   │       ├── __init__.py
+│   │       ├── block_tree.py
+│   │       ├── status_panel.py
+│   │       └── markdown_viewer.py
+│   └── utils/
 │       ├── __init__.py
-│       ├── __main__.py               # CLI entry point
-│       ├── config.py                 # Configuration management (YAML)
-│       ├── models.py                 # Data models (BlockState, EditedContent, IntegrationDecision, BackgroundTask)
-│       │
-│       ├── tui/                      # Textual TUI components
-│       │   ├── __init__.py
-│       │   ├── app.py                # Main TUI application
-│       │   ├── phase1_selection.py   # Block selection screen (P1)
-│       │   ├── phase2_editing.py     # Content editing screen (P2)
-│       │   ├── phase3_integration.py # Integration decisions screen (P1)
-│       │   ├── widgets/              # Reusable widgets
-│       │   │   ├── block_tree.py     # Tree view for blocks
-│       │   │   ├── preview_panel.py  # Preview panel with markdown
-│       │   │   ├── status_widget.py  # Background task status
-│       │   │   └── footer.py         # Context-sensitive key bindings
-│       │   └── markdown_renderer.py  # Markdown rendering utilities
-│       │
-│       ├── services/                 # Business logic
-│       │   ├── __init__.py
-│       │   ├── llm_client.py         # LLM API client (streaming support)
-│       │   ├── knowledge_classifier.py # Phase 1: LLM knowledge classification
-│       │   ├── content_rewriter.py   # Phase 2: LLM content rewording
-│       │   ├── integration_planner.py # Phase 3: LLM integration decisions
-│       │   ├── page_indexer.py       # Background: Page index building
-│       │   ├── rag_search.py         # Background: Semantic search
-│       │   └── file_operations.py    # File I/O with concurrent modification detection
-│       │
-│       └── utils/                    # Utilities
-│           ├── __init__.py
-│           ├── logging.py            # Structured logging
-│           └── retry.py              # Network retry logic
-│
-├── tests/                            # NEW: Application tests
-│   ├── unit/
-│   │   ├── test_config.py
-│   │   ├── test_models.py
-│   │   ├── test_llm_client.py
-│   │   └── test_services.py
-│   ├── integration/
-│   │   ├── test_phase1_workflow.py
-│   │   ├── test_phase2_workflow.py
-│   │   └── test_phase3_workflow.py
-│   └── fixtures/                     # Test data (sample journals, pages)
-│
-├── pyproject.toml                    # Project dependencies
-└── README.md
+│       ├── logging.py
+│       └── ids.py              # UUID generation
 
+tests/
+├── unit/
+│   ├── test_models.py
+│   ├── test_llm_client.py
+│   ├── test_page_indexer.py
+│   └── test_file_monitor.py
+├── integration/
+│   ├── test_workflow.py        # End-to-end phase flow
+│   └── test_rag_pipeline.py
+└── ui/
+    └── test_screens.py         # Textual pilot tests
+
+pyproject.toml                  # Dependencies and entry points
 ```
 
-**Structure Decision**: Single Python application (Option 1). This is a CLI tool with TUI interface, not a web or mobile app. The structure follows Python best practices with clear separation:
-
-- `src/logsqueak/` for main application code
-- `src/logsqueak/tui/` for Textual UI components (phase screens, widgets)
-- `src/logsqueak/services/` for business logic (LLM clients, background tasks)
-- `tests/` for unit and integration tests
-- Existing `src/logseq-outline-parser/` library remains unchanged and is used by the new application
+**Structure Decision**: Single project structure chosen. The application is a CLI tool with TUI interface, not a web or mobile app. Source organized by layer (models, services, tui) with clear separation between Textual UI components and business logic. Existing parser library kept isolated to avoid modifications.
 
 ## Complexity Tracking
 
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
-No violations - Constitution Check passed with full compliance.
+**Status**: No violations - all constitution principles satisfied.
+
+---
+
+## Phase 0 & Phase 1 Complete
+
+### Generated Artifacts
+
+- ✅ **research.md**: Technical decisions for Textual, NDJSON streaming, ChromaDB, configuration
+- ✅ **data-model.md**: Pydantic models for BlockState, EditedContent, IntegrationDecision, Config
+- ✅ **contracts/**:
+  - `llm-streaming.md`: NDJSON formats for knowledge classification, rewording, integration decisions
+  - `service-interfaces.md`: LLMClient, PageIndexer, RAGSearch, FileMonitor interfaces
+  - `file-operations.md`: logseq-outline-parser operations, atomic write guarantees
+- ✅ **quickstart.md**: User-focused walkthrough for installation, configuration, and all three phases
+
+### Post-Design Constitution Check
+
+**Re-evaluation after Phase 1 design completion:**
+
+#### Principle I: Proof-of-Concept First
+**Status**: ✅ PASS (unchanged)
+
+- Design maintains POC scope with pragmatic technology choices
+- No over-engineering detected in service interfaces or contracts
+- Incremental delivery preserved (Phase 1 → 2 → 3 independence)
+
+#### Principle II: Non-Destructive Operations
+**Status**: ✅ PASS (unchanged)
+
+- File operations contract enforces atomic two-phase writes
+- Property order preservation explicitly documented as NON-NEGOTIABLE
+- Concurrent modification detection pattern validated in contracts
+- Provenance tracking formalized in `processed::` property format
+
+#### Principle III: Simplicity and Transparency
+**Status**: ✅ PASS (unchanged)
+
+- NDJSON streaming simpler than SSE (research validated)
+- ChromaDB only abstraction, well-justified for vector search
+- All LLM interactions logged and visible to user
+- Configuration uses standard YAML + Pydantic (no custom formats)
+
+**FINAL GATE RESULT**: ✅ ALL GATES PASS - Design approved
+
+---
+
+## Next Steps
+
+**Command Complete**: `/speckit.plan` has finished Phase 0 (Research) and Phase 1 (Design).
+
+**To proceed with implementation**:
+1. Run `/speckit.tasks` to generate dependency-ordered task breakdown
+2. Run `/speckit.implement` to execute tasks from tasks.md
+
+**Branch**: `002-logsqueak-spec`
+**Plan Location**: `/home/twaugh/devel/logsqueak/specs/002-logsqueak-spec/plan.md`
