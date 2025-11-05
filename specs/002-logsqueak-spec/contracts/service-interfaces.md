@@ -1,6 +1,7 @@
 # Service Interfaces Contract
 
 **Date**: 2025-11-05
+**Updated**: 2025-11-05 (merged services.md, added GraphPaths and mtime improvements)
 
 **Feature**: 002-logsqueak-spec
 
@@ -12,6 +13,8 @@ This document defines the Python service interfaces for the Logsqueak Interactiv
 
 - All LLM operations are async generators (streaming results)
 - All file operations check modification times (concurrent modification detection)
+- All path resolution uses `GraphPaths` from logseq-outline-parser
+- Incremental indexing uses mtime equality check (handles git reverts)
 - All services use Pydantic models for validation
 - All errors are raised with descriptive messages
 
@@ -417,6 +420,7 @@ import chromadb
 from sentence_transformers import SentenceTransformer
 from logseq_outline import LogseqOutline
 from logseq_outline.context import generate_full_context
+from logseq_outline.graph import GraphPaths
 import structlog
 
 logger = structlog.get_logger()
@@ -427,7 +431,7 @@ class PageIndexer:
 
     def __init__(
         self,
-        graph_path: Path,
+        graph_paths: GraphPaths,
         db_path: Path,
         embedding_model: str = "all-MiniLM-L6-v2"
     ):
@@ -435,11 +439,11 @@ class PageIndexer:
         Initialize page indexer.
 
         Args:
-            graph_path: Path to Logseq graph directory
+            graph_paths: GraphPaths instance for path resolution
             db_path: Path to ChromaDB persistent storage
             embedding_model: SentenceTransformer model name
         """
-        self.graph_path = graph_path
+        self.graph_paths = graph_paths
         self.db_path = db_path
         self.encoder = SentenceTransformer(embedding_model)
 
@@ -463,10 +467,10 @@ class PageIndexer:
             progress_callback: Optional callback(current, total) for progress updates
 
         Raises:
-            ValueError: If graph_path doesn't exist or contains no pages
+            ValueError: If graph pages directory doesn't exist or contains no pages
             OSError: On file I/O errors
         """
-        pages_dir = self.graph_path / "pages"
+        pages_dir = self.graph_paths.root / "pages"
         if not pages_dir.exists():
             raise ValueError(f"Pages directory not found: {pages_dir}")
 
@@ -477,7 +481,7 @@ class PageIndexer:
 
         logger.info(
             "page_indexing_started",
-            graph_path=str(self.graph_path),
+            graph_path=str(self.graph_paths.root),
             total_pages=len(page_files)
         )
 
@@ -505,7 +509,13 @@ class PageIndexer:
         logger.info("page_indexing_completed", total_pages=len(page_files))
 
     def _is_page_indexed(self, page_name: str, page_file: Path) -> bool:
-        """Check if page is already indexed and unmodified."""
+        """
+        Check if page is already indexed and unmodified.
+
+        Uses mtime inequality (!=) to detect changes in both directions,
+        which handles Logseq graphs in git where files may revert to
+        earlier content with older timestamps.
+        """
         # Query collection for page metadata
         results = self.collection.get(
             where={"page_name": page_name},
@@ -515,11 +525,11 @@ class PageIndexer:
         if not results["ids"]:
             return False
 
-        # Check modification time
+        # Check modification time (use != to catch git reverts)
         stored_mtime = results["metadatas"][0].get("mtime")
         current_mtime = page_file.stat().st_mtime
 
-        return stored_mtime is not None and current_mtime <= stored_mtime
+        return stored_mtime is not None and current_mtime == stored_mtime
 
     def _index_page_blocks(
         self,
