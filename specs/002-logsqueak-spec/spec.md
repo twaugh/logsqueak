@@ -162,7 +162,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 - **FR-005**: System MUST display a status widget showing which background tasks are active and their progress (percentage when calculable, on/off status otherwise)
 - **FR-006**: System MUST visually highlight blocks identified as knowledge by the LLM with a distinct color (different from user-selected highlight) as they arrive via streaming
 - **FR-007**: System MUST allow users to manually select/deselect any block as knowledge using keyboard controls, independent of LLM suggestions
-- **FR-008**: System MUST use a different highlight color for user-selected blocks vs LLM-suggested blocks
+- **FR-008**: System MUST use distinct highlight colors to differentiate between LLM-suggested blocks and user-selected blocks, ensuring clear visual distinction between the two selection states
 - **FR-009**: Users MUST be able to navigate between blocks using keyboard controls:
   - **(a)** Basic navigation: arrow keys (↑/↓) or vim-style (j/k) to move sequentially between blocks
   - **(b)** Jump-to-knowledge navigation: Shift+j/k/↓/↑ to jump to next/previous LLM-identified knowledge blocks, skipping non-knowledge blocks, with wrap-around behavior
