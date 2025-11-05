@@ -208,8 +208,10 @@ async def build_page_index(
 ### Incremental Update
 
 - Check file mtimes against stored metadata
-- Only re-index pages modified since last run
+- Re-index pages where mtime differs from stored metadata (accounts for git reverts/changes)
 - Delete entries for removed pages
+
+**Rationale**: Comparing mtimes with `!=` instead of `>` handles Logseq graphs stored in git, where file mtimes may decrease when reverting to earlier commits.
 
 ---
 

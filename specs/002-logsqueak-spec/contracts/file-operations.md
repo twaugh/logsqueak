@@ -33,19 +33,42 @@ This document defines the contract for all Logseq file operations in the Logsque
 
 All Logseq file I/O uses the `logseq-outline-parser` library for parsing and rendering.
 
+#### Path Resolution with GraphPaths
+
+```python
+from logseq_outline.graph import GraphPaths
+from pathlib import Path
+
+# Initialize GraphPaths with graph root
+graph_root = Path("~/Documents/logseq-graph").expanduser()
+graph_paths = GraphPaths(graph_root)
+
+# Get journal path
+journal_path = graph_paths.journal_path("2025-11-05")
+# Returns: ~/Documents/logseq-graph/journals/2025-11-05.md
+
+# Get page path (handles hierarchical pages with '/' separator)
+page_path = graph_paths.page_path("Python/Concurrency")
+# Returns: ~/Documents/logseq-graph/pages/Python___Concurrency.md
+```
+
+**Contract**:
+- `GraphPaths` handles conversion between logical names and filesystem paths
+- Hierarchical pages use `/` separator in names, converted to `___` for filenames
+- All file paths are absolute (resolved from graph root)
+
 #### Read Operations
 
 ```python
 from logseq_outline.parser import LogseqOutline
-from pathlib import Path
 
 # Read journal entry
-journal_path = Path("~/Documents/logseq-graph/journals/2025-11-05.md").expanduser()
+journal_path = graph_paths.journal_path("2025-11-05")
 journal_text = journal_path.read_text()
 journal_outline = LogseqOutline.parse(journal_text)
 
 # Read page
-page_path = Path("~/Documents/logseq-graph/pages/Python___Concurrency.md").expanduser()
+page_path = graph_paths.page_path("Python/Concurrency")
 page_text = page_path.read_text()
 page_outline = LogseqOutline.parse(page_text)
 
@@ -483,6 +506,7 @@ Integration requires **TWO writes** to be atomic:
 ```python
 from pathlib import Path
 import structlog
+from logseq_outline.graph import GraphPaths
 
 logger = structlog.get_logger()
 
@@ -490,7 +514,7 @@ logger = structlog.get_logger()
 def write_integration_atomic(
     decision: IntegrationDecision,
     journal_date: str,
-    graph_path: Path,
+    graph_paths: GraphPaths,
     file_monitor: FileMonitor
 ) -> None:
     """
@@ -501,7 +525,7 @@ def write_integration_atomic(
     Args:
         decision: Integration decision to execute
         journal_date: Journal date for provenance link (YYYY-MM-DD)
-        graph_path: Path to Logseq graph directory
+        graph_paths: GraphPaths instance for path resolution
         file_monitor: FileMonitor for concurrent modification detection
 
     Raises:
@@ -509,10 +533,9 @@ def write_integration_atomic(
         ValueError: If target block doesn't exist (validation failed)
         OSError: On file I/O errors
     """
-    # Construct file paths
-    page_filename = decision.target_page.replace("/", "___") + ".md"
-    page_path = graph_path / "pages" / page_filename
-    journal_path = graph_path / "journals" / f"{journal_date}.md"
+    # Construct file paths using GraphPaths
+    page_path = graph_paths.page_path(decision.target_page)
+    journal_path = graph_paths.journal_path(journal_date)
 
     # Step 1: Check and reload page if modified
     if file_monitor.is_modified(page_path):
@@ -784,7 +807,6 @@ if decision.action == "add_under" and decision.target_block_id is None:
 if not page_path.exists():
     raise FileNotFoundError(
         f"Page not found: {page_path}\n"
-        f"Expected location: {graph_path}/pages/{page_filename}\n"
         f"Create the page in Logseq before integrating knowledge."
     )
 
