@@ -1,0 +1,67 @@
+tags:: #machine-learning, #deep-learning
+type:: framework
+language:: [[Python]]
+created:: [[2024-02-13]]
+
+- PyTorch is a deep learning framework
+  - Developed by Facebook AI Research
+  - Released in 2016
+  - Popular in research community
+- Key features
+  id:: 65a2c1f1-8888-4567-89ab-cdef01234588
+  - Dynamic computation graphs
+    - Define-by-run paradigm
+    - More intuitive debugging
+  - Pythonic API
+    - Feels like NumPy
+  - Strong GPU acceleration
+  - Excellent for research
+- Core components
+  - Tensors (like NumPy arrays)
+  - Autograd for automatic differentiation
+  - nn.Module for models
+  - Optimizers
+  - DataLoader for batching
+- Building models
+  - Subclass nn.Module
+  - Define layers in __init__
+  - Implement forward pass
+  - Backward computed automatically
+- Training loop
+  - Manual loop more common than [[TensorFlow]]
+  - Forward pass
+  - Compute loss
+  - Backward pass (loss.backward())
+  - Optimizer step
+  - Zero gradients
+- Data handling
+  - Dataset class for data
+  - DataLoader for batching and shuffling
+  - Transforms for preprocessing
+  - Support for custom datasets
+- TorchScript
+  - Serialize models
+  - Deploy without [[Python]]
+  - Optimize for production
+- Ecosystem
+  - torchvision for computer vision
+  - torchaudio for audio
+  - torchtext for NLP (deprecated)
+  - PyTorch Lightning (high-level)
+  - Hugging Face Transformers
+- vs [[TensorFlow]]
+  - PyTorch: research, dynamic
+  - TensorFlow: production, static
+  - Gap closing over time
+- GPU usage
+  - .to(device) to move tensors
+  - .cuda() shorthand
+  - Automatic mixed precision
+- Community
+  - Strong research adoption
+  - Active forums
+  - Many tutorials and courses
+- Deployment
+  - TorchServe
+  - ONNX for interoperability
+  - Mobile support improving

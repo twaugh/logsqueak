@@ -1,0 +1,52 @@
+tags:: #programming, #paradigm
+type:: paradigm
+created:: [[2024-02-03]]
+
+- Functional programming is a programming paradigm
+  - Computation as evaluation of functions
+  - Avoids changing state and mutable data
+  - Declarative rather than imperative
+- Core principles
+  id:: 65a2c1f0-eeee-4567-89ab-cdef01234578
+  - Pure functions
+    - Same input always gives same output
+    - No side effects
+  - Immutability
+    - Data cannot be modified after creation
+  - First-class functions
+    - Functions as values
+  - Higher-order functions
+    - Functions that take or return functions
+- Common concepts
+  - Map, filter, reduce
+  - Function composition
+  - Currying and partial application
+  - Recursion instead of loops
+  - Lazy evaluation
+- Benefits
+  - Easier to reason about
+  - Easier to test
+  - Better for concurrency
+  - Enables optimization
+  - Referential transparency
+- Functional languages
+  - Haskell (purely functional)
+  - Clojure (Lisp dialect)
+  - Elixir (built on Erlang)
+  - F# (.NET language)
+- FP in [[Python]]
+  - map(), filter(), reduce()
+  - List comprehensions
+  - Lambda functions
+  - functools module
+  - itertools module
+- Challenges
+  - Performance overhead
+  - Harder to learn initially
+  - Not always natural for stateful problems
+  - Debugging can be trickier
+- Practical adoption
+  - Mix with other paradigms
+  - Use pure functions where possible
+  - Immutable data structures
+  - Avoid global state

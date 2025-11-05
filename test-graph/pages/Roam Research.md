@@ -1,0 +1,64 @@
+tags:: #tools, #note-taking, #pkm
+type:: tool
+created:: [[2024-02-10]]
+
+- Roam Research is a note-taking tool for networked thought
+  - Web-based application
+  - Pioneered bidirectional linking in modern tools
+  - Influenced [[Logseq]] and [[Obsidian]]
+- Key features
+  id:: 65a2c1f1-5555-4567-89ab-cdef01234585
+  - Bidirectional links
+    - [[Page]] creates automatic backlinks
+  - Block references
+    - ((block-id)) to embed content
+  - Daily notes
+    - Central to workflow
+  - Graph visualization
+  - Outliner-based
+- Data structure
+  - Everything is a block
+  - Blocks have unique IDs
+  - Pages are collections of blocks
+  - Graph database underneath
+- Queries
+  - Filter and display blocks
+  - Based on tags, attributes
+  - Live updating
+- Attributes
+  - Key:: value syntax
+  - Metadata on blocks
+  - Queryable
+- Templates
+  - ;; for templates
+  - Button triggers
+  - Roam/templates page
+- Multiplayer
+  - Real-time collaboration
+  - Shared graphs
+  - Different from [[Notion]] approach
+- Pricing
+  - Subscription-based
+  - Individual and team plans
+  - More expensive than alternatives
+- Export
+  - JSON format
+  - Markdown export
+  - EDN format (Clojure)
+- Advantages
+  - Polished UX
+  - Fast performance
+  - Active development
+- Disadvantages
+  - Closed source
+  - Data in cloud only
+  - Expensive
+  - Vendor lock-in risk
+- vs [[Logseq]]
+  - Roam: web-based, paid
+  - Logseq: local-first, open source
+  - Similar features
+- Community
+  - Active on Twitter
+  - RoamCult movement
+  - Many workflows shared

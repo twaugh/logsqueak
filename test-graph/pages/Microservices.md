@@ -1,0 +1,53 @@
+tags:: #architecture, #patterns
+type:: pattern
+created:: [[2024-01-29]]
+
+- Microservices is an architectural pattern
+  - Application as suite of small services
+  - Each service runs in own process
+  - Communicate via lightweight protocols
+- Characteristics
+  id:: 65a2c1f0-aaaa-4567-89ab-cdef01234574
+  - Independently deployable
+  - Organized around business capabilities
+  - Decentralized data management
+  - Infrastructure automation
+  - Design for failure
+- Benefits
+  - Technology diversity
+    - Choose best tool for each service
+  - Independent scaling
+  - Easier to understand and modify
+  - Fault isolation
+  - Faster deployment cycles
+- Challenges
+  - Distributed system complexity
+  - Network latency
+  - Data consistency
+  - Testing complexity
+  - Operational overhead
+- Communication patterns
+  - Synchronous: [[REST API]], [[GraphQL]]
+  - Asynchronous: Message queues, events
+  - Service mesh for service-to-service
+- Supporting technologies
+  - [[Docker]] for containerization
+  - [[Kubernetes]] for orchestration
+  - API Gateway for routing
+  - Service discovery (Consul, Eureka)
+  - Distributed tracing (Jaeger)
+- Data management
+  - Database per service pattern
+  - Event sourcing
+  - CQRS (Command Query Responsibility Segregation)
+  - Saga pattern for distributed transactions
+- When to use microservices
+  - Large, complex applications
+  - Need for independent scaling
+  - Multiple teams
+  - Different technology requirements
+- When NOT to use
+  - Small applications
+  - Simple domains
+  - Limited team size
+  - Starting a new project (start monolith)

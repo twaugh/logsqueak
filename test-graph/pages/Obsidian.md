@@ -1,0 +1,58 @@
+tags:: #tools, #note-taking, #pkm
+type:: tool
+created:: [[2024-02-07]]
+
+- Obsidian is a markdown-based knowledge base
+  - "Second brain" concept
+  - Works on local files
+  - Extensible with plugins
+- Key features
+  id:: 65a2c1f1-2222-4567-89ab-cdef01234582
+  - Wikilinks [[Like This]]
+  - Graph view of connections
+  - Canvas for visual thinking
+  - Backlinks panel
+  - Tags and frontmatter
+- Vaults
+  - Folder of markdown files
+  - Multiple vaults supported
+  - Each vault is independent
+- Markdown extensions
+  - Callouts (notes, warnings, etc.)
+  - Mermaid diagrams
+  - Dataview queries
+  - Task management
+- Core plugins
+  - Daily notes
+  - Templates
+  - Backlinks
+  - Outgoing links
+  - Tag pane
+- Community plugins
+  - Dataview (query language)
+  - Templater (advanced templates)
+  - Kanban boards
+  - Calendar view
+  - Excalidraw (drawings)
+- Sync options
+  - Obsidian Sync (paid)
+  - [[Git]] with plugin
+  - iCloud, Dropbox, etc.
+  - Self-hosted sync
+- Themes and customization
+  - CSS snippets
+  - Custom themes
+  - Plugin settings
+  - Hotkeys
+- vs [[Logseq]]
+  - Obsidian: document-based
+  - Logseq: outliner-based
+  - Both: local files, privacy-focused
+- vs [[Notion]]
+  - Obsidian: markdown files
+  - Notion: cloud database
+  - Obsidian: you own your data
+- Philosophy
+  - Linking your thinking
+  - Evergreen notes
+  - Atomic notes

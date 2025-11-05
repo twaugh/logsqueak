@@ -1,0 +1,58 @@
+tags:: #tools, #editor
+type:: tool
+created:: [[2024-02-04]]
+
+- Vim is a highly configurable text editor
+  - Successor to Vi
+  - Modal editing (normal, insert, visual)
+  - Keyboard-driven workflow
+- Modes
+  id:: 65a2c1f0-ffff-4567-89ab-cdef01234579
+  - Normal mode
+    - Default mode for navigation
+    - Press Esc to return
+  - Insert mode
+    - Type text normally
+    - Press i, a, o to enter
+  - Visual mode
+    - Select text
+    - Press v for character, V for line
+  - Command mode
+    - Execute commands
+    - Press : to enter
+- Navigation
+  - h, j, k, l for left, down, up, right
+  - w, b for word forward/backward
+  - 0, $ for line start/end
+  - gg, G for file start/end
+  - { } for paragraph navigation
+- Editing commands
+  - d for delete (dd for line)
+  - y for yank (copy)
+  - p for put (paste)
+  - c for change
+  - . to repeat last command
+- Search and replace
+  - /pattern to search forward
+  - ?pattern to search backward
+  - n, N for next/previous match
+  - :%s/old/new/g for replace all
+- Configuration
+  - .vimrc file
+  - Set options with :set
+  - Map keys with :map
+  - Install plugins
+- Popular plugins
+  - NERDTree for file explorer
+  - fzf.vim for fuzzy finding
+  - vim-surround for brackets/quotes
+  - coc.nvim for LSP support
+- Learning curve
+  - Start with vimtutor
+  - Practice basic motions
+  - Learn incrementally
+  - Muscle memory takes time
+- Modern alternatives
+  - Neovim (Vim fork)
+    - Better extensibility
+    - Built-in LSP

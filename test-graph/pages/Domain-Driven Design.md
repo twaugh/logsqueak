@@ -1,0 +1,60 @@
+tags:: #architecture, #design
+type:: methodology
+created:: [[2024-02-02]]
+
+- Domain-Driven Design (DDD) focuses on core domain
+  - Book by Eric Evans (2003)
+  - Model-driven design approach
+  - Ubiquitous language between developers and domain experts
+- Strategic patterns
+  id:: 65a2c1f0-dddd-4567-89ab-cdef01234577
+  - Bounded contexts
+    - Clear boundaries for models
+    - Different meanings in different contexts
+  - Context mapping
+    - Relationships between contexts
+  - Core domain
+    - Most important part of business
+  - Subdomains
+    - Core, supporting, generic
+- Tactical patterns
+  - Entities
+    - Objects with identity
+    - Mutable, have lifecycle
+  - Value objects
+    - Immutable, defined by attributes
+  - Aggregates
+    - Cluster of entities and value objects
+    - Consistency boundary
+  - Repositories
+    - Persistence abstraction
+  - Domain events
+    - Something that happened
+  - Services
+    - Stateless operations
+- Building blocks
+  - Layered architecture
+    - UI, Application, Domain, Infrastructure
+  - Hexagonal architecture (Ports and Adapters)
+  - Clean architecture
+- Ubiquitous language
+  - Shared vocabulary
+  - Used in code and conversations
+  - Evolves with understanding
+  - Reduces translation overhead
+- Event storming
+  - Workshop technique
+  - Discover domain events
+  - Identify bounded contexts
+  - Collaborative exploration
+- Benefits
+  - Better understanding of domain
+  - More maintainable code
+  - Aligns software with business
+  - Handles complexity
+- When to use DDD
+  - Complex business logic
+  - Long-lived projects
+  - Collaborative domain exploration
+- Works well with [[Microservices]]
+  - Bounded contexts map to services

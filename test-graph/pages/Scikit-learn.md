@@ -1,0 +1,63 @@
+tags:: #machine-learning, #library
+type:: library
+language:: [[Python]]
+created:: [[2024-02-11]]
+
+- Scikit-learn is a [[Python]] [[Machine Learning]] library
+  - Built on NumPy, SciPy, and matplotlib
+  - Simple and efficient tools for data analysis
+  - BSD license, free to use
+- Key modules
+  id:: 65a2c1f1-6666-4567-89ab-cdef01234586
+  - Classification algorithms
+    - SVM, Random Forest, Logistic Regression
+  - Regression algorithms
+    - Linear, Ridge, Lasso
+  - Clustering
+    - K-Means, DBSCAN, Hierarchical
+  - Dimensionality reduction
+    - PCA, t-SNE, UMAP
+  - Model selection
+    - Cross-validation, Grid search
+  - Preprocessing
+    - Scaling, encoding, imputation
+- Common workflow
+  - Load data
+  - Preprocess features
+  - Split train/test
+  - Train model
+  - Evaluate performance
+  - Tune hyperparameters
+- Estimator API
+  - fit() to train
+  - predict() to infer
+  - score() to evaluate
+  - Consistent interface across algorithms
+- Pipelines
+  - Chain preprocessing and model
+  - Prevent data leakage
+  - Simplify workflow
+- Model selection
+  - train_test_split()
+  - cross_val_score()
+  - GridSearchCV for hyperparameters
+  - RandomizedSearchCV for large spaces
+- Preprocessing tools
+  - StandardScaler for normalization
+  - OneHotEncoder for categories
+  - SimpleImputer for missing values
+  - PolynomialFeatures for feature engineering
+- Limitations
+  - Not for deep learning
+    - Use [[TensorFlow]] or [[PyTorch]] instead
+  - Not for large-scale distributed computing
+  - CPU-only (mostly)
+- Best practices
+  - Always scale features
+  - Use pipelines
+  - Cross-validate
+  - Start with simple models
+- Integration
+  - Works well with pandas DataFrames
+  - Matplotlib for visualization
+  - Joblib for model persistence

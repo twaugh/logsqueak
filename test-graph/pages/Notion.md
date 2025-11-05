@@ -1,0 +1,59 @@
+tags:: #tools, #productivity
+type:: tool
+created:: [[2024-02-08]]
+
+- Notion is an all-in-one workspace
+  - Notes, databases, wikis, projects
+  - Cloud-based platform
+  - Collaborative features
+- Building blocks
+  id:: 65a2c1f1-3333-4567-89ab-cdef01234583
+  - Pages
+    - Nested unlimited levels
+  - Blocks
+    - Text, headers, images, etc.
+  - Databases
+    - Tables, boards, calendars, galleries
+  - Formulas and relations
+- Database views
+  - Table view (spreadsheet)
+  - Board view (Kanban)
+  - Calendar view
+  - Gallery view
+  - Timeline view (Gantt)
+- Properties
+  - Text, number, select, multi-select
+  - Date, person, files
+  - Checkbox, URL, email
+  - Relation to other databases
+  - Rollup (aggregate related data)
+- Templates
+  - Button to create from template
+  - Database templates
+  - Community templates
+- Collaboration
+  - Real-time editing
+  - Comments and mentions
+  - Share pages publicly
+  - Workspaces and teams
+- Use cases
+  - Project management
+  - Documentation
+  - CRM and databases
+  - Personal wiki
+  - Meeting notes
+- Limitations
+  - Requires internet
+  - Data not in plain files
+  - Slower than local apps
+  - Export not perfect
+- vs [[Obsidian]]
+  - Notion: cloud, collaborative
+  - Obsidian: local, private
+- vs [[Logseq]]
+  - Notion: databases, polish
+  - Logseq: outliner, graph
+- API
+  - Official API available
+  - Integrations with other tools
+  - Automation possibilities

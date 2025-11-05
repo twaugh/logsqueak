@@ -1,0 +1,53 @@
+tags:: #methodology, #project-management
+type:: methodology
+created:: [[2024-02-01]]
+
+- Agile is a software development methodology
+  - Iterative and incremental approach
+  - Emphasis on flexibility and collaboration
+  - Based on Agile Manifesto (2001)
+- Four core values
+  id:: 65a2c1f0-cccc-4567-89ab-cdef01234576
+  - Individuals and interactions over processes
+  - Working software over documentation
+  - Customer collaboration over contracts
+  - Responding to change over following plan
+- Common frameworks
+  - Scrum (most popular)
+    - Sprints, daily standups, retrospectives
+  - Kanban
+    - Visual workflow, WIP limits
+  - XP (Extreme Programming)
+    - Pair programming, [[TDD]]
+  - SAFe (Scaled Agile)
+- Scrum ceremonies
+  - Sprint planning
+  - Daily standup (15 minutes)
+  - Sprint review (demo)
+  - Sprint retrospective
+- Roles in Scrum
+  - Product Owner
+    - Manages backlog, prioritizes work
+  - Scrum Master
+    - Facilitates process, removes blockers
+  - Development Team
+    - Self-organizing, cross-functional
+- Artifacts
+  - Product backlog
+  - Sprint backlog
+  - Increment (potentially shippable product)
+- Metrics
+  - Velocity (story points per sprint)
+  - Burndown charts
+  - Cycle time
+  - Lead time
+- Benefits
+  - Faster feedback
+  - Better adaptability
+  - Increased collaboration
+  - Higher customer satisfaction
+- Common challenges
+  - Incomplete adoption
+  - Scope creep
+  - Lack of technical practices
+  - Distributed teams

@@ -1,0 +1,54 @@
+tags:: #tools, #editor
+type:: tool
+created:: [[2024-02-05]]
+
+- Emacs is an extensible text editor
+  - "Emacs Makes A Computer Slow" (joke)
+  - Highly programmable with Emacs Lisp
+  - More than just an editor
+- Key characteristics
+  id:: 65a2c1f1-0000-4567-89ab-cdef01234580
+  - Extensible via Emacs Lisp
+  - Self-documenting
+  - Built-in tutorial (C-h t)
+  - Customizable key bindings
+- Keybinding notation
+  - C-x means Ctrl+x
+  - M-x means Alt+x (or Meta)
+  - C-x C-f to open file
+  - C-x C-s to save
+  - C-x b to switch buffer
+- Buffers and windows
+  - Buffer: file or content in memory
+  - Window: view into a buffer
+  - Frame: what others call a window
+  - Split with C-x 2 or C-x 3
+- Major and minor modes
+  - Major mode: one per buffer
+    - Python-mode, Org-mode, etc.
+  - Minor modes: multiple per buffer
+    - Auto-complete, line numbers, etc.
+- Org mode
+  - Outlining and note-taking
+  - TODO lists and agenda
+  - Code blocks and literate programming
+  - Export to HTML, PDF, etc.
+  - Similar to [[Logseq]] but simpler
+- Popular packages
+  - Magit for [[Git]]
+  - Company for completion
+  - Projectile for project management
+  - Evil mode for [[Vim]] emulation
+- Configuration
+  - init.el or .emacs file
+  - use-package for package management
+  - Spacemacs or Doom Emacs (distributions)
+- Philosophy
+  - Batteries included
+  - Discoverability
+  - Self-contained environment
+  - "Living in Emacs"
+- vs [[Vim]]
+  - Emacs: extensible, heavy
+  - Vim: modal, lightweight
+  - Both have steep learning curves

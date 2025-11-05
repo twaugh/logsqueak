@@ -1,0 +1,59 @@
+tags:: #tools, #note-taking, #pkm
+type:: tool
+created:: [[2024-02-06]]
+
+- Logseq is a knowledge management tool
+  - Privacy-first, local-first
+  - Outliner-based (like [[Roam Research]])
+  - Built on graph database
+- Core features
+  id:: 65a2c1f1-1111-4567-89ab-cdef01234581
+  - Bidirectional links
+    - [[Page]] syntax
+  - Block references
+    - ((block-id)) syntax
+  - Daily journals
+    - Automatic daily note creation
+  - Graph view
+    - Visualize connections
+  - Query system
+    - DataLog queries
+- File format
+  - Plain markdown files
+  - Stored locally
+  - Version control friendly
+  - Two-space indentation
+- Properties
+  - property:: value syntax
+  - Block-level metadata
+  - Can be queried
+- Queries
+  - Simple queries
+    - {{query (property type practice)}}
+  - Advanced queries
+    - DataLog syntax
+  - Live updating results
+- Plugins
+  - Community marketplace
+  - JavaScript-based
+  - Extend functionality
+- Use cases
+  - Personal knowledge management
+  - Research notes
+  - Project planning
+  - Learning and study
+  - Zettelkasten method
+- Similar tools
+  - [[Obsidian]] (markdown, vaults)
+  - [[Roam Research]] (web-based)
+  - [[Notion]] (databases)
+  - [[Emacs]] Org-mode
+- Advantages
+  - Your data stays local
+  - Plain text files
+  - Open source
+  - Active community
+- Learning resources
+  - Official documentation
+  - Community Discord
+  - YouTube tutorials

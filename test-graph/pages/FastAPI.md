@@ -1,0 +1,67 @@
+tags:: #framework, #web, #api
+type:: framework
+language:: [[Python]]
+created:: [[2024-02-14]]
+
+- FastAPI is a modern [[Python]] web framework
+  - Built for APIs
+  - High performance (comparable to Node.js)
+  - Based on standard [[Python]] type hints
+- Key features
+  id:: 65a2c1f1-9999-4567-89ab-cdef01234589
+  - Fast to code
+    - Type hints enable auto-completion
+  - Automatic API documentation
+    - Swagger UI and ReDoc
+  - Data validation
+    - Using Pydantic models
+  - Async support
+    - Built on Starlette
+  - Modern [[Python]] (3.7+)
+- Type hints and validation
+  - Function parameters with types
+  - Pydantic models for request bodies
+  - Automatic validation and serialization
+  - Clear error messages
+- Path operations
+  - @app.get(), @app.post(), etc.
+  - Path parameters
+  - Query parameters
+  - Request body
+  - Response model
+- Async/await
+  - Native async support
+  - Can mix sync and async
+  - Use async for I/O operations
+  - Database, HTTP calls, etc.
+- Dependency injection
+  - Depends() for dependencies
+  - Reusable components
+  - Authentication, database sessions
+  - Automatic cleanup
+- Documentation
+  - Auto-generated from code
+  - Interactive API docs at /docs
+  - Alternative docs at /redoc
+  - OpenAPI schema
+- vs [[Flask]]
+  - FastAPI: modern, async, typed
+  - Flask: mature, flexible, simple
+  - FastAPI: better for APIs
+- vs [[Django]]
+  - FastAPI: API-focused, lightweight
+  - Django: full-featured, batteries included
+  - Different use cases
+- Testing
+  - TestClient for testing
+  - Works with [[Pytest]]
+  - Async test support
+- Deployment
+  - Use Uvicorn or Hypercorn
+  - [[Docker]] containers
+  - Serverless functions
+- Use cases
+  - [[REST API]] and [[GraphQL]]
+  - Microservices
+  - Real-time applications
+  - [[Machine Learning]] model serving

@@ -1,0 +1,52 @@
+tags:: #devops, #automation
+type:: practice
+created:: [[2024-01-30]]
+
+- CI/CD automates software delivery pipeline
+  - Continuous Integration (CI)
+  - Continuous Delivery (CD)
+  - Continuous Deployment (CD)
+- Continuous Integration
+  id:: 65a2c1f0-bbbb-4567-89ab-cdef01234575
+  - Developers merge code frequently
+  - Automated builds and tests
+  - Quick feedback on changes
+  - Detect integration issues early
+- Continuous Delivery
+  - Code always ready to deploy
+  - Manual approval for production
+  - Automated deployment to staging
+- Continuous Deployment
+  - Fully automated to production
+  - No manual intervention
+  - Every passing commit deployed
+- Pipeline stages
+  - Source: trigger on code change
+  - Build: compile and package
+  - Test: run automated tests
+    - Unit tests
+    - Integration tests
+    - E2E tests
+  - Deploy: release to environment
+- Popular CI/CD tools
+  - GitHub Actions
+  - GitLab CI/CD
+  - Jenkins
+  - CircleCI
+  - Travis CI
+- Best practices
+  - Keep builds fast
+  - Fail fast on errors
+  - Build once, deploy many times
+  - Use same artifacts across environments
+  - Automated rollback capability
+  - Monitor deployments
+- Testing pyramid
+  - Many unit tests (fast, cheap)
+  - Some integration tests
+  - Few E2E tests (slow, expensive)
+- Benefits
+  - Faster time to market
+  - Higher quality
+  - Reduced risk
+  - Better collaboration

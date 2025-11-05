@@ -1,0 +1,61 @@
+tags:: #methodology, #pkm, #note-taking
+type:: methodology
+created:: [[2024-02-09]]
+
+- Zettelkasten is a note-taking method
+  - German for "slip box"
+  - Developed by Niklas Luhmann
+  - Generated 70+ books and 400+ articles
+- Core principles
+  id:: 65a2c1f1-4444-4567-89ab-cdef01234584
+  - Atomic notes
+    - One idea per note
+    - Complete thoughts
+  - Links between notes
+    - Create connections
+    - Build a web of knowledge
+  - Your own words
+    - Reformulate ideas
+    - Aids understanding
+  - Bottom-up organization
+    - Emerges from connections
+- Types of notes
+  - Fleeting notes
+    - Quick captures
+    - Temporary
+  - Literature notes
+    - From reading
+    - Reference included
+  - Permanent notes
+    - Refined ideas
+    - Live forever
+- Workflow
+  - Capture fleeting notes
+  - Process into literature notes
+  - Create permanent notes
+  - Link to existing notes
+  - Review and refine
+- Numbering systems
+  - Luhmann's system
+    - 1, 1a, 1b, 1a1, etc.
+  - Modern: use unique IDs
+    - Timestamps: 202402091430
+    - UUIDs
+  - Links more important than numbers
+- Tools
+  - Original: physical index cards
+  - Modern: [[Obsidian]], [[Logseq]], [[Roam Research]]
+  - Any tool with backlinks works
+- Benefits
+  - External thinking system
+  - Discover unexpected connections
+  - Writing becomes easier
+  - Knowledge compounds over time
+- Common mistakes
+  - Collecting without processing
+  - Notes too long
+  - Not linking notes
+  - Copying without understanding
+- Books
+  - "How to Take Smart Notes" by Sönke Ahrens
+  - Introduces method to modern audience
