@@ -348,7 +348,6 @@ This section walks through a complete knowledge extraction session, showing what
 1. **Start**: TUI opens showing all blocks in tree view
 2. **Wait for LLM**: Watch as blocks are highlighted (yellow) as LLM identifies knowledge
    - Status widget shows: "Analyzing knowledge blocks (3/15)"
-
 3. **Navigate**: Press `j` to move down through blocks
 4. **Review**: Bottom panel shows full content and LLM reasoning
 5. **Quick navigation**: Press `Shift+j` to jump directly to next LLM-suggested block
@@ -376,31 +375,31 @@ This section walks through a complete knowledge extraction session, showing what
 │ Phase 2: Content Editing                                            │
 ├─────────────────────────────────────────────────────────────────────┤
 │ Knowledge Block 1 of 3                                              │
-│                                                                      │
+│                                                                     │
 │ Original Context (from journal):                                    │
 │ ┌─────────────────────────────────────────────────────────────────┐ │
-│ │ - Daily Standup                                                  │ │
-│ │   - Learned that asyncio.create_task() enables concurrency       │ │
-│ │     - This is different from await which blocks                  │ │
+│ │ - Daily Standup                                                 │ │
+│ │   - Learned that asyncio.create_task() enables concurrency      │ │
+│ │     - This is different from await which blocks                 │ │
 │ └─────────────────────────────────────────────────────────────────┘ │
-│                                                                      │
+│                                                                     │
 │ LLM-Reworded Version:                                               │
 │ ┌─────────────────────────────────────────────────────────────────┐ │
 │ │ Using asyncio.create_task() enables concurrent operations in    │ │
-│ │ Python, unlike await which executes sequentially.                │ │
+│ │ Python, unlike await which executes sequentially.               │ │
 │ └─────────────────────────────────────────────────────────────────┘ │
-│                                                                      │
+│                                                                     │
 │ Current Content (editable):                                         │
 │ ┌─────────────────────────────────────────────────────────────────┐ │
 │ │ Using asyncio.create_task() enables concurrent operations in    │ │
-│ │ Python, unlike await which executes sequentially.                │ │
-│ │ [Cursor here - press Tab to edit]                                │ │
+│ │ Python, unlike await which executes sequentially.               │ │
+│ │ [Cursor here - press Tab to edit]                               │ │
 │ └─────────────────────────────────────────────────────────────────┘ │
-│                                                                      │
-│ Status: Refining content (2/3) | Building page index: 78%          │
-│         Finding relevant pages (1/3)                                 │
+│                                                                     │
+│ Status: Refining content (2/3) | Building page index: 78%           │
+│         Finding relevant pages (1/3)                                │
 ├─────────────────────────────────────────────────────────────────────┤
-│ j/k: Navigate | Tab: Edit | a: Accept LLM | r: Revert | n: Next    │
+│ j/k: Navigate | Tab: Edit | a: Accept LLM | r: Revert | n: Next     │
 └─────────────────────────────────────────────────────────────────────┘
 
 ```
@@ -437,11 +436,9 @@ This section walks through a complete knowledge extraction session, showing what
 3. **Accept or edit**:
    - Press `a` to accept LLM version (updates current content)
    - OR press `Tab` to manually edit the text
-
 4. **Manual editing** (if Tab pressed):
    - Type to modify content
    - Press `Tab` again to unfocus and return to navigation
-
 5. **Next block**: Press `j` to move to next knowledge block (auto-saves edits)
 6. **Wait for RAG**: Status shows "Finding relevant pages (2/3)"
 7. **Proceed**: Press `n` when RAG search completes
@@ -467,39 +464,39 @@ This section walks through a complete knowledge extraction session, showing what
 │ Phase 3: Integration Decisions                                      │
 ├─────────────────────────────────────────────────────────────────────┤
 │ Knowledge Block 1 of 3 (2 decisions: ⊙ 2 pending)                   │
-│                                                                      │
+│                                                                     │
 │ Journal Context (source):                                           │
 │ ┌─────────────────────────────────────────────────────────────────┐ │
-│ │ - Daily Standup                                                  │ │
-│ │   - Learned that asyncio.create_task() enables concurrency       │ │
+│ │ - Daily Standup                                                 │ │
+│ │   - Learned that asyncio.create_task() enables concurrency      │ │
 │ └─────────────────────────────────────────────────────────────────┘ │
-│                                                                      │
+│                                                                     │
 │ Content to Integrate:                                               │
 │ ┌─────────────────────────────────────────────────────────────────┐ │
 │ │ Using asyncio.create_task() enables concurrent operations in    │ │
-│ │ Python, unlike await which executes sequentially.                │ │
+│ │ Python, unlike await which executes sequentially.               │ │
 │ └─────────────────────────────────────────────────────────────────┘ │
-│                                                                      │
+│                                                                     │
 │ Decisions:                                                          │
 │ ┌─────────────────────────────────────────────────────────────────┐ │
 │ │ ▶ Programming Notes/Python (Confidence: 87%)                    │ │
-│ │   Projects/API Redesign (Confidence: 65%)                        │ │
+│ │   Projects/API Redesign (Confidence: 65%)                       │ │
 │ └─────────────────────────────────────────────────────────────────┘ │
-│                                                                      │
-│ Target Page Preview (Programming Notes/Python):                    │
+│                                                                     │
+│ Target Page Preview (Programming Notes/Python):                     │
 │ ┌─────────────────────────────────────────────────────────────────┐ │
 │ │ - Async Patterns                                                │ │
-│ │   - Event loops handle concurrent tasks                          │ │
-│ │   ┃ Using asyncio.create_task() enables concurrent operations  │ │
-│ │   ┃ in Python, unlike await which executes sequentially.       │ │
-│ │   - Use async/await for I/O-bound operations                     │ │
+│ │   - Event loops handle concurrent tasks                         │ │
+│ │   - Use async/await for I/O-bound operations                    │ │
+│ │  ┃- Using asyncio.create_task() enables concurrent operations   │ │
+│ │  ┃  in Python, unlike await which executes sequentially.        │ │
 │ └─────────────────────────────────────────────────────────────────┘ │
-│                                                                      │
+│                                                                     │
 │ Action: Add under "Async Patterns"                                  │
-│ Reasoning: This insight fits well under the 'Async Patterns'       │
+│ Reasoning: This insight fits well under the 'Async Patterns'        │
 │ section as it directly explains task concurrency.                   │
 ├─────────────────────────────────────────────────────────────────────┤
-│ j/k: Navigate decisions | y: Accept | n: Next block | a: Accept all│
+│ j/k: Navigate decisions | y: Accept | n: Next block | a: Accept all │
 └─────────────────────────────────────────────────────────────────────┘
 
 ```
@@ -534,7 +531,6 @@ This section walks through a complete knowledge extraction session, showing what
 6. **Accept decision**: Press `y` to write to the selected target page
    - Decision is marked ✓ Completed
    - Journal block gets `processed::` property with link to integrated block
-
 7. **Multiple integrations**: You can press `y` on multiple decisions to integrate the same knowledge to different pages
 8. **Next block**: Press `n` to advance to next knowledge block
 
@@ -560,18 +556,18 @@ When all knowledge blocks are processed, you'll see:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│ Extraction Complete                                                  │
+│ Extraction Complete                                                 │
 ├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
+│                                                                     │
 │ Summary:                                                            │
-│ - 3 knowledge blocks processed                                       │
-│ - 5 integrations written successfully                                │
-│ - 0 failed integrations                                              │
-│                                                                      │
+│ - 3 knowledge blocks processed                                      │
+│ - 5 integrations written successfully                               │
+│ - 0 failed integrations                                             │
+│                                                                     │
 │ Journal entry updated with provenance markers:                      │
-│ journals/2025-11-05.md                                               │
-│                                                                      │
-│ Press Enter to exit                                                  │
+│ journals/2025-11-05.md                                              │
+│                                                                     │
+│ Press Enter to exit                                                 │
 └─────────────────────────────────────────────────────────────────────┘
 
 ```
@@ -608,7 +604,6 @@ logseq:
 
 rag:
   top_k: 10
-
 ```
 
 **Solution**: Create the config file with your settings (see [Configuration](#configuration) section above).
@@ -620,14 +615,12 @@ rag:
 ```
 Error: Config file has overly permissive permissions: 0o644
 Run: chmod 600 ~/.config/logsqueak/config.yaml
-
 ```
 
 **Solution**:
 
 ```bash
 chmod 600 ~/.config/logsqueak/config.yaml
-
 ```
 
 ---
@@ -637,7 +630,6 @@ chmod 600 ~/.config/logsqueak/config.yaml
 ```
 Error: Graph path does not exist: /home/user/Documents/logseq-graph
 Please create the directory or update config.yaml
-
 ```
 
 **Solution**: Update `logseq.graph_path` in config.yaml with the correct path to your Logseq graph.
@@ -653,14 +645,12 @@ Error: Failed to connect to LLM API at http://localhost:11434/v1
 Connection refused
 
 Auto-retrying in 2 seconds...
-
 ```
 
 **Solution**: Start Ollama:
 
 ```bash
 ollama serve
-
 ```
 
 If already running, check the endpoint in config matches Ollama's actual endpoint.
@@ -674,7 +664,6 @@ Error: LLM API request failed with status 401 Unauthorized
 Invalid API key provided
 
 Please check your API key in ~/.config/logsqueak/config.yaml
-
 ```
 
 **Solution**:
@@ -691,7 +680,6 @@ Please check your API key in ~/.config/logsqueak/config.yaml
 Error: LLM request timed out after 60 seconds
 
 Auto-retrying in 2 seconds...
-
 ```
 
 **Solution**:
@@ -709,7 +697,6 @@ Auto-retrying in 2 seconds...
 ```
 Error: Failed to parse configuration file
 YAML syntax error at line 5: mapping values are not allowed here
-
 ```
 
 **Solution**: Check your YAML syntax - common issues:
@@ -727,7 +714,6 @@ Error writing integration decision:
 Target block 'section-async-patterns' not found in page 'Programming Notes/Python'
 
 File may have been modified externally.
-
 ```
 
 **Solution**:
@@ -752,7 +738,6 @@ grep ERROR ~/.cache/logsqueak/logs/logsqueak.log
 
 # View logs in JSON pretty-print
 cat ~/.cache/logsqueak/logs/logsqueak.log | jq .
-
 ```
 
 Log levels:
@@ -767,27 +752,33 @@ Log levels:
 ### Common Questions
 
 **Q: Can I process multiple journal entries at once?**
+
 A: Yes! Use date range syntax:
 
 ```bash
 logsqueak extract 2025-01-10..2025-01-15
-
 ```
+
 The tree view will show entries grouped by date.
 
 **Q: What if I quit mid-session?**
+
 A: Integrations already written (✓ Completed) remain in your pages. The journal's `processed::` property tracks which blocks were integrated. Blocks you hadn't reached or skipped are not modified.
 
 **Q: Can I edit the LLM's suggestions?**
+
 A: Yes! In Phase 2, press `Tab` to manually edit any knowledge block content. In Phase 3, you can skip decisions you disagree with.
 
 **Q: How do I undo an integration?**
+
 A: Currently no built-in undo. You'll need to manually remove the integrated block from the target page in Logseq. The journal's `processed::` property shows which blocks were integrated and where.
 
 **Q: Why isn't the 'n' key working in Phase 2?**
+
 A: The 'n' key (continue to Phase 3) is disabled until background tasks complete. Wait for "Building page index" and "Finding relevant pages" to finish (status widget shows progress).
 
 **Q: Can I cancel during a write operation?**
+
 A: Pressing Ctrl+C during Phase 3 will show a warning about partial journal state (some blocks already marked as processed). You'll be asked to confirm cancellation.
 
 ---
