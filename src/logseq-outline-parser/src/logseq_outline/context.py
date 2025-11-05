@@ -13,13 +13,18 @@ if TYPE_CHECKING:
     from logseq_outline.parser import LogseqBlock, LogseqOutline
 
 
-def generate_full_context(block: "LogseqBlock", parents: list["LogseqBlock"], indent_str: str = "  ") -> str:
+def generate_full_context(
+    block: "LogseqBlock",
+    parents: list["LogseqBlock"],
+    indent_str: str = "  ",
+    frontmatter: list[str] | None = None
+) -> str:
     """Generate full-context string for a block.
 
-    The full context includes all parent blocks' full content with proper bullet
-    formatting, plus the block's own full content. This must be reproducible from
-    just the block and its parents (no siblings, no children) since we need to
-    recreate the hash when finding blocks by ID.
+    The full context includes optional frontmatter (page properties), all parent
+    blocks' full content with proper bullet formatting, plus the block's own full
+    content. This must be reproducible from just the block and its parents (no
+    siblings, no children) since we need to recreate the hash when finding blocks by ID.
 
     NOTE: Blocks with truly identical content and context will have the same hybrid ID.
     This is by design - such blocks are semantically equivalent for RAG purposes.
@@ -29,9 +34,10 @@ def generate_full_context(block: "LogseqBlock", parents: list["LogseqBlock"], in
         block: The block to generate context for
         parents: List of parent blocks from root to immediate parent
         indent_str: Indentation string (default: "  " for 2 spaces)
+        frontmatter: Optional page-level properties/content that appears before first bullet
 
     Returns:
-        Full context string with bullet markers and indentation
+        Full context string with optional frontmatter, bullet markers and indentation
 
     Examples:
         >>> # Block with no parents
@@ -41,8 +47,26 @@ def generate_full_context(block: "LogseqBlock", parents: list["LogseqBlock"], in
         >>> # Block with parents
         >>> generate_full_context(grandchild, [root, child])
         "- Root content\\n  - Child content\\n    - Grandchild content"
+
+        >>> # Block with frontmatter
+        >>> generate_full_context(block, [], frontmatter=["title:: My Page", "tags:: [[Python]]"])
+        "title:: My Page\\ntags:: [[Python]]\\n\\n- My content"
     """
     context_parts = []
+
+    # Add frontmatter if provided (page properties)
+    # Strip leading/trailing empty lines from frontmatter
+    if frontmatter:
+        # Find first and last non-empty lines
+        non_empty_lines = [line for line in frontmatter if line.strip()]
+        if non_empty_lines:
+            # Find indices of first and last non-empty lines
+            first_idx = next(i for i, line in enumerate(frontmatter) if line.strip())
+            last_idx = len(frontmatter) - 1 - next(i for i, line in enumerate(reversed(frontmatter)) if line.strip())
+            # Add only the content between first and last non-empty lines
+            context_parts.extend(frontmatter[first_idx:last_idx + 1])
+            # Add blank line separator between frontmatter and blocks
+            context_parts.append("")
 
     # Add all parent blocks with proper indentation
     # Use full content (all lines) to maximize uniqueness
@@ -103,7 +127,7 @@ def generate_chunks(outline: "LogseqOutline", page_name: str | None = None) -> l
     """Generate chunks with full context and hybrid IDs for all blocks.
 
     This recursively traverses the outline and generates:
-    - Full context string (for embedding and uniqueness)
+    - Full context string (for embedding and uniqueness, includes frontmatter)
     - Hybrid ID (id:: property if present, otherwise content hash)
 
     Args:
@@ -122,11 +146,12 @@ def generate_chunks(outline: "LogseqOutline", page_name: str | None = None) -> l
     """
     chunks = []
     indent_str = outline.indent_str
+    frontmatter = outline.frontmatter if outline.frontmatter else None
 
     def traverse(block: "LogseqBlock", parents: list["LogseqBlock"]) -> None:
         """Recursively traverse blocks and generate chunks."""
-        # Generate full context for this block (with bullets and indentation)
-        full_context = generate_full_context(block, parents, indent_str)
+        # Generate full context for this block (with frontmatter, bullets and indentation)
+        full_context = generate_full_context(block, parents, indent_str, frontmatter)
 
         # Determine hybrid ID (id:: property or content hash)
         if block.block_id:

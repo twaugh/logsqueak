@@ -264,3 +264,44 @@ class TestGenerateChunks:
         assert chunks[1][1] == "- Root 1\n  id:: root-1\n  - Child 1.1"
         # Grandchild has full ancestry (including parent's properties)
         assert chunks[3][1] == "- Root 1\n  id:: root-1\n  - Child 1.2\n    - Grandchild 1.2.1"
+
+    def test_frontmatter_included_in_context(self):
+        """Test that frontmatter (page properties) is included in full context."""
+        markdown = dedent(
+            """\
+            title:: My Page
+            tags:: [[Python]], [[Concurrency]]
+
+            - First block
+              - Nested block"""
+        )
+        outline = LogseqOutline.parse(markdown)
+
+        chunks = generate_chunks(outline)
+
+        assert len(chunks) == 2
+        # First block should have frontmatter in context
+        expected_first = "title:: My Page\ntags:: [[Python]], [[Concurrency]]\n\n- First block"
+        assert chunks[0][1] == expected_first
+        # Nested block should also have frontmatter
+        expected_nested = "title:: My Page\ntags:: [[Python]], [[Concurrency]]\n\n- First block\n  - Nested block"
+        assert chunks[1][1] == expected_nested
+
+    def test_frontmatter_affects_hash(self):
+        """Test that frontmatter affects content hash for blocks without explicit IDs."""
+        markdown_with_frontmatter = dedent(
+            """\
+            tags:: [[Python]]
+
+            - Same block"""
+        )
+        markdown_without_frontmatter = "- Same block"
+
+        outline_with = LogseqOutline.parse(markdown_with_frontmatter)
+        outline_without = LogseqOutline.parse(markdown_without_frontmatter)
+
+        chunks_with = generate_chunks(outline_with)
+        chunks_without = generate_chunks(outline_without)
+
+        # Same block content but different frontmatter should have different hashes
+        assert chunks_with[0][2] != chunks_without[0][2]
