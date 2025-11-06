@@ -109,17 +109,17 @@ class BlockTree(Tree):
 
             # Content with appropriate background
             if state.classification == "knowledge":
-                # LLM selected - yellow background on content only
-                label.append(content, style="on yellow")
+                # LLM selected - dark blue background on content only
+                label.append(content, style="on dark_blue")
             else:
                 # LLM suggested but not selected
                 label.append(content, style="")
         else:
             # No emoji - use invisible padding
             if state and state.classification == "knowledge" and state.source == "user":
-                # User selected - green background on content, padding separate
+                # User selected - dark green background on content, padding separate
                 label.append(invisible_padding, style="")
-                label.append(content, style="on green")
+                label.append(content, style="on dark_green")
             else:
                 # Not selected - include padding IN the content string
                 label.append(invisible_padding + content, style="")
