@@ -81,8 +81,11 @@ class BlockTree(Tree):
     def _create_block_label(self, block_id: str, content: str) -> Text:
         """Create Rich Text label with visual indicators.
 
-        The robot emoji appears in a fixed-width margin before content,
-        ensuring consistent alignment regardless of emoji presence.
+        Uses invisible Braille Pattern Blank characters (U+2800) to ensure
+        consistent alignment. All blocks have a 2-cell prefix: either a robot
+        emoji (🤖) for LLM-classified blocks, or two invisible Braille blanks
+        for non-classified blocks. Content position remains fixed regardless
+        of selection state.
 
         Args:
             block_id: Block identifier
@@ -91,33 +94,35 @@ class BlockTree(Tree):
         Returns:
             Rich Text object with formatting and indicators
         """
-        label = Text()
-
         # Get block state
         state = self.block_states.get(block_id)
-        if not state:
-            # No state yet, add empty margin space for alignment
-            label.append("   ")  # 3 spaces (emoji + space width)
-            label.append(content)
-            return label
 
-        # Add robot emoji for LLM suggestions, or empty space for alignment
-        if state.llm_classification == "knowledge":
-            label.append("🤖 ", style="")
-        else:
-            # Empty margin space to maintain alignment
-            label.append("   ")  # 3 spaces (emoji + space width)
+        label = Text()
 
-        # Add content with appropriate styling
-        if state.classification == "knowledge" and state.source == "user":
-            # User selected - green highlight
-            label.append(content, style="bold green")
-        elif state.classification == "knowledge" and state.source == "llm":
-            # LLM suggested (not yet selected by user) - yellow highlight
-            label.append(content, style="bold yellow")
+        # Strategy: Emoji OR invisible characters, then content
+        # Using Braille Pattern Blank (U+2800) - an invisible char that takes up space
+        invisible_padding = "\u2800\u2800"  # 2 invisible characters = 2 cells
+
+        if state and state.llm_classification == "knowledge":
+            # Has emoji indicator
+            label.append("🤖", style="")
+
+            # Content with appropriate background
+            if state.classification == "knowledge":
+                # LLM selected - yellow background on content only
+                label.append(content, style="on yellow")
+            else:
+                # LLM suggested but not selected
+                label.append(content, style="")
         else:
-            # Pending - normal style
-            label.append(content, style="")
+            # No emoji - use invisible padding
+            if state and state.classification == "knowledge" and state.source == "user":
+                # User selected - green background on content, padding separate
+                label.append(invisible_padding, style="")
+                label.append(content, style="on green")
+            else:
+                # Not selected - include padding IN the content string
+                label.append(invisible_padding + content, style="")
 
         return label
 
