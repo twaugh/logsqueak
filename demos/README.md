@@ -1,6 +1,39 @@
 # Logsqueak Demos
 
-Interactive demonstrations of Logsqueak TUI widgets.
+Interactive demonstrations of Logsqueak TUI widgets and screens.
+
+## Phase 3 Integration Review Demo
+
+Demonstrates the Phase 3 Integration Review workflow with sample knowledge blocks.
+
+**Run:**
+```bash
+python demos/demo_phase3.py
+```
+
+**Features:**
+- Knowledge block display with hierarchical context
+- Decision list showing integration targets
+- Target page preview with green bar insertion indicator
+- Keyboard-driven navigation and approval workflow
+- State tracking for completed/pending decisions
+
+**Sample Data:**
+- 3 knowledge blocks (Python, Docker, CI/CD topics)
+- Multiple integration decisions per block
+- Target pages with realistic Logseq structure
+
+**Keyboard Controls:**
+- `j` / `k` - Navigate between decisions
+- `y` - Accept current decision
+- `n` - Move to next knowledge block
+- `a` - Accept all pending decisions for current block
+- `q` - Quit
+
+**Layout:**
+- Left panel: Knowledge block content + decision list
+- Right panel: Target page preview with insertion indicator
+- Status bar: Progress tracking (completed/pending counts)
 
 ## TargetPagePreview Demo
 
