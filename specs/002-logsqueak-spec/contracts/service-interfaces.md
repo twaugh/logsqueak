@@ -767,17 +767,20 @@ class FileMonitor:
         """
         Check if file modified since last record.
 
+        Uses mtime inequality (!=) to detect changes in both directions,
+        which handles Logseq graphs in git where files may revert to
+        earlier content with older timestamps.
+
         Args:
             path: File path to check
 
         Returns:
             bool: True if file modified or not tracked, False otherwise
         """
+        current_mtime = path.stat().st_mtime
         if path not in self._mtimes:
             return True
-
-        current_mtime = path.stat().st_mtime
-        return current_mtime > self._mtimes[path]
+        return current_mtime != self._mtimes[path]
 
     def refresh(self, path: Path) -> None:
         """
