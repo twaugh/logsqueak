@@ -110,15 +110,15 @@
 - [x] T038 [P] [US1] Create BlockTree widget with Textual Tree for hierarchical display in src/logsqueak/tui/widgets/block_tree.py
 - [x] T039 [P] [US1] Create StatusPanel widget for background task progress in src/logsqueak/tui/widgets/status_panel.py
 - [x] T040 [P] [US1] Create MarkdownViewer widget for bottom panel display in src/logsqueak/tui/widgets/markdown_viewer.py
-- [ ] T041 [US1] Implement Phase1Screen with BlockTree, StatusPanel, and MarkdownViewer layout in src/logsqueak/tui/screens/block_selection.py
-- [ ] T042 [US1] Implement keyboard controls (j/k navigation, Space toggle, Shift+j/k jump to knowledge) in src/logsqueak/tui/screens/block_selection.py
-- [ ] T043 [US1] Add LLM classification worker using run_worker and classify_blocks streaming in src/logsqueak/tui/screens/block_selection.py
-- [ ] T044 [US1] Add page indexing worker with progress callbacks in src/logsqueak/tui/screens/block_selection.py
-- [ ] T045 [US1] Implement reactive state updates (selected_blocks, llm_suggestions) in src/logsqueak/tui/screens/block_selection.py
-- [ ] T046 [US1] Add visual indicators (robot emoji, highlight colors, bottom panel updates) in src/logsqueak/tui/screens/block_selection.py
-- [ ] T047 [US1] Implement 'a' key to accept all LLM suggestions, 'r' to reset, 'c' to clear all selections in src/logsqueak/tui/screens/block_selection.py
-- [ ] T048 [US1] Add footer with keyboard shortcuts in src/logsqueak/tui/screens/block_selection.py
-- [ ] T049 Run all Phase 1 UI tests with pytest and verify they NOW PASS - tests/ui/test_phase1_*.py
+- [x] T041 [US1] Implement Phase1Screen with BlockTree, StatusPanel, and MarkdownViewer layout in src/logsqueak/tui/screens/block_selection.py
+- [x] T042 [US1] Implement keyboard controls (j/k navigation, Space toggle, Shift+j/k jump to knowledge) in src/logsqueak/tui/screens/block_selection.py
+- [x] T043 [US1] Add LLM classification worker using run_worker and classify_blocks streaming in src/logsqueak/tui/screens/block_selection.py
+- [x] T044 [US1] Add page indexing worker with progress callbacks in src/logsqueak/tui/screens/block_selection.py
+- [x] T045 [US1] Implement reactive state updates (selected_blocks, llm_suggestions) in src/logsqueak/tui/screens/block_selection.py
+- [x] T046 [US1] Add visual indicators (robot emoji, highlight colors, bottom panel updates) in src/logsqueak/tui/screens/block_selection.py
+- [x] T047 [US1] Implement 'a' key to accept all LLM suggestions, 'r' to reset, 'c' to clear all selections in src/logsqueak/tui/screens/block_selection.py
+- [x] T048 [US1] Add footer with keyboard shortcuts in src/logsqueak/tui/screens/block_selection.py
+- [x] T049 Run all Phase 1 UI tests with pytest and verify they NOW PASS - tests/ui/test_phase1_*.py
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently. User should manually test: navigate blocks, see LLM streaming updates, select blocks, verify status widget.
 
