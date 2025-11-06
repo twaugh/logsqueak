@@ -6,22 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Logsqueak** is a TUI (Text User Interface) application for extracting lasting knowledge from Logseq journal entries using LLM-powered analysis. Users interactively review, refine, and integrate knowledge blocks into their Logseq knowledge base.
 
-**Current Status**: Phase 3 complete - Block Selection TUI working
+**Current Status**: Phase 4 complete - Content Editing TUI working
 - ✅ **Implemented**: `logseq-outline-parser` library (robust Logseq markdown parsing)
-- ✅ **Implemented**: Foundational infrastructure (models, services, CLI, config, tests)
+- ✅ **Implemented**: Foundational infrastructure (models, services, CLI, config)
 - ✅ **Implemented**: Phase 1 Block Selection TUI (tree navigation, LLM streaming, manual selection)
-- 🚧 **In Progress**: Phase 4 - Content Editing TUI (next to implement)
-- ⏳ **Planned**: RAG semantic search (PageIndexer, RAGSearch services), Integration Review TUI
+- ✅ **Implemented**: Phase 4 Content Editing TUI (three-panel layout, LLM rewording, manual editing)
+- ✅ **Implemented**: RAG semantic search (PageIndexer, RAGSearch with lazy loading)
+- ⏳ **Planned**: Phase 3 Integration Review TUI, background workers for Phase 2
 
 ## Project Structure
 
 ```
 logsqueak/
 ├── src/
-│   ├── logsqueak/                 # Main application (FOUNDATION COMPLETE)
+│   ├── logsqueak/                 # Main application
 │   │   ├── models/                # Pydantic data models (config, block state, LLM chunks)
-│   │   ├── services/              # LLMClient, FileMonitor (RAG services planned)
-│   │   ├── tui/                   # TUI screens & widgets (Phase 1 complete)
+│   │   ├── services/              # LLMClient, FileMonitor, PageIndexer, RAGSearch
+│   │   ├── tui/                   # TUI screens & widgets (Phase 1, Phase 2 complete)
 │   │   ├── utils/                 # Logging, UUID generation
 │   │   ├── cli.py                 # Click-based CLI entry point
 │   │   └── config.py              # ConfigManager with lazy validation
@@ -30,15 +31,15 @@ logsqueak/
 │           ├── parser.py          # Core parsing/rendering logic
 │           ├── context.py         # Full-context generation & content hashing
 │           └── graph.py           # Graph path utilities
-├── tests/                         # Test suite (148 passed)
+├── tests/                         # Test suite
 │   ├── unit/                      # Unit tests for models, services, utils
-│   ├── integration/               # Integration tests for config, LLM streaming
-│   └── ui/                        # UI tests for Phase 1 (Textual pilot)
+│   ├── integration/               # Integration tests for config, LLM, RAG pipeline
+│   └── ui/                        # UI tests for Phase 1 and Phase 2 (Textual pilot)
 ├── specs/
 │   ├── 001-logsqueak/             # Original knowledge extraction spec
 │   └── 002-logsqueak-spec/        # Interactive TUI feature spec (CURRENT)
 │       ├── spec.md                # Complete feature specification
-│       ├── tasks.md               # Phase 1-3 complete (T001-T049 ✅)
+│       ├── tasks.md               # Phase 1-4 complete (T001-T070 ✅)
 │       └── contracts/             # Service interfaces, data models
 ├── pyproject.toml                 # Project dependencies and config
 └── CLAUDE.md                      # This file
@@ -187,10 +188,10 @@ Implemented services in `src/logsqueak/services/`:
 - **llm_client.py**: LLMClient with async NDJSON streaming, retry logic, structured logging
 - **file_monitor.py**: FileMonitor with mtime tracking using `!=` comparison (git-friendly)
 - **journal_loader.py**: Load and parse journal entries with date range support
+- **page_indexer.py**: ChromaDB vector indexing with lazy-loaded SentenceTransformer, uses `generate_chunks()`
+- **rag_search.py**: Semantic search with explicit link boosting and page-level ranking
 
 Planned services (not yet implemented):
-- **page_indexer.py**: ChromaDB vector indexing (required for US2)
-- **rag_search.py**: Semantic search with explicit link boosting (required for US2)
 - **file_operations.py**: Atomic two-phase writes with provenance markers (required for US3)
 
 ### Configuration & CLI
@@ -206,12 +207,12 @@ Planned services (not yet implemented):
 
 ### Test Coverage
 
-**148 tests passing** across:
-- **Unit tests** (`tests/unit/`): Models, config, LLM client, file monitor, utilities
-- **Integration tests** (`tests/integration/`): Config loading, LLM NDJSON streaming workflows
-- **UI tests** (`tests/ui/`): Phase 1 block selection TUI (navigation, selection, LLM streaming, status panel)
+Comprehensive test suite covering:
+- **Unit tests** (`tests/unit/`): Models, config, LLM client, file monitor, utilities, RAG services
+- **Integration tests** (`tests/integration/`): Config loading, LLM NDJSON streaming, RAG pipeline
+- **UI tests** (`tests/ui/`): Phase 1 and Phase 2 TUI with snapshot testing
 
-All async mocking properly implements context managers. FileMonitor uses `!=` for mtime comparison to handle git reverts.
+All async fixtures use `@pytest_asyncio.fixture`. FileMonitor uses `!=` for mtime comparison to handle git reverts.
 
 ## Interactive TUI Application (IN PROGRESS)
 
@@ -374,8 +375,8 @@ logsqueak extract 2025-01-10..2025-01-15  # Date range
   - `click>=8.1.0` - CLI framework
   - `pyyaml>=6.0.0` - YAML config parsing
   - `structlog>=23.0.0` - Structured logging
-  - `chromadb>=0.4.0` - Vector store for RAG (to be used)
-  - `sentence-transformers>=2.2.0` - Embeddings (to be used, large dependency)
+  - `chromadb>=0.4.0` - Vector store for RAG
+  - `sentence-transformers>=2.2.0` - Embeddings (lazy-loaded to prevent UI blocking)
   - `markdown-it-py>=3.0.0` - Markdown rendering (to be used)
 - **Dev dependencies** (installed):
   - `pytest>=7.4.0` - Test framework
@@ -476,28 +477,28 @@ Logseq uses indented bullets (2 spaces per level) with special features:
 - ✅ **Phase 1: Setup** (T001-T009) - Complete
 - ✅ **Phase 2: Foundational** (T010-T031) - Complete and tested
 - ✅ **Phase 3: User Story 1** (T032-T049) - Block Selection TUI complete
-- 🚧 **Phase 4: User Story 2** (T050-T070) - Content Editing TUI (next to implement)
-- ⏳ **Phase 5: User Story 3** (T071-T096) - Integration Review TUI
+- ✅ **Phase 4: User Story 2** (T050-T070) - Content Editing TUI complete
+- ⏳ **Phase 5: User Story 3** (T071-T096) - Integration Review TUI (next to implement)
 - ⏳ **Phase 6: Application Integration** (T097-T106) - Wire up all phases
 - ⏳ **Phase 7: Edge Cases** (T107-T117) - Error handling polish
 - ⏳ **Phase 8: Polish & Documentation** (T118-T130) - Final validation
 
-**Phase 3 Achievements**:
-- ✅ Block tree navigation with j/k keys and vim-style controls
-- ✅ LLM classification streaming with real-time UI updates
-- ✅ Manual block selection/deselection with Space key
-- ✅ Status panel showing background task progress
-- ✅ Markdown preview of selected blocks with full context
-- ✅ Comprehensive UI test suite using Textual pilot
-- ✅ Working CLI integration with date/range parsing
+**Phase 4 Achievements**:
+- ✅ RAG services (PageIndexer, RAGSearch) with lazy SentenceTransformer loading
+- ✅ ContentEditor widget with focus/unfocus visual indication
+- ✅ Phase2Screen with vertical three-panel layout (original, LLM, editable)
+- ✅ Keyboard controls (j/k navigation, Tab focus, 'a' accept, 'r' revert)
+- ✅ Auto-save on navigation, RAG search blocking on 'n' key
+- ✅ Background worker stubs ready for LLM/RAG integration
+- ✅ Comprehensive UI test suite with snapshot testing
 
-**Next steps** (Phase 4 - User Story 2):
-1. Write UI tests FIRST using Textual pilot (T050-T056) - tests should FAIL
-2. Verify tests fail with `pytest tests/ui/test_phase2_*.py -v`
-3. Implement RAG services (PageIndexer, RAGSearch) with tests (T057-T061)
-4. Implement ContentEditor widget and Phase2Screen (T062-T069)
-5. Run tests again - should NOW PASS (T070)
-6. Manually test TUI: edit content, accept LLM rewording, verify RAG search
+**Next steps** (Phase 5 - User Story 3):
+1. Write UI tests FIRST using Textual pilot (T071-T077) - tests should FAIL
+2. Implement file operations (atomic writes, provenance markers) with tests (T078-T082)
+3. Implement TargetPagePreview and DecisionList widgets (T083-T084)
+4. Implement Phase3Screen with integration review workflow (T085-T095)
+5. Run tests again - should NOW PASS (T096)
+6. Manually test TUI: review decisions, accept integrations, verify writes
 
 **When implementing**:
 - Follow TDD: Write failing tests → Implement → Tests pass → Manual verify
@@ -512,19 +513,23 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
 
 ## Recent Changes
 
+- 2025-11-06: **Phase 4 Complete** - Content Editing TUI implemented and tested (T050-T070)
+  - RAG services (PageIndexer, RAGSearch) with lazy SentenceTransformer loading
+  - Fixed PageIndexer to use `generate_chunks()` for proper semantic chunking
+  - ContentEditor widget and Phase2Screen with vertical three-panel layout
+  - Keyboard controls: j/k navigation, Tab focus, 'a' accept, 'r' revert
+  - Auto-save on navigation, RAG search blocking implemented
+  - Comprehensive UI test suite with snapshot testing
+  - All async fixtures properly use `@pytest_asyncio.fixture`
 - 2025-11-06: **Phase 3 Complete** - Block Selection TUI implemented and tested (T032-T049)
   - BlockTree, StatusPanel, MarkdownViewer widgets complete
   - Phase1Screen with LLM streaming, keyboard navigation, manual selection
   - Journal loader service with date/range parsing
   - CLI integration launching Phase 1 TUI
-  - 22 new UI tests using Textual pilot (148 total tests passing)
-  - User-tested: navigation, LLM streaming, block selection all working
 - 2025-11-06: **Phase 1-2 Complete** - Foundational infrastructure implemented and tested (T001-T031)
   - All data models, services, CLI, config, and utilities complete
-  - 125 tests passing (unit + integration)
   - Fixed FileMonitor to use `!=` comparison (git-friendly)
   - Generated Logsqueak-specific UUID namespace
-  - All async tests properly mock context managers
 
 ## Active Technologies
 - Python 3.11+ (002-logsqueak-spec)
