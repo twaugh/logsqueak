@@ -28,19 +28,22 @@ dependencies = [
     "numpy>=1.24.0",
     "chromadb>=0.4.0",
     "textual>=0.47.0",
+    "structlog>=23.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
+    "pytest-textual-snapshot>=0.4.0",
+    "pytest-asyncio>=0.21.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.7.0",
 ]
 
 [project.scripts]
-logsqueak = "logsqueak.cli.main:main"
+logsqueak = "logsqueak.cli:main"
 
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
