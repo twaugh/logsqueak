@@ -23,6 +23,8 @@ class ContentEditor(TextArea):
         super().__init__("", *args, id="content-editor", **kwargs)
         self.can_focus = True
         self.show_line_numbers = False
+        # Set initial border (unfocused state)
+        self.styles.border = ("solid", "white")
 
     def on_focus(self) -> None:
         """Handle focus event."""
