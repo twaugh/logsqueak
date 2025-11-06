@@ -69,6 +69,9 @@ class BlockTree(Tree):
         # Add node with block_id as data
         node = parent_node.add(label, data=block.block_id)
 
+        # Expand node to show children by default
+        node.expand()
+
         # Recursively add children
         for child in block.children:
             self._add_block_to_tree(child, node)
