@@ -1,0 +1,19 @@
+# serializer version: 1
+# name: test_phase3_decision_list_snapshot
+  DecisionList(id='decision-list')
+# ---
+# name: test_phase3_footer_snapshot
+  Footer()
+# ---
+# name: test_phase3_initial_render_snapshot
+  Phase3Screen()
+# ---
+# name: test_phase3_target_preview_snapshot
+  TargetPagePreview(id='target-page-preview')
+# ---
+# name: test_phase3_with_completed_decision_snapshot
+  Phase3Screen()
+# ---
+# name: test_phase3_with_failed_decision_snapshot
+  Phase3Screen()
+# ---
