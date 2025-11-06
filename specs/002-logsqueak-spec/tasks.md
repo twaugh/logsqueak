@@ -186,20 +186,20 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T071 [P] [US3] Write UI test for decision navigation (j/k between decisions) using Textual pilot in tests/ui/test_phase3_navigation.py - should FAIL initially
-- [ ] T072 [P] [US3] Write UI test for decision acceptance ('y' key triggers write) using Textual pilot in tests/ui/test_phase3_accept.py - should FAIL initially
-- [ ] T073 [P] [US3] Write UI test for next block navigation ('n' key) using Textual pilot in tests/ui/test_phase3_next_block.py - should FAIL initially
-- [ ] T074 [P] [US3] Write UI test for batch accept ('a' key writes all pending) using Textual pilot in tests/ui/test_phase3_batch_accept.py - should FAIL initially
-- [ ] T075 [P] [US3] Write UI test for write failure handling using Textual pilot in tests/ui/test_phase3_errors.py - should FAIL initially
-- [ ] T076 [P] [US3] Write snapshot test for Phase 3 initial render using pytest-textual-snapshot in tests/ui/test_phase3_snapshots.py - should FAIL initially
-- [ ] T077 Run all Phase 3 UI tests with pytest and verify they FAIL as expected
+- [x] T071 [P] [US3] Write UI test for decision navigation (j/k between decisions) using Textual pilot in tests/ui/test_phase3_navigation.py - should FAIL initially
+- [x] T072 [P] [US3] Write UI test for decision acceptance ('y' key triggers write) using Textual pilot in tests/ui/test_phase3_accept.py - should FAIL initially
+- [x] T073 [P] [US3] Write UI test for next block navigation ('n' key) using Textual pilot in tests/ui/test_phase3_next_block.py - should FAIL initially
+- [x] T074 [P] [US3] Write UI test for batch accept ('a' key writes all pending) using Textual pilot in tests/ui/test_phase3_batch_accept.py - should FAIL initially
+- [x] T075 [P] [US3] Write UI test for write failure handling using Textual pilot in tests/ui/test_phase3_errors.py - should FAIL initially
+- [x] T076 [P] [US3] Write snapshot test for Phase 3 initial render using pytest-textual-snapshot in tests/ui/test_phase3_snapshots.py - should FAIL initially
+- [x] T077 Run all Phase 3 UI tests with pytest and verify they FAIL as expected
 
 ### File Operations Implementation (Required for US3)
 
-- [ ] T078 [P] [US3] Implement write_integration function with atomic two-phase writes in src/logsqueak/services/file_operations.py
-- [ ] T079 [P] [US3] Implement add_processed_marker function for journal provenance in src/logsqueak/services/file_operations.py
-- [ ] T080 [P] [US3] Implement validation functions (validate_target_exists, validate_structure) in src/logsqueak/services/file_operations.py
-- [ ] T081 Write unit tests for file operations (add_section, add_under, replace actions) in tests/unit/test_file_operations.py and run with pytest
+- [x] T078 [P] [US3] Implement write_integration function with atomic two-phase writes in src/logsqueak/services/file_operations.py
+- [x] T079 [P] [US3] Implement add_processed_marker function for journal provenance in src/logsqueak/services/file_operations.py
+- [x] T080 [P] [US3] Implement validation functions (validate_target_exists, validate_structure) in src/logsqueak/services/file_operations.py
+- [x] T081 Write unit tests for file operations (add_section, add_under, replace actions) in tests/unit/test_file_operations.py and run with pytest (21/21 passing)
 - [ ] T082 Write integration tests for two-phase atomic writes with FileMonitor in tests/integration/test_atomic_writes.py and run with pytest
 
 ### Implementation for User Story 3

@@ -105,7 +105,7 @@ journal_path.write_text(output_text)
 from logseq_outline.parser import LogseqBlock
 
 # Find block by ID (explicit or hash)
-block, parents = journal_outline.find_block_by_id("abc123-def456-...")
+block = journal_outline.find_block_by_id("abc123-def456-...")
 
 if block is None:
     raise ValueError("Block not found")
@@ -119,9 +119,9 @@ property_value = block.get_property("processed")  # Get property value
 
 **Contract**:
 
-- `find_block_by_id()` returns tuple: `(block, parents)` or `(None, [])` if not found
-- `parents` is list of ancestor blocks from root to immediate parent
+- `find_block_by_id()` returns `LogseqBlock` if found, `None` otherwise
 - `block.block_id` is explicit `id::` property value or `None`
+- For content-hash based lookup, optionally pass `page_name` parameter
 
 ---
 
@@ -269,7 +269,7 @@ def write_add_under(
     )
 
     # Find target block
-    target_block, _ = page_outline.find_block_by_id(target_block_id)
+    target_block = page_outline.find_block_by_id(target_block_id)
     if target_block is None:
         raise ValueError(f"Target block not found: {target_block_id}")
 
@@ -318,7 +318,7 @@ def write_replace(
         ValueError: If target block not found
     """
     # Find target block
-    target_block, _ = page_outline.find_block_by_id(target_block_id)
+    target_block = page_outline.find_block_by_id(target_block_id)
     if target_block is None:
         raise ValueError(f"Target block not found: {target_block_id}")
 
@@ -557,7 +557,7 @@ def write_integration_atomic(
         target_block_id=decision.target_block_id
     )
 
-    existing_block, _ = page_outline.find_block_by_id(expected_block_id)
+    existing_block = page_outline.find_block_by_id(expected_block_id)
     if existing_block is not None:
         logger.info(
             "block_already_exists",
@@ -597,7 +597,7 @@ def write_integration_atomic(
         journal_outline = LogseqOutline.parse(journal_path.read_text())
 
     # Step 6: Add provenance to journal
-    journal_block, _ = journal_outline.find_block_by_id(decision.knowledge_block_id)
+    journal_block = journal_outline.find_block_by_id(decision.knowledge_block_id)
     if journal_block is None:
         raise ValueError(
             f"Knowledge block not found in journal: {decision.knowledge_block_id}"
@@ -644,7 +644,7 @@ def validate_decision(
                 f"Action {decision.action} requires target_block_id"
             )
 
-        block, _ = page_outline.find_block_by_id(decision.target_block_id)
+        block = page_outline.find_block_by_id(decision.target_block_id)
         if block is None:
             raise ValueError(
                 f"Target block not found: {decision.target_block_id} "
