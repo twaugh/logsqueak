@@ -219,9 +219,10 @@
 - [x] T095 [US3] Add footer with context-sensitive shortcuts (varies based on decision state) in src/logsqueak/tui/screens/integration_review.py
 - [x] T096 Run all Phase 3 UI tests with pytest and verify they NOW PASS - tests/ui/test_phase3_*.py (38 passed, 2 skipped)
 
-**Deferred enhancements** (tests marked as skipped):
+**Deferred enhancements**:
 - [ ] T096a Implement decisions_ready tracking to block navigation until LLM generates decisions for next block
 - [ ] T096b Implement Enter key as alternative to 'n' key for advancing to next block
+- [ ] T096c Implement realistic preview generation in _generate_preview_text(): load target page from disk, apply integration action (add_section/add_under/replace), render result showing actual page content with new block inserted at correct location marked with green bar
 
 **Checkpoint**: All P1 user stories (US1, US3) should now be independently functional. This is the MVP! User should manually test: review decisions, accept integrations, verify writes succeed, check provenance markers in journal.
 
