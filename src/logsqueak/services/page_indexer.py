@@ -26,7 +26,8 @@ class PageIndexer:
         self,
         graph_paths: GraphPaths,
         db_path: Path,
-        embedding_model: str = "all-MiniLM-L6-v2"
+        embedding_model: str = "all-MiniLM-L6-v2",
+        encoder: Optional[Any] = None
     ):
         """
         Initialize page indexer.
@@ -34,12 +35,13 @@ class PageIndexer:
         Args:
             graph_paths: GraphPaths instance for path resolution
             db_path: Path to ChromaDB persistent storage
-            embedding_model: SentenceTransformer model name (loaded lazily)
+            embedding_model: SentenceTransformer model name (loaded lazily if encoder not provided)
+            encoder: Optional pre-loaded SentenceTransformer encoder (for testing/performance)
         """
         self.graph_paths = graph_paths
         self.db_path = db_path
         self.embedding_model = embedding_model
-        self._encoder: Optional[Any] = None  # Lazy-loaded SentenceTransformer
+        self._encoder: Optional[Any] = encoder  # Pre-loaded or lazy-loaded SentenceTransformer
 
         # Initialize ChromaDB
         self.chroma_client = chromadb.PersistentClient(path=str(db_path))

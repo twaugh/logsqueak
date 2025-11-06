@@ -42,12 +42,12 @@ def temp_graph(tmp_path):
 
 
 @pytest_asyncio.fixture
-async def indexed_db(temp_graph, tmp_path):
+async def indexed_db(temp_graph, tmp_path, shared_sentence_transformer):
     """Create and populate a ChromaDB index."""
     db_path = tmp_path / "chromadb"
 
     graph_paths = GraphPaths(temp_graph)
-    indexer = PageIndexer(graph_paths, db_path)
+    indexer = PageIndexer(graph_paths, db_path, encoder=shared_sentence_transformer)
 
     # Build index
     await indexer.build_index()
@@ -272,7 +272,7 @@ async def test_find_candidates_uses_original_context(indexed_db):
 
 
 @pytest.mark.asyncio
-async def test_find_candidates_handles_hierarchical_page_links(indexed_db, temp_graph):
+async def test_find_candidates_handles_hierarchical_page_links(indexed_db, temp_graph, shared_sentence_transformer):
     """Test that hierarchical page links (with /) are handled correctly."""
     # Add a hierarchical page
     pages_dir = temp_graph / "pages"
@@ -283,7 +283,7 @@ async def test_find_candidates_handles_hierarchical_page_links(indexed_db, temp_
 
     # Rebuild index
     graph_paths = GraphPaths(temp_graph)
-    indexer = PageIndexer(graph_paths, indexed_db)
+    indexer = PageIndexer(graph_paths, indexed_db, encoder=shared_sentence_transformer)
     await indexer.build_index()
     await indexer.close()
 

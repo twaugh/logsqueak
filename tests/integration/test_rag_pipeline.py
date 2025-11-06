@@ -79,13 +79,13 @@ def test_graph(tmp_path):
 
 
 @pytest_asyncio.fixture
-async def rag_pipeline(test_graph, tmp_path):
+async def rag_pipeline(test_graph, tmp_path, shared_sentence_transformer):
     """Create and initialize the complete RAG pipeline."""
     db_path = tmp_path / "chromadb"
 
     # Build index
     graph_paths = GraphPaths(test_graph)
-    indexer = PageIndexer(graph_paths, db_path)
+    indexer = PageIndexer(graph_paths, db_path, encoder=shared_sentence_transformer)
     await indexer.build_index()
     await indexer.close()
 
@@ -270,13 +270,13 @@ async def test_multiple_knowledge_blocks_parallel_search(rag_pipeline):
 
 
 @pytest.mark.asyncio
-async def test_incremental_index_update_affects_search(test_graph, tmp_path):
+async def test_incremental_index_update_affects_search(test_graph, tmp_path, shared_sentence_transformer):
     """Test that updating the index affects search results."""
     db_path = tmp_path / "chromadb"
 
     # Initial index build
     graph_paths = GraphPaths(test_graph)
-    indexer = PageIndexer(graph_paths, db_path)
+    indexer = PageIndexer(graph_paths, db_path, encoder=shared_sentence_transformer)
     await indexer.build_index()
     await indexer.close()
 
@@ -315,7 +315,7 @@ async def test_incremental_index_update_affects_search(test_graph, tmp_path):
 """)
 
     # Rebuild index
-    indexer = PageIndexer(graph_paths, db_path)
+    indexer = PageIndexer(graph_paths, db_path, encoder=shared_sentence_transformer)
     await indexer.build_index()
     await indexer.close()
 

@@ -48,10 +48,10 @@ def temp_db(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_page_indexer_initialization(temp_graph, temp_db):
+async def test_page_indexer_initialization(temp_graph, temp_db, shared_sentence_transformer):
     """Test PageIndexer initialization."""
     graph_paths = GraphPaths(temp_graph)
-    indexer = PageIndexer(graph_paths, temp_db)
+    indexer = PageIndexer(graph_paths, temp_db, encoder=shared_sentence_transformer)
 
     assert indexer.graph_paths.graph_path == temp_graph
     assert indexer.db_path == temp_db
@@ -61,10 +61,10 @@ async def test_page_indexer_initialization(temp_graph, temp_db):
 
 
 @pytest.mark.asyncio
-async def test_build_index_creates_embeddings(temp_graph, temp_db):
+async def test_build_index_creates_embeddings(temp_graph, temp_db, shared_sentence_transformer):
     """Test that build_index creates embeddings for all pages."""
     graph_paths = GraphPaths(temp_graph)
-    indexer = PageIndexer(graph_paths, temp_db)
+    indexer = PageIndexer(graph_paths, temp_db, encoder=shared_sentence_transformer)
 
     # Build index
     await indexer.build_index()
@@ -81,10 +81,10 @@ async def test_build_index_creates_embeddings(temp_graph, temp_db):
 
 
 @pytest.mark.asyncio
-async def test_build_index_with_progress_callback(temp_graph, temp_db):
+async def test_build_index_with_progress_callback(temp_graph, temp_db, shared_sentence_transformer):
     """Test that progress callback is called during indexing."""
     graph_paths = GraphPaths(temp_graph)
-    indexer = PageIndexer(graph_paths, temp_db)
+    indexer = PageIndexer(graph_paths, temp_db, encoder=shared_sentence_transformer)
 
     progress_updates = []
 
@@ -104,10 +104,10 @@ async def test_build_index_with_progress_callback(temp_graph, temp_db):
 
 
 @pytest.mark.asyncio
-async def test_incremental_indexing_skips_unmodified_pages(temp_graph, temp_db):
+async def test_incremental_indexing_skips_unmodified_pages(temp_graph, temp_db, shared_sentence_transformer):
     """Test that incremental indexing skips unmodified pages."""
     graph_paths = GraphPaths(temp_graph)
-    indexer = PageIndexer(graph_paths, temp_db)
+    indexer = PageIndexer(graph_paths, temp_db, encoder=shared_sentence_transformer)
 
     # First build
     await indexer.build_index()
@@ -124,10 +124,10 @@ async def test_incremental_indexing_skips_unmodified_pages(temp_graph, temp_db):
 
 
 @pytest.mark.asyncio
-async def test_incremental_indexing_updates_modified_pages(temp_graph, temp_db):
+async def test_incremental_indexing_updates_modified_pages(temp_graph, temp_db, shared_sentence_transformer):
     """Test that incremental indexing updates modified pages."""
     graph_paths = GraphPaths(temp_graph)
-    indexer = PageIndexer(graph_paths, temp_db)
+    indexer = PageIndexer(graph_paths, temp_db, encoder=shared_sentence_transformer)
 
     # First build
     await indexer.build_index()
@@ -154,10 +154,10 @@ async def test_incremental_indexing_updates_modified_pages(temp_graph, temp_db):
 
 
 @pytest.mark.asyncio
-async def test_index_hierarchical_pages(temp_graph, temp_db):
+async def test_index_hierarchical_pages(temp_graph, temp_db, shared_sentence_transformer):
     """Test that hierarchical pages (with ___) are indexed correctly."""
     graph_paths = GraphPaths(temp_graph)
-    indexer = PageIndexer(graph_paths, temp_db)
+    indexer = PageIndexer(graph_paths, temp_db, encoder=shared_sentence_transformer)
 
     await indexer.build_index()
 
@@ -173,14 +173,14 @@ async def test_index_hierarchical_pages(temp_graph, temp_db):
 
 
 @pytest.mark.asyncio
-async def test_build_index_raises_on_missing_pages_dir(temp_graph, temp_db):
+async def test_build_index_raises_on_missing_pages_dir(temp_graph, temp_db, shared_sentence_transformer):
     """Test that build_index raises error if pages directory doesn't exist."""
     # Remove pages directory
     pages_dir = temp_graph / "pages"
     shutil.rmtree(pages_dir)
 
     graph_paths = GraphPaths(temp_graph)
-    indexer = PageIndexer(graph_paths, temp_db)
+    indexer = PageIndexer(graph_paths, temp_db, encoder=shared_sentence_transformer)
 
     with pytest.raises(ValueError, match="Pages directory not found"):
         await indexer.build_index()
@@ -189,7 +189,7 @@ async def test_build_index_raises_on_missing_pages_dir(temp_graph, temp_db):
 
 
 @pytest.mark.asyncio
-async def test_build_index_raises_on_empty_pages_dir(temp_graph, temp_db):
+async def test_build_index_raises_on_empty_pages_dir(temp_graph, temp_db, shared_sentence_transformer):
     """Test that build_index raises error if pages directory is empty."""
     # Remove all pages
     pages_dir = temp_graph / "pages"
@@ -197,7 +197,7 @@ async def test_build_index_raises_on_empty_pages_dir(temp_graph, temp_db):
         page_file.unlink()
 
     graph_paths = GraphPaths(temp_graph)
-    indexer = PageIndexer(graph_paths, temp_db)
+    indexer = PageIndexer(graph_paths, temp_db, encoder=shared_sentence_transformer)
 
     with pytest.raises(ValueError, match="No pages found"):
         await indexer.build_index()
@@ -206,10 +206,10 @@ async def test_build_index_raises_on_empty_pages_dir(temp_graph, temp_db):
 
 
 @pytest.mark.asyncio
-async def test_index_blocks_with_children(temp_graph, temp_db):
+async def test_index_blocks_with_children(temp_graph, temp_db, shared_sentence_transformer):
     """Test that nested blocks are indexed correctly."""
     graph_paths = GraphPaths(temp_graph)
-    indexer = PageIndexer(graph_paths, temp_db)
+    indexer = PageIndexer(graph_paths, temp_db, encoder=shared_sentence_transformer)
 
     await indexer.build_index()
 
@@ -223,10 +223,10 @@ async def test_index_blocks_with_children(temp_graph, temp_db):
 
 
 @pytest.mark.asyncio
-async def test_embeddings_are_stored(temp_graph, temp_db):
+async def test_embeddings_are_stored(temp_graph, temp_db, shared_sentence_transformer):
     """Test that embeddings are actually stored in the collection."""
     graph_paths = GraphPaths(temp_graph)
-    indexer = PageIndexer(graph_paths, temp_db)
+    indexer = PageIndexer(graph_paths, temp_db, encoder=shared_sentence_transformer)
 
     await indexer.build_index()
 
