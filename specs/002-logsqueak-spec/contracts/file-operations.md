@@ -44,11 +44,11 @@ graph_root = Path("~/Documents/logseq-graph").expanduser()
 graph_paths = GraphPaths(graph_root)
 
 # Get journal path
-journal_path = graph_paths.journal_path("2025-11-05")
+journal_path = graph_paths.get_journal_path("2025-11-05")
 # Returns: ~/Documents/logseq-graph/journals/2025-11-05.md
 
 # Get page path (handles hierarchical pages with '/' separator)
-page_path = graph_paths.page_path("Python/Concurrency")
+page_path = graph_paths.get_page_path("Python/Concurrency")
 # Returns: ~/Documents/logseq-graph/pages/Python___Concurrency.md
 ```
 

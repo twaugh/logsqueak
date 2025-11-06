@@ -326,8 +326,8 @@ async def write_integration_atomic(
         OSError: On file I/O errors
     """
     # Construct file paths using GraphPaths
-    page_path = graph_paths.page_path(decision.target_page)
-    journal_path = graph_paths.journal_path(journal_date)
+    page_path = graph_paths.get_page_path(decision.target_page)
+    journal_path = graph_paths.get_journal_path(journal_date)
 
     # Check if page file exists
     if not page_path.exists():
