@@ -98,18 +98,18 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T032 [P] [US1] Write UI test for block tree navigation (j/k keys) using Textual pilot in tests/ui/test_phase1_navigation.py - should FAIL initially
-- [ ] T033 [P] [US1] Write UI test for block selection toggle (Space key) using Textual pilot in tests/ui/test_phase1_selection.py - should FAIL initially
-- [ ] T034 [P] [US1] Write UI test for LLM suggestion streaming updates using Textual pilot in tests/ui/test_phase1_llm_streaming.py - should FAIL initially
-- [ ] T035 [P] [US1] Write UI test for status widget progress display using Textual pilot in tests/ui/test_phase1_status.py - should FAIL initially
-- [ ] T036 [P] [US1] Write snapshot test for Phase 1 initial render using pytest-textual-snapshot in tests/ui/test_phase1_snapshots.py - should FAIL initially
-- [ ] T037 Run all Phase 1 UI tests with pytest and verify they FAIL as expected
+- [x] T032 [P] [US1] Write UI test for block tree navigation (j/k keys) using Textual pilot in tests/ui/test_phase1_navigation.py - should FAIL initially
+- [x] T033 [P] [US1] Write UI test for block selection toggle (Space key) using Textual pilot in tests/ui/test_phase1_selection.py - should FAIL initially
+- [x] T034 [P] [US1] Write UI test for LLM suggestion streaming updates using Textual pilot in tests/ui/test_phase1_llm_streaming.py - should FAIL initially
+- [x] T035 [P] [US1] Write UI test for status widget progress display using Textual pilot in tests/ui/test_phase1_status.py - should FAIL initially
+- [x] T036 [P] [US1] Write snapshot test for Phase 1 initial render using pytest-textual-snapshot in tests/ui/test_phase1_snapshots.py - should FAIL initially
+- [x] T037 Run all Phase 1 UI tests with pytest and verify they FAIL as expected
 
 ### Implementation for User Story 1
 
-- [ ] T038 [P] [US1] Create BlockTree widget with Textual Tree for hierarchical display in src/logsqueak/tui/widgets/block_tree.py
-- [ ] T039 [P] [US1] Create StatusPanel widget for background task progress in src/logsqueak/tui/widgets/status_panel.py
-- [ ] T040 [P] [US1] Create MarkdownViewer widget for bottom panel display in src/logsqueak/tui/widgets/markdown_viewer.py
+- [x] T038 [P] [US1] Create BlockTree widget with Textual Tree for hierarchical display in src/logsqueak/tui/widgets/block_tree.py
+- [x] T039 [P] [US1] Create StatusPanel widget for background task progress in src/logsqueak/tui/widgets/status_panel.py
+- [x] T040 [P] [US1] Create MarkdownViewer widget for bottom panel display in src/logsqueak/tui/widgets/markdown_viewer.py
 - [ ] T041 [US1] Implement Phase1Screen with BlockTree, StatusPanel, and MarkdownViewer layout in src/logsqueak/tui/screens/block_selection.py
 - [ ] T042 [US1] Implement keyboard controls (j/k navigation, Space toggle, Shift+j/k jump to knowledge) in src/logsqueak/tui/screens/block_selection.py
 - [ ] T043 [US1] Add LLM classification worker using run_worker and classify_blocks streaming in src/logsqueak/tui/screens/block_selection.py
