@@ -81,11 +81,13 @@ class BlockTree(Tree):
     def _create_block_label(self, block_id: str, content: str) -> Text:
         """Create Rich Text label with visual indicators.
 
+        Uses emoji indicators to show selection source:
+        - 🤖 = LLM selected (blue background)
+        - ✅ = User selected (green background)
+        - Invisible padding = Not selected
+
         Uses invisible Braille Pattern Blank characters (U+2800) to ensure
-        consistent alignment. All blocks have a 2-cell prefix: either a robot
-        emoji (🤖) for LLM-classified blocks, or two invisible Braille blanks
-        for non-classified blocks. Content position remains fixed regardless
-        of selection state.
+        consistent alignment when no emoji is shown.
 
         Args:
             block_id: Block identifier
@@ -103,31 +105,24 @@ class BlockTree(Tree):
         # Using Braille Pattern Blank (U+2800) - an invisible char that takes up space
         invisible_padding = "\u2800\u2800"  # 2 invisible characters = 2 cells
 
-        if state and state.llm_classification == "knowledge":
-            # Has emoji indicator
-            label.append("🤖", style="")
-
-            # Content with appropriate background
-            if state.classification == "knowledge":
-                # Selected - color depends on source
-                if state.source == "user":
-                    # User confirmed - dark green background
-                    label.append(content, style="on dark_green")
-                else:
-                    # LLM selected - dark blue background
-                    label.append(content, style="on dark_blue")
-            else:
-                # LLM suggested but not selected
-                label.append(content, style="")
-        else:
-            # No emoji - use invisible padding
-            if state and state.classification == "knowledge" and state.source == "user":
-                # User selected - dark green background on content, padding separate
-                label.append(invisible_padding, style="")
+        # Determine emoji and style based on state
+        if state and state.classification == "knowledge":
+            # Block is selected - emoji depends on source
+            if state.source == "user":
+                # User selected - checkmark + green
+                label.append("✅", style="")
                 label.append(content, style="on dark_green")
             else:
-                # Not selected - include padding IN the content string
-                label.append(invisible_padding + content, style="")
+                # LLM selected - robot + blue
+                label.append("🤖", style="")
+                label.append(content, style="on dark_blue")
+        elif state and state.llm_classification == "knowledge":
+            # LLM suggested but not selected - robot, no background
+            label.append("🤖", style="")
+            label.append(content, style="")
+        else:
+            # Not selected, no LLM suggestion - invisible padding
+            label.append(invisible_padding + content, style="")
 
         return label
 
