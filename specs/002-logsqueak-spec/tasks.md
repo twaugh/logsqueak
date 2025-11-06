@@ -29,15 +29,15 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Update pyproject.toml with TUI dependencies (textual, httpx, pydantic, click, chromadb, sentence-transformers, markdown-it-py, pyyaml, structlog, pytest-textual-snapshot)
-- [ ] T002 Create main package structure: src/logsqueak/{__init__.py,cli.py,config.py}
-- [ ] T003 [P] Create models package structure: src/logsqueak/models/{__init__.py,block_state.py,edited_content.py,integration_decision.py,background_task.py}
-- [ ] T004 [P] Create services package structure: src/logsqueak/services/{__init__.py,llm_client.py,page_indexer.py,rag_search.py,file_monitor.py}
-- [ ] T005 [P] Create TUI package structure: src/logsqueak/tui/{__init__.py,app.py,screens/__init__.py,widgets/__init__.py}
-- [ ] T006 [P] Create utils package structure: src/logsqueak/utils/{__init__.py,logging.py,ids.py}
-- [ ] T007 [P] Create test directory structure: tests/{unit,integration,ui}/{__init__.py}
-- [ ] T008 Configure structlog for JSON logging to ~/.cache/logsqueak/logs/logsqueak.log
-- [ ] T009 Create CLI entry point with Click in src/logsqueak/cli.py (basic 'extract' command placeholder)
+- [x] T001 Update pyproject.toml with TUI dependencies (textual, httpx, pydantic, click, chromadb, sentence-transformers, markdown-it-py, pyyaml, structlog, pytest-textual-snapshot)
+- [x] T002 Create main package structure: src/logsqueak/{__init__.py,cli.py,config.py}
+- [x] T003 [P] Create models package structure: src/logsqueak/models/{__init__.py,block_state.py,edited_content.py,integration_decision.py,background_task.py}
+- [x] T004 [P] Create services package structure: src/logsqueak/services/{__init__.py,llm_client.py,page_indexer.py,rag_search.py,file_monitor.py}
+- [x] T005 [P] Create TUI package structure: src/logsqueak/tui/{__init__.py,app.py,screens/__init__.py,widgets/__init__.py}
+- [x] T006 [P] Create utils package structure: src/logsqueak/utils/{__init__.py,logging.py,ids.py}
+- [x] T007 [P] Create test directory structure: tests/{unit,integration,ui}/{__init__.py}
+- [x] T008 Configure structlog for JSON logging to ~/.cache/logsqueak/logs/logsqueak.log
+- [x] T009 Create CLI entry point with Click in src/logsqueak/cli.py (basic 'extract' command placeholder)
 
 ---
 
@@ -49,40 +49,40 @@
 
 ### Configuration Management
 
-- [ ] T010 [P] Implement LLMConfig Pydantic model in src/logsqueak/models/config.py
-- [ ] T011 [P] Implement LogseqConfig Pydantic model in src/logsqueak/models/config.py
-- [ ] T012 [P] Implement RAGConfig Pydantic model in src/logsqueak/models/config.py
-- [ ] T013 Implement Config root model with YAML loading and file permission validation in src/logsqueak/models/config.py
-- [ ] T014 Write unit tests for Config models in tests/unit/test_config.py and run with pytest
-- [ ] T015 Implement config management in src/logsqueak/config.py with lazy validation and helpful error messages
-- [ ] T016 Write integration tests for config loading in tests/integration/test_config_loading.py and run with pytest
+- [x] T010 [P] Implement LLMConfig Pydantic model in src/logsqueak/models/config.py
+- [x] T011 [P] Implement LogseqConfig Pydantic model in src/logsqueak/models/config.py
+- [x] T012 [P] Implement RAGConfig Pydantic model in src/logsqueak/models/config.py
+- [x] T013 Implement Config root model with YAML loading and file permission validation in src/logsqueak/models/config.py
+- [x] T014 Write unit tests for Config models in tests/unit/test_config.py and run with pytest
+- [x] T015 Implement config management in src/logsqueak/config.py with lazy validation and helpful error messages
+- [x] T016 Write integration tests for config loading in tests/integration/test_config_loading.py and run with pytest
 
 ### Core Data Models
 
-- [ ] T017 [P] Implement BlockState Pydantic model in src/logsqueak/models/block_state.py
-- [ ] T018 [P] Implement EditedContent Pydantic model in src/logsqueak/models/edited_content.py
-- [ ] T019 [P] Implement IntegrationDecision Pydantic model in src/logsqueak/models/integration_decision.py
-- [ ] T020 [P] Implement BackgroundTask Pydantic model in src/logsqueak/models/background_task.py
-- [ ] T021 Write unit tests for all data models in tests/unit/test_models.py and run with pytest
+- [x] T017 [P] Implement BlockState Pydantic model in src/logsqueak/models/block_state.py
+- [x] T018 [P] Implement EditedContent Pydantic model in src/logsqueak/models/edited_content.py
+- [x] T019 [P] Implement IntegrationDecision Pydantic model in src/logsqueak/models/integration_decision.py
+- [x] T020 [P] Implement BackgroundTask Pydantic model in src/logsqueak/models/background_task.py
+- [x] T021 Write unit tests for all data models in tests/unit/test_models.py and run with pytest
 
 ### LLM Client (with NDJSON Streaming)
 
-- [ ] T022 Implement LLMClient class with stream_ndjson method in src/logsqueak/services/llm_client.py
-- [ ] T023 Implement retry logic with automatic retry (2s delay) in src/logsqueak/services/llm_client.py
-- [ ] T024 Implement Pydantic chunk models (KnowledgeClassificationChunk, ContentRewordingChunk, IntegrationDecisionChunk) in src/logsqueak/models/llm_chunks.py
-- [ ] T025 Write unit tests for LLMClient with mocked httpx responses in tests/unit/test_llm_client.py and run with pytest
-- [ ] T026 Write integration tests for LLMClient NDJSON parsing (malformed JSON, network errors, timeouts) in tests/integration/test_llm_streaming.py and run with pytest
+- [x] T022 Implement LLMClient class with stream_ndjson method in src/logsqueak/services/llm_client.py
+- [x] T023 Implement retry logic with automatic retry (2s delay) in src/logsqueak/services/llm_client.py
+- [x] T024 Implement Pydantic chunk models (KnowledgeClassificationChunk, ContentRewordingChunk, IntegrationDecisionChunk) in src/logsqueak/models/llm_chunks.py
+- [x] T025 Write unit tests for LLMClient with mocked httpx responses in tests/unit/test_llm_client.py and run with pytest
+- [x] T026 Write integration tests for LLMClient NDJSON parsing (malformed JSON, network errors, timeouts) in tests/integration/test_llm_streaming.py and run with pytest
 
 ### File Monitoring
 
-- [ ] T027 Implement FileMonitor class (record, is_modified, refresh, check_and_reload) in src/logsqueak/services/file_monitor.py
-- [ ] T028 Write unit tests for FileMonitor in tests/unit/test_file_monitor.py and run with pytest
+- [x] T027 Implement FileMonitor class (record, is_modified, refresh, check_and_reload) in src/logsqueak/services/file_monitor.py
+- [x] T028 Write unit tests for FileMonitor in tests/unit/test_file_monitor.py and run with pytest
 
 ### Utilities
 
-- [ ] T029 [P] Implement UUID generation utilities (deterministic UUID v5) in src/logsqueak/utils/ids.py
-- [ ] T030 [P] Implement structured logging setup in src/logsqueak/utils/logging.py
-- [ ] T031 Write unit tests for utilities in tests/unit/test_utils.py and run with pytest
+- [x] T029 [P] Implement UUID generation utilities (deterministic UUID v5) in src/logsqueak/utils/ids.py
+- [x] T030 [P] Implement structured logging setup in src/logsqueak/utils/logging.py
+- [x] T031 Write unit tests for utilities in tests/unit/test_utils.py and run with pytest
 
 **Checkpoint**: Foundation ready - ALL tests must pass before proceeding. User should verify tests run successfully.
 
