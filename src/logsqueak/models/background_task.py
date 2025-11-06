@@ -1,7 +1,17 @@
 """BackgroundTask model for async operations."""
 
+from enum import Enum
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
+
+
+class BackgroundTaskState(str, Enum):
+    """Enum for background task states."""
+
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 class BackgroundTask(BaseModel):
