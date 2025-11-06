@@ -137,8 +137,8 @@ class Phase2Screen(Screen):
 
         # Update original context panel
         original_context = self.query_one("#original-context", Static)
-        # TODO: Generate hierarchical context with parents
-        original_context.update(current_ec.original_content)
+        formatted_context = self._format_hierarchical_context(current_ec.original_content)
+        original_context.update(formatted_context)
 
         # Update LLM reworded panel
         llm_reworded = self.query_one("#llm-reworded", Static)
@@ -269,6 +269,109 @@ class Phase2Screen(Screen):
 
         # Update current content from editor
         current_ec.current_content = editor.get_content()
+
+    def _format_hierarchical_context(self, context: str, width: int = 80) -> str:
+        """Format hierarchical context with bullets and hanging indent.
+
+        Each block (separated by hierarchy) gets ONE bullet on its first line.
+        All subsequent lines of that block use hanging indent.
+
+        Takes context like:
+            "Projects\n  Python Learning\n    Block content\n    Second line\n    Third line"
+
+        Returns formatted with one bullet per block:
+            "• Projects\n  • Python Learning\n    • Block content\n      Second line\n      Third line"
+
+        Args:
+            context: The hierarchical context string
+            width: Maximum line width (default 80, will be overridden by widget width)
+        """
+        if not context:
+            return ""
+
+        lines = context.split('\n')
+        formatted_lines = []
+        previous_indent = -1
+
+        for line in lines:
+            if not line.strip():  # Empty line
+                formatted_lines.append("")
+                continue
+
+            # Count leading spaces to determine indent level
+            stripped = line.lstrip(' ')
+            indent_count = len(line) - len(stripped)
+
+            # Determine if this is a new block (indent decreased or at same level as new block)
+            # First line of a block gets a bullet, continuation lines don't
+            is_new_block = indent_count != previous_indent
+
+            if is_new_block:
+                # First line of block gets bullet
+                first_line_prefix = ' ' * indent_count + '• '
+                hanging_indent_prefix = ' ' * (indent_count + 2)
+                previous_indent = indent_count
+            else:
+                # Continuation line of same block - no bullet, just hanging indent
+                first_line_prefix = ' ' * (indent_count + 2)
+                hanging_indent_prefix = ' ' * (indent_count + 2)
+
+            # Calculate available width for text
+            available_width = max(40, width - len(first_line_prefix))
+
+            # Wrap the text manually
+            wrapped = self._wrap_text(stripped, available_width)
+
+            # Add the first wrapped line (with or without bullet)
+            if wrapped:
+                formatted_lines.append(first_line_prefix + wrapped[0])
+
+                # Add subsequent wrapped lines with hanging indent
+                for wrapped_line in wrapped[1:]:
+                    formatted_lines.append(hanging_indent_prefix + wrapped_line)
+
+        return '\n'.join(formatted_lines)
+
+    def _wrap_text(self, text: str, width: int) -> list[str]:
+        """Wrap text to specified width, breaking on word boundaries.
+
+        Args:
+            text: Text to wrap
+            width: Maximum width per line
+
+        Returns:
+            List of wrapped lines
+        """
+        if len(text) <= width:
+            return [text]
+
+        words = text.split()
+        lines = []
+        current_line = []
+        current_length = 0
+
+        for word in words:
+            word_length = len(word)
+
+            # Check if adding this word would exceed width
+            # Account for space before word (except first word)
+            space_needed = 1 if current_line else 0
+
+            if current_length + space_needed + word_length <= width:
+                current_line.append(word)
+                current_length += space_needed + word_length
+            else:
+                # Start new line
+                if current_line:
+                    lines.append(' '.join(current_line))
+                current_line = [word]
+                current_length = word_length
+
+        # Add remaining words
+        if current_line:
+            lines.append(' '.join(current_line))
+
+        return lines if lines else [text]
 
     # Background worker methods (stubs for now)
 
