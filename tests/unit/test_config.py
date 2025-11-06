@@ -60,20 +60,6 @@ class TestLogseqConfig:
 
         assert Path(config.graph_path) == graph_dir
 
-    @pytest.mark.skip(reason="Tilde expansion tested in integration tests")
-    def test_logseq_config_with_tilde_path(self, tmp_path, monkeypatch):
-        """Test Logseq config expands tilde in path."""
-        # Create a temp directory to simulate home
-        graph_dir = tmp_path / "logseq"
-        graph_dir.mkdir()
-
-        # Mock Path.home()
-        monkeypatch.setattr(Path, "home", lambda: tmp_path)
-
-        config = LogseqConfig(graph_path="~/logseq")
-
-        assert Path(config.graph_path) == graph_dir
-
     def test_logseq_config_nonexistent_path(self):
         """Test Logseq config fails with nonexistent path."""
         with pytest.raises(ValueError, match="Graph path does not exist"):

@@ -6,11 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Logsqueak** is a TUI (Text User Interface) application for extracting lasting knowledge from Logseq journal entries using LLM-powered analysis. Users interactively review, refine, and integrate knowledge blocks into their Logseq knowledge base.
 
-**Current Status**: Foundation complete, ready for TUI implementation
+**Current Status**: Phase 3 complete - Block Selection TUI working
 - ✅ **Implemented**: `logseq-outline-parser` library (robust Logseq markdown parsing)
 - ✅ **Implemented**: Foundational infrastructure (models, services, CLI, config, tests)
-- 🚧 **In Progress**: Interactive TUI screens (Phase 3+ in tasks.md)
-- ⏳ **Planned**: RAG semantic search (PageIndexer, RAGSearch services)
+- ✅ **Implemented**: Phase 1 Block Selection TUI (tree navigation, LLM streaming, manual selection)
+- 🚧 **In Progress**: Phase 4 - Content Editing TUI (next to implement)
+- ⏳ **Planned**: RAG semantic search (PageIndexer, RAGSearch services), Integration Review TUI
 
 ## Project Structure
 
@@ -20,7 +21,7 @@ logsqueak/
 │   ├── logsqueak/                 # Main application (FOUNDATION COMPLETE)
 │   │   ├── models/                # Pydantic data models (config, block state, LLM chunks)
 │   │   ├── services/              # LLMClient, FileMonitor (RAG services planned)
-│   │   ├── tui/                   # TUI structure (screens/widgets to be implemented)
+│   │   ├── tui/                   # TUI screens & widgets (Phase 1 complete)
 │   │   ├── utils/                 # Logging, UUID generation
 │   │   ├── cli.py                 # Click-based CLI entry point
 │   │   └── config.py              # ConfigManager with lazy validation
@@ -29,15 +30,15 @@ logsqueak/
 │           ├── parser.py          # Core parsing/rendering logic
 │           ├── context.py         # Full-context generation & content hashing
 │           └── graph.py           # Graph path utilities
-├── tests/                         # Test suite (125 passed, 1 skipped)
+├── tests/                         # Test suite (148 passed)
 │   ├── unit/                      # Unit tests for models, services, utils
 │   ├── integration/               # Integration tests for config, LLM streaming
-│   └── ui/                        # UI tests (to be implemented with Textual pilot)
+│   └── ui/                        # UI tests for Phase 1 (Textual pilot)
 ├── specs/
 │   ├── 001-logsqueak/             # Original knowledge extraction spec
 │   └── 002-logsqueak-spec/        # Interactive TUI feature spec (CURRENT)
 │       ├── spec.md                # Complete feature specification
-│       ├── tasks.md               # Phase 1-2 complete (T001-T031 ✅)
+│       ├── tasks.md               # Phase 1-3 complete (T001-T049 ✅)
 │       └── contracts/             # Service interfaces, data models
 ├── pyproject.toml                 # Project dependencies and config
 └── CLAUDE.md                      # This file
@@ -185,6 +186,7 @@ All models in `src/logsqueak/models/`:
 Implemented services in `src/logsqueak/services/`:
 - **llm_client.py**: LLMClient with async NDJSON streaming, retry logic, structured logging
 - **file_monitor.py**: FileMonitor with mtime tracking using `!=` comparison (git-friendly)
+- **journal_loader.py**: Load and parse journal entries with date range support
 
 Planned services (not yet implemented):
 - **page_indexer.py**: ChromaDB vector indexing (required for US2)
@@ -193,7 +195,7 @@ Planned services (not yet implemented):
 
 ### Configuration & CLI
 
-- **cli.py**: Click-based CLI with `extract` command (placeholder implementation)
+- **cli.py**: Click-based CLI with `extract` command launching Phase 1 TUI
 - **config.py**: ConfigManager with lazy validation, helpful error messages, permission checks (mode 600)
 - Config file: `~/.config/logsqueak/config.yaml` (user must create before first run)
 
@@ -204,9 +206,10 @@ Planned services (not yet implemented):
 
 ### Test Coverage
 
-**125 tests passing, 1 skipped** across:
+**148 tests passing** across:
 - **Unit tests** (`tests/unit/`): Models, config, LLM client, file monitor, utilities
 - **Integration tests** (`tests/integration/`): Config loading, LLM NDJSON streaming workflows
+- **UI tests** (`tests/ui/`): Phase 1 block selection TUI (navigation, selection, LLM streaming, status panel)
 
 All async mocking properly implements context managers. FileMonitor uses `!=` for mtime comparison to handle git reverts.
 
@@ -319,7 +322,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 ### Running Tests
 
 ```bash
-# Run all tests (125 passed, 1 skipped)
+# Run all tests (148 passed)
 pytest -v
 
 # Run parser tests only
@@ -351,13 +354,14 @@ mypy src/
 ### Running the CLI
 
 ```bash
-# CLI entry point exists (placeholder implementation)
-logsqueak extract                     # Placeholder - shows message
-logsqueak extract 2025-01-15          # Placeholder - shows message
-logsqueak extract 2025-01-10..2025-01-15  # Placeholder - shows message
+# Launch Phase 1 Block Selection TUI
+logsqueak extract                         # Today's journal entry
+logsqueak extract 2025-01-15              # Specific date
+logsqueak extract 2025-01-10..2025-01-15  # Date range
 
-# Future: Full TUI workflow (Phase 6 - not yet implemented)
-# Will launch interactive TUI with Phase 1 → Phase 2 → Phase 3
+# Navigate blocks (j/k), see LLM classification streaming
+# Select blocks with Space, accept all suggestions with 'a'
+# Press 'n' to proceed (Phase 2-3 not yet implemented)
 ```
 
 ## Python Version & Dependencies
@@ -471,20 +475,29 @@ Logseq uses indented bullets (2 spaces per level) with special features:
 **Implementation status** (see tasks.md for details):
 - ✅ **Phase 1: Setup** (T001-T009) - Complete
 - ✅ **Phase 2: Foundational** (T010-T031) - Complete and tested
-- 🚧 **Phase 3: User Story 1** (T032-T049) - Block Selection TUI (next to implement)
-- ⏳ **Phase 4: User Story 2** (T050-T070) - Content Editing TUI
+- ✅ **Phase 3: User Story 1** (T032-T049) - Block Selection TUI complete
+- 🚧 **Phase 4: User Story 2** (T050-T070) - Content Editing TUI (next to implement)
 - ⏳ **Phase 5: User Story 3** (T071-T096) - Integration Review TUI
 - ⏳ **Phase 6: Application Integration** (T097-T106) - Wire up all phases
 - ⏳ **Phase 7: Edge Cases** (T107-T117) - Error handling polish
 - ⏳ **Phase 8: Polish & Documentation** (T118-T130) - Final validation
 
-**Next steps** (Phase 3 - User Story 1):
-1. Write UI tests FIRST using Textual pilot (T032-T037) - tests should FAIL
-2. Verify tests fail with `pytest tests/ui/test_phase1_*.py -v`
-3. Implement BlockTree, StatusPanel, MarkdownViewer widgets (T038-T040)
-4. Implement Phase1Screen with keyboard controls and LLM streaming (T041-T048)
-5. Run tests again - should NOW PASS (T049)
-6. Manually test TUI: navigate blocks, see LLM streaming, select blocks
+**Phase 3 Achievements**:
+- ✅ Block tree navigation with j/k keys and vim-style controls
+- ✅ LLM classification streaming with real-time UI updates
+- ✅ Manual block selection/deselection with Space key
+- ✅ Status panel showing background task progress
+- ✅ Markdown preview of selected blocks with full context
+- ✅ Comprehensive UI test suite using Textual pilot
+- ✅ Working CLI integration with date/range parsing
+
+**Next steps** (Phase 4 - User Story 2):
+1. Write UI tests FIRST using Textual pilot (T050-T056) - tests should FAIL
+2. Verify tests fail with `pytest tests/ui/test_phase2_*.py -v`
+3. Implement RAG services (PageIndexer, RAGSearch) with tests (T057-T061)
+4. Implement ContentEditor widget and Phase2Screen (T062-T069)
+5. Run tests again - should NOW PASS (T070)
+6. Manually test TUI: edit content, accept LLM rewording, verify RAG search
 
 **When implementing**:
 - Follow TDD: Write failing tests → Implement → Tests pass → Manual verify
@@ -499,14 +512,19 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
 
 ## Recent Changes
 
+- 2025-11-06: **Phase 3 Complete** - Block Selection TUI implemented and tested (T032-T049)
+  - BlockTree, StatusPanel, MarkdownViewer widgets complete
+  - Phase1Screen with LLM streaming, keyboard navigation, manual selection
+  - Journal loader service with date/range parsing
+  - CLI integration launching Phase 1 TUI
+  - 22 new UI tests using Textual pilot (148 total tests passing)
+  - User-tested: navigation, LLM streaming, block selection all working
 - 2025-11-06: **Phase 1-2 Complete** - Foundational infrastructure implemented and tested (T001-T031)
   - All data models, services, CLI, config, and utilities complete
   - 125 tests passing (unit + integration)
   - Fixed FileMonitor to use `!=` comparison (git-friendly)
   - Generated Logsqueak-specific UUID namespace
   - All async tests properly mock context managers
-- 2025-11-04: Created hybrid CLAUDE.md reflecting current implementation (parser only) + planned TUI feature
-- 2025-11-04: Completed clarification session for 002-logsqueak-spec (configuration management, validation strategy)
 
 ## Active Technologies
 - Python 3.11+ (002-logsqueak-spec)

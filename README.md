@@ -2,7 +2,7 @@
 
 Turn your Logseq journal chaos into organized knowledge. Interactive TUI (Text User Interface) for extracting lasting insights from journal entries using LLM-powered analysis.
 
-**Status**: 🚧 **Foundation Complete** - Interactive TUI implementation in progress (Phase 3+)
+**Status**: 🚧 **Phase 3 Complete** - Block Selection TUI working, Content Editing next (Phase 4)
 
 ## Overview
 
@@ -30,22 +30,26 @@ All operations are **keyboard-driven** with vim-style navigation and **streaming
 
 ## Features
 
-### ✅ Implemented (Foundation)
+### ✅ Implemented
 - **Logseq Parser**: Production-ready markdown parser with property order preservation
 - **Data Models**: Pydantic models for config, block state, LLM chunks, integration decisions
 - **LLM Client**: Async NDJSON streaming with retry logic and structured logging
 - **File Monitor**: Git-friendly mtime tracking for concurrent modification detection
 - **Configuration**: Lazy validation with helpful error messages (mode 600 permission check)
 - **Utilities**: Structured logging (structlog), deterministic UUID generation
-- **Test Suite**: 125 tests passing (unit + integration)
+- **Test Suite**: 148 tests passing (unit + integration + UI)
+- **Phase 1 TUI**: Block selection with tree navigation, LLM streaming, manual selection
+- **Journal Loader**: Load and parse journal entries with date/range support
+- **CLI Integration**: Working `logsqueak extract` command
 
-### 🚧 In Progress (Interactive TUI)
-- **Phase 1 Screen**: Block selection with tree navigation (next to implement)
-- **Phase 2 Screen**: Content editing with LLM rewording
+### 🚧 In Progress
+- **Phase 2 Screen**: Content editing with LLM rewording (next to implement)
+
+### ⏳ Planned
 - **Phase 3 Screen**: Integration review with target page preview
 - **Services**: RAG search (PageIndexer, RAGSearch), file operations
 
-### ⏳ Planned
+### ⏳ Planned (After Phase 2-3 Complete)
 - **Application Integration**: Wire up all 3 phases in TUI app
 - **Edge Cases**: Error handling, concurrent modification detection
 - **Polish**: Comprehensive logging, documentation, manual validation
@@ -103,7 +107,7 @@ pip install -e .
 pip install -e src/logseq-outline-parser/
 
 # Verify installation
-pytest -v  # Should show 125 passed, 1 skipped
+pytest -v  # Should show 148 passed
 ```
 
 **What gets installed:**
@@ -146,25 +150,39 @@ chmod 600 ~/.config/logsqueak/config.yaml
 
 ## Usage
 
-**⚠️ TUI Not Yet Implemented**
+### Current Status: Phase 1 TUI Working
 
-The CLI entry point exists but launches a placeholder:
+Launch the interactive block selection TUI:
 
 ```bash
-# Placeholder - shows message about TUI implementation
-logsqueak extract                     # Today's journal (future)
-logsqueak extract 2025-01-15          # Specific date (future)
-logsqueak extract 2025-01-10..2025-01-15  # Date range (future)
+# Extract from today's journal
+logsqueak extract
+
+# Extract from specific date
+logsqueak extract 2025-01-15
+
+# Extract from date range
+logsqueak extract 2025-01-10..2025-01-15
 ```
 
-**Future workflow** (Phase 6 - when TUI complete):
-1. Launch interactive TUI with `logsqueak extract 2025-01-15`
-2. **Phase 1**: Navigate blocks (j/k), see LLM suggestions, select with Space
-3. Press `n` to proceed to Phase 2
-4. **Phase 2**: Review/edit content, accept LLM rewording with `a`
-5. Press `n` to proceed to Phase 3
-6. **Phase 3**: Review integration decisions, accept with `y`
-7. Writes complete - journal marked with `processed::` markers
+**Phase 1 - Block Selection** (Currently Working):
+- Navigate blocks with `j`/`k` (vim-style) or arrow keys
+- Watch LLM classification stream in real-time (knowledge vs. activity)
+- Select/deselect blocks with `Space`
+- Accept all LLM suggestions with `a`
+- Clear all selections with `c`, reset to LLM suggestions with `r`
+- Jump to next/prev knowledge block with `Shift+j`/`Shift+k`
+- View block content with full context in bottom panel
+- Press `n` to proceed (Phase 2-3 not yet implemented)
+- Press `q` to quit
+
+**Future workflow** (when Phase 2-3 complete):
+1. **Phase 1**: Select knowledge blocks (WORKING NOW)
+2. Press `n` to proceed to Phase 2
+3. **Phase 2**: Review/edit content, accept LLM rewording with `a` (not yet implemented)
+4. Press `n` to proceed to Phase 3
+5. **Phase 3**: Review integration decisions, accept with `y` (not yet implemented)
+6. Writes complete - journal marked with `processed::` markers
 
 All keyboard-driven, no mouse required.
 
@@ -173,23 +191,23 @@ All keyboard-driven, no mouse required.
 ```
 logsqueak/
 ├── src/
-│   ├── logsqueak/                 # Main application (FOUNDATION COMPLETE)
+│   ├── logsqueak/                 # Main application
 │   │   ├── models/                # Pydantic data models ✅
-│   │   ├── services/              # LLMClient, FileMonitor ✅ (RAG pending)
-│   │   ├── tui/                   # TUI structure 🚧 (screens/widgets pending)
+│   │   ├── services/              # LLMClient, FileMonitor, JournalLoader ✅
+│   │   ├── tui/                   # TUI screens & widgets (Phase 1 ✅, Phase 2-3 pending)
 │   │   ├── utils/                 # Logging, UUID generation ✅
 │   │   ├── cli.py                 # CLI entry point ✅
 │   │   └── config.py              # ConfigManager ✅
 │   └── logseq-outline-parser/     # Parser library ✅
-├── tests/                         # Test suite (125 passed, 1 skipped)
+├── tests/                         # Test suite (148 passed)
 │   ├── unit/                      # Unit tests ✅
 │   ├── integration/               # Integration tests ✅
-│   └── ui/                        # UI tests (pending)
+│   └── ui/                        # UI tests for Phase 1 ✅
 ├── specs/
 │   ├── 001-logsqueak/             # Original 5-phase pipeline spec
 │   └── 002-logsqueak-spec/        # Interactive TUI spec (CURRENT)
 │       ├── spec.md                # Feature specification
-│       ├── tasks.md               # Phase 1-2 complete ✅
+│       ├── tasks.md               # Phase 1-3 complete ✅ (T001-T049)
 │       └── contracts/             # Service interfaces, data models
 └── pyproject.toml                 # Dependencies and config
 ```
@@ -204,7 +222,7 @@ logsqueak/
 # Activate venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Run all tests (125 passed, 1 skipped)
+# Run all tests (148 passed)
 pytest -v
 
 # Run only parser tests
@@ -240,9 +258,9 @@ mypy src/
 
 ## Implementation Status
 
-**✅ Phase 1-2 Complete (Tasks T001-T031)**
+**✅ Phase 1-3 Complete (Tasks T001-T049)**
 
-Foundation ready for TUI implementation:
+Foundation and Block Selection TUI ready:
 
 - ✅ **Logseq Outline Parser** (Production-ready library)
   - Non-destructive parsing & rendering with property order preservation
@@ -271,14 +289,24 @@ Foundation ready for TUI implementation:
   - Deterministic UUID v5 with Logsqueak-specific namespace
 
 - ✅ **Test Coverage**
-  - 125 tests passing, 1 skipped
+  - 148 tests passing
   - Unit tests: All models, services, utilities
   - Integration tests: Config loading, LLM NDJSON streaming
+  - UI tests: Phase 1 block selection TUI
   - Proper async context manager mocking
 
-**🚧 Phase 3+ In Progress**
+- ✅ **Phase 1 Block Selection TUI**
+  - BlockTree widget: Hierarchical block display with expand/collapse
+  - StatusPanel widget: Background task progress tracking
+  - MarkdownViewer widget: Block preview with full context
+  - Keyboard navigation: j/k, Space, Shift+j/k, a/c/r keys
+  - LLM streaming: Real-time classification updates
+  - Journal loader: Date/range parsing and multi-file support
+  - CLI integration: `logsqueak extract` command
 
-Next: User Story 1 (Block Selection TUI) using Test-Driven Development
+**🚧 Phase 4 In Progress**
+
+Next: User Story 2 (Content Editing TUI) using Test-Driven Development
 
 ## Architecture
 
@@ -338,21 +366,22 @@ Key resources:
 4. Run tests again - should NOW PASS
 5. Manual verification in TUI before proceeding
 
-**Current Status**: Ready to begin Phase 3 (User Story 1 - Block Selection TUI)
+**Current Status**: Phase 3 complete - Ready to begin Phase 4 (User Story 2 - Content Editing TUI)
 
 ## Roadmap
 
-**Completed** (Phase 1-2):
+**Completed** (Phase 1-3):
 - ✅ Project structure and dependencies
 - ✅ All data models with Pydantic validation
 - ✅ LLM client with NDJSON streaming
 - ✅ Configuration management with lazy validation
 - ✅ File monitoring for concurrent edits
-- ✅ Comprehensive test suite (125 tests)
+- ✅ Journal loading with date/range parsing
+- ✅ Comprehensive test suite (148 tests)
+- ✅ User Story 1: Block Selection TUI
 
-**Next** (Phase 3-5):
-- 🚧 User Story 1: Block Selection TUI
-- ⏳ User Story 2: Content Editing TUI
+**Next** (Phase 4-5):
+- 🚧 User Story 2: Content Editing TUI
 - ⏳ User Story 3: Integration Review TUI
 
 **Future** (Phase 6-8):
