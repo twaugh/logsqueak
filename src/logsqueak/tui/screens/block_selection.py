@@ -199,10 +199,22 @@ class Phase1Screen(Screen):
             state = self.block_states[block_id]
 
             if state.classification == "knowledge":
-                # Deselect
-                state.classification = "pending"
+                # Already selected - behavior depends on source and LLM classification
+                if state.source == "llm":
+                    # LLM-suggested (blue) → User-confirmed (green)
+                    state.source = "user"
+                    state.confidence = 1.0
+                else:
+                    # User-confirmed (green) → back to original state
+                    if state.llm_classification == "knowledge":
+                        # Has LLM suggestion → return to LLM-suggested (blue)
+                        state.source = "llm"
+                        state.confidence = state.llm_confidence or 0.0
+                    else:
+                        # No LLM suggestion → Deselect completely (no highlight)
+                        state.classification = "pending"
             else:
-                # Select
+                # Not selected → Select as user choice (green)
                 state.classification = "knowledge"
                 state.source = "user"
                 state.confidence = 1.0

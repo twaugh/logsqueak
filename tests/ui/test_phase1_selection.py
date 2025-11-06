@@ -50,9 +50,9 @@ def sample_blocks():
 
 
 @pytest.mark.asyncio
-async def test_space_toggles_selection(sample_blocks):
-    """Test Space key toggles block selection."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15")
+async def test_space_toggles_selection_non_llm_block(sample_blocks):
+    """Test Space key toggles selection on non-LLM blocks (no suggestion)."""
+    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", auto_start_workers=False)
     app = Phase1TestApp(screen)
 
     async with app.run_test() as pilot:
@@ -60,16 +60,17 @@ async def test_space_toggles_selection(sample_blocks):
 
         tree = screen.query_one("#block-tree")
 
-        # Initially at block-1, not selected
+        # Initially at block-1, not selected, no LLM classification
         cursor_node = tree.get_node_at_line(tree.cursor_line)
         block_id = cursor_node.data
         assert screen.block_states[block_id].classification == "pending"
+        assert screen.block_states[block_id].llm_classification is None
 
         # Press Space to select
         await pilot.press("space")
         await pilot.pause()
 
-        # Should now be selected
+        # Should now be selected as user choice (green)
         assert screen.block_states[block_id].classification == "knowledge"
         assert screen.block_states[block_id].source == "user"
         assert screen.block_states[block_id].confidence == 1.0
@@ -78,14 +79,72 @@ async def test_space_toggles_selection(sample_blocks):
         await pilot.press("space")
         await pilot.pause()
 
-        # Should be back to pending
+        # Should be back to pending (no highlight)
         assert screen.block_states[block_id].classification == "pending"
+
+
+@pytest.mark.asyncio
+async def test_space_toggles_llm_suggested_block(sample_blocks):
+    """Test Space key toggles LLM-suggested blocks between blue and green."""
+    # Set up block with LLM suggestion
+    block_states = {
+        "block-1": BlockState(
+            block_id="block-1",
+            classification="knowledge",  # Auto-accepted LLM suggestion
+            source="llm",
+            confidence=0.92,
+            llm_classification="knowledge",
+            llm_confidence=0.92,
+            reason="Test LLM reasoning"
+        ),
+    }
+
+    screen = Phase1Screen(
+        blocks=[sample_blocks[0]],
+        journal_date="2025-01-15",
+        initial_block_states=block_states,
+        auto_start_workers=False
+    )
+    app = Phase1TestApp(screen)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        # Initially LLM-suggested (blue)
+        assert screen.block_states["block-1"].classification == "knowledge"
+        assert screen.block_states["block-1"].source == "llm"
+
+        # Press Space to confirm (blue → green)
+        await pilot.press("space")
+        await pilot.pause()
+
+        # Should now be user-confirmed (green)
+        assert screen.block_states["block-1"].classification == "knowledge"
+        assert screen.block_states["block-1"].source == "user"
+        assert screen.block_states["block-1"].confidence == 1.0
+
+        # Press Space again (green → blue)
+        await pilot.press("space")
+        await pilot.pause()
+
+        # Should be back to LLM-suggested (blue)
+        assert screen.block_states["block-1"].classification == "knowledge"
+        assert screen.block_states["block-1"].source == "llm"
+        assert screen.block_states["block-1"].confidence == 0.92
+
+        # Press Space once more (blue → green again)
+        await pilot.press("space")
+        await pilot.pause()
+
+        # Should be user-confirmed again
+        assert screen.block_states["block-1"].classification == "knowledge"
+        assert screen.block_states["block-1"].source == "user"
 
 
 @pytest.mark.asyncio
 async def test_selection_updates_visual_indicator(sample_blocks):
     """Test that selection adds visual indicator (green highlight)."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15")
+    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", auto_start_workers=False)
     app = Phase1TestApp(screen)
 
     async with app.run_test() as pilot:
@@ -138,7 +197,8 @@ async def test_accept_all_llm_suggestions(sample_blocks):
     screen = Phase1Screen(
         blocks=sample_blocks,
         journal_date="2025-01-15",
-        initial_block_states=block_states
+        initial_block_states=block_states,
+        auto_start_workers=False
     )
     app = Phase1TestApp(screen)
 
@@ -191,7 +251,8 @@ async def test_clear_all_selections(sample_blocks):
     screen = Phase1Screen(
         blocks=sample_blocks,
         journal_date="2025-01-15",
-        initial_block_states=block_states
+        initial_block_states=block_states,
+        auto_start_workers=False
     )
     app = Phase1TestApp(screen)
 
@@ -258,7 +319,7 @@ async def test_reset_to_llm_suggestion(sample_blocks):
 @pytest.mark.asyncio
 async def test_next_button_enabled_when_blocks_selected(sample_blocks):
     """Test 'n' key is only enabled when at least one block is selected."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15")
+    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", auto_start_workers=False)
     app = Phase1TestApp(screen)
 
     async with app.run_test() as pilot:

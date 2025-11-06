@@ -109,8 +109,13 @@ class BlockTree(Tree):
 
             # Content with appropriate background
             if state.classification == "knowledge":
-                # LLM selected - dark blue background on content only
-                label.append(content, style="on dark_blue")
+                # Selected - color depends on source
+                if state.source == "user":
+                    # User confirmed - dark green background
+                    label.append(content, style="on dark_green")
+                else:
+                    # LLM selected - dark blue background
+                    label.append(content, style="on dark_blue")
             else:
                 # LLM suggested but not selected
                 label.append(content, style="")
