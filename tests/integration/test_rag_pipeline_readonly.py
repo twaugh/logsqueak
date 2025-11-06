@@ -1,4 +1,4 @@
-"""Integration tests for the complete RAG pipeline (indexing + search)."""
+"""Integration tests for the complete RAG pipeline (read-only tests with module-scoped fixtures)."""
 
 import pytest
 import pytest_asyncio
@@ -9,9 +9,10 @@ from logsqueak.models.edited_content import EditedContent
 from logseq_outline.graph import GraphPaths
 
 
-@pytest.fixture
-def test_graph(tmp_path):
-    """Create a realistic test Logseq graph."""
+@pytest.fixture(scope="module")
+def test_graph(tmp_path_factory):
+    """Create a realistic test Logseq graph (module-scoped for read-only tests)."""
+    tmp_path = tmp_path_factory.mktemp("rag_pipeline")
     graph_path = tmp_path / "test-graph"
     graph_path.mkdir()
 
@@ -78,9 +79,10 @@ def test_graph(tmp_path):
     return graph_path
 
 
-@pytest_asyncio.fixture
-async def rag_pipeline(test_graph, tmp_path, shared_sentence_transformer):
-    """Create and initialize the complete RAG pipeline."""
+@pytest_asyncio.fixture(scope="module")
+async def rag_pipeline(test_graph, tmp_path_factory, shared_sentence_transformer):
+    """Create and initialize the complete RAG pipeline (module-scoped for read-only tests)."""
+    tmp_path = tmp_path_factory.mktemp("chromadb")
     db_path = tmp_path / "chromadb"
 
     # Build index
@@ -267,70 +269,6 @@ async def test_multiple_knowledge_blocks_parallel_search(rag_pipeline):
     assert "Machine Learning" in results["block-1"] or "Python" in results["block-1"]
     assert "Web Development" in results["block-2"] or "Python" in results["block-2"]
     assert "Web Development" in results["block-3"]  # Mentions Docker deployment
-
-
-@pytest.mark.asyncio
-async def test_incremental_index_update_affects_search(test_graph, tmp_path, shared_sentence_transformer):
-    """Test that updating the index affects search results."""
-    db_path = tmp_path / "chromadb"
-
-    # Initial index build
-    graph_paths = GraphPaths(test_graph)
-    indexer = PageIndexer(graph_paths, db_path, encoder=shared_sentence_transformer)
-    await indexer.build_index()
-    await indexer.close()
-
-    # Initial search
-    search = RAGSearch(db_path)
-
-    edited_content = [
-        EditedContent(
-            block_id="block-1",
-            original_content="Quantum computing concepts",
-            current_content="Quantum computing concepts"
-        )
-    ]
-
-    original_contexts = {
-        "block-1": "Quantum computing concepts"
-    }
-
-    initial_results = await search.find_candidates(
-        edited_content,
-        original_contexts,
-        top_k=3
-    )
-
-    await search.close()
-
-    # Add a new page about quantum computing
-    pages_dir = test_graph / "pages"
-    quantum_page = pages_dir / "Quantum Computing.md"
-    quantum_page.write_text("""- Quantum Computing Basics
-  - Qubits and superposition
-  - Quantum entanglement
-- Applications
-  - Cryptography
-  - Drug discovery
-""")
-
-    # Rebuild index
-    indexer = PageIndexer(graph_paths, db_path, encoder=shared_sentence_transformer)
-    await indexer.build_index()
-    await indexer.close()
-
-    # Search again
-    search = RAGSearch(db_path)
-    updated_results = await search.find_candidates(
-        edited_content,
-        original_contexts,
-        top_k=3
-    )
-
-    # Should now find the Quantum Computing page
-    assert "Quantum Computing" in updated_results["block-1"]
-
-    await search.close()
 
 
 @pytest.mark.asyncio
