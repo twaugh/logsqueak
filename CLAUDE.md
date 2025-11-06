@@ -6,24 +6,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Logsqueak** is a TUI (Text User Interface) application for extracting lasting knowledge from Logseq journal entries using LLM-powered analysis. Users interactively review, refine, and integrate knowledge blocks into their Logseq knowledge base.
 
-**Current Status**: Early development
+**Current Status**: Foundation complete, ready for TUI implementation
 - ✅ **Implemented**: `logseq-outline-parser` library (robust Logseq markdown parsing)
-- 🚧 **In Progress**: Interactive TUI for knowledge extraction (spec: `specs/002-logsqueak-spec/`)
-- ⏳ **Planned**: LLM integration, RAG semantic search, background task orchestration
+- ✅ **Implemented**: Foundational infrastructure (models, services, CLI, config, tests)
+- 🚧 **In Progress**: Interactive TUI screens (Phase 3+ in tasks.md)
+- ⏳ **Planned**: RAG semantic search (PageIndexer, RAGSearch services)
 
 ## Project Structure
 
 ```
 logsqueak/
 ├── src/
-│   └── logseq-outline-parser/     # Logseq markdown parser library (IMPLEMENTED)
+│   ├── logsqueak/                 # Main application (FOUNDATION COMPLETE)
+│   │   ├── models/                # Pydantic data models (config, block state, LLM chunks)
+│   │   ├── services/              # LLMClient, FileMonitor (RAG services planned)
+│   │   ├── tui/                   # TUI structure (screens/widgets to be implemented)
+│   │   ├── utils/                 # Logging, UUID generation
+│   │   ├── cli.py                 # Click-based CLI entry point
+│   │   └── config.py              # ConfigManager with lazy validation
+│   └── logseq-outline-parser/     # Logseq markdown parser library (COMPLETE)
 │       └── src/logseq_outline/
 │           ├── parser.py          # Core parsing/rendering logic
 │           ├── context.py         # Full-context generation & content hashing
 │           └── graph.py           # Graph path utilities
+├── tests/                         # Test suite (125 passed, 1 skipped)
+│   ├── unit/                      # Unit tests for models, services, utils
+│   ├── integration/               # Integration tests for config, LLM streaming
+│   └── ui/                        # UI tests (to be implemented with Textual pilot)
 ├── specs/
 │   ├── 001-logsqueak/             # Original knowledge extraction spec
 │   └── 002-logsqueak-spec/        # Interactive TUI feature spec (CURRENT)
+│       ├── spec.md                # Complete feature specification
+│       ├── tasks.md               # Phase 1-2 complete (T001-T031 ✅)
+│       └── contracts/             # Service interfaces, data models
 ├── pyproject.toml                 # Project dependencies and config
 └── CLAUDE.md                      # This file
 ```
@@ -151,7 +166,51 @@ pytest src/logseq-outline-parser/tests/test_parser.py      # Parsing/rendering
 pytest src/logseq-outline-parser/tests/test_context.py     # Context generation & hashing
 ```
 
-## Planned: Interactive TUI Application
+## Foundational Infrastructure (IMPLEMENTED)
+
+The foundational infrastructure is **complete and tested** (Phase 1-2 in tasks.md):
+
+### Data Models (Pydantic)
+
+All models in `src/logsqueak/models/`:
+- **config.py**: LLMConfig, LogseqConfig, RAGConfig, Config (with YAML loading and permission validation)
+- **block_state.py**: BlockState (Phase 1 selection tracking)
+- **edited_content.py**: EditedContent (Phase 2 editing state)
+- **integration_decision.py**: IntegrationDecision (Phase 3 write decisions)
+- **background_task.py**: BackgroundTaskState enum (async task status)
+- **llm_chunks.py**: NDJSON streaming chunk models (KnowledgeClassificationChunk, ContentRewordingChunk, IntegrationDecisionChunk)
+
+### Services Layer
+
+Implemented services in `src/logsqueak/services/`:
+- **llm_client.py**: LLMClient with async NDJSON streaming, retry logic, structured logging
+- **file_monitor.py**: FileMonitor with mtime tracking using `!=` comparison (git-friendly)
+
+Planned services (not yet implemented):
+- **page_indexer.py**: ChromaDB vector indexing (required for US2)
+- **rag_search.py**: Semantic search with explicit link boosting (required for US2)
+- **file_operations.py**: Atomic two-phase writes with provenance markers (required for US3)
+
+### Configuration & CLI
+
+- **cli.py**: Click-based CLI with `extract` command (placeholder implementation)
+- **config.py**: ConfigManager with lazy validation, helpful error messages, permission checks (mode 600)
+- Config file: `~/.config/logsqueak/config.yaml` (user must create before first run)
+
+### Utilities
+
+- **logging.py**: Structured logging (structlog) to `~/.cache/logsqueak/logs/logsqueak.log`
+- **ids.py**: Deterministic UUID v5 generation with Logsqueak-specific namespace (`32e497fc-abf0-4d71-8cff-e302eb3e2bb0`)
+
+### Test Coverage
+
+**125 tests passing, 1 skipped** across:
+- **Unit tests** (`tests/unit/`): Models, config, LLM client, file monitor, utilities
+- **Integration tests** (`tests/integration/`): Config loading, LLM NDJSON streaming workflows
+
+All async mocking properly implements context managers. FileMonitor uses `!=` for mtime comparison to handle git reverts.
+
+## Interactive TUI Application (IN PROGRESS)
 
 See `specs/002-logsqueak-spec/spec.md` for the complete feature specification.
 
@@ -192,7 +251,7 @@ logseq:
   graph_path: ~/Documents/logseq-graph
 
 rag:
-  top_k: 10  # Optional: Number of candidate pages to retrieve (default: 10)
+  top_k: 10  # Optional: Number of similar blocks to retrieve per search (default: 10)
 ```
 
 **Optional fields:**
@@ -260,14 +319,20 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 ### Running Tests
 
 ```bash
-# Run parser tests (currently the only tests)
+# Run all tests (125 passed, 1 skipped)
+pytest -v
+
+# Run parser tests only
 pytest src/logseq-outline-parser/tests/ -v
 
-# Run with coverage
-pytest src/logseq-outline-parser/tests/ --cov=logseq_outline --cov-report=html
+# Run main app tests only
+pytest tests/unit/ tests/integration/ -v
 
-# Future: When main app tests exist
-# pytest tests/unit/ tests/integration/ -v
+# Run with coverage
+pytest --cov=logsqueak --cov=logseq_outline --cov-report=html -v
+
+# Verify foundational tests (Phase 2 checkpoint)
+pytest tests/unit/ tests/integration/test_config*.py tests/integration/test_llm*.py -v
 ```
 
 ### Code Quality
@@ -283,26 +348,37 @@ ruff check src/ tests/
 mypy src/
 ```
 
-### Running the CLI (Not Yet Implemented)
+### Running the CLI
 
 ```bash
-# Future commands (from spec):
-# logsqueak extract 2025-01-15          # Extract from specific date
-# logsqueak extract 2025-01-10..2025-01-15  # Date range
-# logsqueak extract                     # Today's journal
+# CLI entry point exists (placeholder implementation)
+logsqueak extract                     # Placeholder - shows message
+logsqueak extract 2025-01-15          # Placeholder - shows message
+logsqueak extract 2025-01-10..2025-01-15  # Placeholder - shows message
+
+# Future: Full TUI workflow (Phase 6 - not yet implemented)
+# Will launch interactive TUI with Phase 1 → Phase 2 → Phase 3
 ```
 
 ## Python Version & Dependencies
 
 - **Python**: 3.11+ (required)
-- **Key dependencies**:
-  - `textual>=0.47.0` - TUI framework (planned)
-  - `httpx>=0.27.0` - LLM client (planned)
-  - `pydantic>=2.0.0` - Data validation (planned)
-  - `click>=8.1.0` - CLI framework (planned)
-  - `chromadb>=0.4.0` - Vector store for RAG (planned)
-  - `sentence-transformers>=2.2.0` - Embeddings (planned, large dependency)
-  - `markdown-it-py>=3.0.0` - Markdown rendering (planned)
+- **Runtime dependencies** (installed):
+  - `textual>=0.47.0` - TUI framework
+  - `httpx>=0.27.0` - Async HTTP client for LLM API
+  - `pydantic>=2.0.0` - Data validation and models
+  - `click>=8.1.0` - CLI framework
+  - `pyyaml>=6.0.0` - YAML config parsing
+  - `structlog>=23.0.0` - Structured logging
+  - `chromadb>=0.4.0` - Vector store for RAG (to be used)
+  - `sentence-transformers>=2.2.0` - Embeddings (to be used, large dependency)
+  - `markdown-it-py>=3.0.0` - Markdown rendering (to be used)
+- **Dev dependencies** (installed):
+  - `pytest>=7.4.0` - Test framework
+  - `pytest-asyncio>=0.21.0` - Async test support
+  - `pytest-textual-snapshot>=0.4.0` - TUI snapshot testing
+  - `pytest-cov>=4.1.0` - Coverage reporting
+  - `black>=23.0.0`, `ruff>=0.1.0`, `mypy>=1.7.0` - Code quality
 
 ## Project Constitution
 
@@ -392,26 +468,43 @@ Logseq uses indented bullets (2 spaces per level) with special features:
 
 **Spec location**: `specs/002-logsqueak-spec/spec.md`
 
-**Implementation guidance**:
-1. Use Textual framework for TUI (already in dependencies)
-2. Build incrementally: Phase 1 → Phase 2 → Phase 3
-3. Test each phase independently before integrating
-4. Use existing parser library for all Logseq file operations
-5. Follow keyboard control specifications exactly (user muscle memory)
+**Implementation status** (see tasks.md for details):
+- ✅ **Phase 1: Setup** (T001-T009) - Complete
+- ✅ **Phase 2: Foundational** (T010-T031) - Complete and tested
+- 🚧 **Phase 3: User Story 1** (T032-T049) - Block Selection TUI (next to implement)
+- ⏳ **Phase 4: User Story 2** (T050-T070) - Content Editing TUI
+- ⏳ **Phase 5: User Story 3** (T071-T096) - Integration Review TUI
+- ⏳ **Phase 6: Application Integration** (T097-T106) - Wire up all phases
+- ⏳ **Phase 7: Edge Cases** (T107-T117) - Error handling polish
+- ⏳ **Phase 8: Polish & Documentation** (T118-T130) - Final validation
+
+**Next steps** (Phase 3 - User Story 1):
+1. Write UI tests FIRST using Textual pilot (T032-T037) - tests should FAIL
+2. Verify tests fail with `pytest tests/ui/test_phase1_*.py -v`
+3. Implement BlockTree, StatusPanel, MarkdownViewer widgets (T038-T040)
+4. Implement Phase1Screen with keyboard controls and LLM streaming (T041-T048)
+5. Run tests again - should NOW PASS (T049)
+6. Manually test TUI: navigate blocks, see LLM streaming, select blocks
 
 **When implementing**:
-- Start with Phase 1 block selection screen (P1 priority)
-- Use mock LLM responses initially (avoid API costs during dev)
-- Implement streaming incrementally (start with batch, add streaming later)
-- Test round-trip parsing extensively (property order preservation)
+- Follow TDD: Write failing tests → Implement → Tests pass → Manual verify
+- Use Textual pilot for all UI tests (automated keyboard/mouse simulation)
+- Test each phase independently before proceeding
+- Property order preservation is NON-NEGOTIABLE
+- Get user verification at each checkpoint before continuing
 
 ## License
 
 GPLv3 - All code is licensed under GPLv3 regardless of authorship method (including AI-assisted development).
 
 ## Recent Changes
-- 002-logsqueak-spec: Added Python 3.11+
 
+- 2025-11-06: **Phase 1-2 Complete** - Foundational infrastructure implemented and tested (T001-T031)
+  - All data models, services, CLI, config, and utilities complete
+  - 125 tests passing (unit + integration)
+  - Fixed FileMonitor to use `!=` comparison (git-friendly)
+  - Generated Logsqueak-specific UUID namespace
+  - All async tests properly mock context managers
 - 2025-11-04: Created hybrid CLAUDE.md reflecting current implementation (parser only) + planned TUI feature
 - 2025-11-04: Completed clarification session for 002-logsqueak-spec (configuration management, validation strategy)
 

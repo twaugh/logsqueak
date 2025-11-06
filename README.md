@@ -1,40 +1,61 @@
 # Logsqueak
 
-Turn your Logseq journal chaos into organized knowledge. Advanced 5-phase LLM pipeline with persistent vector store automatically extracts insights and files them where they belong.
+Turn your Logseq journal chaos into organized knowledge. Interactive TUI (Text User Interface) for extracting lasting insights from journal entries using LLM-powered analysis.
 
-**Status**: ✅ Production Ready - All core features complete and tested
+**Status**: 🚧 **Foundation Complete** - Interactive TUI implementation in progress (Phase 3+)
 
 ## Overview
 
-Logsqueak implements a **5-phase pipeline** for knowledge management:
+Logsqueak provides an **interactive 3-phase workflow** for knowledge extraction:
 
-**Phase 0 - Indexing**: Parse your entire Logseq graph, generate block-level embeddings, store in persistent ChromaDB vector store with incremental updates
+**Phase 1 - Block Selection**:
+- View journal blocks in hierarchical tree
+- LLM streams classification results (knowledge vs. activity)
+- Manually select/deselect blocks with keyboard controls
+- Background: Page indexing for semantic search
 
-**Phase 1 - Extraction**: LLM identifies lasting knowledge from journal entries (vs. temporary activity logs), returns exact block text with hybrid IDs
+**Phase 2 - Content Editing**:
+- Review selected blocks with full context
+- LLM generates reworded versions (removes temporal context)
+- Accept LLM suggestions or edit manually
+- Background: RAG search finds candidate target pages
 
-**Phase 2 - Enhanced RAG**: Hybrid search combining semantic similarity + explicit `[[Page Links]]`, aggregates block-level candidates
+**Phase 3 - Integration Review**:
+- LLM suggests where to integrate each knowledge block
+- Preview target pages with insertion points
+- Accept/skip decisions (writes immediately on accept)
+- Atomic consistency: Journal marked only when page write succeeds
 
-**Phase 3 - Decision & Rewording**: Decider LLM chooses action (UPDATE/APPEND/IGNORE), Reworder LLM refines content for evergreen knowledge base
-
-**Phase 4 - Atomic Execution**: Apply operations, generate UUIDs, add `processed::` markers to journal with bidirectional block references
+All operations are **keyboard-driven** with vim-style navigation and **streaming LLM results** for responsive feedback.
 
 ## Features
 
-### Core Capabilities
-- **5-Phase LLM Pipeline**: Extractor → RAG → Decider → Reworder → Executor
-- **Persistent Vector Store**: ChromaDB with incremental indexing (survives across sessions)
-- **Hybrid ID System**: Stable block identifiers (`id::` property OR content hash)
-- **Block-Level Targeting**: Precise UPDATE/APPEND operations via hybrid IDs
-- **Enhanced RAG**: Semantic search + hinted search (page links in journal)
-- **Configurable Models**: Use different models for extraction, decisions, and rewording
-- **Atomic Journal Updates**: Bidirectional links with `processed::` markers
+### ✅ Implemented (Foundation)
+- **Logseq Parser**: Production-ready markdown parser with property order preservation
+- **Data Models**: Pydantic models for config, block state, LLM chunks, integration decisions
+- **LLM Client**: Async NDJSON streaming with retry logic and structured logging
+- **File Monitor**: Git-friendly mtime tracking for concurrent modification detection
+- **Configuration**: Lazy validation with helpful error messages (mode 600 permission check)
+- **Utilities**: Structured logging (structlog), deterministic UUID generation
+- **Test Suite**: 125 tests passing (unit + integration)
 
-### Non-Destructive Operations
-- **UPDATE**: Replaces block content while preserving structure and ID
-- **APPEND_CHILD**: Adds child to specific block
-- **APPEND_ROOT**: Adds root-level block to page
-- **Property Order Preservation**: NEVER reorders block properties (FR-008)
-- **Traceability**: Every integration tracked with block references in journal
+### 🚧 In Progress (Interactive TUI)
+- **Phase 1 Screen**: Block selection with tree navigation (next to implement)
+- **Phase 2 Screen**: Content editing with LLM rewording
+- **Phase 3 Screen**: Integration review with target page preview
+- **Services**: RAG search (PageIndexer, RAGSearch), file operations
+
+### ⏳ Planned
+- **Application Integration**: Wire up all 3 phases in TUI app
+- **Edge Cases**: Error handling, concurrent modification detection
+- **Polish**: Comprehensive logging, documentation, manual validation
+
+### Key Design Principles
+- **Non-Destructive**: All integrations traceable via `processed::` markers
+- **Property Order Preservation**: NEVER reorder (insertion order sacred)
+- **Keyboard-Driven**: Vim-style navigation (j/k), no mouse required
+- **Streaming LLM**: Real-time updates as results arrive
+- **Explicit Control**: Users approve all integrations (no auto-write)
 
 ## Installation
 
@@ -45,6 +66,8 @@ Logsqueak implements a **5-phase pipeline** for knowledge management:
 - Access to an LLM API (OpenAI, Anthropic, or local Ollama)
 
 ### Setup
+
+**IMPORTANT**: The following steps install all runtime and development dependencies, including large packages like sentence-transformers (~500MB) and ChromaDB.
 
 **Option 1: Automated Setup (Recommended)**
 
@@ -71,122 +94,104 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Upgrade pip in the venv
 pip install --upgrade pip
 
-# Install logsqueak in editable mode (installs all dependencies including ChromaDB)
+# Install logsqueak in editable mode with all dependencies
+# This installs: textual, httpx, pydantic, click, structlog, chromadb,
+# sentence-transformers (~500MB), and all dev dependencies
 pip install -e .
 
-# Note: Tests run directly from source
-# Tests use: pytest (which reads pythonpath from pyproject.toml)
+# Also install the parser library in editable mode
+pip install -e src/logseq-outline-parser/
+
+# Verify installation
+pytest -v  # Should show 125 passed, 1 skipped
 ```
+
+**What gets installed:**
+- Runtime dependencies: textual, httpx, pydantic, click, pyyaml, structlog, chromadb, sentence-transformers, markdown-it-py
+- Dev dependencies: pytest, pytest-asyncio, pytest-textual-snapshot, pytest-cov, black, ruff, mypy
 
 ### Configuration
 
-Create `~/.config/logsqueak/config.yaml`:
+Create `~/.config/logsqueak/config.yaml` with mode 600 permissions:
 
 ```yaml
 llm:
-  endpoint: https://api.openai.com/v1
+  endpoint: https://api.openai.com/v1  # Or http://localhost:11434/v1 for Ollama
   api_key: sk-your-api-key-here
-  model: gpt-4-turbo-preview  # Default model for all phases
-
-  # Optional: Configure separate models for different phases
-  # extractor_model: gpt-4-turbo-preview  # Phase 1 (defaults to model)
-  # decider_model: gpt-3.5-turbo         # Phase 3.1 - faster/cheaper
-  # reworder_model: gpt-4-turbo-preview  # Phase 3.2 - high quality
+  model: gpt-4-turbo-preview
 
 logseq:
   graph_path: ~/Documents/logseq-graph
 
 rag:
-  top_k: 10  # Number of similar chunks to retrieve (default: 10)
+  top_k: 10  # Number of similar blocks to retrieve per search (default: 10)
 ```
 
-**For Ollama (local)**:
-
+**Optional settings:**
 ```yaml
 llm:
-  endpoint: http://localhost:11434/v1
-  api_key: ollama  # Any non-empty value
-  model: llama3.2
-  decider_model: llama3.2  # Use same model for all phases
-  reworder_model: llama3.2
-
-logseq:
-  graph_path: ~/Documents/logseq-graph
-
-rag:
-  top_k: 5  # Fewer candidates for local models
+  num_ctx: 32768  # Ollama context window size (controls VRAM usage)
 ```
 
-#### RAG Configuration
+**Configuration behavior:**
+- File must exist before first run (not auto-created)
+- File permissions must be mode 600 (checked on load)
+- Lazy validation: Settings validated only when first accessed
+- Helpful error messages with example YAML for missing/invalid config
 
-The `rag.top_k` setting controls how many similar chunks are retrieved in Phase 2 (Enhanced RAG). The Decider (Phase 3.1) then evaluates each (knowledge, candidate page) pair.
-
-**Tuning recommendations:**
-- **5-10**: Good balance for most use cases
-- **10-20**: More thorough search, higher LLM cost
-- **3-5**: Faster, cheaper, may miss relevant pages
-
-**Viewing pipeline details:**
+Set correct permissions:
 ```bash
-# See detailed logs for all phases
-logsqueak extract --verbose 2025-01-15
+chmod 600 ~/.config/logsqueak/config.yaml
 ```
-
-Shows candidate retrieval, decider decisions, and write operations.
 
 ## Usage
 
-### First Time Setup
+**⚠️ TUI Not Yet Implemented**
+
+The CLI entry point exists but launches a placeholder:
 
 ```bash
-# Build the vector store index (Phase 0)
-logsqueak index rebuild
-
-# Check index status
-logsqueak index status
+# Placeholder - shows message about TUI implementation
+logsqueak extract                     # Today's journal (future)
+logsqueak extract 2025-01-15          # Specific date (future)
+logsqueak extract 2025-01-10..2025-01-15  # Date range (future)
 ```
 
-### Extracting Knowledge
+**Future workflow** (Phase 6 - when TUI complete):
+1. Launch interactive TUI with `logsqueak extract 2025-01-15`
+2. **Phase 1**: Navigate blocks (j/k), see LLM suggestions, select with Space
+3. Press `n` to proceed to Phase 2
+4. **Phase 2**: Review/edit content, accept LLM rewording with `a`
+5. Press `n` to proceed to Phase 3
+6. **Phase 3**: Review integration decisions, accept with `y`
+7. Writes complete - journal marked with `processed::` markers
 
-```bash
-# Extract from specific date (writes directly with processed:: markers)
-logsqueak extract 2025-01-15
-
-# Extract from date range
-logsqueak extract 2025-01-10..2025-01-15
-
-# Extract from today's journal
-logsqueak extract
-
-# Enable verbose logging to see pipeline details
-logsqueak extract --verbose 2025-01-15
-```
-
-**Note**: The 5-phase pipeline writes directly to pages and adds `processed::` markers to journal entries. Each marker contains bidirectional links in the format:
-```
-processed:: [PageName](((block-uuid-1))), [OtherPage](((block-uuid-2)))
-```
-
-Click these links in Logseq to jump to the integrated knowledge blocks.
+All keyboard-driven, no mouse required.
 
 ## Project Structure
 
 ```
 logsqueak/
-├── src/logsqueak/         # Source code
-│   ├── cli/               # Command-line interface
-│   ├── config/            # Configuration management
-│   ├── extraction/        # Knowledge extraction logic
-│   ├── integration/       # Page integration logic
-│   ├── llm/               # LLM client abstraction
-│   ├── logseq/            # Logseq file format handling
-│   ├── models/            # Data models
-│   └── rag/               # RAG infrastructure
-├── tests/                 # Test suite
-│   ├── unit/              # Unit tests
-│   ├── integration/       # Integration tests
-│   └── fixtures/          # Test data
-└── specs/                 # Feature specifications
+├── src/
+│   ├── logsqueak/                 # Main application (FOUNDATION COMPLETE)
+│   │   ├── models/                # Pydantic data models ✅
+│   │   ├── services/              # LLMClient, FileMonitor ✅ (RAG pending)
+│   │   ├── tui/                   # TUI structure 🚧 (screens/widgets pending)
+│   │   ├── utils/                 # Logging, UUID generation ✅
+│   │   ├── cli.py                 # CLI entry point ✅
+│   │   └── config.py              # ConfigManager ✅
+│   └── logseq-outline-parser/     # Parser library ✅
+├── tests/                         # Test suite (125 passed, 1 skipped)
+│   ├── unit/                      # Unit tests ✅
+│   ├── integration/               # Integration tests ✅
+│   └── ui/                        # UI tests (pending)
+├── specs/
+│   ├── 001-logsqueak/             # Original 5-phase pipeline spec
+│   └── 002-logsqueak-spec/        # Interactive TUI spec (CURRENT)
+│       ├── spec.md                # Feature specification
+│       ├── tasks.md               # Phase 1-2 complete ✅
+│       └── contracts/             # Service interfaces, data models
+└── pyproject.toml                 # Dependencies and config
 ```
 
 ## Development
@@ -199,22 +204,20 @@ logsqueak/
 # Activate venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Run all tests (that don't require heavy dependencies)
-pytest tests/unit/test_config.py tests/unit/test_journal.py tests/unit/test_knowledge.py tests/unit/test_parser.py tests/unit/test_graph.py tests/unit/test_preview.py tests/integration/
+# Run all tests (125 passed, 1 skipped)
+pytest -v
+
+# Run only parser tests
+pytest src/logseq-outline-parser/tests/ -v
+
+# Run only main app tests
+pytest tests/unit/ tests/integration/ -v
 
 # Run with coverage
-pytest tests/unit/ tests/integration/ --cov=logsqueak --cov-report=html
+pytest --cov=logsqueak --cov=logseq_outline --cov-report=html -v
 
-# Run specific test file
-pytest tests/unit/test_parser.py -v
-
-# Skip slow tests (requires sentence-transformers)
-pytest -m "not slow"
-```
-
-**Note**: Some tests require `sentence-transformers` which is a large dependency. Install it separately if needed:
-```bash
-pip install sentence-transformers>=2.2.0
+# Verify foundational tests (Phase 2 checkpoint)
+pytest tests/unit/ tests/integration/test_config*.py tests/integration/test_llm*.py -v
 ```
 
 ### Code Quality
@@ -237,82 +240,78 @@ mypy src/
 
 ## Implementation Status
 
-Production-ready 5-phase pipeline with all core features complete:
+**✅ Phase 1-2 Complete (Tasks T001-T031)**
 
-- ✅ **Hybrid-ID Foundation**
-  - Parser extracts `id::` properties
-  - Full-context chunk generation with parent traversal
-  - Content hashing for hybrid IDs
-  - Writer generates UUIDs for new blocks
-  - Round-trip safety tests (preserve IDs)
-  - `find_block_by_id()` for AST lookup
+Foundation ready for TUI implementation:
 
-- ✅ **Persistent Vector Store**
-  - ChromaDB dependency and integration
-  - VectorStore abstraction with ChromaDBStore
-  - Block-level chunking with full-context text
-  - Cache manifest system (mtime tracking)
-  - Incremental index builder (detects add/update/delete)
-  - CLI commands: `index rebuild`, `index status`
+- ✅ **Logseq Outline Parser** (Production-ready library)
+  - Non-destructive parsing & rendering with property order preservation
+  - Hybrid ID system (explicit `id::` OR content hash)
+  - Full-context generation for semantic search
+  - Frontmatter support, round-trip safety tests
 
-- ✅ **Block-Level Targeting**
-  - Block ID targeting infrastructure
-  - UPDATE operation (replace content, preserve ID)
-  - APPEND_CHILD operation (add to specific block)
-  - APPEND_ROOT operation (add to page root)
+- ✅ **Data Models** (Pydantic validation)
+  - Config models (LLMConfig, LogseqConfig, RAGConfig, Config)
+  - Block state models (BlockState, EditedContent, IntegrationDecision)
+  - LLM chunk models (KnowledgeClassificationChunk, ContentRewordingChunk, IntegrationDecisionChunk)
+  - Background task state enum
 
-- ✅ **Multi-Stage LLM Pipeline**
-  - Phase 1: Knowledge extraction with hybrid IDs
-  - Phase 2: Enhanced RAG (semantic + hinted search)
-  - Phase 3.1: Decider LLM (action selection)
-  - Phase 3.2: Reworder LLM (content refinement)
-  - Phase 4: Atomic execution with journal cleanup
-  - Configurable models for each phase
-  - Full 5-phase pipeline integration
+- ✅ **Services Layer**
+  - LLMClient: Async NDJSON streaming, retry logic, structured logging
+  - FileMonitor: Mtime tracking with `!=` comparison (git-friendly)
 
-- ✅ **Testing & Reliability**
-  - Full pipeline integration tests
-  - Comprehensive error recovery tests
-  - Round-trip parsing validation
+- ✅ **Configuration & CLI**
+  - ConfigManager with lazy validation
+  - Mode 600 permission checking
+  - Helpful error messages with example YAML
+  - Click-based CLI entry point (placeholder implementation)
+
+- ✅ **Utilities**
+  - Structured logging (structlog) to `~/.cache/logsqueak/logs/logsqueak.log`
+  - Deterministic UUID v5 with Logsqueak-specific namespace
+
+- ✅ **Test Coverage**
+  - 125 tests passing, 1 skipped
+  - Unit tests: All models, services, utilities
+  - Integration tests: Config loading, LLM NDJSON streaming
+  - Proper async context manager mocking
+
+**🚧 Phase 3+ In Progress**
+
+Next: User Story 1 (Block Selection TUI) using Test-Driven Development
 
 ## Architecture
 
-### 5-Phase Pipeline
+### Interactive 3-Phase TUI Workflow
 
-```
-Phase 0 - Indexing (run once, then incrementally):
-  Parse all pages → Generate full-context chunks → Extract hybrid IDs
-  → Store in ChromaDB → Maintain manifest (mtime tracking)
+**Phase 1 - Block Selection Screen** (User Story 1, T032-T049):
+- BlockTree widget: Hierarchical display of journal blocks
+- LLM worker: Streams classification results (knowledge vs. activity)
+- StatusPanel widget: Shows background task progress (LLM classification, page indexing)
+- User actions: Navigate (j/k), select/deselect (Space), accept all (a), proceed (n)
 
-Phase 1 - Knowledge Extraction:
-  Load journal → LLM identifies knowledge blocks → Add parent context
-  → Create Knowledge Packages with hybrid IDs
+**Phase 2 - Content Editing Screen** (User Story 2, T050-T070):
+- ContentEditor widget: Three-panel view (original, LLM reworded, current editable)
+- LLM worker: Streams rewording suggestions
+- RAG worker: Finds candidate target pages in background
+- User actions: Navigate (j/k with auto-save), accept LLM (a), revert (r), Tab to focus editor, proceed (n) when RAG complete
 
-Phase 2 - Enhanced RAG:
-  Semantic search (ChromaDB top_k) + Hinted search ([[Page Links]])
-  → Aggregate and deduplicate → Group by page → Return candidates
-
-Phase 3 - Decision & Rewording:
-  For each (knowledge, candidate) pair:
-    Phase 3.1 - Decider: LLM chooses UPDATE/APPEND_CHILD/APPEND_ROOT/IGNORE
-    Phase 3.2 - Reworder: LLM refines content (if not IGNORE)
-  → Build Write List
-
-Phase 4 - Execution & Cleanup:
-  Group by page → Parse AST → Apply operations → Generate UUIDs
-  → Atomically update journal with processed:: markers
-  → Write all changes
-```
+**Phase 3 - Integration Review Screen** (User Story 3, T071-T096):
+- DecisionList widget: Batched decisions per knowledge block
+- TargetPagePreview widget: Shows target page with green bar at insertion point
+- LLM worker: Streams integration decisions
+- File operations: Atomic two-phase writes with provenance markers
+- User actions: Navigate decisions (j/k), accept (y), skip (s), next block (n), batch accept (a)
 
 ### Key Design Principles
 
-1. **Property Order Preservation**: NEVER reorder (insertion order sacred - FR-008)
-2. **Hybrid ID System**: Persistent `id::` OR content hash for stable targeting
+1. **Property Order Preservation**: NEVER reorder (insertion order sacred)
+2. **Non-Destructive Operations**: All integrations traceable via `processed::` markers
 3. **Atomic Consistency**: Journal marked only when page write succeeds
-4. **Block-Level Precision**: Target specific blocks via `find_block_by_id()`
-5. **Persistent Vector Store**: ChromaDB with incremental updates (manifest-based)
-6. **Multi-Model Architecture**: Separate models for extraction, decisions, and rewording
-7. **Bidirectional Links**: `processed::` markers in journal reference integrated blocks
+4. **Keyboard-Driven**: Vim-style navigation (j/k), context-sensitive shortcuts
+5. **Streaming LLM**: Real-time UI updates as results arrive
+6. **Explicit Control**: Users approve all integrations (no auto-write)
+7. **Test-Driven Development**: Write failing tests → Implement → Tests pass → Manual verify
 
 ## License
 
@@ -322,49 +321,41 @@ This project uses AI assistance (Claude Code) in development. All code is licens
 
 ## Contributing
 
-See [CLAUDE.md](CLAUDE.md) for developer documentation and architecture details.
+See [CLAUDE.md](CLAUDE.md) for developer documentation, architecture details, and implementation guidance.
 
-Additional resources in [specs/001-knowledge-extraction/](specs/001-knowledge-extraction/):
-- `spec.md` - Feature requirements and user stories
-- `data-model.md` - Entity definitions
-- `quickstart.md` - Developer setup guide
+Key resources:
+- **specs/002-logsqueak-spec/spec.md** - Complete interactive TUI feature specification
+- **specs/002-logsqueak-spec/tasks.md** - Implementation tasks (Phase 1-2 complete ✅)
+- **specs/002-logsqueak-spec/contracts/** - Service interfaces and data models
+- **CLAUDE.md** - Developer guide with parser API, testing, and next steps
 
-## Testing
+## Development Workflow
 
-Test coverage focuses on:
+**Test-Driven Development** (Phase 3+ approach):
+1. Write UI tests FIRST using Textual pilot - tests should FAIL
+2. Verify tests fail: `pytest tests/ui/test_phase1_*.py -v`
+3. Implement widgets and screens
+4. Run tests again - should NOW PASS
+5. Manual verification in TUI before proceeding
 
-- **Unit Tests**: All data models, parser/renderer, graph operations
-- **Integration Tests**: Round-trip parsing, full extraction workflow
-- **Contract Tests**: CLI commands, LLM interactions, file operations
-
-Run with:
-
-```bash
-pytest --cov=logsqueak --cov-report=term-missing
-```
-
-## Performance
-
-Tested on 500+ page Logseq graph:
-
-**Vector Store Indexing (Phase 0):**
-- **Initial build**: ~20-30 seconds (parse all pages, generate block embeddings)
-- **Incremental updates**: ~2 seconds (only process changed pages)
-- **Storage**: `~/.cache/logsqueak/chroma/` (persistent across sessions)
-
-**Knowledge Extraction (Phases 1-4):**
-- **Phase 1-2**: ~2-3 seconds per journal (extraction + RAG search)
-- **Phase 3**: Variable (depends on number of candidates and LLM speed)
-- **Phase 4**: ~1-2 seconds (AST operations + file writes)
-
-**Total**: Typically 5-10 seconds per journal entry (excluding LLM API latency)
+**Current Status**: Ready to begin Phase 3 (User Story 1 - Block Selection TUI)
 
 ## Roadmap
 
-**Future Enhancements:**
-- Performance benchmarks and optimization
-- Batch processing optimization
-- Semantic deduplication across pages
-- Historical journal summarization
-- Rich terminal UI (TUI)
-- Async LLM calls for parallelization
+**Completed** (Phase 1-2):
+- ✅ Project structure and dependencies
+- ✅ All data models with Pydantic validation
+- ✅ LLM client with NDJSON streaming
+- ✅ Configuration management with lazy validation
+- ✅ File monitoring for concurrent edits
+- ✅ Comprehensive test suite (125 tests)
+
+**Next** (Phase 3-5):
+- 🚧 User Story 1: Block Selection TUI
+- ⏳ User Story 2: Content Editing TUI
+- ⏳ User Story 3: Integration Review TUI
+
+**Future** (Phase 6-8):
+- ⏳ Application integration (wire up all 3 phases)
+- ⏳ RAG services (PageIndexer, RAGSearch)
+- ⏳ Edge case handling and polish
