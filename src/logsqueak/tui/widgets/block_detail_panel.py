@@ -175,18 +175,20 @@ class BlockDetailPanel(Widget):
             return
 
         # Build full context markdown for the preview
+        # Note: Always render at indent level 0 in the detail panel
         lines = []
 
         # Include parent blocks for context (if provided)
         if parent_blocks:
             for parent in parent_blocks:
-                # Render parent as Logseq markdown
+                # Render parent as Logseq markdown (no indentation)
                 parent_content = parent.get_full_content(normalize_whitespace=True)
-                lines.append(f"{'  ' * parent.indent_level}- {parent_content}")
+                lines.append(f"- {parent_content}")
 
         # Add the current block (only the block itself, not its children)
+        # Always render at indent level 0
         block_content = block.get_full_content(normalize_whitespace=True)
-        lines.append(f"{'  ' * block.indent_level}- {block_content}")
+        lines.append(f"- {block_content}")
 
         # Combine into markdown text
         markdown_text = "\n".join(lines)
