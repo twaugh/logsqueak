@@ -25,6 +25,18 @@ class Phase1Screen(Screen):
     Displays journal blocks, streams LLM suggestions, allows user selection.
     """
 
+    CSS = """
+    BlockTree {
+        height: 1fr;
+    }
+
+    BlockDetailPanel {
+        height: auto;
+        min-height: 16;
+        max-height: 30;
+    }
+    """
+
     BINDINGS = [
         ("j", "cursor_down", "Down"),
         ("k", "cursor_up", "Up"),

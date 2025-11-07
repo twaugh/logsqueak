@@ -34,7 +34,8 @@ class StatusInfoPanel(Static):
         border: solid $accent;
         background: $surface;
         padding: 1;
-        height: 100%;
+        height: auto;
+        overflow-y: auto;
     }
     """
 
@@ -50,11 +51,7 @@ class StatusInfoPanel(Static):
         """
         lines = []
 
-        # Selection status header
-        lines.append(Text("Status", style="bold underline"))
-        lines.append(Text(""))
-
-        # Show selection status
+        # Show selection status (no header, just the status)
         if state.classification == "knowledge":
             # Block is selected
             if state.source == "user":
@@ -64,15 +61,12 @@ class StatusInfoPanel(Static):
         elif state.llm_classification == "knowledge":
             # LLM suggested but not selected
             lines.append(Text("🤖 Suggested by LLM", style="bold yellow"))
-            lines.append(Text("(not yet selected)", style="dim"))
         else:
             # Not selected, no LLM suggestion
             lines.append(Text("Not selected", style="dim"))
 
         # LLM analysis section (if available)
         if state.llm_classification == "knowledge":
-            lines.append(Text(""))
-            lines.append(Text("LLM Analysis", style="bold underline"))
             lines.append(Text(""))
 
             # Confidence score
@@ -81,27 +75,33 @@ class StatusInfoPanel(Static):
                 confidence_text = Text("Confidence: ", style="bold")
                 confidence_text.append(f"{confidence_pct}%", style="cyan")
                 lines.append(confidence_text)
-                lines.append(Text(""))
 
             # Reasoning
             if state.reason:
                 lines.append(Text("Reasoning:", style="bold"))
-                # Wrap reasoning text to fit panel width
+                # Manually wrap reasoning text to fit panel width
+                # Panel width is 35, minus 2 for padding = 33 characters available
+                max_width = 31
                 reason_words = state.reason.split()
                 current_line = []
                 current_length = 0
-                max_width = 30  # Leave some margin
 
                 for word in reason_words:
-                    word_len = len(word) + 1  # +1 for space
-                    if current_length + word_len > max_width and current_line:
+                    word_len = len(word)
+                    # Check if adding this word would exceed max width
+                    if current_line and current_length + 1 + word_len > max_width:
+                        # Flush current line and start new one
                         lines.append(Text(" ".join(current_line), style="italic"))
                         current_line = [word]
                         current_length = word_len
                     else:
+                        # Add word to current line
+                        if current_line:
+                            current_length += 1  # Space before word
                         current_line.append(word)
                         current_length += word_len
 
+                # Flush remaining words
                 if current_line:
                     lines.append(Text(" ".join(current_line), style="italic"))
 
@@ -129,7 +129,9 @@ class BlockDetailPanel(Widget):
 
     DEFAULT_CSS = """
     BlockDetailPanel {
-        height: 16;
+        height: auto;
+        min-height: 16;
+        max-height: 30;
         background: $surface;
     }
 
