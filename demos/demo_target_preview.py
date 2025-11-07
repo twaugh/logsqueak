@@ -18,20 +18,27 @@ from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
 # Sample Logseq page content demonstrating various features
 SAMPLE_PAGES = {
     "basic": """- Python Concepts
+  A collection of fundamental Python programming concepts.
   - Functions
+    Reusable blocks of code that perform specific tasks.
   - Decorators
   - Generators""",
 
     "with_formatting": """- [[Python]] Best Practices
+  Following established conventions helps maintain code quality and readability across teams.
   - Use **type hints** for clarity
+    Introduced in Python 3.5, type hints help catch bugs early and improve IDE support.
   - Follow #PEP8 style guide
   - See [official docs](https://docs.python.org)
   - Related: [[Code Quality]]""",
 
     "nested_structure": """- Web Development
+  Modern web development encompasses both client-side and server-side technologies.
   - Frontend
+    The client-side of web applications, running in the user's browser.
     - React
       - Hooks
+        Introduced in React 16.8, hooks allow functional components to use state and lifecycle features.
       - Context API
     - CSS
       - Flexbox
@@ -44,12 +51,15 @@ SAMPLE_PAGES = {
       - MongoDB""",
 
     "mixed_content": """- Project: Logsqueak Knowledge Extraction
+  A TUI application for extracting lasting knowledge from Logseq journal entries using LLM-powered analysis.
   tags:: #project #logseq #tui
   status:: in-progress
   - **Phase 1**: Block Selection ✅
+    Users can navigate journal blocks in a hierarchical tree view with LLM classification.
   - **Phase 2**: Content Editing ✅
   - **Phase 3**: Integration Review 🚧
     - Implement [[TargetPagePreview]] widget
+      Shows preview of new content in target page context with insertion indicator.
     - Add green bar insertion indicator
     - Test with real [[Logseq]] data
   - See [[Project Management]] for timeline""",

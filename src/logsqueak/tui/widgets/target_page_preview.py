@@ -203,7 +203,7 @@ class TargetPagePreview(Widget):
             self._gutter.marked_lines = set()
 
     def _prepare_content(self) -> str:
-        """Prepare content for rendering (add property line breaks)."""
+        """Prepare content for rendering (add line breaks for continuation lines)."""
         content = self._preview_content
 
         if not content:
@@ -214,18 +214,29 @@ class TargetPagePreview(Widget):
         # Process lines for proper rendering
         processed_lines = []
         for i, line in enumerate(lines):
-            # Check if next line is a property (for line break before it)
-            next_is_property = False
+            # Check if next line is a continuation line (not a bullet, not empty)
+            next_is_continuation = False
             if i + 1 < len(lines):
-                next_line = lines[i + 1].strip()
-                if "::" in next_line and not next_line.startswith("-"):
-                    next_is_property = True
+                next_line = lines[i + 1]
+                # Continuation line: has indentation but no bullet marker
+                stripped = next_line.lstrip()
+                if stripped and not stripped.startswith("-") and len(next_line) > len(stripped):
+                    next_is_continuation = True
 
             # Detect Logseq properties (key:: value pattern)
             is_property = "::" in line and not line.strip().startswith("-")
 
+            # Check if current line is a continuation line
+            stripped_current = line.lstrip()
+            is_continuation = (
+                stripped_current
+                and not stripped_current.startswith("-")
+                and len(line) > len(stripped_current)
+            )
+
             # Add double-space at end to force markdown line break
-            if is_property or next_is_property:
+            # This is needed for continuation lines and properties
+            if is_property or next_is_continuation or is_continuation:
                 line = line.rstrip() + "  "
 
             processed_lines.append(line)
