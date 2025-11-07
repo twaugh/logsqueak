@@ -2,6 +2,45 @@
 
 Interactive demonstrations of Logsqueak TUI widgets and screens.
 
+## Phase 1 Block Selection Demo
+
+Demonstrates the Phase 1 Block Selection workflow with realistic journal entries.
+
+**Run:**
+```bash
+python demos/demo_phase1.py
+```
+
+**Features:**
+- Hierarchical tree view of journal blocks
+- LLM classification suggestions (knowledge vs. activity logs)
+- Visual indicators for classified blocks
+- Block preview panel showing full context
+- Status tracking for selected/suggested blocks
+- Keyboard-driven navigation and selection
+
+**Sample Data:**
+- Realistic journal entry (2025-01-15)
+- Mix of knowledge blocks (Python asyncio, Docker networking, Git tips)
+- Mix of activity logs (meetings, todos, lunch)
+- LLM confidence scores and reasoning for each classification
+
+**Keyboard Controls:**
+- `j` / `k` - Navigate between blocks
+- `Shift+J` / `Shift+K` - Jump to next/previous knowledge block
+- `Space` - Toggle block selection
+- `a` - Accept all LLM suggestions
+- `c` - Clear all selections
+- `r` - Reset to LLM suggestions
+- `n` - Proceed to next phase
+- `q` - Quit
+
+**Layout:**
+- Left panel: Block tree with selection indicators
+- Center panel: Status panel showing counts and progress
+- Right panel: Markdown preview of selected block
+- Footer: Keyboard shortcuts
+
 ## Phase 3 Integration Review Demo
 
 Demonstrates the Phase 3 Integration Review workflow with sample knowledge blocks.

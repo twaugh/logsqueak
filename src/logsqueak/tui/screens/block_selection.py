@@ -28,6 +28,8 @@ class Phase1Screen(Screen):
     BINDINGS = [
         ("j", "cursor_down", "Down"),
         ("k", "cursor_up", "Up"),
+        ("down", "cursor_down", "Down"),
+        ("up", "cursor_up", "Up"),
         ("shift+j", "jump_next_knowledge", "Next Knowledge"),
         ("shift+k", "jump_prev_knowledge", "Prev Knowledge"),
         Binding("space", "toggle_selection", "Toggle Selection", priority=True),
@@ -154,19 +156,23 @@ class Phase1Screen(Screen):
         if self._indexing_worker:
             self._indexing_worker.cancel()
 
+    def on_tree_node_highlighted(self, event: BlockTree.NodeHighlighted) -> None:
+        """Called when tree cursor moves (handles arrow keys and j/k)."""
+        self._update_current_block()
+
     # Keyboard actions
 
     def action_cursor_down(self) -> None:
         """Move cursor down in tree."""
         tree = self.query_one(BlockTree)
         tree.action_cursor_down()
-        self._update_current_block()
+        # Note: _update_current_block() called by on_tree_node_highlighted event
 
     def action_cursor_up(self) -> None:
         """Move cursor up in tree."""
         tree = self.query_one(BlockTree)
         tree.action_cursor_up()
-        self._update_current_block()
+        # Note: _update_current_block() called by on_tree_node_highlighted event
 
     def action_jump_next_knowledge(self) -> None:
         """Jump to next LLM-suggested knowledge block."""
@@ -177,7 +183,7 @@ class Phase1Screen(Screen):
         if next_line is not None:
             tree.cursor_line = next_line
             tree.scroll_to_line(next_line)
-            self._update_current_block()
+            # Note: _update_current_block() called by on_tree_node_highlighted event
 
     def action_jump_prev_knowledge(self) -> None:
         """Jump to previous LLM-suggested knowledge block."""
@@ -188,7 +194,7 @@ class Phase1Screen(Screen):
         if prev_line is not None:
             tree.cursor_line = prev_line
             tree.scroll_to_line(prev_line)
-            self._update_current_block()
+            # Note: _update_current_block() called by on_tree_node_highlighted event
 
     def action_toggle_selection(self) -> None:
         """Toggle selection on current block."""
