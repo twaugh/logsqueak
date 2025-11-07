@@ -201,8 +201,8 @@ class TestRenderOutlineWithTracking:
         outline = LogseqOutline.parse(content)
         rendered_lines, block_map = render_outline_with_tracking(outline, max_width=80)
 
-        # Should produce 4 lines (2 blocks x 2 lines each)
-        assert len(rendered_lines) == 4
+        # Should produce 3 lines (Block one: 2 lines, Block two: 1 line - id:: is omitted)
+        assert len(rendered_lines) == 3
 
         # Block one should map to lines 0 and 1
         block_one = outline.blocks[0]
@@ -210,12 +210,12 @@ class TestRenderOutlineWithTracking:
         assert 0 in block_map[block_one_id]
         assert 1 in block_map[block_one_id]
 
-        # Block two should map to lines 2 and 3
+        # Block two should map to line 2 only (id:: property is not rendered)
         block_two = outline.blocks[1]
         block_two_id = get_block_id(block_two, [])
-        assert block_two_id == "12345"  # Explicit ID
+        assert block_two_id == "12345"  # Explicit ID still parsed
         assert 2 in block_map[block_two_id]
-        assert 3 in block_map[block_two_id]
+        assert len(block_map[block_two_id]) == 1  # Only the block content line, not the id:: line
 
     def test_render_outline_with_wrapping(self):
         """Test tracking with word-wrapped content."""
@@ -260,12 +260,42 @@ class TestRenderOutlineWithTracking:
         assert first_child.block_id == "child-id"
         assert "child-id" in block_map
 
+        # First child should only map to 1 line (content only, id:: omitted)
+        first_child_lines = block_map["child-id"]
+        assert len(first_child_lines) == 1
+
         # Verify children don't overlap with parent in line numbers
         for i, child in enumerate(outline.blocks[0].children):
             child_id = get_block_id(child, [parent])
             child_lines = block_map[child_id]
             # Child lines should not overlap with parent lines
             assert not set(parent_lines).intersection(set(child_lines))
+
+    def test_id_property_omitted_but_others_rendered(self):
+        """Test that id:: properties are omitted but other properties are rendered."""
+        content = """- Block with mixed properties
+  id:: test-id
+  tags:: #test #demo
+  status:: complete"""
+
+        outline = LogseqOutline.parse(content)
+        rendered_lines, block_map = render_outline_with_tracking(outline, max_width=80)
+
+        # Should produce 3 lines: block content + tags + status (id:: is omitted)
+        assert len(rendered_lines) == 3
+
+        # Verify id:: is not in any rendered line
+        for line in rendered_lines:
+            assert "id:" not in line.plain
+            assert "test-id" not in line.plain
+
+        # Verify other properties ARE rendered
+        assert any("tags:" in line.plain for line in rendered_lines)
+        assert any("status:" in line.plain for line in rendered_lines)
+
+        # Block should still be tracked with explicit ID
+        assert "test-id" in block_map
+        assert len(block_map["test-id"]) == 3  # All 3 rendered lines belong to this block
 
     def test_find_block_by_line_number(self):
         """Test finding which block corresponds to a line number."""

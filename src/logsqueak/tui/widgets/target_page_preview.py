@@ -235,6 +235,14 @@ def render_block_content(
         # Determine if this is a property line
         is_property = "::" in content_line and not content_line.strip().startswith("-")
 
+        # Skip id:: properties completely (don't render them at all)
+        if is_property:
+            # Check if this is an id:: property
+            property_match = re.match(r'^\s*(id)::\s*', content_line)
+            if property_match:
+                # Skip this line entirely - don't render id:: properties
+                continue
+
         # Render the content with syntax highlighting
         if is_property:
             rendered = render_property_line(content_line)

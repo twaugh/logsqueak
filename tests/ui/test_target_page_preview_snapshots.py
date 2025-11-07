@@ -110,7 +110,10 @@ def test_target_preview_with_wrapping(snap_compare):
 
 
 def test_target_preview_with_highlight_explicit_id(snap_compare):
-    """Snapshot test for green bar highlighting with explicit block ID."""
+    """Snapshot test for green bar highlighting with explicit block ID.
+
+    Note: id:: property is not rendered, but block is still highlighted.
+    """
     content = """- Parent block
   - First child
   - Second child to highlight
@@ -122,7 +125,10 @@ def test_target_preview_with_highlight_explicit_id(snap_compare):
 
 
 def test_target_preview_with_highlight_and_properties(snap_compare):
-    """Snapshot test for highlighting block with properties (all lines highlighted)."""
+    """Snapshot test for highlighting block with properties (all lines highlighted).
+
+    Note: id:: property is not rendered, but tags and status are shown.
+    """
     content = """- Parent block
   - Child one
   - Child two with properties
@@ -136,7 +142,10 @@ def test_target_preview_with_highlight_and_properties(snap_compare):
 
 
 def test_target_preview_nested_with_highlight(snap_compare):
-    """Snapshot test for deeply nested structure with highlighted block."""
+    """Snapshot test for deeply nested structure with highlighted block.
+
+    Note: id:: property is not rendered, but description property is shown.
+    """
     content = """- Web Development
   - Frontend
     - React
