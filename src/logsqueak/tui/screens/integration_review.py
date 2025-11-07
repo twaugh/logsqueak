@@ -211,37 +211,164 @@ class Phase3Screen(Screen):
 
         decision = block_decisions[self.current_decision_index]
 
-        # Generate preview content
-        # For now, just show a placeholder
-        # In full implementation, this would load the target page and render it
-        preview_text = self._generate_preview_text(decision)
+        # Generate preview content with integrated block
+        preview_text, highlight_block_id = self._generate_preview_with_integration(decision)
 
         preview = self.query_one(TargetPagePreview)
-        # TODO: Find the actual block to highlight based on decision.target_block_id
-        # For now, don't highlight anything (placeholder implementation)
-        preview.load_preview(preview_text, highlight_block_id=None)
+        preview.load_preview(preview_text, highlight_block_id=highlight_block_id)
 
-    def _generate_preview_text(self, decision: IntegrationDecision) -> str:
-        """Generate preview text for integration decision.
+    def _generate_preview_with_integration(
+        self, decision: IntegrationDecision
+    ) -> tuple[str, str | None]:
+        """Generate preview with integrated content.
 
         Args:
             decision: Integration decision to preview
 
         Returns:
-            Preview text with integrated content
+            Tuple of (preview_text, highlight_block_id)
         """
-        # Placeholder implementation
-        # Full implementation would:
-        # 1. Load target page from disk
-        # 2. Apply the integration action
-        # 3. Render the result with insertion point marked
+        if not self.graph_paths:
+            # No graph paths - return placeholder
+            return self._generate_placeholder_preview(decision), None
+
+        # Try to load the target page
+        try:
+            page_path = self.graph_paths.get_page_path(decision.target_page)
+            if page_path.exists():
+                page_content = page_path.read_text()
+            else:
+                # Page doesn't exist yet - create minimal structure
+                page_content = f"- {decision.target_page}"
+        except Exception as e:
+            logger.error("failed_to_load_page", error=str(e), page=decision.target_page)
+            return self._generate_placeholder_preview(decision), None
+
+        # Parse the target page
+        outline = LogseqOutline.parse(page_content)
+
+        # Create a new block for the knowledge content
+        new_block_content = decision.refined_text
+        new_block_id = f"preview-{decision.knowledge_block_id}"
+
+        # Find where to insert based on action
+        action = decision.action
+        target_block_id = decision.target_block_id
+
+        if action == "add_under" and target_block_id:
+            # Find the target block and add as child
+            target_found = self._add_block_under(outline, target_block_id, new_block_content, new_block_id)
+            if not target_found:
+                logger.warning("target_block_not_found", target_id=target_block_id)
+        elif action == "add_section":
+            # Add as new root-level block
+            new_root = LogseqBlock(
+                content=[new_block_content],
+                indent_level=0,
+                block_id=new_block_id
+            )
+            outline.blocks.append(new_root)
+
+        # Render the modified outline
+        preview_content = outline.render()
+
+        # Re-parse to get the actual hash IDs
+        reparsed = LogseqOutline.parse(preview_content)
+
+        # Find the block with our new content to get its hash
+        highlight_block_id = self._find_block_by_content(reparsed.blocks, new_block_content)
+
+        return preview_content, highlight_block_id
+
+    def _add_block_under(
+        self, outline: LogseqOutline, target_id: str, content: str, block_id: str
+    ) -> bool:
+        """Add a new block under the target block.
+
+        Args:
+            outline: Outline to modify
+            target_id: ID of target block to add under
+            content: Content for new block
+            block_id: ID for new block
+
+        Returns:
+            True if target was found and block added
+        """
+        def search_and_add(blocks: list[LogseqBlock], parents: list[LogseqBlock]) -> bool:
+            for parent_block in blocks:
+                # Check if this is the target (by explicit ID or content hash)
+                block_matches = False
+                if parent_block.block_id == target_id:
+                    block_matches = True
+                else:
+                    # Try content hash
+                    full_context = generate_full_context(parent_block, parents)
+                    if generate_content_hash(full_context) == target_id:
+                        block_matches = True
+
+                if block_matches:
+                    # Found the target - add new block as child
+                    new_child = LogseqBlock(
+                        content=[content],
+                        indent_level=parent_block.indent_level + 1,
+                        block_id=block_id
+                    )
+                    parent_block.children.append(new_child)
+                    return True
+
+                # Recursively search children
+                if search_and_add(parent_block.children, parents + [parent_block]):
+                    return True
+            return False
+
+        return search_and_add(outline.blocks, [])
+
+    def _find_block_by_content(
+        self, blocks: list[LogseqBlock], content: str, parents: list[LogseqBlock] = None
+    ) -> str | None:
+        """Find a block by its content and return its hash.
+
+        Args:
+            blocks: Blocks to search
+            content: Content to find
+            parents: Parent blocks for context
+
+        Returns:
+            Content hash of found block, or None
+        """
+        if parents is None:
+            parents = []
+
+        for block in blocks:
+            # Check if this block contains our content
+            if block.content and content in block.content[0]:
+                # Generate its hash
+                full_context = generate_full_context(block, parents)
+                return generate_content_hash(full_context)
+
+            # Search children
+            result = self._find_block_by_content(block.children, content, parents + [block])
+            if result:
+                return result
+
+        return None
+
+    def _generate_placeholder_preview(self, decision: IntegrationDecision) -> str:
+        """Generate placeholder preview when page can't be loaded.
+
+        Args:
+            decision: Integration decision
+
+        Returns:
+            Placeholder text
+        """
         return f"""Target Page: {decision.target_page}
 Action: {decision.action}
 Confidence: {decision.confidence:.0%}
 
 {decision.refined_text}
 
-[Preview of integrated content would appear here]
+[Unable to load target page for preview]
 """
 
     def action_navigate_next_decision(self) -> None:
