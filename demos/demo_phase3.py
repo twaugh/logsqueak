@@ -249,8 +249,18 @@ class Phase3Demo(App):
         """Load initial content."""
         self.call_later(self.update_display)
 
-    async def update_display(self) -> None:
-        """Update all display elements for current state."""
+    async def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        """Handle cursor movement in decisions list (from any navigation method)."""
+        if event.list_view.id == "decisions-list" and event.item is not None:
+            new_index = event.list_view.index
+            # Only update if the index actually changed
+            if new_index != self.current_decision_idx:
+                logger.debug(f"Decision index changed from {self.current_decision_idx} to {new_index}")
+                self.current_decision_idx = new_index
+                await self.update_display()
+
+    async def _do_update_display(self) -> None:
+        """Internal method to update all display elements for current state."""
         block = KNOWLEDGE_BLOCKS[self.current_block_idx]
 
         # Update knowledge block display
@@ -388,18 +398,22 @@ class Phase3Demo(App):
             f"✓ {completed_count} completed, ⊙ {pending_count} pending"
         )
 
+    async def update_display(self) -> None:
+        """Update all display elements for current state."""
+        await self._do_update_display()
+
     def action_next_decision(self) -> None:
         """Navigate to next decision."""
+        decisions_list = self.query_one("#decisions-list", ListView)
         block = KNOWLEDGE_BLOCKS[self.current_block_idx]
-        if self.current_decision_idx < len(block["decisions"]) - 1:
-            self.current_decision_idx += 1
-            self.call_later(self.update_display)
+        if decisions_list.index < len(block["decisions"]) - 1:
+            decisions_list.index += 1
 
     def action_prev_decision(self) -> None:
         """Navigate to previous decision."""
-        if self.current_decision_idx > 0:
-            self.current_decision_idx -= 1
-            self.call_later(self.update_display)
+        decisions_list = self.query_one("#decisions-list", ListView)
+        if decisions_list.index > 0:
+            decisions_list.index -= 1
 
     def action_accept(self) -> None:
         """Accept current decision."""
