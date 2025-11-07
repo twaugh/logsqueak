@@ -5,13 +5,16 @@ visually integrated at the insertion point, marked with a green bar.
 """
 
 from typing import Callable
-from textual.widgets import Markdown, Static
-from textual.containers import Horizontal
+from textual.widgets import Markdown, Static, RichLog
+from textual.containers import Horizontal, Vertical, ScrollableContainer
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.app import ComposeResult
 from markdown_it import MarkdownIt
 from markdown_it.rules_inline import StateInline
+from rich.text import Text
+from rich.markdown import Markdown as RichMarkdown
+import re
 
 
 def logseq_page_link_plugin(md: MarkdownIt) -> None:
@@ -81,11 +84,70 @@ def logseq_tag_plugin(md: MarkdownIt) -> None:
     md.inline.ruler.before("text", "logseq_tag", parse_tag)
 
 
+def logseq_property_plugin(md: MarkdownIt) -> None:
+    """Plugin to parse Logseq property syntax.
+
+    Converts key:: value to styled property display: key: value
+    """
+    def parse_property(state: StateInline, silent: bool) -> bool:
+        # Look for property pattern at start of line (after whitespace)
+        # Properties are: word-chars followed by :: followed by value
+
+        # Check if we're at the start of a potential property key
+        pos = state.pos
+        src = state.src
+
+        # Find :: delimiter
+        delimiter_pos = src.find("::", pos)
+        if delimiter_pos == -1 or delimiter_pos - pos > 50:  # Reasonable key length limit
+            return False
+
+        # Check if this looks like a property (key before ::)
+        key_part = src[pos:delimiter_pos]
+
+        # Property keys should be at start of line (after whitespace) or after list marker
+        # For inline parsing, we need to check if we're at the logical start
+        line_start = src.rfind("\n", 0, pos) + 1
+        prefix = src[line_start:pos]
+
+        # Check if prefix is only whitespace or list marker + whitespace
+        if not (prefix.strip() == "" or prefix.strip() == "-"):
+            return False
+
+        # Key should not contain spaces or special chars (except - and _)
+        if not key_part or not all(c.isalnum() or c in "-_" for c in key_part):
+            return False
+
+        # Find end of value (end of line or certain delimiters)
+        value_start = delimiter_pos + 2
+        value_end = src.find("\n", value_start)
+        if value_end == -1:
+            value_end = len(src)
+
+        value_part = src[value_start:value_end].strip()
+
+        if not silent:
+            # Render as: <span class="logseq-property"><span class="property-key">key:</span> <span class="property-value">value</span></span>
+            token = state.push("html_inline", "", 0)
+            token.content = (
+                f'<span class="logseq-property">'
+                f'<span class="property-key">{key_part}:</span> '
+                f'<span class="property-value">{value_part}</span>'
+                f'</span>'
+            )
+
+        state.pos = value_end
+        return True
+
+    md.inline.ruler.before("text", "logseq_property", parse_property)
+
+
 def create_logseq_parser() -> MarkdownIt:
     """Create a MarkdownIt parser with Logseq extensions."""
     parser = MarkdownIt()
     parser.use(logseq_page_link_plugin)
     parser.use(logseq_tag_plugin)
+    parser.use(logseq_property_plugin)
     return parser
 
 
@@ -153,6 +215,20 @@ class TargetPagePreview(Widget):
     TargetPagePreview .logseq-tag {
         color: $success;
     }
+
+    TargetPagePreview .logseq-property {
+        color: $text-muted;
+        text-style: italic;
+    }
+
+    TargetPagePreview .property-key {
+        color: $warning;
+        text-style: bold;
+    }
+
+    TargetPagePreview .property-value {
+        color: $text-muted;
+    }
     """
 
     def __init__(self, *args, **kwargs):
@@ -203,7 +279,13 @@ class TargetPagePreview(Widget):
             self._gutter.marked_lines = set()
 
     def _prepare_content(self) -> str:
-        """Prepare content for rendering (add line breaks for continuation lines)."""
+        """Prepare content for rendering (add line breaks for continuation lines).
+
+        Also transforms Logseq-specific syntax for better display:
+        - Properties: 'key:: value' → '**key:** *value*'
+        - Tags: '#tag' → '`#tag`' (code formatting)
+        - Link tags: '#[[Page Name]]' → '`#`**Page Name**'
+        """
         content = self._preview_content
 
         if not content:
@@ -223,15 +305,41 @@ class TargetPagePreview(Widget):
                 if stripped and not stripped.startswith("-") and len(next_line) > len(stripped):
                     next_is_continuation = True
 
-            # Detect Logseq properties (key:: value pattern)
-            is_property = "::" in line and not line.strip().startswith("-")
+            # Detect and transform Logseq properties (key:: value pattern)
+            stripped_current = line.lstrip()
+            is_property = "::" in line and not stripped_current.startswith("-")
+
+            if is_property:
+                # Transform "key:: value" to styled "key: value"
+                # Match property pattern
+                match = re.match(r'^(\s*)([\w-]+)::\s*(.*)$', line)
+                if match:
+                    indent, key, value = match.groups()
+
+                    # Transform tags in the property value before wrapping in italic
+                    # Handle #[[link-tag]] first (more specific pattern)
+                    value = re.sub(r'#\[\[([^\]]+)\]\]', r'`#`**\1**', value)
+                    # Then handle regular #tags
+                    value = re.sub(r'#([\w-]+)', r'`#\1`', value)
+
+                    # Use markdown bold for key, italic for value
+                    # Note: nested markdown (italic containing code) should work
+                    line = f"{indent}**{key}:** *{value}*"
+            else:
+                # Transform tags in non-property lines
+                # Handle #[[link-tag]] first (more specific pattern)
+                line = re.sub(r'#\[\[([^\]]+)\]\]', r'`#`**\1**', line)
+                # Then handle regular #tags
+                line = re.sub(r'(?<=\s)#([\w-]+)', r'`#\1`', line)
+                # Also catch tags at start of line/value
+                line = re.sub(r'^(\s*)#([\w-]+)', r'\1`#\2`', line)
 
             # Check if current line is a continuation line
-            stripped_current = line.lstrip()
             is_continuation = (
                 stripped_current
                 and not stripped_current.startswith("-")
                 and len(line) > len(stripped_current)
+                and not is_property  # Don't double-process properties
             )
 
             # Add double-space at end to force markdown line break
