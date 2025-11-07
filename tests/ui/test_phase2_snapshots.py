@@ -61,6 +61,7 @@ def sample_edited_content_for_snapshot():
         EditedContent(
             block_id="block-1",
             original_content="Today I learned about Python decorators",
+            hierarchical_context="Today I learned about Python decorators",
             current_content="Today I learned about Python decorators",
             reworded_content="Python decorators are functions that modify other functions",
             rewording_complete=True
@@ -68,6 +69,7 @@ def sample_edited_content_for_snapshot():
         EditedContent(
             block_id="block-2",
             original_content="Fixed the authentication bug in the login module",
+            hierarchical_context="Fixed the authentication bug in the login module",
             current_content="Fixed the authentication bug in the login module",
             reworded_content=None,  # Still pending
             rewording_complete=False

@@ -57,16 +57,19 @@ def sample_edited_content(sample_blocks):
         EditedContent(
             block_id="block-1",
             original_content="First knowledge block with some content",
+            hierarchical_context="First knowledge block with some content",
             current_content="First knowledge block with some content"
         ),
         EditedContent(
             block_id="block-2",
             original_content="Second knowledge block about Python",
+            hierarchical_context="Second knowledge block about Python",
             current_content="Second knowledge block about Python"
         ),
         EditedContent(
             block_id="block-3",
             original_content="Third knowledge block with technical notes",
+            hierarchical_context="Third knowledge block with technical notes",
             current_content="Third knowledge block with technical notes"
         ),
     ]

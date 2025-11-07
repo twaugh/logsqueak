@@ -51,6 +51,7 @@ def sample_edited_content_with_rewording():
         EditedContent(
             block_id="block-1",
             original_content="Today I learned about Python decorators",
+            hierarchical_context="Today I learned about Python decorators",
             current_content="Today I learned about Python decorators",
             reworded_content="Python decorators are functions that modify other functions",
             rewording_complete=True
@@ -58,6 +59,7 @@ def sample_edited_content_with_rewording():
         EditedContent(
             block_id="block-2",
             original_content="This morning I fixed the authentication bug",
+            hierarchical_context="This morning I fixed the authentication bug",
             current_content="This morning I fixed the authentication bug",
             reworded_content="Authentication bug was resolved by validating token expiry",
             rewording_complete=True
@@ -72,6 +74,7 @@ def sample_edited_content_pending_rewording():
         EditedContent(
             block_id="block-1",
             original_content="Today I learned about Python decorators",
+            hierarchical_context="Today I learned about Python decorators",
             current_content="Today I learned about Python decorators",
             reworded_content=None,
             rewording_complete=False

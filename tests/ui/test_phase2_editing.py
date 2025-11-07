@@ -45,6 +45,7 @@ def sample_edited_content():
         EditedContent(
             block_id="block-1",
             original_content="First knowledge block",
+            hierarchical_context="First knowledge block",
             current_content="First knowledge block"
         ),
     ]
@@ -235,6 +236,7 @@ async def test_editor_loads_current_content_on_display(sample_blocks, sample_edi
         EditedContent(
             block_id="block-1",
             original_content="Original text",
+            hierarchical_context="Original text",
             current_content="Modified text that user edited",
             reworded_content=None
         ),

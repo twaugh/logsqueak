@@ -45,6 +45,7 @@ def sample_edited_content_modified():
         EditedContent(
             block_id="block-1",
             original_content="Original content from journal",
+            hierarchical_context="Original content from journal",
             current_content="User edited this content",
             reworded_content="LLM reworded version",
             rewording_complete=True
@@ -59,6 +60,7 @@ def sample_edited_content_with_llm():
         EditedContent(
             block_id="block-1",
             original_content="Original content from journal",
+            hierarchical_context="Original content from journal",
             current_content="LLM reworded version",
             reworded_content="LLM reworded version",
             rewording_complete=True
@@ -172,6 +174,7 @@ async def test_revert_when_already_original(sample_blocks):
         EditedContent(
             block_id="block-1",
             original_content="Original content from journal",
+            hierarchical_context="Original content from journal",
             current_content="Original content from journal",  # Same as original
             reworded_content=None,
             rewording_complete=False

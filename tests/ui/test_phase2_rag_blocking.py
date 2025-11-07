@@ -46,6 +46,7 @@ def sample_edited_content():
         EditedContent(
             block_id="block-1",
             original_content="First knowledge block",
+            hierarchical_context="First knowledge block",
             current_content="First knowledge block"
         ),
     ]
