@@ -160,6 +160,15 @@ class Phase3Screen(Screen):
             # For now, we're using pre-generated decisions
             pass
 
+    def watch_current_decision_index(self, old_index: int, new_index: int) -> None:
+        """React to changes in current_decision_index.
+
+        This is called automatically by Textual's reactive system whenever
+        current_decision_index changes, regardless of how it changed.
+        """
+        if old_index != new_index:
+            self._update_decision_display()
+
     def _display_current_block(self) -> None:
         """Display current knowledge block and its decisions."""
         if not self.journal_blocks:
@@ -378,13 +387,13 @@ Confidence: {decision.confidence:.0%}
 
         if self.current_decision_index < len(block_decisions) - 1:
             self.current_decision_index += 1
-            self._update_decision_display()
+            # The watch_current_decision_index watcher will handle the update
 
     def action_navigate_previous_decision(self) -> None:
         """Navigate to previous decision for current block."""
         if self.current_decision_index > 0:
             self.current_decision_index -= 1
-            self._update_decision_display()
+            # The watch_current_decision_index watcher will handle the update
 
     def _update_decision_display(self) -> None:
         """Update decision list and preview after navigation."""
