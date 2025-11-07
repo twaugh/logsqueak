@@ -3,7 +3,9 @@ type:: tool
 created:: [[2024-01-22]]
 
 - Git is a distributed version control system
+  Unlike centralized version control systems, Git allows every developer to have a complete copy of the entire repository history.
   - Created by Linus Torvalds in 2005
+    Developed to manage Linux kernel development after the previous VCS became unavailable.
   - Industry standard for source control
 - Basic concepts
   id:: 65a2c1f0-3333-4567-89ab-cdef0123456d
@@ -25,11 +27,14 @@ created:: [[2024-01-22]]
   - git merge - combine branches
     - Can cause merge conflicts
 - Branching strategies
+  Different teams adopt different branching models based on their deployment frequency and team size.
   - Git Flow
+    A more complex model with multiple long-lived branches for different purposes.
     - Feature branches, develop, main
   - GitHub Flow
     - Simple: main + feature branches
   - Trunk-based development
+    Favored by high-performing teams for continuous delivery.
     - Short-lived branches
 - Best practices
   - Write descriptive commit messages
