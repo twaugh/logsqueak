@@ -222,12 +222,12 @@ async def test_bottom_panel_updates_on_navigation(sample_blocks):
         await pilot.pause()
 
         # Initially showing block 1
-        markdown_viewer = screen.query_one("#markdown-viewer")
-        assert "Block 1" in markdown_viewer.markdown
+        block_detail_panel = screen.query_one("#block-detail-panel")
+        assert screen.current_block_id == "block-1"
 
         # Navigate to block 2
         await pilot.press("j")
         await pilot.pause()
 
-        # Bottom panel should update
-        assert "Block 2" in markdown_viewer.markdown
+        # Bottom panel should update to block 2
+        assert screen.current_block_id == "block-2"

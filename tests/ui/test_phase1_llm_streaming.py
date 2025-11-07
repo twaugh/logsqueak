@@ -192,13 +192,13 @@ async def test_bottom_panel_shows_llm_reasoning(sample_blocks, mock_llm_classifi
         await pilot.pause()
 
         # Navigate to block-1 (should be classified)
-        markdown_viewer = screen.query_one("#markdown-viewer")
+        block_detail_panel = screen.query_one("#block-detail-panel")
 
         # Bottom panel should show LLM reasoning (wait for update)
         await asyncio.sleep(0.1)
         await pilot.pause()
 
-        # Verify that block was classified (LLM analysis may take time to update markdown)
+        # Verify that block was classified (LLM analysis may take time to update)
         # The important thing is the block state was updated
         assert screen.block_states["block-1"].llm_classification == "knowledge"
         assert screen.block_states["block-1"].llm_confidence == 0.92

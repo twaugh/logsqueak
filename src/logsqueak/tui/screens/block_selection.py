@@ -16,7 +16,7 @@ from textual.binding import Binding
 from logseq_outline.parser import LogseqBlock
 from logsqueak.models.block_state import BlockState
 from logsqueak.models.background_task import BackgroundTask
-from logsqueak.tui.widgets import BlockTree, StatusPanel, MarkdownViewer
+from logsqueak.tui.widgets import BlockTree, StatusPanel, BlockDetailPanel
 
 
 class Phase1Screen(Screen):
@@ -117,7 +117,7 @@ class Phase1Screen(Screen):
         - Header
         - Main container (vertical split):
           - BlockTree (top 60%)
-          - MarkdownViewer (bottom 40%)
+          - BlockDetailPanel (bottom 40%)
         - StatusPanel
         - Footer
         """
@@ -133,7 +133,7 @@ class Phase1Screen(Screen):
                 )
 
                 # Selected block details (bottom panel)
-                yield MarkdownViewer()
+                yield BlockDetailPanel()
 
         yield StatusPanel(background_tasks=self.background_tasks)
         yield Footer()
@@ -298,9 +298,9 @@ class Phase1Screen(Screen):
                 if block:
                     state = self.block_states[block_id]
 
-                    # Update markdown viewer
-                    viewer = self.query_one(MarkdownViewer)
-                    viewer.show_block(block, state)
+                    # Update block detail panel (async call)
+                    panel = self.query_one(BlockDetailPanel)
+                    self.call_later(panel.show_block, block, state)
             elif tree.cursor_line >= 0:
                 # Cursor is on a line but block_id might be None (root node)
                 # Try to get the first actual block
@@ -311,8 +311,8 @@ class Phase1Screen(Screen):
                         block = self._find_block_by_id(self.blocks, block_id)
                         if block and block_id in self.block_states:
                             state = self.block_states[block_id]
-                            viewer = self.query_one(MarkdownViewer)
-                            viewer.show_block(block, state)
+                            panel = self.query_one(BlockDetailPanel)
+                            self.call_later(panel.show_block, block, state)
                 except:
                     pass
         except:
