@@ -12,6 +12,7 @@ from textual.widgets import Static, Footer, Label
 from textual.reactive import reactive
 from logseq_outline.parser import LogseqBlock, LogseqOutline
 from logseq_outline.graph import GraphPaths
+from logseq_outline.context import generate_full_context, generate_content_hash
 from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.models.edited_content import EditedContent
 from logsqueak.models.background_task import BackgroundTaskState
@@ -216,8 +217,9 @@ class Phase3Screen(Screen):
         preview_text = self._generate_preview_text(decision)
 
         preview = self.query_one(TargetPagePreview)
-        # For simplicity, mark first line as insertion point
-        preview.load_preview(preview_text, insertion_line=0)
+        # TODO: Find the actual block to highlight based on decision.target_block_id
+        # For now, don't highlight anything (placeholder implementation)
+        preview.load_preview(preview_text, highlight_block_id=None)
 
     def _generate_preview_text(self, decision: IntegrationDecision) -> str:
         """Generate preview text for integration decision.

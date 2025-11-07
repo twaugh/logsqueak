@@ -13,6 +13,18 @@ from textual.containers import Container, Horizontal, Vertical
 from textual.widgets import Header, Footer, Static, ListView, ListItem, Label
 from textual.binding import Binding
 from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
+from logseq_outline.parser import LogseqOutline, LogseqBlock
+from logseq_outline.context import generate_full_context, generate_content_hash
+import logging
+
+# Set up file logging
+logging.basicConfig(
+    filename='/tmp/demo_phase3.log',
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    force=True  # Force reconfiguration
+)
+logger = logging.getLogger(__name__)
 
 
 # Sample data from test-graph
@@ -291,10 +303,77 @@ class Phase3Demo(App):
         preview = self.query_one(TargetPagePreview)
         page_content = TARGET_PAGES.get(decision["target_page"], "*Page not found*")
 
-        # Find insertion line (simplified - just pick line 4 for demo)
-        insertion_line = 4
+        # Generate preview with integrated new block
+        preview_content = page_content
+        highlight_block_id = None
 
-        await preview.load_preview(page_content, insertion_line=insertion_line)
+        if page_content != "*Page not found*":
+            # Parse the target page
+            outline = LogseqOutline.parse(page_content)
+
+            # Create a new block for the knowledge content
+            new_block_content = block["content"]
+            new_block_id = f"new-kb-{block['id']}"  # Temporary ID for highlighting
+
+            # Find where to insert based on action
+            action = decision["action"]
+            target_title = decision.get("target_block_title")
+
+            if action == "add_under" and target_title:
+                # Find the target block and add as child
+                def add_under_block(blocks, parents=[]):
+                    for parent_block in blocks:
+                        if parent_block.content and target_title.lower() in parent_block.content[0].lower():
+                            # Found the target - add new block as child
+                            # Note: add_child only takes the first line, but we want the full content
+                            # So we'll manually create the child block
+                            new_child = LogseqBlock(
+                                content=[new_block_content],  # Wrapped in list - this is the full content
+                                indent_level=parent_block.indent_level + 1,
+                                block_id=new_block_id
+                            )
+                            parent_block.children.append(new_child)
+                            return True
+                        # Recursively search children
+                        if add_under_block(parent_block.children, parents + [parent_block]):
+                            return True
+                    return False
+
+                add_under_block(outline.blocks)
+            elif action == "add_section":
+                # Add as new root-level block
+                new_root = LogseqBlock(
+                    content=[new_block_content],
+                    indent_level=0,
+                    block_id=new_block_id
+                )
+                outline.blocks.append(new_root)
+
+            # Render the modified outline
+            preview_content = outline.render()
+
+            # Re-parse to get the actual hash IDs that were generated
+            reparsed = LogseqOutline.parse(preview_content)
+
+            # Find the block with our new content
+            def find_new_block(blocks, parents=[]):
+                for block in blocks:
+                    # Check if this block contains our new content
+                    if block.content and new_block_content in block.content[0]:
+                        # Generate its hash
+                        full_context = generate_full_context(block, parents)
+                        return generate_content_hash(full_context)
+                    # Search children
+                    result = find_new_block(block.children, parents + [block])
+                    if result:
+                        return result
+                return None
+
+            highlight_block_id = find_new_block(reparsed.blocks)
+        else:
+            highlight_block_id = None
+
+        await preview.load_preview(preview_content, highlight_block_id=highlight_block_id)
 
         # Update status bar
         completed_count = sum(

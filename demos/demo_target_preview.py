@@ -13,6 +13,8 @@ from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.widgets import Header, Footer, Button, Static
 from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
+from logseq_outline.parser import LogseqOutline
+from logseq_outline.context import generate_full_context, generate_content_hash
 
 
 # Sample Logseq page content demonstrating various features
@@ -78,6 +80,7 @@ class DemoApp(App):
 
     TargetPagePreview {
         border: solid white;
+        height: 1fr;
     }
 
     Button {
@@ -103,8 +106,7 @@ class DemoApp(App):
     def __init__(self):
         super().__init__()
         self.current_page = "basic"
-        self.insertion_enabled = False
-        self.insertion_line = 2
+        self.highlight_enabled = False
 
     def compose(self) -> ComposeResult:
         """Compose the demo UI."""
@@ -112,7 +114,7 @@ class DemoApp(App):
 
         with Container(id="controls"):
             yield Static(
-                "Press 1-4 to load different samples | Press 'i' to toggle insertion indicator",
+                "Press 1-4 to load different samples | Press 'i' to toggle block highlight",
                 id="info"
             )
             with Horizontal():
@@ -135,9 +137,24 @@ class DemoApp(App):
         self.current_page = sample_name
         content = SAMPLE_PAGES[sample_name]
 
+        # Parse to find a block to highlight
+        highlight_block_id = None
+        if self.highlight_enabled:
+            outline = LogseqOutline.parse(content)
+            if outline.blocks:
+                # Find first child block (more interesting than root)
+                if outline.blocks[0].children:
+                    target_block = outline.blocks[0].children[0]
+                    # If it has explicit ID, use it
+                    if target_block.block_id:
+                        highlight_block_id = target_block.block_id
+                    else:
+                        # Generate content hash
+                        full_context = generate_full_context(target_block, [outline.blocks[0]])
+                        highlight_block_id = generate_content_hash(full_context)
+
         preview = self.query_one(TargetPagePreview)
-        insertion_line = self.insertion_line if self.insertion_enabled else -1
-        await preview.load_preview(content, insertion_line=insertion_line)
+        await preview.load_preview(content, highlight_block_id=highlight_block_id)
 
         # Update button states
         for btn_id, btn_sample in [
@@ -172,14 +189,14 @@ class DemoApp(App):
         await self.load_sample("mixed_content")
 
     async def action_toggle_insertion(self) -> None:
-        """Toggle insertion indicator."""
-        self.insertion_enabled = not self.insertion_enabled
+        """Toggle block highlight."""
+        self.highlight_enabled = not self.highlight_enabled
 
         # Update button
         button = self.query_one("#btn-insert", Button)
-        button.variant = "success" if self.insertion_enabled else "default"
+        button.variant = "success" if self.highlight_enabled else "default"
 
-        # Reload current sample with new insertion state
+        # Reload current sample with new highlight state
         await self.load_sample(self.current_page)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
