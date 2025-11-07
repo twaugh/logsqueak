@@ -182,13 +182,21 @@ class BlockDetailPanel(Widget):
         if parent_blocks:
             for parent in parent_blocks:
                 # Render parent as Logseq markdown (no indentation)
-                parent_content = parent.get_full_content(normalize_whitespace=True)
-                lines.append(f"- {parent_content}")
+                # First line gets the bullet, continuation lines get proper indent
+                for i, content_line in enumerate(parent.content):
+                    if i == 0:
+                        lines.append(f"- {content_line}")
+                    else:
+                        lines.append(f"  {content_line}")
 
         # Add the current block (only the block itself, not its children)
         # Always render at indent level 0
-        block_content = block.get_full_content(normalize_whitespace=True)
-        lines.append(f"- {block_content}")
+        # First line gets the bullet, continuation lines get hanging indent
+        for i, content_line in enumerate(block.content):
+            if i == 0:
+                lines.append(f"- {content_line}")
+            else:
+                lines.append(f"  {content_line}")
 
         # Combine into markdown text
         markdown_text = "\n".join(lines)
