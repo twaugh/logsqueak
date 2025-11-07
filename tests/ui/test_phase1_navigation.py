@@ -148,8 +148,8 @@ async def test_jump_to_next_knowledge_block(sample_blocks):
         # Initially at line 1 (block-1, which is knowledge)
         assert tree.cursor_line == 1
 
-        # Press Shift+j to jump to next knowledge block
-        await pilot.press("shift+j")
+        # Press J to jump to next knowledge block
+        await pilot.press("J")
 
         # Should jump to block-3 (need to check data, not line number)
         cursor_node = tree.get_node_at_line(tree.cursor_line)
@@ -203,8 +203,8 @@ async def test_jump_to_previous_knowledge_block(sample_blocks):
         # Tree starts at line 1 (block-1), so j,j should get to block-3
         await pilot.press("j", "j")
 
-        # Press Shift+k to jump to previous knowledge block
-        await pilot.press("shift+k")
+        # Press K to jump to previous knowledge block
+        await pilot.press("K")
 
         # Should jump back to block-1
         cursor_node = tree.get_node_at_line(tree.cursor_line)

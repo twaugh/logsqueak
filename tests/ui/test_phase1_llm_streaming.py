@@ -111,8 +111,8 @@ async def test_llm_results_appear_incrementally(sample_blocks, mock_llm_classifi
         await asyncio.sleep(0.15)
         await pilot.pause()
 
-        # Block 1 should be classified as knowledge
-        assert screen.block_states["block-1"].classification == "knowledge"
+        # Block 1 should be suggested by LLM (but NOT selected)
+        assert screen.block_states["block-1"].classification == "pending"  # Not selected yet
         assert screen.block_states["block-1"].llm_classification == "knowledge"
         assert screen.block_states["block-1"].llm_confidence == 0.92
 
@@ -128,8 +128,8 @@ async def test_llm_results_appear_incrementally(sample_blocks, mock_llm_classifi
         assert screen.block_states["block-2"].classification == "pending"
         assert screen.block_states["block-2"].llm_classification is None
 
-        # Block 3 should be classified as knowledge
-        assert screen.block_states["block-3"].classification == "knowledge"
+        # Block 3 should be suggested by LLM (but NOT selected)
+        assert screen.block_states["block-3"].classification == "pending"  # Not selected yet
         assert screen.block_states["block-3"].llm_classification == "knowledge"
         assert screen.block_states["block-3"].llm_confidence == 0.88
 

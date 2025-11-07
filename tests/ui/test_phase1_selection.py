@@ -86,13 +86,12 @@ async def test_space_toggles_selection_non_llm_block(sample_blocks):
 @pytest.mark.asyncio
 async def test_space_toggles_llm_suggested_block(sample_blocks):
     """Test Space key toggles LLM-suggested blocks between blue and green."""
-    # Set up block with LLM suggestion
+    # Set up block with LLM suggestion (but NOT selected)
     block_states = {
         "block-1": BlockState(
             block_id="block-1",
-            classification="knowledge",  # Auto-accepted LLM suggestion
-            source="llm",
-            confidence=0.92,
+            classification="pending",  # LLM suggested but not selected
+            source="user",
             llm_classification="knowledge",
             llm_confidence=0.92,
             reason="Test LLM reasoning"
@@ -110,33 +109,33 @@ async def test_space_toggles_llm_suggested_block(sample_blocks):
     async with app.run_test() as pilot:
         await pilot.pause()
 
-        # Initially LLM-suggested (blue)
-        assert screen.block_states["block-1"].classification == "knowledge"
-        assert screen.block_states["block-1"].source == "llm"
+        # Initially LLM-suggested but not selected (blue robot emoji, not green)
+        assert screen.block_states["block-1"].classification == "pending"
+        assert screen.block_states["block-1"].llm_classification == "knowledge"
 
-        # Press Space to confirm (blue → green)
+        # Press Space to select (pending → selected)
         await pilot.press("space")
         await pilot.pause()
 
-        # Should now be user-confirmed (green)
+        # Should now be user-selected (green checkmark)
         assert screen.block_states["block-1"].classification == "knowledge"
         assert screen.block_states["block-1"].source == "user"
         assert screen.block_states["block-1"].confidence == 1.0
 
-        # Press Space again (green → blue)
+        # Press Space again (selected → deselected)
         await pilot.press("space")
         await pilot.pause()
 
-        # Should be back to LLM-suggested (blue)
-        assert screen.block_states["block-1"].classification == "knowledge"
-        assert screen.block_states["block-1"].source == "llm"
-        assert screen.block_states["block-1"].confidence == 0.92
+        # Should be back to pending (no checkmark, but still has LLM suggestion)
+        assert screen.block_states["block-1"].classification == "pending"
+        assert screen.block_states["block-1"].source == "user"
+        assert screen.block_states["block-1"].llm_classification == "knowledge"  # LLM suggestion preserved
 
-        # Press Space once more (blue → green again)
+        # Press Space once more (pending → selected again)
         await pilot.press("space")
         await pilot.pause()
 
-        # Should be user-confirmed again
+        # Should be user-selected again
         assert screen.block_states["block-1"].classification == "knowledge"
         assert screen.block_states["block-1"].source == "user"
 
