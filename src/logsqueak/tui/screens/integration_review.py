@@ -215,7 +215,7 @@ class Phase3Screen(Screen):
         preview_text, highlight_block_id = self._generate_preview_with_integration(decision)
 
         preview = self.query_one(TargetPagePreview)
-        preview.load_preview(preview_text, highlight_block_id=highlight_block_id)
+        self.call_later(preview.load_preview, preview_text, highlight_block_id)
 
     def _generate_preview_with_integration(
         self, decision: IntegrationDecision

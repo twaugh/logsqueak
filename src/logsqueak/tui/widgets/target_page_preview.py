@@ -427,14 +427,14 @@ class TargetPagePreview(Widget):
         """Widget mounted - load any pending content."""
         # If content was set before widgets were available, load it now
         if self._content and self._content_widget and self._gutter:
-            await self._render_content()
+            await self._render_preview()
 
     async def on_resize(self) -> None:
         """Widget resized - re-render if we have content."""
         # If we have pending content and now have a width, render it
         if self._content and self._content_widget and self._gutter:
             if self.size.width > 0:
-                await self._render_content()
+                await self._render_preview()
 
     async def load_preview(
         self, content: str, highlight_block_id: Optional[str] = None
@@ -453,9 +453,9 @@ class TargetPagePreview(Widget):
             # Widgets not ready yet - on_mount will handle it
             return
 
-        await self._render_content()
+        await self._render_preview()
 
-    async def _render_content(self) -> None:
+    async def _render_preview(self) -> None:
         """Internal method to render the current content."""
         content = self._content
         highlight_block_id = self._highlight_block_id
