@@ -401,6 +401,10 @@ class Phase1Screen(Screen):
                     tree = self.query_one(BlockTree)
                     tree.update_block_label(block_id)
 
+                    # Update bottom panel if this is the currently selected block
+                    if block_id == self.current_block_id:
+                        self._update_current_block()
+
             count += 1
 
             # Update progress
