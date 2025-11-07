@@ -158,17 +158,22 @@ class EditedContent(BaseModel):
 
     original_content: str = Field(
         ...,
-        description="Original block content from journal (without parent context)"
+        description="Original block content from journal (single block only, without parent context)"
+    )
+
+    hierarchical_context: str = Field(
+        ...,
+        description="Full hierarchical context including all parent blocks (shown in top read-only panel)"
     )
 
     reworded_content: Optional[str] = Field(
         default=None,
-        description="LLM-generated reworded version (removes temporal context)"
+        description="LLM-generated reworded version of original_content (removes temporal context, single block only)"
     )
 
     current_content: str = Field(
         ...,
-        description="Current editable content (starts as original, user can modify)"
+        description="Current editable content (starts as original_content, user can modify in bottom panel)"
     )
 
     rewording_complete: bool = Field(
@@ -185,8 +190,9 @@ class EditedContent(BaseModel):
 
 - `block_id`: Links to corresponding BlockState from Phase 1
 - `original_content`: The exact content from the journal entry (single block only, no parent hierarchy)
-- `reworded_content`: LLM-suggested version with temporal context removed (None until LLM responds)
-- `current_content`: The version that will be integrated (starts as original, user can accept LLM version or manually edit)
+- `hierarchical_context`: Full hierarchical context including all parent blocks (displayed in top read-only panel for context)
+- `reworded_content`: LLM-suggested version with temporal context removed (single block only, None until LLM responds)
+- `current_content`: The version that will be integrated (starts as original_content, user can accept LLM version or manually edit)
 - `rewording_complete`: Flag indicating whether to show "Accept LLM version" action
 
 **Example JSON**:
@@ -195,6 +201,7 @@ class EditedContent(BaseModel):
 {
   "block_id": "abc123def456",
   "original_content": "Today I learned that using `asyncio.create_task()` is better than `await` for concurrent operations in Python.",
+  "hierarchical_context": "2025-01-15 - Tuesday\n  Morning coding session\n    Today I learned that using `asyncio.create_task()` is better than `await` for concurrent operations in Python.",
   "reworded_content": "Using `asyncio.create_task()` enables concurrent operations in Python, unlike `await` which executes sequentially.",
   "current_content": "Using `asyncio.create_task()` enables concurrent operations in Python, unlike `await` which executes sequentially.",
   "rewording_complete": true

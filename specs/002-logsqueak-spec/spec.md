@@ -287,7 +287,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 
 - **BlockState**: Represents the selection state of a journal block (block_id: str, classification: Literal["pending", "knowledge"], confidence: float | None, source: Literal["user", "llm"], llm_classification: Literal["knowledge"] | None, llm_confidence: float | None, reason: str | None)
 
-- **EditedContent**: Represents the edited content for a knowledge block in Phase 2 (block_id: str, original_content: str, reworded_content: str | None, current_content: str, rewording_complete: bool)
+- **EditedContent**: Represents the edited content for a knowledge block in Phase 2 (block_id: str, original_content: str, hierarchical_context: str, reworded_content: str | None, current_content: str, rewording_complete: bool)
 
 - **IntegrationDecision**: Represents a decision about integrating a knowledge block to a specific page (knowledge_block_id: str, target_page: str, action: Literal["add_section", "add_under", "replace"], target_block_id: str | None, target_block_title: str | None, confidence: float, refined_text: str, reasoning: str, write_status: Literal["pending", "completed", "failed"])
 
