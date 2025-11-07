@@ -9,10 +9,13 @@ Demonstrates the integration review workflow with:
 """
 
 from textual.app import App, ComposeResult
-from textual.containers import Container, Horizontal, Vertical
-from textual.widgets import Header, Footer, Static, ListView, ListItem, Label
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll
+from textual.widgets import Header, Footer, Static, Label
 from textual.binding import Binding
+from textual.reactive import reactive
 from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
+from logsqueak.tui.widgets.decision_list import DecisionList
+from logsqueak.models.integration_decision import IntegrationDecision
 from logseq_outline.parser import LogseqOutline, LogseqBlock
 from logseq_outline.context import generate_full_context, generate_content_hash
 import logging
@@ -27,7 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# Sample data from test-graph
+# Sample data - knowledge blocks with their decisions
 KNOWLEDGE_BLOCKS = [
     {
         "id": "kb1",
@@ -36,20 +39,28 @@ KNOWLEDGE_BLOCKS = [
         "context": "Journal: 2025-01-15\n  - Morning session\n    - Python learning",
         "content": "**List comprehensions** are a concise way to create lists in Python. They combine map() and filter() operations into a single expression: `[x*2 for x in range(10) if x % 2 == 0]`",
         "decisions": [
-            {
-                "target_page": "Python",
-                "action": "add_under",
-                "target_block_title": "List Operations",
-                "confidence": 0.92,
-                "reasoning": "This is a fundamental Python feature that belongs under list operations",
-            },
-            {
-                "target_page": "Functional Programming",
-                "action": "add_section",
-                "target_block_title": None,
-                "confidence": 0.78,
-                "reasoning": "List comprehensions are a functional programming concept",
-            },
+            IntegrationDecision(
+                knowledge_block_id="kb1",
+                target_page="Python",
+                action="add_under",
+                target_block_id="target-1",
+                target_block_title="List Operations",
+                refined_text="**List comprehensions** are a concise way to create lists in Python. They combine map() and filter() operations into a single expression: `[x*2 for x in range(10) if x % 2 == 0]`",
+                confidence=0.92,
+                reasoning="This is a fundamental Python feature that belongs under list operations",
+                write_status="pending"
+            ),
+            IntegrationDecision(
+                knowledge_block_id="kb1",
+                target_page="Functional Programming",
+                action="add_section",
+                target_block_id=None,
+                target_block_title=None,
+                refined_text="**List comprehensions** are a concise way to create lists in Python. They combine map() and filter() operations into a single expression: `[x*2 for x in range(10) if x % 2 == 0]`",
+                confidence=0.78,
+                reasoning="List comprehensions are a functional programming concept",
+                write_status="pending"
+            ),
         ],
     },
     {
@@ -59,13 +70,17 @@ KNOWLEDGE_BLOCKS = [
         "context": "Journal: 2025-01-15\n  - Afternoon\n    - Docker setup",
         "content": "Docker **multi-stage builds** reduce image size by using multiple FROM statements. Build artifacts from earlier stages can be copied to later stages with `COPY --from=builder`, eliminating build dependencies from the final image.",
         "decisions": [
-            {
-                "target_page": "Docker",
-                "action": "add_under",
-                "target_block_title": "Best Practices",
-                "confidence": 0.95,
-                "reasoning": "Multi-stage builds are a Docker best practice for production images",
-            },
+            IntegrationDecision(
+                knowledge_block_id="kb2",
+                target_page="Docker",
+                action="add_under",
+                target_block_id="target-2",
+                target_block_title="Best Practices",
+                refined_text="Docker **multi-stage builds** reduce image size by using multiple FROM statements. Build artifacts from earlier stages can be copied to later stages with `COPY --from=builder`, eliminating build dependencies from the final image.",
+                confidence=0.95,
+                reasoning="Multi-stage builds are a Docker best practice for production images",
+                write_status="pending"
+            ),
         ],
     },
     {
@@ -75,20 +90,28 @@ KNOWLEDGE_BLOCKS = [
         "context": "Journal: 2025-01-16\n  - Reading notes\n    - CI/CD article",
         "content": "**Continuous deployment** differs from continuous delivery in that code changes automatically deploy to production after passing tests, without human approval. This requires high confidence in automated testing and monitoring.",
         "decisions": [
-            {
-                "target_page": "CI/CD",
-                "action": "add_section",
-                "target_block_title": None,
-                "confidence": 0.88,
-                "reasoning": "This clarifies an important distinction in CI/CD terminology",
-            },
-            {
-                "target_page": "DevOps",
-                "action": "add_under",
-                "target_block_title": "Deployment Strategies",
-                "confidence": 0.82,
-                "reasoning": "Continuous deployment is a key DevOps practice",
-            },
+            IntegrationDecision(
+                knowledge_block_id="kb3",
+                target_page="CI/CD",
+                action="add_section",
+                target_block_id=None,
+                target_block_title=None,
+                refined_text="**Continuous deployment** differs from continuous delivery in that code changes automatically deploy to production after passing tests, without human approval. This requires high confidence in automated testing and monitoring.",
+                confidence=0.88,
+                reasoning="This clarifies an important distinction in CI/CD terminology",
+                write_status="pending"
+            ),
+            IntegrationDecision(
+                knowledge_block_id="kb3",
+                target_page="DevOps",
+                action="add_under",
+                target_block_id="target-3",
+                target_block_title="Deployment Strategies",
+                refined_text="**Continuous deployment** differs from continuous delivery in that code changes automatically deploy to production after passing tests, without human approval. This requires high confidence in automated testing and monitoring.",
+                confidence=0.82,
+                reasoning="Continuous deployment is a key DevOps practice",
+                write_status="pending"
+            ),
         ],
     },
 ]
@@ -174,9 +197,10 @@ class Phase3Demo(App):
     #decisions-container {
         height: 1fr;
         border: solid yellow;
+        padding: 1;
     }
 
-    #decisions-list {
+    DecisionList {
         height: 100%;
     }
 
@@ -199,29 +223,25 @@ class Phase3Demo(App):
         background: $panel;
         padding: 1;
     }
-
-    ListItem {
-        padding: 1;
-    }
-
-    ListItem > Label {
-        width: 100%;
-    }
     """
 
     BINDINGS = [
         Binding("j", "next_decision", "Next Decision", show=True),
         Binding("k", "prev_decision", "Prev Decision", show=True),
+        Binding("down", "next_decision", "Next Decision", show=False),
+        Binding("up", "prev_decision", "Prev Decision", show=False),
         Binding("y", "accept", "Accept (✓)", show=True),
         Binding("n", "next_block", "Next Block", show=True),
         Binding("a", "accept_all", "Accept All", show=True),
         Binding("q", "quit", "Quit", show=True),
     ]
 
+    # Reactive state
+    current_block_idx = reactive(0)
+    current_decision_idx = reactive(0)
+
     def __init__(self):
         super().__init__()
-        self.current_block_idx = 0
-        self.current_decision_idx = 0
         self.completed_decisions = set()  # Set of (block_id, decision_idx)
 
     def compose(self) -> ComposeResult:
@@ -234,7 +254,7 @@ class Phase3Demo(App):
                 with Container(id="left-panel"):
                     yield Static(id="knowledge-block")
                     with Container(id="decisions-container"):
-                        yield ListView(id="decisions-list")
+                        yield DecisionList()
 
                 # Right panel: Target page preview
                 with Vertical(id="right-panel"):
@@ -249,15 +269,25 @@ class Phase3Demo(App):
         """Load initial content."""
         self.call_later(self.update_display)
 
-    async def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
-        """Handle cursor movement in decisions list (from any navigation method)."""
-        if event.list_view.id == "decisions-list" and event.item is not None:
-            new_index = event.list_view.index
-            # Only update if the index actually changed
-            if new_index != self.current_decision_idx:
-                logger.debug(f"Decision index changed from {self.current_decision_idx} to {new_index}")
-                self.current_decision_idx = new_index
-                await self.update_display()
+    def watch_current_block_idx(self, old_idx: int, new_idx: int) -> None:
+        """React to changes in current_block_idx.
+
+        This is called automatically by Textual's reactive system whenever
+        current_block_idx changes, regardless of how it changed.
+        """
+        if old_idx != new_idx:
+            logger.debug(f"Block index changed from {old_idx} to {new_idx}")
+            self.call_later(self.update_display)
+
+    def watch_current_decision_idx(self, old_idx: int, new_idx: int) -> None:
+        """React to changes in current_decision_idx.
+
+        This is called automatically by Textual's reactive system whenever
+        current_decision_idx changes, regardless of how it changed.
+        """
+        if old_idx != new_idx:
+            logger.debug(f"Decision index changed from {old_idx} to {new_idx}")
+            self.call_later(self.update_display)
 
     async def _do_update_display(self) -> None:
         """Internal method to update all display elements for current state."""
@@ -274,44 +304,30 @@ class Phase3Demo(App):
             f"{block['content']}"
         )
 
-        # Update decisions list
-        decisions_list = self.query_one("#decisions-list", ListView)
-        await decisions_list.clear()
-
+        # Update decisions list with DecisionList widget
+        # First, update write_status for completed decisions
         for idx, decision in enumerate(block["decisions"]):
-            # Check if this decision is completed
-            is_completed = (block["id"], idx) in self.completed_decisions
-            is_selected = idx == self.current_decision_idx
+            if (block["id"], idx) in self.completed_decisions:
+                decision.write_status = "completed"
 
-            status = "✓" if is_completed else "⊙"
-            style = "green" if is_completed else "yellow" if is_selected else "white"
-
-            label_text = (
-                f"[{style}]{status} {decision['target_page']}[/{style}]\n"
-                f"  {decision['action']} "
-            )
-            if decision["target_block_title"]:
-                label_text += f"'{decision['target_block_title']}'"
-            label_text += f"\n  Confidence: {decision['confidence']:.0%}"
-
-            item = ListItem(Label(label_text))
-            await decisions_list.append(item)
-
-        # Highlight current decision
-        if 0 <= self.current_decision_idx < len(block["decisions"]):
-            decisions_list.index = self.current_decision_idx
+        decisions_list = self.query_one(DecisionList)
+        decisions_list.load_decisions(block["decisions"], self.current_decision_idx)
 
         # Update preview header
-        decision = block["decisions"][self.current_decision_idx]
-        header = self.query_one("#preview-header", Static)
-        header.update(
-            f"[bold]Target Page: {decision['target_page']}[/bold]\n"
-            f"Reasoning: {decision['reasoning']}"
-        )
+        if block["decisions"]:
+            decision = block["decisions"][self.current_decision_idx]
+            header = self.query_one("#preview-header", Static)
+            header.update(
+                f"[bold]Target Page: {decision.target_page}[/bold]\n"
+                f"Reasoning: {decision.reasoning}"
+            )
 
         # Update target page preview
+        if not block["decisions"]:
+            return
+
         preview = self.query_one(TargetPagePreview)
-        page_content = TARGET_PAGES.get(decision["target_page"], "*Page not found*")
+        page_content = TARGET_PAGES.get(decision.target_page, "*Page not found*")
 
         # Generate preview with integrated new block
         preview_content = page_content
@@ -322,12 +338,12 @@ class Phase3Demo(App):
             outline = LogseqOutline.parse(page_content)
 
             # Create a new block for the knowledge content
-            new_block_content = block["content"]
+            new_block_content = decision.refined_text
             new_block_id = f"new-kb-{block['id']}"  # Temporary ID for highlighting
 
             # Find where to insert based on action
-            action = decision["action"]
-            target_title = decision.get("target_block_title")
+            action = decision.action
+            target_title = decision.target_block_title
 
             if action == "add_under" and target_title:
                 # Find the target block and add as child
@@ -335,10 +351,8 @@ class Phase3Demo(App):
                     for parent_block in blocks:
                         if parent_block.content and target_title.lower() in parent_block.content[0].lower():
                             # Found the target - add new block as child
-                            # Note: add_child only takes the first line, but we want the full content
-                            # So we'll manually create the child block
                             new_child = LogseqBlock(
-                                content=[new_block_content],  # Wrapped in list - this is the full content
+                                content=[new_block_content],
                                 indent_level=parent_block.indent_level + 1,
                                 block_id=new_block_id
                             )
@@ -367,14 +381,14 @@ class Phase3Demo(App):
 
             # Find the block with our new content
             def find_new_block(blocks, parents=[]):
-                for block in blocks:
+                for blk in blocks:
                     # Check if this block contains our new content
-                    if block.content and new_block_content in block.content[0]:
+                    if blk.content and new_block_content in blk.content[0]:
                         # Generate its hash
-                        full_context = generate_full_context(block, parents)
+                        full_context = generate_full_context(blk, parents)
                         return generate_content_hash(full_context)
                     # Search children
-                    result = find_new_block(block.children, parents + [block])
+                    result = find_new_block(blk.children, parents + [blk])
                     if result:
                         return result
                 return None
@@ -404,21 +418,22 @@ class Phase3Demo(App):
 
     def action_next_decision(self) -> None:
         """Navigate to next decision."""
-        decisions_list = self.query_one("#decisions-list", ListView)
         block = KNOWLEDGE_BLOCKS[self.current_block_idx]
-        if decisions_list.index < len(block["decisions"]) - 1:
-            decisions_list.index += 1
+        if self.current_decision_idx < len(block["decisions"]) - 1:
+            self.current_decision_idx += 1
+            # The watch_current_decision_idx watcher will handle the update
 
     def action_prev_decision(self) -> None:
         """Navigate to previous decision."""
-        decisions_list = self.query_one("#decisions-list", ListView)
-        if decisions_list.index > 0:
-            decisions_list.index -= 1
+        if self.current_decision_idx > 0:
+            self.current_decision_idx -= 1
+            # The watch_current_decision_idx watcher will handle the update
 
     def action_accept(self) -> None:
         """Accept current decision."""
         block = KNOWLEDGE_BLOCKS[self.current_block_idx]
         self.completed_decisions.add((block["id"], self.current_decision_idx))
+        # Update display to show the checkmark
         self.call_later(self.update_display)
 
     async def action_accept_all(self) -> None:
@@ -433,7 +448,7 @@ class Phase3Demo(App):
         if self.current_block_idx < len(KNOWLEDGE_BLOCKS) - 1:
             self.current_block_idx += 1
             self.current_decision_idx = 0
-            await self.update_display()
+            # Reactive properties will trigger update
         else:
             # Show completion
             status = self.query_one("#status-bar", Static)
