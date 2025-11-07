@@ -226,8 +226,8 @@ def render_block_content(
     """
     lines = []
     base_indent = indent_str * block.indent_level
-    bullet = "- "
-    hanging_indent_width = len(bullet)  # Width of "- "
+    bullet = "• "
+    hanging_indent_width = len(bullet)  # Width of "• "
 
     for i, content_line in enumerate(block.content):
         is_first_line = (i == 0)

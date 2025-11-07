@@ -37,7 +37,7 @@ class TestRenderBlockContent:
 
         # Should produce one line with bullet
         assert len(lines) == 1
-        assert "- Short content" in lines[0].plain
+        assert "• Short content" in lines[0].plain
 
     def test_render_block_with_property_no_wrapping(self):
         """Test rendering block with property, both fitting in width."""
@@ -50,7 +50,7 @@ class TestRenderBlockContent:
 
         # Should produce two lines: content + property
         assert len(lines) == 2
-        assert "- Block content" in lines[0].plain
+        assert "• Block content" in lines[0].plain
         assert "key: value" in lines[1].plain
         # Property should be indented (2 spaces for bullet width)
         assert lines[1].plain.startswith("  ")
@@ -69,7 +69,7 @@ class TestRenderBlockContent:
         assert len(lines) > 1
 
         # First line should have bullet
-        assert lines[0].plain.startswith("- ")
+        assert lines[0].plain.startswith("• ")
 
         # Subsequent wrapped lines should have hanging indent (2 spaces)
         for wrapped_line in lines[1:]:
@@ -85,7 +85,7 @@ class TestRenderBlockContent:
         lines = render_block_content(block, max_width=80)
 
         # Should have base indent (2 spaces) + bullet
-        assert lines[0].plain.startswith("  - ")
+        assert lines[0].plain.startswith("  • ")
 
     def test_render_block_with_multi_line_content(self):
         """Test block with multiple content lines (continuation lines)."""
@@ -104,7 +104,7 @@ class TestRenderBlockContent:
         assert len(lines) == 3
 
         # First line with bullet
-        assert lines[0].plain.startswith("- First line")
+        assert lines[0].plain.startswith("• First line")
 
         # Continuation lines with hanging indent
         assert lines[1].plain.startswith("  Continuation")
@@ -126,7 +126,7 @@ class TestRenderBlockContent:
         assert len(lines) > 2  # At least: block line + property start + wrapped continuation
 
         # First line is block
-        assert "- Block" in lines[0].plain
+        assert "• Block" in lines[0].plain
 
         # Second line is property start
         assert lines[1].plain.startswith("  tags:")
@@ -187,9 +187,9 @@ class TestRenderOutlineWithTracking:
         assert len(block_map) == 3
 
         # Verify indentation
-        assert rendered_lines[0].plain.startswith("- Parent")
-        assert rendered_lines[1].plain.startswith("  - Child")
-        assert rendered_lines[2].plain.startswith("    - Grandchild")
+        assert rendered_lines[0].plain.startswith("• Parent")
+        assert rendered_lines[1].plain.startswith("  • Child")
+        assert rendered_lines[2].plain.startswith("    • Grandchild")
 
     def test_render_outline_with_properties(self):
         """Test rendering blocks with properties and tracking."""
