@@ -6,6 +6,7 @@ from logsqueak.tui.widgets.markdown_viewer import MarkdownViewer
 from logsqueak.tui.widgets.content_editor import ContentEditor
 from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
 from logsqueak.tui.widgets.decision_list import DecisionList
+from logsqueak.tui.widgets.block_detail_panel import BlockDetailPanel
 
 __all__ = [
     "BlockTree",
@@ -14,4 +15,5 @@ __all__ = [
     "ContentEditor",
     "TargetPagePreview",
     "DecisionList",
+    "BlockDetailPanel",
 ]
