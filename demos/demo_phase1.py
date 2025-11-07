@@ -5,6 +5,12 @@ This demonstrates the interactive block selection workflow where users:
 2. See LLM classification suggestions (knowledge vs. activity logs)
 3. Manually select/deselect blocks for extraction
 
+Features demonstrated:
+- Long lines with word wrapping in the preview panel
+- Multi-line blocks with continuation lines
+- Hierarchical structure with parent-child relationships
+- LLM confidence scores and reasoning
+
 Run: python demos/demo_phase1.py
 """
 
@@ -44,18 +50,18 @@ def create_sample_blocks() -> list[LogseqBlock]:
                 ),
                 # Knowledge: Python async patterns
                 LogseqBlock(
-                    content=["Learned about Python asyncio patterns while debugging slow API calls"],
+                    content=["Learned about [[Python]] asyncio patterns while debugging slow API calls #async #concurrency"],
                     indent_level=1,
                     block_id="block-2",
                     children=[
                         LogseqBlock(
-                            content=["asyncio.create_task() enables concurrent operations without blocking"],
+                            content=["**asyncio.create_task()** enables concurrent operations without blocking"],
                             indent_level=2,
                             block_id="block-2-1",
                             children=[]
                         ),
                         LogseqBlock(
-                            content=["This is different from await which blocks until the coroutine completes"],
+                            content=["This is different from *await* which blocks until the coroutine completes"],
                             indent_level=2,
                             block_id="block-2-2",
                             children=[]
@@ -90,12 +96,12 @@ def create_sample_blocks() -> list[LogseqBlock]:
                 ),
                 # Knowledge: Docker networking
                 LogseqBlock(
-                    content=["Docker containers on same bridge network can communicate by service name"],
+                    content=["[[Docker]] containers on same bridge network can communicate by service name #docker #networking"],
                     indent_level=1,
                     block_id="block-4",
                     children=[
                         LogseqBlock(
-                            content=["No need to use IP addresses - Docker DNS handles name resolution"],
+                            content=["No need to use IP addresses - **Docker DNS** handles name resolution automatically"],
                             indent_level=2,
                             block_id="block-4-1",
                             children=[]
@@ -111,12 +117,12 @@ def create_sample_blocks() -> list[LogseqBlock]:
                 ),
                 # Knowledge: Git workflow tip
                 LogseqBlock(
-                    content=["TIL: git rebase -i HEAD~N lets you interactively squash commits"],
+                    content=["TIL: `git rebase -i HEAD~N` lets you interactively squash commits #git #workflow"],
                     indent_level=1,
                     block_id="block-6",
                     children=[
                         LogseqBlock(
-                            content=["Use 'fixup' instead of 'squash' to discard commit messages"],
+                            content=["Use **fixup** instead of **squash** to discard commit messages"],
                             indent_level=2,
                             block_id="block-6-1",
                             children=[]
@@ -128,6 +134,26 @@ def create_sample_blocks() -> list[LogseqBlock]:
                     content=["TODO Review PR #456 before EOD"],
                     indent_level=1,
                     block_id="block-7",
+                    children=[]
+                ),
+                # Knowledge: Long line with word wrapping
+                LogseqBlock(
+                    content=["Discovered that [[Python]]'s `asyncio.gather()` with **return_exceptions=True** allows you to handle individual task failures gracefully without canceling other concurrent operations, which is essential for robust parallel processing in production systems #python #async"],
+                    indent_level=1,
+                    block_id="block-8",
+                    children=[]
+                ),
+                # Knowledge: Multi-line block with continuation
+                LogseqBlock(
+                    content=[
+                        "Understanding the difference between [[SQL]] JOIN types: #sql #database",
+                        "**INNER JOIN** returns only matching rows from both tables",
+                        "**LEFT JOIN** returns all rows from left table plus matches from right",
+                        "**RIGHT JOIN** returns all rows from right table plus matches from left",
+                        "**FULL OUTER JOIN** returns all rows from both tables with NULLs for non-matches"
+                    ],
+                    indent_level=1,
+                    block_id="block-9",
                     children=[]
                 ),
             ]
@@ -269,6 +295,26 @@ def create_sample_block_states() -> dict[str, BlockState]:
             classification="pending",
             source="llm",
             llm_classification=None,
+        ),
+        # Long line with asyncio.gather() - KNOWLEDGE
+        "block-8": BlockState(
+            block_id="block-8",
+            classification="knowledge",
+            confidence=0.94,
+            source="llm",
+            llm_classification="knowledge",
+            llm_confidence=0.94,
+            reason="Technical insight about asyncio error handling and parallel processing"
+        ),
+        # Multi-line SQL JOIN explanation - KNOWLEDGE
+        "block-9": BlockState(
+            block_id="block-9",
+            classification="knowledge",
+            confidence=0.96,
+            source="llm",
+            llm_classification="knowledge",
+            llm_confidence=0.96,
+            reason="Comprehensive explanation of SQL JOIN types with clear distinctions"
         ),
     }
 
