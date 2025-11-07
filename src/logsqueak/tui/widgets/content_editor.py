@@ -20,9 +20,9 @@ class ContentEditor(TextArea):
         **kwargs
     ):
         """Initialize ContentEditor."""
-        super().__init__("", *args, id="content-editor", **kwargs)
+        super().__init__("", *args, id="content-editor", soft_wrap=True, **kwargs)
         self.can_focus = True
-        self.show_line_numbers = False
+        self.show_line_numbers = True
         # Set initial border (unfocused state)
         self.styles.border = ("solid", "white")
 

@@ -137,13 +137,19 @@ class Phase2Screen(Screen):
 
         # Update original context panel
         original_context = self.query_one("#original-context", Static)
-        formatted_context = self._format_hierarchical_context(current_ec.original_content)
+        formatted_context = self._format_hierarchical_context(current_ec.hierarchical_context)
         original_context.update(formatted_context)
 
-        # Update LLM reworded panel
+        # Update LLM reworded panel with line numbers
         llm_reworded = self.query_one("#llm-reworded", Static)
         if current_ec.rewording_complete and current_ec.reworded_content:
-            llm_reworded.update(current_ec.reworded_content)
+            # Get widget width for wrapping (subtract padding/border)
+            widget_width = max(40, llm_reworded.size.width - 4) if llm_reworded.size.width > 0 else 80
+            formatted_content = self._format_content_with_line_numbers(
+                current_ec.reworded_content,
+                width=widget_width
+            )
+            llm_reworded.update(formatted_content)
         else:
             llm_reworded.update("⏳ Waiting for LLM rewording...")
 
@@ -372,6 +378,53 @@ class Phase2Screen(Screen):
             lines.append(' '.join(current_line))
 
         return lines if lines else [text]
+
+    def _format_content_with_line_numbers(self, content: str, width: int = 80) -> str:
+        """Format content with line numbers for wrapped lines.
+
+        This formats single-block content (which may have multiple continuation lines)
+        with word wrapping and line numbers to distinguish:
+        - Actual new lines (from content) - shown with line number (1, 2, 3, etc.)
+        - Wrapped portions of long lines - shown with spaces (no line number)
+
+        Args:
+            content: The single-block content to format
+            width: Maximum line width for wrapping (default 80, accounts for line number gutter)
+
+        Returns:
+            Formatted content with line numbers
+        """
+        if not content:
+            return ""
+
+        # Split content into actual lines (from the content itself)
+        actual_lines = content.split('\n')
+        formatted_lines = []
+        line_num = 1
+
+        for line in actual_lines:
+            if not line.strip():
+                # Empty line - show line number (dim)
+                formatted_lines.append(f"[dim]{line_num:2}[/dim] ")
+                line_num += 1
+                continue
+
+            # Wrap this line if it's too long (account for line number gutter: "NN ")
+            gutter_width = 3  # "NN " format
+            available_width = max(40, width - gutter_width)
+            wrapped = self._wrap_text(line, available_width)
+
+            if wrapped:
+                # First wrapped line - show line number (dim)
+                formatted_lines.append(f"[dim]{line_num:2}[/dim] {wrapped[0]}")
+
+                # Subsequent wrapped lines - show spaces instead of line number
+                for wrapped_line in wrapped[1:]:
+                    formatted_lines.append(f"   {wrapped_line}")
+
+                line_num += 1
+
+        return '\n'.join(formatted_lines)
 
     # Background worker methods (stubs for now)
 
