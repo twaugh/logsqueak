@@ -27,9 +27,9 @@ python demos/demo_phase1.py
 
 **Keyboard Controls:**
 - `j` / `k` - Navigate between blocks
-- `Shift+J` / `Shift+K` - Jump to next/previous knowledge block
+- `J` / `K` - Jump to next/previous knowledge block
 - `Space` - Toggle block selection
-- `a` - Accept all LLM suggestions
+- `a` - Accept all LLM suggestions (keeps user selections)
 - `c` - Clear all selections
 - `r` - Reset to LLM suggestions
 - `n` - Proceed to next phase

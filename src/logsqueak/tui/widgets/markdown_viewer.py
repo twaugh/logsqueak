@@ -72,12 +72,13 @@ class MarkdownViewer(Static):
                 content_parts.append(f"- Reasoning: {state.reason}\n")
 
         # Show selection status
+        content_parts.append("\n---\n")
         if state.classification == "knowledge":
-            content_parts.append("\n---\n")
-            if state.source == "user":
-                content_parts.append("✓ **Selected by you**\n")
-            elif state.source == "llm":
-                content_parts.append("🤖 **Suggested by LLM** (not yet selected)\n")
+            # Block is selected (will be processed in Phase 2)
+            content_parts.append("✓ **Selected by you**\n")
+        elif state.llm_classification == "knowledge":
+            # Block is suggested but not selected
+            content_parts.append("🤖 **Suggested by LLM** (not yet selected)\n")
 
         # Combine and render
         markdown_text = "".join(content_parts)

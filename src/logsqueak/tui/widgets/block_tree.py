@@ -107,19 +107,14 @@ class BlockTree(Tree):
 
         # Determine emoji and style based on state
         if state and state.classification == "knowledge":
-            # Block is selected - emoji depends on source
-            if state.source == "user":
-                # User selected - checkmark + green
-                label.append("✅", style="")
-                label.append(content, style="on dark_green")
-            else:
-                # LLM selected - robot + blue
-                label.append("🤖", style="")
-                label.append(content, style="on dark_blue")
+            # Block is selected (will be processed in Phase 2)
+            # Always use checkmark + green for selected blocks
+            label.append("✅", style="")
+            label.append(content, style="on dark_green")
         elif state and state.llm_classification == "knowledge":
-            # LLM suggested but not selected - robot, no background
+            # LLM suggested but not selected yet - robot + blue background
             label.append("🤖", style="")
-            label.append(content, style="")
+            label.append(content, style="on dark_blue")
         else:
             # Not selected, no LLM suggestion - invisible padding
             label.append(invisible_padding + content, style="")
@@ -201,23 +196,25 @@ class BlockTree(Tree):
         return None
 
     def find_next_knowledge_block(self, from_line: int) -> Optional[int]:
-        """Find next LLM-suggested knowledge block.
+        """Find next LLM-suggested knowledge block (wraps around to start).
 
         Args:
             from_line: Start searching from this line
 
         Returns:
-            Line number of next knowledge block, or None
+            Line number of next knowledge block, or None if no knowledge blocks exist
         """
         # Try to search forward through reasonable number of lines
         # (tree doesn't expose total line count directly)
         current_line = from_line + 1
         max_attempts = 100  # Reasonable upper bound
+        found_end = False
 
         for _ in range(max_attempts):
             try:
                 node = self.get_node_at_line(current_line)
                 if node is None:
+                    found_end = True
                     break
                 if node.data:
                     state = self.block_states.get(node.data)
@@ -225,23 +222,67 @@ class BlockTree(Tree):
                         return current_line
                 current_line += 1
             except:
+                found_end = True
                 break
+
+        # If we reached the end, wrap around and search from the beginning
+        if found_end:
+            current_line = 0
+            while current_line <= from_line:
+                try:
+                    node = self.get_node_at_line(current_line)
+                    if node and node.data:
+                        state = self.block_states.get(node.data)
+                        if state and state.llm_classification == "knowledge":
+                            return current_line
+                    current_line += 1
+                except:
+                    break
 
         return None
 
     def find_previous_knowledge_block(self, from_line: int) -> Optional[int]:
-        """Find previous LLM-suggested knowledge block.
+        """Find previous LLM-suggested knowledge block (wraps around to end).
 
         Args:
             from_line: Start searching from this line
 
         Returns:
-            Line number of previous knowledge block, or None
+            Line number of previous knowledge block, or None if no knowledge blocks exist
         """
         # Iterate backwards through lines
         current_line = from_line - 1
 
         while current_line >= 0:
+            try:
+                node = self.get_node_at_line(current_line)
+                if node and node.data:
+                    state = self.block_states.get(node.data)
+                    if state and state.llm_classification == "knowledge":
+                        return current_line
+                current_line -= 1
+            except:
+                break
+
+        # If we reached the beginning, wrap around and search from the end
+        # Find the last line
+        current_line = from_line + 1
+        max_attempts = 100
+        last_valid_line = from_line
+
+        for _ in range(max_attempts):
+            try:
+                node = self.get_node_at_line(current_line)
+                if node is None:
+                    break
+                last_valid_line = current_line
+                current_line += 1
+            except:
+                break
+
+        # Now search backwards from the end to from_line
+        current_line = last_valid_line
+        while current_line > from_line:
             try:
                 node = self.get_node_at_line(current_line)
                 if node and node.data:

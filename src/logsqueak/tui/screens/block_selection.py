@@ -30,8 +30,8 @@ class Phase1Screen(Screen):
         ("k", "cursor_up", "Up"),
         ("down", "cursor_down", "Down"),
         ("up", "cursor_up", "Up"),
-        ("shift+j", "jump_next_knowledge", "Next Knowledge"),
-        ("shift+k", "jump_prev_knowledge", "Prev Knowledge"),
+        ("J", "jump_next_knowledge", "Next Knowledge"),
+        ("K", "jump_prev_knowledge", "Prev Knowledge"),
         Binding("space", "toggle_selection", "Toggle Selection", priority=True),
         ("a", "accept_all_suggestions", "Accept All"),
         ("c", "clear_all_selections", "Clear All"),
@@ -205,22 +205,12 @@ class Phase1Screen(Screen):
             state = self.block_states[block_id]
 
             if state.classification == "knowledge":
-                # Already selected - behavior depends on source and LLM classification
-                if state.source == "llm":
-                    # LLM-suggested (blue) → User-confirmed (green)
-                    state.source = "user"
-                    state.confidence = 1.0
-                else:
-                    # User-confirmed (green) → back to original state
-                    if state.llm_classification == "knowledge":
-                        # Has LLM suggestion → return to LLM-suggested (blue)
-                        state.source = "llm"
-                        state.confidence = state.llm_confidence or 0.0
-                    else:
-                        # No LLM suggestion → Deselect completely (no highlight)
-                        state.classification = "pending"
+                # Already selected (green checkmark) → Deselect
+                state.classification = "pending"
+                state.source = "user"
+                state.confidence = None
             else:
-                # Not selected → Select as user choice (green)
+                # Not selected → Select as user choice (green checkmark)
                 state.classification = "knowledge"
                 state.source = "user"
                 state.confidence = 1.0
@@ -231,18 +221,19 @@ class Phase1Screen(Screen):
             self._update_current_block()
 
     def action_accept_all_suggestions(self) -> None:
-        """Accept all LLM suggestions."""
+        """Accept all LLM suggestions (keeps existing user selections)."""
         tree = self.query_one(BlockTree)
 
         for block_id, state in self.block_states.items():
             if state.llm_classification == "knowledge":
-                # Accept LLM suggestion
-                state.classification = "knowledge"
-                state.source = "llm"
-                state.confidence = state.llm_confidence or 0.0
+                # Accept LLM suggestion (only if not already selected)
+                if state.classification != "knowledge":
+                    state.classification = "knowledge"
+                    state.source = "llm"
+                    state.confidence = state.llm_confidence or 0.0
 
-                # Update visual
-                tree.update_block_label(block_id)
+                    # Update visual
+                    tree.update_block_label(block_id)
 
         self._update_selected_count()
         self._update_current_block()
@@ -392,12 +383,7 @@ class Phase1Screen(Screen):
                     state.llm_confidence = result["confidence"]
                     state.reason = result["reason"]
 
-                    # Auto-accept LLM suggestion
-                    state.classification = "knowledge"
-                    state.source = "llm"
-                    state.confidence = result["confidence"]
-
-                    # Update visual
+                    # Update visual (shows robot emoji but block not selected yet)
                     tree = self.query_one(BlockTree)
                     tree.update_block_label(block_id)
 
