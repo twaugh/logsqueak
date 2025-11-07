@@ -14,17 +14,22 @@ class EditedContent(BaseModel):
 
     original_content: str = Field(
         ...,
-        description="Original block content from journal (without parent context)"
+        description="Original block content from journal (single block only, without parent context)"
+    )
+
+    hierarchical_context: str = Field(
+        ...,
+        description="Full hierarchical context including all parent blocks (shown in top read-only panel)"
     )
 
     reworded_content: Optional[str] = Field(
         default=None,
-        description="LLM-generated reworded version (removes temporal context)"
+        description="LLM-generated reworded version of original_content (removes temporal context, single block only)"
     )
 
     current_content: str = Field(
         ...,
-        description="Current editable content (starts as original, user can modify)"
+        description="Current editable content (starts as original_content, user can modify in bottom panel)"
     )
 
     rewording_complete: bool = Field(
