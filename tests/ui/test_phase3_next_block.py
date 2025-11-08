@@ -51,11 +51,13 @@ def sample_edited_content():
         EditedContent(
             block_id="journal-block-1",
             original_content="First knowledge block about Python",
+            hierarchical_context="- Today's learning\n  - Programming\n    - First knowledge block about Python",
             current_content="Python async programming patterns"
         ),
         EditedContent(
             block_id="journal-block-2",
             original_content="Second knowledge block about Textual",
+            hierarchical_context="- Today's learning\n  - UI development\n    - Second knowledge block about Textual",
             current_content="Textual TUI framework architecture"
         ),
     ]
@@ -244,43 +246,6 @@ async def test_n_key_at_last_block_does_nothing(
 
         # Should show completion summary or stay at last block
         # (Implementation may vary - could show completion screen)
-
-
-@pytest.mark.skip(reason="Enter key navigation not implemented - alternative to 'n' key")
-@pytest.mark.asyncio
-async def test_enter_key_advances_when_current_block_complete(
-    sample_journal_blocks, sample_edited_content, sample_decisions
-):
-    """Test Enter key advances to next block when current block processing complete."""
-    screen = Phase3Screen(
-        journal_blocks=sample_journal_blocks,
-        edited_content=sample_edited_content,
-        decisions=sample_decisions,
-        journal_date="2025-11-06",
-        auto_start_workers=False
-    )
-    app = Phase3TestApp(screen)
-
-    screen.write_integration = AsyncMock(return_value=True)
-
-    async with app.run_test() as pilot:
-        await pilot.pause()
-
-        # Accept all decisions for block 1
-        await pilot.press("y")  # Decision 0
-        await pilot.pause()
-        await pilot.press("j", "y")  # Decision 1
-        await pilot.pause()
-        await pilot.press("j", "y")  # Decision 2
-        await pilot.pause()
-
-        # All decisions for block 1 are now completed
-        # Press Enter to advance
-        await pilot.press("enter")
-        await pilot.pause()
-
-        # Should advance to block 2
-        assert screen.current_block_index == 1
 
 
 @pytest.mark.asyncio
