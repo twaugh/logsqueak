@@ -79,6 +79,7 @@ async def test_find_candidates_handles_hierarchical_page_links(indexed_db, temp_
         EditedContent(
             block_id="block-1",
             original_content="Backend API uses Flask, see [[Projects/Backend]]",
+            hierarchical_context="- Development notes\n  - Web frameworks\n    - Backend API uses Flask, see [[Projects/Backend]]",
             current_content="Backend API uses Flask"
         )
     ]

@@ -79,6 +79,7 @@ async def test_find_candidates_returns_relevant_pages(indexed_db):
         EditedContent(
             block_id="block-1",
             original_content="Learning about Python decorators and how they work",
+            hierarchical_context="- Daily notes\n  - Programming studies\n    - Learning about Python decorators and how they work",
             current_content="Python decorators modify function behavior"
         )
     ]
@@ -112,6 +113,7 @@ async def test_find_candidates_ranks_pages_by_relevance(indexed_db):
         EditedContent(
             block_id="block-1",
             original_content="Machine learning frameworks use Python extensively",
+            hierarchical_context="- Research notes\n  - AI and ML\n    - Machine learning frameworks use Python extensively",
             current_content="Machine learning frameworks use Python extensively"
         )
     ]
@@ -143,11 +145,13 @@ async def test_find_candidates_handles_multiple_blocks(indexed_db):
         EditedContent(
             block_id="block-1",
             original_content="Python decorators are powerful",
+            hierarchical_context="- Learning log\n  - Python decorators are powerful",
             current_content="Python decorators are powerful"
         ),
         EditedContent(
             block_id="block-2",
             original_content="JavaScript arrow functions",
+            hierarchical_context="- Learning log\n  - JavaScript arrow functions",
             current_content="JavaScript arrow functions"
         )
     ]
@@ -183,6 +187,7 @@ async def test_find_candidates_respects_top_k_limit(indexed_db):
         EditedContent(
             block_id="block-1",
             original_content="Programming concepts",
+            hierarchical_context="- Tech notes\n  - Programming concepts",
             current_content="Programming concepts"
         )
     ]
@@ -216,6 +221,7 @@ async def test_explicit_link_boosting(indexed_db):
         EditedContent(
             block_id="block-1",
             original_content="See [[Python Programming]] for more details about decorators",
+            hierarchical_context="- References\n  - See [[Python Programming]] for more details about decorators",
             current_content="See Python Programming for more details about decorators"
         )
     ]
@@ -250,6 +256,7 @@ async def test_find_candidates_uses_original_context(indexed_db):
         EditedContent(
             block_id="block-1",
             original_content="Today I learned about Python",
+            hierarchical_context="- Daily Notes\n  - Today I learned about Python decorators and closures",
             current_content="Python programming concepts"  # Edited to remove temporal context
         )
     ]
@@ -283,6 +290,7 @@ async def test_empty_results_when_no_matches(indexed_db):
         EditedContent(
             block_id="block-1",
             original_content="Quantum physics concepts",
+            hierarchical_context="- Science topics\n  - Physics\n    - Quantum physics concepts",
             current_content="Quantum physics concepts"
         )
     ]
