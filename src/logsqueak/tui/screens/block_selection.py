@@ -445,11 +445,19 @@ class Phase1Screen(Screen):
 
             self.background_tasks["page_indexing"].progress_percentage = float(progress)
 
-            status_panel = self.query_one(StatusPanel)
-            status_panel.update_status()
+            # Update status panel if it's mounted
+            try:
+                status_panel = self.query_one(StatusPanel)
+                status_panel.update_status()
+            except Exception:
+                pass  # Widget not mounted yet
 
         # Mark complete
         self.background_tasks["page_indexing"].status = "completed"
 
-        status_panel = self.query_one(StatusPanel)
-        status_panel.update_status()
+        # Update status panel if it's mounted
+        try:
+            status_panel = self.query_one(StatusPanel)
+            status_panel.update_status()
+        except Exception:
+            pass  # Widget not mounted yet
