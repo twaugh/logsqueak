@@ -8,13 +8,14 @@ from typing import Optional
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.containers import Container, Horizontal, Vertical
-from textual.widgets import Static, Footer, Label
+from textual.widgets import Footer, Label
 from textual.reactive import reactive
 from logseq_outline.parser import LogseqBlock
 from logsqueak.models.edited_content import EditedContent
 from logsqueak.models.background_task import BackgroundTaskState
 from logsqueak.tui.widgets.content_editor import ContentEditor
 from logsqueak.tui.widgets.status_panel import StatusPanel
+from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
 import structlog
 
 logger = structlog.get_logger()
@@ -53,17 +54,13 @@ class Phase2Screen(Screen):
     #original-panel {
         height: 1fr;
         min-height: 3;
-        border: solid $accent;
-        border-title-align: center;
-        overflow: hidden auto;
+        layout: vertical;
     }
 
     #llm-panel {
         height: 1fr;
         min-height: 3;
-        border: solid $accent;
-        border-title-align: center;
-        overflow: hidden auto;
+        layout: vertical;
     }
 
     #editor-panel {
@@ -75,11 +72,11 @@ class Phase2Screen(Screen):
     }
 
     #original-context {
-        height: auto;
+        height: 1fr;
     }
 
     #llm-reworded {
-        height: auto;
+        height: 1fr;
     }
 
     ContentEditor {
@@ -138,13 +135,13 @@ class Phase2Screen(Screen):
 
             # Three-panel layout (vertical - top to bottom)
             with Vertical(id="content-panels"):
-                # Top panel: Original context
+                # Top panel: Original context (using TargetPagePreview for syntax highlighting)
                 with Container(id="original-panel"):
-                    yield Static("", id="original-context")
+                    yield TargetPagePreview(id="original-context")
 
-                # Middle panel: LLM reworded version
+                # Middle panel: LLM reworded version (using TargetPagePreview for syntax highlighting)
                 with Container(id="llm-panel"):
-                    yield Static("", id="llm-reworded")
+                    yield TargetPagePreview(id="llm-reworded")
 
                 # Bottom panel: Editable current content
                 with Container(id="editor-panel"):
@@ -157,7 +154,7 @@ class Phase2Screen(Screen):
             # Footer with keyboard shortcuts
             yield Footer()
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         """Handle screen mount event."""
         # Set border titles for panels
         self.query_one("#original-panel").border_title = "Original Context"
@@ -165,7 +162,7 @@ class Phase2Screen(Screen):
         self.query_one("#editor-panel").border_title = "Current Content (Editable)"
 
         # Update initial display
-        self._update_display()
+        await self._update_display()
 
         # Start background workers if enabled
         if self.auto_start_workers:
@@ -178,7 +175,46 @@ class Phase2Screen(Screen):
         # self.run_worker(self._page_indexing_worker(), name="page_indexing")
         pass
 
-    def _update_display(self) -> None:
+    def _convert_to_logseq_bullets(self, text: str) -> str:
+        """Convert plain indented text to Logseq bullet format.
+
+        Takes text with indentation (spaces) and converts to bullets.
+        Example:
+            "Parent\n  Child\n    Grandchild"
+        Becomes:
+            "- Parent\n  - Child\n    - Grandchild"
+
+        Args:
+            text: Indented plain text
+
+        Returns:
+            Logseq markdown with bullets
+        """
+        if not text:
+            return ""
+
+        lines = text.split('\n')
+        result = []
+
+        for line in lines:
+            if not line.strip():
+                result.append(line)
+                continue
+
+            # Count leading spaces
+            stripped = line.lstrip(' ')
+            indent_count = len(line) - len(stripped)
+            indent = ' ' * indent_count
+
+            # Add bullet if line doesn't already have one
+            if not stripped.startswith('- '):
+                result.append(f"{indent}- {stripped}")
+            else:
+                result.append(line)
+
+        return '\n'.join(result)
+
+    async def _update_display(self) -> None:
         """Update all display panels for current block."""
         if not self.edited_content:
             return
@@ -193,30 +229,27 @@ class Phase2Screen(Screen):
             f"Block {self.current_block_index + 1} of {len(self.edited_content)}"
         )
 
-        # Update original context panel
-        original_context = self.query_one("#original-context", Static)
-        formatted_context = self._format_hierarchical_context(current_ec.hierarchical_context)
-        original_context.update(formatted_context)
+        # Update original context panel using TargetPagePreview
+        original_context = self.query_one("#original-context", TargetPagePreview)
+        # Convert hierarchical context to Logseq bullets if needed
+        context_with_bullets = self._convert_to_logseq_bullets(current_ec.hierarchical_context)
+        await original_context.load_preview(context_with_bullets)
 
-        # Update LLM reworded panel with line numbers
-        llm_reworded = self.query_one("#llm-reworded", Static)
+        # Update LLM reworded panel using TargetPagePreview
+        llm_reworded = self.query_one("#llm-reworded", TargetPagePreview)
         if current_ec.rewording_complete and current_ec.reworded_content:
-            # Get widget width for wrapping (subtract padding/border)
-            widget_width = max(40, llm_reworded.size.width - 4) if llm_reworded.size.width > 0 else 80
-            formatted_content = self._format_content_with_line_numbers(
-                current_ec.reworded_content,
-                width=widget_width
-            )
-            llm_reworded.update(formatted_content)
+            # Format as single block for display
+            content_as_block = f"- {current_ec.reworded_content}"
+            await llm_reworded.load_preview(content_as_block)
         else:
-            # Show waiting message
-            llm_reworded.update("⏳ Waiting for LLM rewording...")
+            # Clear preview and show waiting message
+            llm_reworded.clear()
 
         # Update editor with current content
         editor = self.query_one(ContentEditor)
         editor.load_content(current_ec.current_content)
 
-    def action_navigate_next(self) -> None:
+    async def action_navigate_next(self) -> None:
         """Navigate to next block (j or down arrow)."""
         # Only navigate if editor is not focused
         editor = self.query_one(ContentEditor)
@@ -229,9 +262,9 @@ class Phase2Screen(Screen):
         # Move to next block
         if self.current_block_index < len(self.edited_content) - 1:
             self.current_block_index += 1
-            self._update_display()
+            await self._update_display()
 
-    def action_navigate_previous(self) -> None:
+    async def action_navigate_previous(self) -> None:
         """Navigate to previous block (k or up arrow)."""
         # Only navigate if editor is not focused
         editor = self.query_one(ContentEditor)
@@ -244,7 +277,7 @@ class Phase2Screen(Screen):
         # Move to previous block
         if self.current_block_index > 0:
             self.current_block_index -= 1
-            self._update_display()
+            await self._update_display()
 
     def action_toggle_focus(self) -> None:
         """Toggle focus on/off the editor (Tab key)."""
@@ -334,156 +367,6 @@ class Phase2Screen(Screen):
 
         # Update current content from editor
         current_ec.current_content = editor.get_content()
-
-    def _format_hierarchical_context(self, context: str, width: int = 80) -> str:
-        """Format hierarchical context with bullets and hanging indent.
-
-        Each block (separated by hierarchy) gets ONE bullet on its first line.
-        All subsequent lines of that block use hanging indent.
-
-        Takes context like:
-            "Projects\n  Python Learning\n    Block content\n    Second line\n    Third line"
-
-        Returns formatted with one bullet per block:
-            "• Projects\n  • Python Learning\n    • Block content\n      Second line\n      Third line"
-
-        Args:
-            context: The hierarchical context string
-            width: Maximum line width (default 80, will be overridden by widget width)
-        """
-        if not context:
-            return ""
-
-        lines = context.split('\n')
-        formatted_lines = []
-        previous_indent = -1
-
-        for line in lines:
-            if not line.strip():  # Empty line
-                formatted_lines.append("")
-                continue
-
-            # Count leading spaces to determine indent level
-            stripped = line.lstrip(' ')
-            indent_count = len(line) - len(stripped)
-
-            # Determine if this is a new block (indent decreased or at same level as new block)
-            # First line of a block gets a bullet, continuation lines don't
-            is_new_block = indent_count != previous_indent
-
-            if is_new_block:
-                # First line of block gets bullet
-                first_line_prefix = ' ' * indent_count + '• '
-                hanging_indent_prefix = ' ' * (indent_count + 2)
-                previous_indent = indent_count
-            else:
-                # Continuation line of same block - no bullet, just hanging indent
-                first_line_prefix = ' ' * (indent_count + 2)
-                hanging_indent_prefix = ' ' * (indent_count + 2)
-
-            # Calculate available width for text
-            available_width = max(40, width - len(first_line_prefix))
-
-            # Wrap the text manually
-            wrapped = self._wrap_text(stripped, available_width)
-
-            # Add the first wrapped line (with or without bullet)
-            if wrapped:
-                formatted_lines.append(first_line_prefix + wrapped[0])
-
-                # Add subsequent wrapped lines with hanging indent
-                for wrapped_line in wrapped[1:]:
-                    formatted_lines.append(hanging_indent_prefix + wrapped_line)
-
-        return '\n'.join(formatted_lines)
-
-    def _wrap_text(self, text: str, width: int) -> list[str]:
-        """Wrap text to specified width, breaking on word boundaries.
-
-        Args:
-            text: Text to wrap
-            width: Maximum width per line
-
-        Returns:
-            List of wrapped lines
-        """
-        if len(text) <= width:
-            return [text]
-
-        words = text.split()
-        lines = []
-        current_line = []
-        current_length = 0
-
-        for word in words:
-            word_length = len(word)
-
-            # Check if adding this word would exceed width
-            # Account for space before word (except first word)
-            space_needed = 1 if current_line else 0
-
-            if current_length + space_needed + word_length <= width:
-                current_line.append(word)
-                current_length += space_needed + word_length
-            else:
-                # Start new line
-                if current_line:
-                    lines.append(' '.join(current_line))
-                current_line = [word]
-                current_length = word_length
-
-        # Add remaining words
-        if current_line:
-            lines.append(' '.join(current_line))
-
-        return lines if lines else [text]
-
-    def _format_content_with_line_numbers(self, content: str, width: int = 80) -> str:
-        """Format content with line numbers for wrapped lines.
-
-        This formats single-block content (which may have multiple continuation lines)
-        with word wrapping and line numbers to distinguish:
-        - Actual new lines (from content) - shown with line number (1, 2, 3, etc.)
-        - Wrapped portions of long lines - shown with spaces (no line number)
-
-        Args:
-            content: The single-block content to format
-            width: Maximum line width for wrapping (default 80, accounts for line number gutter)
-
-        Returns:
-            Formatted content with line numbers
-        """
-        if not content:
-            return ""
-
-        # Split content into actual lines (from the content itself)
-        actual_lines = content.split('\n')
-        formatted_lines = []
-        line_num = 1
-
-        for line in actual_lines:
-            if not line.strip():
-                # Empty line - show line number (dim)
-                formatted_lines.append(f"[dim]{line_num:2}[/dim] ")
-                line_num += 1
-                continue
-
-            # Wrap this line if it's too long (account for line number gutter: "NN ")
-            gutter_width = 3  # "NN " format
-            available_width = max(40, width - gutter_width)
-            wrapped = self._wrap_text(line, available_width)
-
-            if wrapped:
-                # First wrapped line - show line number (dim)
-                formatted_lines.append(f"[dim]{line_num:2}[/dim] {wrapped[0]}")
-
-                # Subsequent wrapped lines - show spaces instead of line number
-                for wrapped_line in wrapped[1:]:
-                    formatted_lines.append(f"   {wrapped_line}")
-
-                line_num += 1
-
-        return '\n'.join(formatted_lines)
 
     # Background worker methods (stubs for now)
 

@@ -407,7 +407,10 @@ class TargetPagePreview(Widget):
 
     def __init__(self, *args, **kwargs):
         """Initialize TargetPagePreview with gutter and content."""
-        super().__init__(*args, id="target-page-preview", **kwargs)
+        # If id is not provided, use default
+        if 'id' not in kwargs:
+            kwargs['id'] = "target-page-preview"
+        super().__init__(*args, **kwargs)
         self.can_focus = True
         self._content = ""
         self._highlight_block_id: Optional[str] = None
