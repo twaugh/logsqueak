@@ -10,6 +10,7 @@ from textual.screen import Screen
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.widgets import Static, Footer, Label
 from textual.reactive import reactive
+from rich.panel import Panel
 from logseq_outline.parser import LogseqBlock
 from logsqueak.models.edited_content import EditedContent
 from logsqueak.models.background_task import BackgroundTaskState
@@ -80,15 +81,13 @@ class Phase2Screen(Screen):
 
             # Three-panel layout (vertical - top to bottom)
             with Vertical(id="content-panels"):
-                # Top panel: Original context
+                # Top panel: Original context (in a frame)
                 with Container(id="original-panel"):
-                    yield Label("Original Context", classes="panel-header")
                     with VerticalScroll():
                         yield Static("", id="original-context")
 
-                # Middle panel: LLM reworded version
+                # Middle panel: LLM reworded version (in a frame)
                 with Container(id="llm-panel"):
-                    yield Label("LLM Reworded", classes="panel-header")
                     with VerticalScroll():
                         yield Static("", id="llm-reworded")
 
@@ -135,12 +134,14 @@ class Phase2Screen(Screen):
             f"Block {self.current_block_index + 1} of {len(self.edited_content)}"
         )
 
-        # Update original context panel
+        # Update original context panel (wrapped in a frame)
         original_context = self.query_one("#original-context", Static)
         formatted_context = self._format_hierarchical_context(current_ec.hierarchical_context)
-        original_context.update(formatted_context)
+        # Wrap in a Panel (frame)
+        panel = Panel(formatted_context, title="Original Context", border_style="blue")
+        original_context.update(panel)
 
-        # Update LLM reworded panel with line numbers
+        # Update LLM reworded panel with line numbers (wrapped in a frame)
         llm_reworded = self.query_one("#llm-reworded", Static)
         if current_ec.rewording_complete and current_ec.reworded_content:
             # Get widget width for wrapping (subtract padding/border)
@@ -149,9 +150,13 @@ class Phase2Screen(Screen):
                 current_ec.reworded_content,
                 width=widget_width
             )
-            llm_reworded.update(formatted_content)
+            # Wrap in a Panel (frame)
+            panel = Panel(formatted_content, title="LLM Reworded", border_style="green")
+            llm_reworded.update(panel)
         else:
-            llm_reworded.update("⏳ Waiting for LLM rewording...")
+            # Show waiting message in a frame
+            panel = Panel("⏳ Waiting for LLM rewording...", title="LLM Reworded", border_style="yellow")
+            llm_reworded.update(panel)
 
         # Update editor with current content
         editor = self.query_one(ContentEditor)
