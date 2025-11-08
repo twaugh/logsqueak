@@ -26,9 +26,10 @@ def render_inline_syntax(content: str, base_style: str = "") -> Text:
     1. [[Page Links]]
     2. #[[Link Tags]]
     3. #tags
-    4. **bold**
-    5. *italic*
-    6. URLs
+    4. `inline code`
+    5. **bold**
+    6. *italic*
+    7. URLs
 
     Args:
         content: String content to render
@@ -69,7 +70,15 @@ def render_inline_syntax(content: str, base_style: str = "") -> Text:
             matched = True
             continue
 
-        # 3. Bold: **text**
+        # 3. Inline code: `code`
+        code_match = re.match(r'^`([^`]+)`', remaining)
+        if code_match:
+            text.append(code_match.group(1), style="bold cyan on black")
+            pos += code_match.end()
+            matched = True
+            continue
+
+        # 4. Bold: **text**
         bold_match = re.match(r'^\*\*([^*]+)\*\*', remaining)
         if bold_match:
             text.append(bold_match.group(1), style="bold")
@@ -77,7 +86,7 @@ def render_inline_syntax(content: str, base_style: str = "") -> Text:
             matched = True
             continue
 
-        # 4. Italic: *text* (but not part of **)
+        # 5. Italic: *text* (but not part of **)
         italic_match = re.match(r'^\*([^*]+)\*(?!\*)', remaining)
         if italic_match:
             text.append(italic_match.group(1), style="italic")
@@ -85,7 +94,7 @@ def render_inline_syntax(content: str, base_style: str = "") -> Text:
             matched = True
             continue
 
-        # 5. URL: http:// or https://
+        # 6. URL: http:// or https://
         url_match = re.match(r'^(https?://[^\s]+)', remaining)
         if url_match:
             text.append(url_match.group(1), style="blue underline")
@@ -93,7 +102,7 @@ def render_inline_syntax(content: str, base_style: str = "") -> Text:
             matched = True
             continue
 
-        # 6. Tag: #word (at start or after whitespace)
+        # 7. Tag: #word (at start or after whitespace)
         # Check if we're at start or after whitespace
         if pos == 0 or content[pos - 1].isspace():
             tag_match = re.match(r'^#([\w-]+)', remaining)
