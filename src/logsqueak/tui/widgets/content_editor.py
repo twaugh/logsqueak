@@ -19,8 +19,15 @@ class ContentEditor(TextArea):
         *args,
         **kwargs
     ):
-        """Initialize ContentEditor."""
-        super().__init__("", *args, id="content-editor", soft_wrap=True, **kwargs)
+        """Initialize ContentEditor with markdown language support."""
+        super().__init__(
+            "",
+            *args,
+            id="content-editor",
+            language="markdown",
+            soft_wrap=True,
+            **kwargs
+        )
         self.can_focus = True
         self.show_line_numbers = True
         # Set initial border (unfocused state)
