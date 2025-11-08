@@ -267,7 +267,7 @@ Each line is a complete JSON object representing one reworded knowledge block.
   "messages": [
     {
       "role": "system",
-      "content": "You are an AI assistant that decides where to integrate knowledge into a Logseq knowledge base. You will receive knowledge blocks with their original journal context and candidate target pages with their structure.\n\nRELEVANCE FILTERING (FR-032a):\n- Only output decisions where confidence ≥ 0.30 (30%)\n- Only output decisions where semantic connection is clear and actionable\n- Maximum 2 decisions per (knowledge_block, target_page) pair - choose the 2 best integration points if multiple locations are relevant\n- If a candidate page is not relevant, omit it entirely (do not output a decision for it)\n- If NO candidate pages meet the threshold, output nothing (empty stream)\n\nFor each relevant integration, choose the best action:\n- 'add_section': Create new top-level section on the page\n- 'add_under': Add as child under an existing block (provide target_block_id)\n- 'replace': Replace an existing block's content (provide target_block_id)\n\nOutput one JSON object per line (NDJSON format), not a JSON array. Each object must have: knowledge_block_id (string), target_page (string), action (string), target_block_id (string or null), target_block_title (string or null), confidence (float 0-1), reasoning (string explaining why this integration makes sense)."
+      "content": "You are an AI assistant that decides where to integrate knowledge into a Logseq knowledge base. You will receive knowledge blocks with their original journal context and candidate target pages with their structure.\n\nRELEVANCE FILTERING:\n- Only output decisions where confidence ≥ 0.30 (30%)\n- Only output decisions where semantic connection is clear and actionable\n- Maximum 2 decisions per (knowledge_block, target_page) pair - choose the 2 best integration points if multiple locations are relevant\n- If a candidate page is not relevant, omit it entirely (do not output a decision for it)\n- If NO candidate pages meet the threshold, output nothing (empty stream)\n\nDUPLICATE DETECTION:\n- FIRST check if similar/identical knowledge already exists in each candidate page\n- If duplicate found, use action='skip_exists' with target_block_id pointing to existing block\n- For skip_exists: provide reasoning explaining why it's a duplicate\n- For skip_exists: set target_block_title to describe location (e.g., \"Already exists at 'Section Name'\")\n\nFor each relevant NEW integration, choose the best action:\n- 'add_section': Create new top-level section on the page\n- 'add_under': Add as child under an existing block (provide target_block_id)\n- 'replace': Replace an existing block's content (provide target_block_id)\n- 'skip_exists': Knowledge already exists in target page (provide target_block_id of existing block)\n\nOutput one JSON object per line (NDJSON format), not a JSON array. Each object must have: knowledge_block_id (string), target_page (string), action (string), target_block_id (string or null), target_block_title (string or null), confidence (float 0-1), reasoning (string explaining why this integration makes sense or why it's a duplicate)."
     },
     {
       "role": "user",
@@ -359,13 +359,20 @@ Each line is a complete JSON object representing one integration decision (one k
 {"knowledge_block_id": "abc123", "target_page": "Python/Concurrency", "action": "add_under", "target_block_id": "pattern-section-123", "target_block_title": "Common Patterns", "confidence": 0.92, "reasoning": "This knowledge about asyncio.Queue's thread-safety is a common pattern in Python concurrency. Adding it under the 'Common Patterns' section provides clear context and makes it discoverable."}
 ```
 
+**Example with duplicate detection**:
+
+```
+{"knowledge_block_id": "abc123", "target_page": "Python/Concurrency", "action": "skip_exists", "target_block_id": "asyncio-queue-789", "target_block_title": "Already exists at 'Asyncio Patterns'", "confidence": 0.95, "reasoning": "This knowledge about asyncio.Queue's thread-safety already exists in the target page under 'Asyncio Patterns' with nearly identical wording."}
+```
+
 **Important**:
 - No JSON array wrapping
 - No SSE format
 - One JSON object per line (NDJSON)
 - Only return relevant integrations (omit pages that are not good fits)
-- No `skip_reason` field (removed - only suggest relevant pages)
-- In this example, `Textual/Architecture` is omitted because it's not a strong fit
+- Use `action="skip_exists"` when duplicate content is found in target page
+- For skip_exists decisions, system will filter them out by default but show count in summary
+- In the first example, `Textual/Architecture` is omitted because it's not a strong fit
 
 **Stream End**: Connection closes
 
@@ -494,11 +501,11 @@ class IntegrationDecisionChunk(BaseModel):
 
     knowledge_block_id: str = Field(..., description="Block ID of the knowledge being integrated")
     target_page: str = Field(..., description="Target page name (hierarchical pages use '/' separator)")
-    action: Literal["add_section", "add_under", "replace"] = Field(..., description="Type of integration action")
-    target_block_id: Optional[str] = Field(default=None, description="Target block ID for 'add_under' or 'replace' actions")
+    action: Literal["add_section", "add_under", "replace", "skip_exists"] = Field(..., description="Type of integration action")
+    target_block_id: Optional[str] = Field(default=None, description="Target block ID for 'add_under', 'replace', or 'skip_exists' actions")
     target_block_title: Optional[str] = Field(default=None, description="Human-readable title of target block (for display)")
     confidence: float = Field(..., ge=0.0, le=1.0, description="LLM's confidence score for this integration (0.0-1.0)")
-    reasoning: str = Field(..., description="LLM's explanation for this integration decision")
+    reasoning: str = Field(..., description="LLM's explanation for this integration decision or duplicate detection")
 ```
 
 **Note**: Phase 3 batching (FR-032): System waits for all decisions for a given knowledge block to arrive before displaying. Application must buffer all decisions with matching `knowledge_block_id`.

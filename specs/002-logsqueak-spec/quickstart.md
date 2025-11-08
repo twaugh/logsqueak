@@ -447,7 +447,8 @@ This section walks through a complete knowledge extraction session, showing what
 ┌─────────────────────────────────────────────────────────────────────┐
 │ Phase 3: Integration Decisions                                      │
 ├─────────────────────────────────────────────────────────────────────┤
-│ Knowledge Block 1 of 3 (Decision 1 of 2: ⊙ pending)                 │
+│ Knowledge Block 1 of 3 (2 new integrations, 1 already recorded)     │
+│ Decision 1 of 2: ⊙ pending                                          │
 │                                                                     │
 │ Journal Context (source):                                           │
 │ ┌─────────────────────────────────────────────────────────────────┐ │
@@ -572,6 +573,7 @@ When all knowledge blocks are processed, you'll see:
 - **Multiple pages**: Same knowledge can be relevant to multiple pages - accept all that make sense
 - **Skip irrelevant**: Press `n` to skip if LLM suggestions don't fit
 - **No relevant pages**: If LLM finds no good match, it shows "No relevant pages found" - press `n` to skip
+- **Already recorded**: If knowledge already exists in a page, the status shows "N already recorded" - these duplicates are skipped automatically
 - **Atomic writes**: Each `y` press writes immediately and marks journal - if you quit mid-session, completed integrations remain
 - **Provenance**: Check your journal entry after completion - `processed::` property links to all integrated blocks
 

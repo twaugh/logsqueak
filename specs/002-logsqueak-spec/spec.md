@@ -100,9 +100,10 @@ The user wants to review integration suggestions for each knowledge block, see w
 **Acceptance Scenarios**:
 
 1. **Given** 5 knowledge blocks need integration and the LLM is evaluating candidate pages from RAG search, **When** the user enters Phase 3, **Then** they see a "Processing knowledge blocks..." status while the system waits for ALL decisions for the first knowledge block to arrive (the system does NOT display any decisions until all decisions for that block are ready)
-2. **Given** all decisions for a knowledge block have arrived from the LLM, **When** the system displays them, **Then** the user sees only the active/relevant decisions (e.g., if 10 candidate pages were searched but only 2 are relevant, only 2 decisions are shown; if no pages are relevant, the block shows "No relevant pages found")
-3. **Given** a knowledge block has multiple relevant target pages, **When** displaying decisions, **Then** the system shows at most 2 decisions per (knowledge block, target page) pair (the LLM filters to the most relevant integration points)
-4. **Given** a knowledge block is displayed with its decisions, **When** user reviews it, **Then** they see:
+2. **Given** all decisions for a knowledge block have arrived from the LLM, **When** the system displays them, **Then** the user sees only the active/relevant decisions with decisions where `action="skip_exists"` filtered out by default (e.g., if 10 candidate pages were searched but only 2 are relevant and 3 are duplicates, only the 2 new integration decisions are shown in the list)
+3. **Given** the LLM detected that knowledge already exists in some candidate pages, **When** displaying the block status, **Then** the system shows a summary like "Block 2 of 5 (2 new integrations, 3 already recorded)" indicating both actionable decisions and skipped duplicates
+4. **Given** a knowledge block has multiple relevant target pages, **When** displaying decisions, **Then** the system shows at most 2 decisions per (knowledge block, target page) pair (the LLM filters to the most relevant integration points)
+5. **Given** a knowledge block is displayed with its decisions, **When** user reviews it, **Then** they see:
 
    - The knowledge block number and total (e.g., "Knowledge Block 1 of 5")
    - Hierarchical journal context (where the knowledge came from, shown dimmed)
@@ -111,14 +112,14 @@ The user wants to review integration suggestions for each knowledge block, see w
    - For the currently selected decision: target page preview showing existing page structure with new content highlighted with green bar (`┃`) in its target location
    - Action description, confidence score, and LLM reasoning for the selected decision
 
-5. **Given** a knowledge block has 3 relevant pages with decisions, **When** user presses 'j' or 'k', **Then** they navigate between the different page decisions for this knowledge block, and the preview panel updates to show the selected decision's target page context
-6. **Given** a decision shows "Add under 'Project Timeline'" with the target page preview visible, **When** user presses 'y' (accept), **Then** system immediately writes that knowledge block to the target page at the specified location and atomically adds to the `processed::` property on the journal block (creating it if it doesn't exist, or appending to the comma-separated list if it does), where each link uses markdown link format `[Page Name](((uuid)))` with the target page name as link text (with '___' converted to '/' for hierarchical pages) and Logseq block reference `((uuid))` as the link target
-7. **Given** a write operation succeeds, **When** the system updates the display, **Then** that decision is marked as completed with a checkmark (✓) and remains visible in the list
-8. **Given** user has accepted one decision for a knowledge block and other decisions remain, **When** they press 'y' on another decision for the same block, **Then** system writes to that additional page as well (the user can integrate the same knowledge block to multiple pages)
-9. **Given** a write operation fails, **When** the error occurs, **Then** system shows error details (e.g., "Target block not found"), marks that decision as failed (⚠), and allows user to continue with remaining decisions
-10. **Given** user has reviewed all decisions for a knowledge block, **When** they press 'n' (next block), **Then** system advances to the next knowledge block and waits for all its decisions to arrive before displaying (same batching behavior)
-11. **Given** the status display shows "Block 2 of 5 (3 decisions: ✓ 1 completed, ⊙ 2 pending)", **When** user views the screen, **Then** they can see progress at a glance and available actions are shown in the footer
-12. **Given** all knowledge blocks are reviewed and processed, **When** the last block completes, **Then** system shows completion summary with total blocks integrated, total writes performed, failed count, and link to journal entry with provenance markers
+6. **Given** a knowledge block has 3 relevant pages with decisions, **When** user presses 'j' or 'k', **Then** they navigate between the different page decisions for this knowledge block, and the preview panel updates to show the selected decision's target page context
+7. **Given** a decision shows "Add under 'Project Timeline'" with the target page preview visible, **When** user presses 'y' (accept), **Then** system immediately writes that knowledge block to the target page at the specified location and atomically adds to the `processed::` property on the journal block (creating it if it doesn't exist, or appending to the comma-separated list if it does), where each link uses markdown link format `[Page Name](((uuid)))` with the target page name as link text (with '___' converted to '/' for hierarchical pages) and Logseq block reference `((uuid))` as the link target
+8. **Given** a write operation succeeds, **When** the system updates the display, **Then** that decision is marked as completed with a checkmark (✓) and remains visible in the list
+9. **Given** user has accepted one decision for a knowledge block and other decisions remain, **When** they press 'y' on another decision for the same block, **Then** system writes to that additional page as well (the user can integrate the same knowledge block to multiple pages)
+10. **Given** a write operation fails, **When** the error occurs, **Then** system shows error details (e.g., "Target block not found"), marks that decision as failed (⚠), and allows user to continue with remaining decisions
+11. **Given** user has reviewed all decisions for a knowledge block, **When** they press 'n' (next block), **Then** system advances to the next knowledge block and waits for all its decisions to arrive before displaying (same batching behavior)
+12. **Given** the status display shows "Block 2 of 5 (3 decisions: ✓ 1 completed, ⊙ 2 pending)", **When** user views the screen, **Then** they can see progress at a glance and available actions are shown in the footer
+13. **Given** all knowledge blocks are reviewed and processed, **When** the last block completes, **Then** system shows completion summary with total blocks integrated, total writes performed, failed count, and link to journal entry with provenance markers
 
 **Keyboard Controls**:
 
@@ -198,6 +199,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 - **FR-032**: System MUST batch LLM integration decisions by knowledge block - all decisions for a given knowledge block must arrive before displaying any decisions for that block
 - **FR-032a**: LLM MUST return only active/relevant decisions via prompt-based filtering (e.g., if 10 candidate pages are searched but only 2 are relevant, return only 2 decisions). See contracts/llm-api.md Phase 3 "Relevance Filtering" section for filtering criteria (confidence ≥ 30%, clear semantic connection).
 - **FR-032b**: LLM MUST return at most 2 decisions per (knowledge block, target page) pair
+- **FR-032c**: LLM MUST check each candidate page for existing similar/identical knowledge and return `action="skip_exists"` if duplicate content is found, with `target_block_id` pointing to the existing block containing the duplicate
 - **FR-033**: System MUST display all decisions for a knowledge block together in a list format, with one knowledge block visible at a time
 - **FR-034**: System MUST show confidence scores as percentages for each integration decision
 - **FR-035**: System MUST display hierarchical journal context with proper indentation, all markdown rendered and displayed in dimmed style
@@ -219,6 +221,9 @@ The user wants to review integration suggestions for each knowledge block, see w
 - **FR-051**: System MUST support full Logseq markdown rendering in all displayed content
 - **FR-052**: System MUST show "Processing knowledge blocks..." status while waiting for all decisions for a knowledge block to arrive
 - **FR-053**: System MUST show "No relevant pages found" message if LLM returns no active decisions for a knowledge block
+- **FR-053a**: System MUST filter out decisions with `action="skip_exists"` from the interactive decision list by default
+- **FR-053b**: System MUST display a summary count of skipped decisions (e.g., "2 new integrations, 3 already recorded") in the status display
+- **FR-053c**: System MUST mark `skip_exists` decisions with a distinct visual indicator (↷) if displayed in the decision list
 
 #### Completion & Error Handling
 
@@ -289,7 +294,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 
 - **EditedContent**: Represents the edited content for a knowledge block in Phase 2 (block_id: str, original_content: str, hierarchical_context: str, reworded_content: str | None, current_content: str, rewording_complete: bool)
 
-- **IntegrationDecision**: Represents a decision about integrating a knowledge block to a specific page (knowledge_block_id: str, target_page: str, action: Literal["add_section", "add_under", "replace"], target_block_id: str | None, target_block_title: str | None, confidence: float, refined_text: str, reasoning: str, write_status: Literal["pending", "completed", "failed"])
+- **IntegrationDecision**: Represents a decision about integrating a knowledge block to a specific page (knowledge_block_id: str, target_page: str, action: Literal["add_section", "add_under", "replace", "skip_exists"], target_block_id: str | None, target_block_title: str | None, confidence: float, refined_text: str, reasoning: str, write_status: Literal["pending", "completed", "failed"])
 
 - **BackgroundTask**: Represents a long-running background task (task_type: Literal["llm_classification", "page_indexing", "rag_search", "llm_rewording", "llm_decisions"], status: Literal["running", "completed", "failed"], progress_percentage: float | None)
 

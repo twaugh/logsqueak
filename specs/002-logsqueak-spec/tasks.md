@@ -241,8 +241,10 @@ All P1 user stories (US1, US3) are independently functional. This is the MVP fou
 
 - [ ] T096 [P] Add LLM classification worker to Phase 1 in src/logsqueak/tui/screens/block_selection.py (connect to LLMClient.classify_blocks)
 - [ ] T097 [P] Add LLM rewording worker to Phase 2 in src/logsqueak/tui/screens/content_editing.py (connect to LLMClient.reword_content)
-- [ ] T098 [P] Add LLM integration decisions worker to Phase 3 in src/logsqueak/tui/screens/integration_review.py (connect to LLMClient.plan_integrations)
+- [ ] T098 [P] Add LLM integration decisions worker to Phase 3 in src/logsqueak/tui/screens/integration_review.py (connect to LLMClient.plan_integrations, handle action="skip_exists" for duplicate detection)
 - [ ] T099 [P] Add decisions_ready tracking to block navigation in Phase 3 until LLM generates decisions for next block in src/logsqueak/tui/screens/integration_review.py
+- [ ] T099a [P] Update DecisionList widget to filter out decisions with action="skip_exists" by default in src/logsqueak/tui/widgets/decision_list.py (per FR-053a)
+- [ ] T099b [P] Update Phase3Screen status display to show summary count of new vs already-recorded decisions (e.g., "2 new integrations, 3 already recorded") in src/logsqueak/tui/screens/integration_review.py (per FR-053b)
 
 ### Application Integration
 

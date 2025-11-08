@@ -236,14 +236,14 @@ class IntegrationDecision(BaseModel):
         description="Target page name (hierarchical pages use '/' separator)"
     )
 
-    action: Literal["add_section", "add_under", "replace"] = Field(
+    action: Literal["add_section", "add_under", "replace", "skip_exists"] = Field(
         ...,
         description="Type of integration action"
     )
 
     target_block_id: Optional[str] = Field(
         default=None,
-        description="Target block ID for 'add_under' or 'replace' actions"
+        description="Target block ID for 'add_under', 'replace', or 'skip_exists' actions"
     )
 
     target_block_title: Optional[str] = Field(
@@ -291,16 +291,17 @@ class IntegrationDecision(BaseModel):
   - `add_section`: Create new top-level section
   - `add_under`: Add as child under specific block
   - `replace`: Replace existing block content (all content lines) while preserving properties and children
+  - `skip_exists`: Skip integration because similar/identical knowledge already exists in target page
 
-- `target_block_id`: Identifies target block for `add_under` or `replace` (None for `add_section`)
-- `target_block_title`: Human-readable description (e.g., "Under 'Project Timeline'")
+- `target_block_id`: Identifies target block for `add_under`, `replace`, or `skip_exists` (None for `add_section`). For `skip_exists`, points to the existing block containing duplicate content.
+- `target_block_title`: Human-readable description (e.g., "Under 'Project Timeline'" or "Already exists at 'Async Patterns'")
 - `confidence`: LLM's confidence (shown as percentage in UI)
 - `refined_text`: The actual content to write (comes from EditedContent.current_content)
-- `reasoning`: LLM's explanation for why this integration makes sense
+- `reasoning`: LLM's explanation for why this integration makes sense (or why it's a duplicate for `skip_exists`)
 - `write_status`: Tracks whether decision has been accepted and written
 - `error_message`: Details if write failed (e.g., "Target block not found")
 
-**Example JSON**:
+**Example JSON (New Integration)**:
 
 ```json
 {
@@ -312,6 +313,24 @@ class IntegrationDecision(BaseModel):
   "confidence": 0.87,
   "refined_text": "Using `asyncio.create_task()` enables concurrent operations in Python, unlike `await` which executes sequentially.",
   "reasoning": "This insight fits well under the 'Async Patterns' section as it directly explains task concurrency.",
+  "write_status": "pending",
+  "error_message": null
+}
+
+```
+
+**Example JSON (Duplicate Detected)**:
+
+```json
+{
+  "knowledge_block_id": "abc123def456",
+  "target_page": "Programming Notes/Python",
+  "action": "skip_exists",
+  "target_block_id": "block-xyz789",
+  "target_block_title": "Already exists at 'Async Patterns'",
+  "confidence": 0.95,
+  "refined_text": "Using `asyncio.create_task()` enables concurrent operations in Python, unlike `await` which executes sequentially.",
+  "reasoning": "This knowledge already exists in the target page under the 'Async Patterns' section with nearly identical wording.",
   "write_status": "pending",
   "error_message": null
 }
