@@ -54,6 +54,7 @@ class Phase2Screen(Screen):
         height: 1fr;
         min-height: 3;
         border: solid $accent;
+        border-title-align: center;
         overflow: hidden auto;
     }
 
@@ -61,6 +62,7 @@ class Phase2Screen(Screen):
         height: 1fr;
         min-height: 3;
         border: solid $accent;
+        border-title-align: center;
         overflow: hidden auto;
     }
 
@@ -68,6 +70,7 @@ class Phase2Screen(Screen):
         height: 1fr;
         min-height: 4;
         border: solid $accent;
+        border-title-align: center;
         layout: vertical;
     }
 
@@ -77,12 +80,6 @@ class Phase2Screen(Screen):
 
     #llm-reworded {
         height: auto;
-    }
-
-    .panel-header {
-        height: 1;
-        background: $boost;
-        padding: 0 1;
     }
 
     ContentEditor {
@@ -143,17 +140,14 @@ class Phase2Screen(Screen):
             with Vertical(id="content-panels"):
                 # Top panel: Original context
                 with Container(id="original-panel"):
-                    yield Label("Original Context", classes="panel-header")
                     yield Static("", id="original-context")
 
                 # Middle panel: LLM reworded version
                 with Container(id="llm-panel"):
-                    yield Label("LLM Reworded", classes="panel-header")
                     yield Static("", id="llm-reworded")
 
                 # Bottom panel: Editable current content
                 with Container(id="editor-panel"):
-                    yield Label("Current Content (Editable)", classes="panel-header")
                     yield ContentEditor()
 
             # Status panel for background tasks
@@ -165,6 +159,11 @@ class Phase2Screen(Screen):
 
     def on_mount(self) -> None:
         """Handle screen mount event."""
+        # Set border titles for panels
+        self.query_one("#original-panel").border_title = "Original Context"
+        self.query_one("#llm-panel").border_title = "LLM Reworded"
+        self.query_one("#editor-panel").border_title = "Current Content (Editable)"
+
         # Update initial display
         self._update_display()
 
