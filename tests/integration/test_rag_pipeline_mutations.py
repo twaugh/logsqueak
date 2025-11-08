@@ -96,12 +96,13 @@ async def test_incremental_index_update_affects_search(test_graph, tmp_path, sha
         EditedContent(
             block_id="block-1",
             original_content="Quantum computing concepts",
+            hierarchical_context="- Quantum computing concepts",
             current_content="Quantum computing concepts"
         )
     ]
 
     original_contexts = {
-        "block-1": "Quantum computing concepts"
+        "block-1": "- Quantum computing concepts"
     }
 
     initial_results = await search.find_candidates(

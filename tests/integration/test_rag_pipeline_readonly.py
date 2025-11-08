@@ -109,12 +109,13 @@ async def test_end_to_end_rag_pipeline(rag_pipeline):
         EditedContent(
             block_id="block-1",
             original_content="Learned about Python decorators today",
+            hierarchical_context="- Daily Notes - 2025-01-15\n  - Learned about Python decorators today",
             current_content="Python decorators modify function behavior"
         )
     ]
 
     original_contexts = {
-        "block-1": "Daily Notes - 2025-01-15\n  Learned about Python decorators today"
+        "block-1": "- Daily Notes - 2025-01-15\n  - Learned about Python decorators today"
     }
 
     # Search for candidates
@@ -141,12 +142,13 @@ async def test_explicit_links_boost_rankings(rag_pipeline):
         EditedContent(
             block_id="block-1",
             original_content="Backend APIs can be built with Python Flask, see [[Web Development]]",
+            hierarchical_context="- Backend APIs can be built with Python Flask, see [[Web Development]]",
             current_content="Backend APIs can be built with Python Flask"
         )
     ]
 
     original_contexts = {
-        "block-1": "Backend APIs can be built with Python Flask, see [[Web Development]]"
+        "block-1": "- Backend APIs can be built with Python Flask, see [[Web Development]]"
     }
 
     results = await search.find_candidates(
@@ -173,12 +175,13 @@ async def test_semantic_search_finds_related_pages(rag_pipeline):
         EditedContent(
             block_id="block-1",
             original_content="Data preprocessing is crucial before training ML models",
+            hierarchical_context="- Data preprocessing is crucial before training ML models",
             current_content="Data preprocessing is crucial before training ML models"
         )
     ]
 
     original_contexts = {
-        "block-1": "Data preprocessing is crucial before training ML models"
+        "block-1": "- Data preprocessing is crucial before training ML models"
     }
 
     results = await search.find_candidates(
@@ -203,12 +206,13 @@ async def test_hierarchical_pages_in_search_results(rag_pipeline):
         EditedContent(
             block_id="block-1",
             original_content="Building REST API with Flask framework",
+            hierarchical_context="- Building REST API with Flask framework",
             current_content="Building REST API with Flask framework"
         )
     ]
 
     original_contexts = {
-        "block-1": "Building REST API with Flask framework"
+        "block-1": "- Building REST API with Flask framework"
     }
 
     results = await search.find_candidates(
@@ -233,24 +237,27 @@ async def test_multiple_knowledge_blocks_parallel_search(rag_pipeline):
         EditedContent(
             block_id="block-1",
             original_content="Python is great for machine learning",
+            hierarchical_context="- Python is great for machine learning",
             current_content="Python is great for machine learning"
         ),
         EditedContent(
             block_id="block-2",
             original_content="Flask is a lightweight web framework",
+            hierarchical_context="- Flask is a lightweight web framework",
             current_content="Flask is a lightweight web framework"
         ),
         EditedContent(
             block_id="block-3",
             original_content="Docker containers simplify deployment",
+            hierarchical_context="- Docker containers simplify deployment",
             current_content="Docker containers simplify deployment"
         )
     ]
 
     original_contexts = {
-        "block-1": "Python is great for machine learning",
-        "block-2": "Flask is a lightweight web framework",
-        "block-3": "Docker containers simplify deployment"
+        "block-1": "- Python is great for machine learning",
+        "block-2": "- Flask is a lightweight web framework",
+        "block-3": "- Docker containers simplify deployment"
     }
 
     results = await search.find_candidates(
@@ -281,6 +288,7 @@ async def test_context_provides_better_results_than_content_alone(rag_pipeline):
         EditedContent(
             block_id="block-1",
             original_content="Flask framework",
+            hierarchical_context="- Flask framework",
             current_content="Flask framework"
         )
     ]
@@ -289,6 +297,7 @@ async def test_context_provides_better_results_than_content_alone(rag_pipeline):
         EditedContent(
             block_id="block-2",
             original_content="Flask framework",
+            hierarchical_context="- Projects - Backend Development\n  - Technology Stack\n    - Flask framework for REST API",
             current_content="Flask framework"
         )
     ]
@@ -296,7 +305,7 @@ async def test_context_provides_better_results_than_content_alone(rag_pipeline):
     # Without context
     results_no_context = await search.find_candidates(
         edited_content_without_context,
-        {"block-1": "Flask framework"},
+        {"block-1": "- Flask framework"},
         top_k=5
     )
 
@@ -304,7 +313,7 @@ async def test_context_provides_better_results_than_content_alone(rag_pipeline):
     results_with_context = await search.find_candidates(
         edited_content_with_context,
         {
-            "block-2": "Projects - Backend Development\n  Technology Stack\n    Flask framework for REST API"
+            "block-2": "- Projects - Backend Development\n  - Technology Stack\n    - Flask framework for REST API"
         },
         top_k=5
     )
