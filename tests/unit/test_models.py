@@ -80,6 +80,7 @@ class TestEditedContent:
         content = EditedContent(
             block_id="abc123",
             original_content="Today I learned about asyncio.",
+            hierarchical_context="- Python learning notes\n  - Concurrency patterns\n    - Today I learned about asyncio.",
             current_content="Today I learned about asyncio."
         )
 
@@ -93,6 +94,7 @@ class TestEditedContent:
         content = EditedContent(
             block_id="abc123",
             original_content="Today I learned about asyncio.",
+            hierarchical_context="- Python learning notes\n  - Concurrency patterns\n    - Today I learned about asyncio.",
             reworded_content="asyncio enables concurrent programming in Python.",
             current_content="asyncio enables concurrent programming in Python.",
             rewording_complete=True
@@ -107,6 +109,7 @@ class TestEditedContent:
         content = EditedContent(
             block_id="abc123",
             original_content="Original text",
+            hierarchical_context="- Journal entry\n  - Notes section\n    - Original text",
             current_content="Original text"
         )
 
