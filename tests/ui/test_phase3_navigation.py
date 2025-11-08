@@ -50,11 +50,13 @@ def sample_edited_content():
         EditedContent(
             block_id="journal-block-1",
             original_content="First knowledge block about Python",
+            hierarchical_context="- Journal entry\n  - Coding notes\n    - First knowledge block about Python",
             current_content="Python async programming patterns"
         ),
         EditedContent(
             block_id="journal-block-2",
             original_content="Second knowledge block about Textual",
+            hierarchical_context="- Journal entry\n  - TUI notes\n    - Second knowledge block about Textual",
             current_content="Textual TUI framework architecture"
         ),
     ]

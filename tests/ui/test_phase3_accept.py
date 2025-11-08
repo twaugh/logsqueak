@@ -45,6 +45,7 @@ def sample_edited_content():
         EditedContent(
             block_id="journal-block-1",
             original_content="Knowledge block about Python async",
+            hierarchical_context="- Daily journal\n  - Programming notes\n    - Knowledge block about Python async",
             current_content="Python async programming patterns"
         ),
     ]

@@ -53,6 +53,7 @@ def sample_edited_content():
         EditedContent(
             block_id="journal-block-1",
             original_content="Discovered async/await pattern for handling concurrent file I/O",
+            hierarchical_context="- Work notes\n  - Python patterns\n    - Discovered async/await pattern for handling concurrent file I/O",
             current_content="Async/await pattern for concurrent file I/O operations"
         ),
     ]
