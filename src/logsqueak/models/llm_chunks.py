@@ -80,14 +80,14 @@ class IntegrationDecisionChunk(BaseModel):
         description="Target page name (hierarchical pages use '/' separator)"
     )
 
-    action: Literal["add_section", "add_under", "replace"] = Field(
+    action: Literal["add_section", "add_under", "replace", "skip_exists"] = Field(
         ...,
         description="Type of integration action"
     )
 
     target_block_id: Optional[str] = Field(
         default=None,
-        description="Target block ID for 'add_under' or 'replace' actions"
+        description="Target block ID for 'add_under', 'replace', or 'skip_exists' actions"
     )
 
     target_block_title: Optional[str] = Field(

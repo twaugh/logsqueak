@@ -237,7 +237,7 @@ def validate_decision(
     Raises:
         ValueError: If target block doesn't exist or structure invalid
     """
-    if decision.action in ["add_under", "replace"]:
+    if decision.action in ["add_under", "replace", "skip_exists"]:
         if decision.target_block_id is None:
             raise ValueError(
                 f"Action {decision.action} requires target_block_id, but it is None"
@@ -297,6 +297,11 @@ def apply_integration(
             knowledge_block_id=decision.knowledge_block_id,
             target_page=decision.target_page
         )
+
+    elif decision.action == "skip_exists":
+        # Block already exists - return existing block ID for provenance
+        # (no write needed, just link to existing block in journal)
+        return decision.target_block_id
 
     else:
         raise ValueError(f"Unknown action: {decision.action}")
@@ -365,6 +370,16 @@ async def write_integration_atomic(
             message="Skipping page write (idempotent retry)"
         )
         new_block_id = expected_block_id
+        # Skip to journal update (Step 5)
+    elif decision.action == "skip_exists":
+        # Block already exists - no write needed, just add provenance
+        new_block_id = decision.target_block_id
+        logger.info(
+            "skip_exists_decision",
+            page=decision.target_page,
+            block_id=new_block_id,
+            message="Block already exists, skipping write (adding provenance only)"
+        )
         # Skip to journal update (Step 5)
     else:
         # Step 3: Apply integration to page outline

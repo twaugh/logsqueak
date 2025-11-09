@@ -374,6 +374,40 @@ class TestValidateDecision:
         # Should not raise
         validate_decision(decision, outline)
 
+    def test_validates_skip_exists_requires_target_block_id(self):
+        """Test that skip_exists action requires target_block_id."""
+        decision = IntegrationDecision(
+            knowledge_block_id="block-1",
+            target_page="Python/Concurrency",
+            action="skip_exists",
+            target_block_id=None,  # Missing
+            confidence=0.8,
+            refined_text="Content",
+            reasoning="Block already exists"
+        )
+
+        outline = LogseqOutline.parse("- Existing block")
+
+        with pytest.raises(ValueError, match="requires target_block_id"):
+            validate_decision(decision, outline)
+
+    def test_validates_skip_exists_target_block_exists(self):
+        """Test that skip_exists validates target block exists."""
+        decision = IntegrationDecision(
+            knowledge_block_id="block-1",
+            target_page="Python/Concurrency",
+            action="skip_exists",
+            target_block_id="existing-1",
+            confidence=0.8,
+            refined_text="Content",
+            reasoning="Block already exists"
+        )
+
+        outline = LogseqOutline.parse("- Existing block\n  id:: existing-1")
+
+        # Should not raise
+        validate_decision(decision, outline)
+
 
 class TestApplyIntegration:
     """Tests for apply_integration function."""
@@ -438,6 +472,30 @@ class TestApplyIntegration:
         first_line = outline.blocks[0].content[0]
         assert "Replacement content" in first_line
         assert block_id is not None
+
+    def test_applies_skip_exists_action(self):
+        """Test that skip_exists action returns existing block ID without modifying page."""
+        decision = IntegrationDecision(
+            knowledge_block_id="block-1",
+            target_page="Python/Concurrency",
+            action="skip_exists",
+            target_block_id="existing-1",
+            confidence=0.8,
+            refined_text="Duplicate content",
+            reasoning="Block already exists with same content"
+        )
+
+        outline = LogseqOutline.parse("- Existing content\n  id:: existing-1")
+        original_content = outline.blocks[0].content[0]
+
+        block_id = apply_integration(decision, outline)
+
+        # Should return existing block ID
+        assert block_id == "existing-1"
+        # Content should NOT be modified
+        assert outline.blocks[0].content[0] == original_content
+        # Should still have only one block
+        assert len(outline.blocks) == 1
 
     def test_raises_error_for_unknown_action(self):
         """Test that unknown action raises error."""

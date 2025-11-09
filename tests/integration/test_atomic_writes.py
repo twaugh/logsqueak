@@ -465,3 +465,56 @@ async def test_property_order_preservation(
     assert "id::" in lines[2]
     assert "author::" in lines[3]
     assert "created::" in lines[4]
+
+
+@pytest.mark.asyncio
+async def test_atomic_write_skip_exists(
+    graph_paths,
+    file_monitor,
+    sample_journal,
+    sample_page
+):
+    """Test skip_exists action adds provenance without modifying page."""
+    # Create page with existing block
+    page_path = graph_paths.get_page_path("Python/Concurrency")
+    page_path.parent.mkdir(parents=True, exist_ok=True)
+    page_content = """- Existing block content
+  id:: existing-block-id
+  tags:: #python
+"""
+    page_path.write_text(page_content)
+
+    decision = IntegrationDecision(
+        knowledge_block_id="knowledge-block-1",
+        target_page="Python/Concurrency",
+        action="skip_exists",
+        target_block_id="existing-block-id",
+        confidence=0.95,
+        refined_text="Duplicate content",
+        reasoning="Block already exists with same content"
+    )
+
+    file_monitor.record(sample_page)
+    file_monitor.record(sample_journal)
+
+    await write_integration_atomic(
+        decision=decision,
+        journal_date="2025-11-06",
+        graph_paths=graph_paths,
+        file_monitor=file_monitor
+    )
+
+    # Verify page was NOT modified
+    page_after = page_path.read_text()
+    assert page_after == page_content
+
+    # Verify journal was updated with provenance
+    journal_path = graph_paths.get_journal_path("2025-11-06")
+    journal = LogseqOutline.parse(journal_path.read_text())
+    knowledge_block = journal.find_block_by_id("knowledge-block-1")
+
+    assert knowledge_block is not None
+    processed = knowledge_block.get_property("processed")
+    assert processed is not None
+    assert "Python/Concurrency" in processed
+    assert "existing-block-id" in processed
