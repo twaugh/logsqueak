@@ -56,11 +56,10 @@ class TestLLMStreamingIntegration:
     @pytest.mark.asyncio
     async def test_classification_streaming_workflow(self, llm_client):
         """Test complete classification streaming workflow."""
-        # Simulate realistic NDJSON response
+        # Simulate realistic NDJSON response (LLM only returns knowledge blocks)
         mock_lines = [
-            '{"type": "classification", "block_id": "block-1", "is_knowledge": true, "confidence": 0.92, "reason": "Contains reusable programming insight"}',
-            '{"type": "classification", "block_id": "block-2", "is_knowledge": false, "confidence": 0.12, "reason": null}',
-            '{"type": "classification", "block_id": "block-3", "is_knowledge": true, "confidence": 0.85, "reason": "Explains important concept"}',
+            '{"type": "classification", "block_id": "block-1", "confidence": 0.92, "reason": "Contains reusable programming insight"}',
+            '{"type": "classification", "block_id": "block-3", "confidence": 0.85, "reason": "Explains important concept"}',
         ]
 
         mock_client = create_mock_streaming_client(mock_lines)
@@ -74,14 +73,14 @@ class TestLLMStreamingIntegration:
             ):
                 results.append(chunk)
 
-            # Verify all chunks received
-            assert len(results) == 3
+            # Verify all chunks received (only knowledge blocks)
+            assert len(results) == 2
 
             # Verify knowledge blocks
-            knowledge_blocks = [r for r in results if r.is_knowledge]
-            assert len(knowledge_blocks) == 2
-            assert knowledge_blocks[0].block_id == "block-1"
-            assert knowledge_blocks[0].confidence == 0.92
+            assert results[0].block_id == "block-1"
+            assert results[0].confidence == 0.92
+            assert results[1].block_id == "block-3"
+            assert results[1].confidence == 0.85
 
     @pytest.mark.asyncio
     async def test_rewording_streaming_workflow(self, llm_client):
@@ -135,12 +134,12 @@ class TestLLMStreamingIntegration:
     async def test_malformed_json_recovery(self, llm_client):
         """Test streaming recovers from malformed JSON lines."""
         mock_lines = [
-            '{"type": "classification", "block_id": "block-1", "is_knowledge": true, "confidence": 0.92}',
+            '{"type": "classification", "block_id": "block-1", "confidence": 0.92}',
             '{malformed json here}',
             'not json at all',
-            '{"type": "classification", "block_id": "block-2", "is_knowledge": false, "confidence": 0.15}',
+            '{"type": "classification", "block_id": "block-2", "confidence": 0.15}',
             '',  # Empty line
-            '{"type": "classification", "block_id": "block-3", "is_knowledge": true, "confidence": 0.88}',
+            '{"type": "classification", "block_id": "block-3", "confidence": 0.88}',
         ]
 
         mock_client = create_mock_streaming_client(mock_lines)
@@ -166,7 +165,7 @@ class TestLLMStreamingIntegration:
         import httpx
 
         mock_lines = [
-            '{"type": "classification", "block_id": "block-1", "is_knowledge": true, "confidence": 0.92}',
+            '{"type": "classification", "block_id": "block-1", "confidence": 0.92}',
         ]
 
         attempts = [0]

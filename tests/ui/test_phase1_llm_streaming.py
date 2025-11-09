@@ -53,29 +53,20 @@ def sample_blocks():
 
 @pytest.fixture
 def mock_llm_classification_stream():
-    """Mock LLM classification streaming results."""
+    """Mock LLM classification streaming results (only returns knowledge blocks)."""
     async def stream():
         # Simulate streaming results arriving incrementally
+        # LLM only returns knowledge blocks (omits activity blocks like "block-2")
         await asyncio.sleep(0.1)
         yield {
             "block_id": "block-1",
-            "is_knowledge": True,
             "confidence": 0.92,
             "reason": "Explains asyncio patterns"
         }
 
         await asyncio.sleep(0.1)
         yield {
-            "block_id": "block-2",
-            "is_knowledge": False,
-            "confidence": 0.15,
-            "reason": "Just a task"
-        }
-
-        await asyncio.sleep(0.1)
-        yield {
             "block_id": "block-3",
-            "is_knowledge": True,
             "confidence": 0.88,
             "reason": "Explains Python type system"
         }

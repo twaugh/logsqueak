@@ -383,25 +383,25 @@ class Phase1Screen(Screen):
         status_panel = self.query_one(StatusPanel)
         status_panel.update_status()
 
-        # Stream results
+        # Stream results (LLM only returns knowledge blocks, omits activity blocks)
         count = 0
         async for result in self.llm_stream_fn():
             block_id = result["block_id"]
             if block_id in self.block_states:
                 state = self.block_states[block_id]
 
-                if result["is_knowledge"]:
-                    state.llm_classification = "knowledge"
-                    state.llm_confidence = result["confidence"]
-                    state.reason = result["reason"]
+                # All results are knowledge blocks (LLM filters out activity blocks)
+                state.llm_classification = "knowledge"
+                state.llm_confidence = result["confidence"]
+                state.reason = result["reason"]
 
-                    # Update visual (shows robot emoji but block not selected yet)
-                    tree = self.query_one(BlockTree)
-                    tree.update_block_label(block_id)
+                # Update visual (shows robot emoji but block not selected yet)
+                tree = self.query_one(BlockTree)
+                tree.update_block_label(block_id)
 
-                    # Update bottom panel if this is the currently selected block
-                    if block_id == self.current_block_id:
-                        self._update_current_block()
+                # Update bottom panel if this is the currently selected block
+                if block_id == self.current_block_id:
+                    self._update_current_block()
 
             count += 1
 

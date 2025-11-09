@@ -21,11 +21,6 @@ class KnowledgeClassificationChunk(BaseModel):
         description="Block identifier being classified"
     )
 
-    is_knowledge: bool = Field(
-        ...,
-        description="Whether block contains lasting knowledge"
-    )
-
     confidence: float = Field(
         ...,
         ge=0.0,

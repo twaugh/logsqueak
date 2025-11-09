@@ -70,7 +70,7 @@ class LLMClient:
             ...     system_prompt="You are a knowledge classifier",
             ...     chunk_model=KnowledgeClassificationChunk
             ... ):
-            ...     print(f"Block {chunk.block_id}: {chunk.is_knowledge}")
+            ...     print(f"Block {chunk.block_id}: confidence {chunk.confidence}")
         """
         request_id = str(asyncio.current_task().get_name() if asyncio.current_task() else "unknown")
 

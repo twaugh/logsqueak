@@ -245,14 +245,12 @@ class TestLLMChunks:
         """Test parsing knowledge classification chunk."""
         chunk = KnowledgeClassificationChunk(
             block_id="abc123",
-            is_knowledge=True,
             confidence=0.92,
             reason="Contains reusable insight."
         )
 
         assert chunk.type == "classification"
         assert chunk.block_id == "abc123"
-        assert chunk.is_knowledge is True
         assert chunk.confidence == 0.92
 
     def test_content_rewording_chunk(self):

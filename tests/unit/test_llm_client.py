@@ -36,10 +36,10 @@ class TestLLMClient:
     @pytest.mark.asyncio
     async def test_stream_ndjson_success(self, llm_client):
         """Test successful NDJSON streaming."""
-        # Mock response data
+        # Mock response data (LLM only returns knowledge blocks)
         mock_lines = [
-            '{"type": "classification", "block_id": "abc123", "is_knowledge": true, "confidence": 0.92, "reason": "Test"}',
-            '{"type": "classification", "block_id": "def456", "is_knowledge": false, "confidence": 0.15}',
+            '{"type": "classification", "block_id": "abc123", "confidence": 0.92, "reason": "Test"}',
+            '{"type": "classification", "block_id": "def456", "confidence": 0.15}',
         ]
 
         # Mock httpx response
@@ -71,17 +71,15 @@ class TestLLMClient:
 
             assert len(chunks) == 2
             assert chunks[0].block_id == "abc123"
-            assert chunks[0].is_knowledge is True
             assert chunks[1].block_id == "def456"
-            assert chunks[1].is_knowledge is False
 
     @pytest.mark.asyncio
     async def test_stream_ndjson_skips_malformed_json(self, llm_client):
         """Test streaming skips malformed JSON lines."""
         mock_lines = [
-            '{"type": "classification", "block_id": "abc123", "is_knowledge": true, "confidence": 0.92}',
+            '{"type": "classification", "block_id": "abc123", "confidence": 0.92}',
             '{invalid json}',  # Malformed
-            '{"type": "classification", "block_id": "def456", "is_knowledge": false, "confidence": 0.15}',
+            '{"type": "classification", "block_id": "def456", "confidence": 0.15}',
         ]
 
         # Mock httpx response
@@ -120,10 +118,10 @@ class TestLLMClient:
     async def test_stream_ndjson_skips_empty_lines(self, llm_client):
         """Test streaming skips empty lines."""
         mock_lines = [
-            '{"type": "classification", "block_id": "abc123", "is_knowledge": true, "confidence": 0.92}',
+            '{"type": "classification", "block_id": "abc123", "confidence": 0.92}',
             '',  # Empty line
             '   ',  # Whitespace only
-            '{"type": "classification", "block_id": "def456", "is_knowledge": false, "confidence": 0.15}',
+            '{"type": "classification", "block_id": "def456", "confidence": 0.15}',
         ]
 
         # Mock httpx response
@@ -161,7 +159,7 @@ class TestLLMClient:
         """Test automatic retry on timeout errors."""
         # First attempt: timeout, second attempt: success
         mock_lines = [
-            '{"type": "classification", "block_id": "abc123", "is_knowledge": true, "confidence": 0.92}',
+            '{"type": "classification", "block_id": "abc123", "confidence": 0.92}',
         ]
 
         attempts = [0]
