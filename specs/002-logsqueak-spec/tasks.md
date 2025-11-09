@@ -239,33 +239,255 @@ All P1 user stories (US1, US3) are independently functional. This is the MVP fou
 
 **Purpose**: Connect all phases into working CLI application and wire up background workers
 
-### Background Workers
+**Testing Strategy**:
+- **Unit tests**: Mock LLMClient.stream_ndjson() to return canned NDJSON responses
+- **Integration tests**: Test with fixture data (no live LLM calls required)
+- **Manual tests**: Test with real Ollama/OpenAI (documented in Phase 8 T131-T133)
 
-- [ ] T096 [P] Add LLM classification worker to Phase 1 in src/logsqueak/tui/screens/block_selection.py (connect to LLMClient.classify_blocks)
-- [ ] T097 [P] Add LLM rewording worker to Phase 2 in src/logsqueak/tui/screens/content_editing.py (connect to LLMClient.reword_content)
-- [ ] T097a [P] Add RAG page loading after search completes in Phase 2 using RAGSearch.load_page_contents() in src/logsqueak/tui/screens/content_editing.py
-- [ ] T098 [P] Add LLM integration decisions worker to Phase 3 in src/logsqueak/tui/screens/integration_review.py (connect to LLMClient.plan_integrations, handle action="skip_exists" for duplicate detection)
+**Mock Pattern Example**:
+```python
+# tests/unit/test_llm_helpers.py
+@pytest.fixture
+def mock_decision_stream():
+    """Return async iterator with test decisions."""
+    decisions = [
+        IntegrationDecision(knowledge_block_id="A", target_page="Page1", ...),
+        IntegrationDecision(knowledge_block_id="A", target_page="Page2", ...),
+        IntegrationDecision(knowledge_block_id="B", target_page="Page1", ...),
+    ]
+    async def _stream():
+        for d in decisions:
+            yield d
+    return _stream()
+```
+
+---
+
+### Prerequisites (Complete Before Workers)
+
+**Purpose**: Implement missing service methods needed by workers
+
+- [ ] T058a [P] Add load_page_contents() method to RAGSearch class in src/logsqueak/services/rag_search.py (loads and parses candidate pages from disk for LLM)
+- [ ] T060a Write unit tests for RAGSearch.load_page_contents() in tests/unit/test_rag_search.py and run with pytest
+- [ ] T060b Run pytest tests/unit/test_rag_search.py -v and verify load_page_contents() tests PASS
+
+**Checkpoint 6.0**: All service prerequisites complete and tested
+
+---
+
+### Background Workers (Test-Driven Development)
+
+**Step 1: Write Helper Function Tests (Should FAIL)**
+
+> **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
+
+- [ ] T095a [P] Write unit tests for batch_decisions_by_block() in tests/unit/test_llm_helpers.py - should FAIL initially
+- [ ] T095b [P] Write unit tests for filter_skip_exists_blocks() with count tracking in tests/unit/test_llm_helpers.py - should FAIL initially
+- [ ] T095c Run pytest tests/unit/test_llm_helpers.py -v and verify tests FAIL as expected
+
+**Step 2: Implement Helper Functions**
+
+**Parallel Group A: Decision Batching Helpers (No Dependencies)**
+
+These can be implemented in parallel:
+
 - [ ] T098a [P] Implement batch_decisions_by_block() helper function for consecutive grouping in src/logsqueak/services/llm_helpers.py
-- [ ] T098b [P] Implement filter_skip_exists_blocks() helper function to filter entire blocks in src/logsqueak/services/llm_helpers.py
-- [ ] T098c [P] Wire up decision batching pipeline (raw → batched → filtered) in Phase 3 worker in src/logsqueak/tui/screens/integration_review.py
-- [ ] T099 [P] Add decisions_ready tracking to block navigation in Phase 3 until LLM generates decisions for next block in src/logsqueak/tui/screens/integration_review.py
-- [ ] T099a [P] Update DecisionList widget to filter out decisions with action="skip_exists" by default (already handled by T098b) in src/logsqueak/tui/widgets/decision_list.py (per FR-053a)
-- [ ] T099b [P] Update Phase3Screen status display to show summary count of new vs already-recorded decisions (e.g., "2 new integrations, 3 already recorded") in src/logsqueak/tui/screens/integration_review.py (per FR-053b)
+- [ ] T098b [P] Implement filter_skip_exists_blocks() helper function to filter entire blocks AND track skipped count in src/logsqueak/services/llm_helpers.py
+  - Function should return tuple: (filtered_stream, skipped_count) OR use class with .skipped_count property
+  - Must count blocks that have ANY decision with action="skip_exists"
 
-### Application Integration
+**Step 3: Verify Helper Tests Pass**
+
+- [ ] T095d Run pytest tests/unit/test_llm_helpers.py -v and verify tests NOW PASS
+
+**Checkpoint 6.1**: Decision batching helpers implemented and tested
+
+---
+
+**Step 4: Write LLM Wrapper Tests (Should FAIL)**
+
+> **NOTE: Write these tests FIRST using mock LLMClient**
+
+- [ ] T096a [P] Write unit tests for classify_blocks() wrapper in tests/unit/test_llm_wrappers.py - should FAIL initially
+- [ ] T096b [P] Write unit tests for reword_content() wrapper in tests/unit/test_llm_wrappers.py - should FAIL initially
+- [ ] T096c [P] Write unit tests for plan_integrations() wrapper in tests/unit/test_llm_wrappers.py - should FAIL initially
+- [ ] T096d Run pytest tests/unit/test_llm_wrappers.py -v and verify tests FAIL as expected
+
+**Step 5: Implement LLM Wrapper Functions**
+
+**Parallel Group B: LLM Wrappers (Depends on Group A for plan_integrations)**
+
+These can be implemented in parallel after decision batching helpers complete:
+
+- [ ] T096e [P] Implement classify_blocks() wrapper function in src/logsqueak/services/llm_wrappers.py (wraps LLMClient.stream_ndjson with Phase 1 prompt)
+- [ ] T096f [P] Implement reword_content() wrapper function in src/logsqueak/services/llm_wrappers.py (wraps LLMClient.stream_ndjson with Phase 2 prompt)
+- [ ] T096g [P] Implement plan_integrations() wrapper function in src/logsqueak/services/llm_wrappers.py (wraps LLMClient.stream_ndjson with Phase 3 prompt, returns raw stream)
+- [ ] T096h Run pytest tests/unit/test_llm_wrappers.py -v and verify tests NOW PASS
+
+**Checkpoint 6.2**: LLM wrapper functions implemented and tested
+
+---
+
+**Step 6: Wire Up Workers in TUI Screens**
+
+**Parallel Group C: Phase Workers (Depends on Group B)**
+
+These can be implemented in parallel after LLM wrappers complete:
+
+- [ ] T096 [P] Add LLM classification worker to Phase 1 in src/logsqueak/tui/screens/block_selection.py
+  - Connect to classify_blocks() wrapper
+  - Update BlockState as chunks arrive
+  - Handle errors with user-friendly messages
+
+- [ ] T097 [P] Add LLM rewording worker to Phase 2 in src/logsqueak/tui/screens/content_editing.py
+  - Connect to reword_content() wrapper
+  - Update EditedContent as chunks arrive
+  - Handle errors with user-friendly messages
+
+- [ ] T097a [P] Add RAG page loading after search completes in Phase 2 using RAGSearch.load_page_contents() in src/logsqueak/tui/screens/content_editing.py
+  - Store page_contents in screen state for Phase 3
+
+- [ ] T098 [P] Add LLM integration decisions worker to Phase 3 in src/logsqueak/tui/screens/integration_review.py
+  - Connect to plan_integrations() wrapper
+  - Handle action="skip_exists" for duplicate detection
+
+- [ ] T098c [P] Wire up decision batching pipeline (raw → batched → filtered) in Phase 3 worker in src/logsqueak/tui/screens/integration_review.py
+  - Pipeline: plan_integrations() → batch_decisions_by_block() → filter_skip_exists_blocks() → UI display
+
+- [ ] T099 [P] Add decisions_ready tracking to block navigation in Phase 3 until LLM generates decisions for next block in src/logsqueak/tui/screens/integration_review.py
+  - Show "Processing knowledge blocks..." status while waiting
+
+- [ ] T099a [P] Update DecisionList widget to filter out decisions with action="skip_exists" by default in src/logsqueak/tui/widgets/decision_list.py (per FR-053a)
+  - Note: Already handled by T098b filtering, but widget should validate
+
+- [ ] T099b [P] Update Phase3Screen status display to show summary count of new vs already-recorded decisions in src/logsqueak/tui/screens/integration_review.py (per FR-053b)
+  - Example: "2 new integrations, 3 already recorded"
+  - Use skipped_count from filter_skip_exists_blocks()
+
+**Checkpoint 6.3**: All phase workers wired up and functioning
+
+---
+
+### Application Integration (Incremental Testing)
+
+**Component 1: Main App Shell**
+
+- [ ] T100a Write unit tests for App class screen management in tests/unit/test_app.py - should FAIL initially
+  - Test: App instantiates without errors
+  - Test: App can install Phase1Screen, Phase2Screen, Phase3Screen
+  - Test: App tracks current phase state
 
 - [ ] T100 Implement main TUI App class with screen management (Phase1Screen → Phase2Screen → Phase3Screen) in src/logsqueak/tui/app.py
-- [ ] T101 Implement screen transition logic (Phase 1 'n' → Phase 2, Phase 2 'n' → Phase 3) in src/logsqueak/tui/app.py
-- [ ] T102 Implement back navigation (Phase 2 'q' → Phase 1, Phase 3 'q' → Phase 2) in src/logsqueak/tui/app.py
-- [ ] T103 Implement global keyboard shortcuts (Ctrl+C quit with confirmation in Phase 3) in src/logsqueak/tui/app.py
-- [ ] T104 Implement CLI 'extract' command with date/range parsing in src/logsqueak/cli.py
-- [ ] T105 Implement journal loading with multiple date support (grouped by date in tree) in src/logsqueak/cli.py
-- [ ] T106 Implement config loading with helpful error messages (missing file, invalid permissions, validation failures) in src/logsqueak/cli.py
-- [ ] T107 Wire up all services (LLMClient, PageIndexer, RAGSearch, FileMonitor) to TUI app in src/logsqueak/cli.py
-- [ ] T108 Write integration test for full workflow (Phase 1 → Phase 2 → Phase 3) in tests/integration/test_workflow.py and run with pytest
-- [ ] T109 Write CLI integration tests (date parsing, config errors, journal loading) in tests/integration/test_cli.py and run with pytest
+  - Class inherits from textual.app.App
+  - Implements screen stack management
+  - Stores shared state (config, services, file_monitor)
 
-**Checkpoint**: Complete end-to-end workflow should be functional. User should test: `logsqueak extract`, navigate all 3 phases, complete a full extraction session.
+- [ ] T100b Run pytest tests/unit/test_app.py -v and verify tests NOW PASS
+
+**Checkpoint 6.4**: App shell instantiates and loads screens
+
+---
+
+**Component 2: Screen Transitions**
+
+- [ ] T101a Write integration tests for phase transitions in tests/integration/test_phase_transitions.py - should FAIL initially
+  - Test: Phase 1 'n' key transitions to Phase 2 with selected blocks
+  - Test: Phase 2 'n' key transitions to Phase 3 with edited content
+  - Test: State passed correctly between phases
+
+- [ ] T101 Implement screen transition logic (Phase 1 'n' → Phase 2, Phase 2 'n' → Phase 3) in src/logsqueak/tui/app.py
+  - Phase 1 → Phase 2: Pass selected blocks and EditedContent list
+  - Phase 2 → Phase 3: Pass EditedContent, candidate_pages, page_contents, original_contexts
+
+- [ ] T102 Implement back navigation (Phase 2 'q' → Phase 1, Phase 3 'q' → Phase 2) in src/logsqueak/tui/app.py
+  - Pop screen stack to previous phase
+  - Preserve state (don't lose selections)
+
+- [ ] T103 Implement global keyboard shortcuts (Ctrl+C quit with confirmation in Phase 3) in src/logsqueak/tui/app.py
+  - Phase 1-2: Quit immediately
+  - Phase 3: Show warning about partial journal state, ask confirmation
+
+- [ ] T101b Run pytest tests/integration/test_phase_transitions.py -v and verify tests NOW PASS
+
+**Checkpoint 6.5**: Navigation between phases works correctly with state preservation
+
+---
+
+**Component 3: CLI Integration**
+
+- [ ] T104a Write unit tests for date parsing in tests/unit/test_cli.py - should FAIL initially
+  - Test: parse_date_or_range("2025-01-15") returns single date
+  - Test: parse_date_or_range("2025-01-10..2025-01-15") returns date list
+  - Test: parse_date_or_range(None) returns today's date
+  - Test: Invalid formats raise helpful errors
+
+- [ ] T104 Implement CLI 'extract' command with date/range parsing in src/logsqueak/cli.py
+  - Add parse_date_or_range() helper function
+  - Validate date formats (YYYY-MM-DD)
+  - Handle ".." range syntax
+
+- [ ] T105 Implement journal loading with multiple date support (grouped by date in tree) in src/logsqueak/cli.py
+  - Add load_journal_entries() function
+  - Use GraphPaths.get_journal_path() for each date
+  - Parse with LogseqOutline.parse()
+  - Return dict[str, LogseqOutline] mapping date → outline
+
+- [ ] T106 Implement config loading with helpful error messages in src/logsqueak/cli.py
+  - Try to load config from ~/.config/logsqueak/config.yaml
+  - Show example YAML if missing (FR-072b)
+  - Check file permissions mode 600 (FR-074)
+  - Handle validation failures with clear messages (FR-072f)
+
+- [ ] T109 Write CLI integration tests in tests/integration/test_cli.py and run with pytest
+  - Test: CLI with valid date launches app
+  - Test: CLI with date range loads multiple journals
+  - Test: CLI with missing config shows helpful error
+  - Test: CLI with invalid permissions shows error
+
+- [ ] T104b Run pytest tests/unit/test_cli.py tests/integration/test_cli.py -v and verify all PASS
+
+**Checkpoint 6.6**: CLI can parse arguments, load config, and launch TUI
+
+---
+
+**Component 4: Service Wiring & End-to-End**
+
+- [ ] T107 Wire up all services (LLMClient, PageIndexer, RAGSearch, FileMonitor) to TUI app in src/logsqueak/cli.py
+  - Initialize services in CLI extract command
+  - Pass services to App via constructor
+  - App shares services with all phases
+
+- [ ] T108 Write integration test for full workflow (Phase 1 → Phase 2 → Phase 3) in tests/integration/test_workflow.py and run with pytest
+  - Use pytest-textual pilot to simulate full session
+  - Mock LLM responses with fixture data
+  - Verify: Block selection → Content editing → Integration → Writes succeed
+  - Verify: Journal gets processed:: markers
+  - Verify: Target pages get new blocks with id:: properties
+
+- [ ] T108a Run pytest tests/integration/test_workflow.py -v and verify it PASSES
+  - This is the final gate - if this passes, Phase 6 is complete
+
+**Checkpoint 6.7**: Complete end-to-end workflow functional from CLI to file writes
+
+---
+
+**Final Phase 6 Validation**
+
+User should manually test:
+1. `logsqueak extract` - Launches Phase 1 with today's journal
+2. `logsqueak extract 2025-01-15` - Loads specific date
+3. `logsqueak extract 2025-01-10..2025-01-15` - Loads date range
+4. Navigate all 3 phases with real LLM (Ollama or OpenAI)
+5. Complete a full extraction session with writes
+6. Verify journal has processed:: markers
+7. Verify target pages have new blocks with id:: properties
+
+**Success Criteria**:
+- [ ] All tasks T058a-T108a complete
+- [ ] All unit tests pass (pytest tests/unit/ -v)
+- [ ] All integration tests pass (pytest tests/integration/ -v)
+- [ ] Manual end-to-end test completes without errors
+- [ ] Files written have correct structure and provenance
 
 ---
 
@@ -311,7 +533,14 @@ All P1 user stories (US1, US3) are independently functional. This is the MVP fou
 
 ### Final Validation
 
-- [ ] T130 Run full test suite (all unit, integration, UI tests) with pytest and verify 100% pass
+- [ ] T130 Run full test suite with coverage and verify quality gates:
+  - Run: `pytest --cov=logsqueak --cov-report=html --cov-report=term -v`
+  - All tests pass (0 failures)
+  - Coverage ≥ 80% for src/logsqueak/services/
+  - Coverage ≥ 70% for src/logsqueak/tui/screens/
+  - Coverage ≥ 60% for src/logsqueak/tui/widgets/
+  - Review uncovered code and add tests for critical paths
+- [ ] T130a Generate and review HTML coverage report: `open htmlcov/index.html`
 - [ ] T131 Manual validation of quickstart.md walkthrough (Phase 1, Phase 2, Phase 3)
 - [ ] T132 Test with Ollama local model (verify num_ctx config, connection, streaming)
 - [ ] T133 Test with OpenAI API (verify API key handling, rate limits, errors)
