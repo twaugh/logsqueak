@@ -30,10 +30,9 @@ class Phase3Screen(Screen):
     """Phase 3: Integration Review screen.
 
     Displays integration decisions for each knowledge block with:
-    1. Journal context panel (top-left)
-    2. Refined content panel (top-right)
-    3. Decision list (bottom-left)
-    4. Target page preview (bottom-right)
+    1. Journal context panel (top, full width)
+    2. Decision list (bottom-left)
+    3. Target page preview (bottom-right)
     """
 
     DEFAULT_CSS = """
@@ -56,23 +55,13 @@ class Phase3Screen(Screen):
         layout: vertical;
     }
 
-    #top-row {
-        height: 1fr;
-        layout: horizontal;
-    }
-
     #journal-context-panel {
-        width: 1fr;
-        layout: vertical;
-    }
-
-    #refined-content-panel {
-        width: 1fr;
+        height: 1fr;
         layout: vertical;
     }
 
     #bottom-row {
-        height: 1fr;
+        height: 2fr;
         layout: horizontal;
     }
 
@@ -94,10 +83,6 @@ class Phase3Screen(Screen):
     }
 
     #journal-context {
-        height: 1fr;
-    }
-
-    #refined-content {
         height: 1fr;
     }
 
@@ -184,21 +169,13 @@ class Phase3Screen(Screen):
             # Header showing block progress
             yield Label("", id="block-counter")
 
-            # Four-panel layout (2x2 grid)
+            # Three-panel layout: journal context on top, decisions and preview below
             with Vertical(id="content-panels"):
-                # Top row: Journal context and refined content
-                with Container(id="top-row"):
-                    # Top-left: Journal context
-                    with Container(id="journal-context-panel"):
-                        yield Label("Journal Context", classes="panel-header")
-                        with VerticalScroll():
-                            yield Static("", id="journal-context")
-
-                    # Top-right: Refined content
-                    with Container(id="refined-content-panel"):
-                        yield Label("Refined Content", classes="panel-header")
-                        with VerticalScroll():
-                            yield Static("", id="refined-content")
+                # Top: Journal context (full width)
+                with Container(id="journal-context-panel"):
+                    yield Label("Journal Context", classes="panel-header")
+                    with VerticalScroll():
+                        yield Static("", id="journal-context")
 
                 # Bottom row: Decision list and target page preview
                 with Container(id="bottom-row"):
@@ -259,14 +236,6 @@ class Phase3Screen(Screen):
         # For simplicity, just show the block itself
         context_widget = self.query_one("#journal-context", Static)
         context_widget.update(current_block.get_full_content())
-
-        # Display refined content
-        edited = self.edited_content_map.get(block_id)
-        refined_widget = self.query_one("#refined-content", Static)
-        if edited:
-            refined_widget.update(edited.current_content)
-        else:
-            refined_widget.update("No refined content available")
 
         # Get decisions for this block
         block_decisions = self.decisions_by_block.get(block_id, [])
