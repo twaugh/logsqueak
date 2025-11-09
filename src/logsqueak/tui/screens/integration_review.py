@@ -36,6 +36,76 @@ class Phase3Screen(Screen):
     4. Target page preview (bottom-right)
     """
 
+    DEFAULT_CSS = """
+    Phase3Screen {
+        layout: vertical;
+    }
+
+    #phase3-container {
+        height: 100%;
+        layout: vertical;
+    }
+
+    #block-counter {
+        height: auto;
+        padding: 0 1;
+    }
+
+    #content-panels {
+        height: 1fr;
+        layout: vertical;
+    }
+
+    #top-row {
+        height: 1fr;
+        layout: horizontal;
+    }
+
+    #journal-context-panel {
+        width: 1fr;
+        layout: vertical;
+    }
+
+    #refined-content-panel {
+        width: 1fr;
+        layout: vertical;
+    }
+
+    #bottom-row {
+        height: 1fr;
+        layout: horizontal;
+    }
+
+    #decision-list-panel {
+        width: 1fr;
+        min-width: 30;
+        layout: vertical;
+    }
+
+    #preview-panel {
+        width: 2fr;
+        layout: vertical;
+    }
+
+    .panel-header {
+        height: auto;
+        padding: 0 1;
+        text-style: bold;
+    }
+
+    #journal-context {
+        height: 1fr;
+    }
+
+    #refined-content {
+        height: 1fr;
+    }
+
+    TargetPagePreview {
+        height: 1fr;
+    }
+    """
+
     BINDINGS = [
         ("j", "navigate_next_decision", "Next decision"),
         ("k", "navigate_previous_decision", "Previous decision"),
@@ -152,7 +222,7 @@ class Phase3Screen(Screen):
     def on_mount(self) -> None:
         """Initialize screen when mounted."""
         # Display first block
-        self._display_current_block()
+        self.call_later(self._display_current_block)
 
         # Start background workers if enabled
         if self.auto_start_workers:
@@ -167,9 +237,9 @@ class Phase3Screen(Screen):
         current_decision_index changes, regardless of how it changed.
         """
         if old_index != new_index:
-            self._update_decision_display()
+            self.call_later(self._update_decision_display)
 
-    def _display_current_block(self) -> None:
+    async def _display_current_block(self) -> None:
         """Display current knowledge block and its decisions."""
         if not self.journal_blocks:
             return
@@ -206,9 +276,9 @@ class Phase3Screen(Screen):
         decision_list.load_decisions(block_decisions, self.current_decision_index)
 
         # Display preview for current decision
-        self._update_preview()
+        await self._update_preview()
 
-    def _update_preview(self) -> None:
+    async def _update_preview(self) -> None:
         """Update target page preview with current decision."""
         block_id = self.journal_blocks[self.current_block_index].block_id
         block_decisions = self.decisions_by_block.get(block_id, [])
@@ -224,7 +294,7 @@ class Phase3Screen(Screen):
         preview_text, highlight_block_id = self._generate_preview_with_integration(decision)
 
         preview = self.query_one(TargetPagePreview)
-        self.call_later(preview.load_preview, preview_text, highlight_block_id)
+        await preview.load_preview(preview_text, highlight_block_id)
 
     def _generate_preview_with_integration(
         self, decision: IntegrationDecision
@@ -312,7 +382,8 @@ class Phase3Screen(Screen):
                 else:
                     # Try content hash
                     full_context = generate_full_context(parent_block, parents)
-                    if generate_content_hash(full_context) == target_id:
+                    content_hash = generate_content_hash(full_context)
+                    if content_hash == target_id:
                         block_matches = True
 
                 if block_matches:
@@ -395,7 +466,7 @@ Confidence: {decision.confidence:.0%}
             self.current_decision_index -= 1
             # The watch_current_decision_index watcher will handle the update
 
-    def _update_decision_display(self) -> None:
+    async def _update_decision_display(self) -> None:
         """Update decision list and preview after navigation."""
         block_id = self.journal_blocks[self.current_block_index].block_id
         block_decisions = self.decisions_by_block.get(block_id, [])
@@ -405,7 +476,7 @@ Confidence: {decision.confidence:.0%}
         decision_list.set_current_index(self.current_decision_index)
 
         # Update preview
-        self._update_preview()
+        await self._update_preview()
 
     async def action_accept_decision(self) -> None:
         """Accept current decision and trigger write operation."""
@@ -460,7 +531,7 @@ Confidence: {decision.confidence:.0%}
         if self.current_block_index < len(self.journal_blocks) - 1:
             self.current_block_index += 1
             self.current_decision_index = 0
-            self._display_current_block()
+            self.call_later(self._display_current_block)
 
     async def action_accept_all(self) -> None:
         """Accept all pending decisions for current block."""

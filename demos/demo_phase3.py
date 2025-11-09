@@ -11,6 +11,7 @@ from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.models.edited_content import EditedContent
 from logseq_outline.parser import LogseqOutline, LogseqBlock
 import logging
+import structlog
 
 # Set up file logging
 logging.basicConfig(
@@ -20,6 +21,22 @@ logging.basicConfig(
     force=True  # Force reconfiguration
 )
 logger = logging.getLogger(__name__)
+
+# Configure structlog to use standard logging
+structlog.configure(
+    processors=[
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.dev.ConsoleRenderer(),
+    ],
+    wrapper_class=structlog.stdlib.BoundLogger,
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    cache_logger_on_first_use=True,
+)
 
 
 # Sample data - knowledge blocks with their decisions
@@ -115,6 +132,7 @@ TARGET_PAGES = {
     - Variables and Types
     - Control Flow
   - List Operations
+    id:: target-1
     - Creating Lists
     - Indexing and Slicing
     - List Methods
@@ -134,6 +152,7 @@ TARGET_PAGES = {
     - Building Images
     - Image Layers
   - Best Practices
+    id:: target-2
     - Security
     - Performance Optimization
   - Networking
@@ -148,6 +167,7 @@ TARGET_PAGES = {
     - Environment Management""",
     "DevOps": """- DevOps Practices
   - Deployment Strategies
+    id:: target-3
     - Blue-Green Deployment
     - Canary Releases
   - Monitoring
@@ -156,11 +176,29 @@ TARGET_PAGES = {
 }
 
 
+class MockGraphPaths:
+    """Mock GraphPaths for demo to provide target page content."""
+
+    def get_page_path(self, page_name: str):
+        """Return a mock path that provides page content."""
+        class MockPath:
+            def __init__(self, page_name):
+                self.page_name = page_name
+
+            def exists(self):
+                return self.page_name in TARGET_PAGES
+
+            def read_text(self):
+                return TARGET_PAGES.get(self.page_name, f"- {self.page_name}")
+
+        return MockPath(page_name)
+
+
 def create_demo_data():
     """Create demo data for Phase3Screen.
 
     Returns:
-        tuple: (journal_blocks, edited_content, decisions)
+        tuple: (journal_blocks, edited_content, decisions, graph_paths)
     """
     # Create journal blocks (mock LogseqBlock objects)
     journal_blocks = []
@@ -190,7 +228,10 @@ def create_demo_data():
         # Add the decisions for this block
         all_decisions.extend(kb["decisions"])
 
-    return journal_blocks, edited_content_list, all_decisions
+    # Create mock GraphPaths
+    graph_paths = MockGraphPaths()
+
+    return journal_blocks, edited_content_list, all_decisions, graph_paths
 
 
 class Phase3Demo(App):
@@ -203,7 +244,7 @@ class Phase3Demo(App):
     async def on_mount(self) -> None:
         """Push the Phase3Screen when app mounts."""
         # Create demo data
-        journal_blocks, edited_content, decisions = create_demo_data()
+        journal_blocks, edited_content, decisions, graph_paths = create_demo_data()
 
         # Create and push Phase3Screen
         screen = Phase3Screen(
@@ -211,7 +252,7 @@ class Phase3Demo(App):
             edited_content=edited_content,
             decisions=decisions,
             journal_date="2025-01-15",
-            graph_paths=None,
+            graph_paths=graph_paths,
             file_monitor=None,
             auto_start_workers=False  # Don't start background workers in demo
         )

@@ -389,7 +389,6 @@ class TargetPagePreview(Widget):
     TargetPagePreview {
         border: solid white;
         background: $surface;
-        height: auto;
     }
 
     TargetPagePreview:focus-within {
