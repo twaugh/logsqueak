@@ -299,9 +299,26 @@ def apply_integration(
         )
 
     elif decision.action == "skip_exists":
-        # Block already exists - return existing block ID for provenance
-        # (no write needed, just link to existing block in journal)
-        return decision.target_block_id
+        # Block already exists - ensure it has id:: property for provenance linking
+        # Find the existing block
+        target_block = page_outline.find_block_by_id(decision.target_block_id)
+        if target_block is None:
+            raise ValueError(f"Target block not found: {decision.target_block_id}")
+
+        # If block already has explicit id::, use it (no modification needed)
+        if target_block.block_id is not None:
+            return target_block.block_id
+
+        # Otherwise, add deterministic id:: property to make it linkable
+        # This is non-destructive (doesn't change semantic content)
+        new_block_id = generate_integration_id(
+            knowledge_block_id=decision.knowledge_block_id,
+            target_page=decision.target_page,
+            action="skip_exists",
+            target_block_id=decision.target_block_id
+        )
+        target_block.set_property("id", new_block_id)
+        return new_block_id
 
     else:
         raise ValueError(f"Unknown action: {decision.action}")
@@ -371,36 +388,40 @@ async def write_integration_atomic(
         )
         new_block_id = expected_block_id
         # Skip to journal update (Step 5)
-    elif decision.action == "skip_exists":
-        # Block already exists - no write needed, just add provenance
-        new_block_id = decision.target_block_id
-        logger.info(
-            "skip_exists_decision",
-            page=decision.target_page,
-            block_id=new_block_id,
-            message="Block already exists, skipping write (adding provenance only)"
-        )
-        # Skip to journal update (Step 5)
     else:
         # Step 3: Apply integration to page outline
+        # For skip_exists, this might add id:: property if missing
+        original_rendered = page_outline.render()
         new_block_id = apply_integration(decision, page_outline)
+        new_rendered = page_outline.render()
 
-        # Step 4: Write page (FIRST WRITE)
-        try:
-            page_path.write_text(page_outline.render())
-            file_monitor.refresh(page_path)
+        # Step 4: Write page only if content changed (FIRST WRITE)
+        # For skip_exists with existing id::, no write needed
+        # For skip_exists without id::, write to add the id:: property
+        if original_rendered != new_rendered:
+            try:
+                page_path.write_text(new_rendered)
+                file_monitor.refresh(page_path)
+                logger.info(
+                    "page_write_success",
+                    page=decision.target_page,
+                    block_id=new_block_id,
+                    action=decision.action
+                )
+            except Exception as e:
+                logger.error(
+                    "page_write_failed",
+                    page=decision.target_page,
+                    error=str(e)
+                )
+                raise
+        else:
             logger.info(
-                "page_write_success",
+                "skip_page_write",
                 page=decision.target_page,
-                block_id=new_block_id
+                block_id=new_block_id,
+                reason="No content changes (block already has id:: property)"
             )
-        except Exception as e:
-            logger.error(
-                "page_write_failed",
-                page=decision.target_page,
-                error=str(e)
-            )
-            raise
 
     # Step 5: Check and reload journal if modified
     if file_monitor.is_modified(journal_path):

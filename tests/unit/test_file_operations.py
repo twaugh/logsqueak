@@ -473,8 +473,8 @@ class TestApplyIntegration:
         assert "Replacement content" in first_line
         assert block_id is not None
 
-    def test_applies_skip_exists_action(self):
-        """Test that skip_exists action returns existing block ID without modifying page."""
+    def test_applies_skip_exists_action_with_existing_id(self):
+        """Test that skip_exists with existing id:: returns it without modification."""
         decision = IntegrationDecision(
             knowledge_block_id="block-1",
             target_page="Python/Concurrency",
@@ -496,6 +496,34 @@ class TestApplyIntegration:
         assert outline.blocks[0].content[0] == original_content
         # Should still have only one block
         assert len(outline.blocks) == 1
+
+    def test_applies_skip_exists_action_adds_id_if_missing(self):
+        """Test that skip_exists adds id:: property if block doesn't have one."""
+        # Block without explicit id:: property (uses content hash as implicit ID)
+        outline = LogseqOutline.parse("- Existing content without id")
+
+        # Get the block's hybrid ID (content hash since no explicit id::)
+        content_hash = outline.blocks[0].get_hybrid_id()
+
+        decision = IntegrationDecision(
+            knowledge_block_id="block-1",
+            target_page="Python/Concurrency",
+            action="skip_exists",
+            target_block_id=content_hash,  # Content hash (implicit ID)
+            confidence=0.8,
+            refined_text="Duplicate content",
+            reasoning="Block already exists with same content"
+        )
+
+        block_id = apply_integration(decision, outline)
+
+        # Should generate and add deterministic UUID
+        assert block_id is not None
+        assert block_id != content_hash  # Different from content hash
+        # Block should now have id:: property
+        assert outline.blocks[0].get_property("id") == block_id
+        # Content should NOT be modified (only id:: property added)
+        assert outline.blocks[0].content[0] == "Existing content without id"
 
     def test_raises_error_for_unknown_action(self):
         """Test that unknown action raises error."""

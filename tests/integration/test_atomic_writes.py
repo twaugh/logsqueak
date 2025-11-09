@@ -468,14 +468,14 @@ async def test_property_order_preservation(
 
 
 @pytest.mark.asyncio
-async def test_atomic_write_skip_exists(
+async def test_atomic_write_skip_exists_with_id(
     graph_paths,
     file_monitor,
     sample_journal,
     sample_page
 ):
-    """Test skip_exists action adds provenance without modifying page."""
-    # Create page with existing block
+    """Test skip_exists with existing id:: adds provenance without modifying page."""
+    # Create page with existing block that has id::
     page_path = graph_paths.get_page_path("Python/Concurrency")
     page_path.parent.mkdir(parents=True, exist_ok=True)
     page_content = """- Existing block content
@@ -518,3 +518,66 @@ async def test_atomic_write_skip_exists(
     assert processed is not None
     assert "Python/Concurrency" in processed
     assert "existing-block-id" in processed
+
+
+@pytest.mark.asyncio
+async def test_atomic_write_skip_exists_adds_id_if_missing(
+    graph_paths,
+    file_monitor,
+    sample_journal,
+    sample_page
+):
+    """Test skip_exists adds id:: property if block doesn't have one."""
+    # Create page with existing block WITHOUT id:: property
+    page_path = graph_paths.get_page_path("Python/Concurrency")
+    page_path.parent.mkdir(parents=True, exist_ok=True)
+    page_content = """- Existing block content
+  tags:: #python
+"""
+    page_path.write_text(page_content)
+
+    # Get the content hash for the block (hybrid ID system)
+    page_outline = LogseqOutline.parse(page_content)
+    content_hash = page_outline.blocks[0].get_hybrid_id()
+
+    # LLM identified duplicate using content hash (implicit ID)
+    decision = IntegrationDecision(
+        knowledge_block_id="knowledge-block-1",
+        target_page="Python/Concurrency",
+        action="skip_exists",
+        target_block_id=content_hash,  # Content hash from hybrid ID system
+        confidence=0.95,
+        refined_text="Duplicate content",
+        reasoning="Block already exists with same content"
+    )
+
+    file_monitor.record(sample_page)
+    file_monitor.record(sample_journal)
+
+    await write_integration_atomic(
+        decision=decision,
+        journal_date="2025-11-06",
+        graph_paths=graph_paths,
+        file_monitor=file_monitor
+    )
+
+    # Verify page WAS modified (id:: property added)
+    page_after = page_path.read_text()
+    assert page_after != page_content
+    assert "id::" in page_after
+
+    # Parse and verify id:: was added
+    page_outline = LogseqOutline.parse(page_after)
+    assert page_outline.blocks[0].get_property("id") is not None
+    added_id = page_outline.blocks[0].get_property("id")
+
+    # Verify journal was updated with provenance using the NEW id
+    journal_path = graph_paths.get_journal_path("2025-11-06")
+    journal = LogseqOutline.parse(journal_path.read_text())
+    knowledge_block = journal.find_block_by_id("knowledge-block-1")
+
+    assert knowledge_block is not None
+    processed = knowledge_block.get_property("processed")
+    assert processed is not None
+    assert "Python/Concurrency" in processed
+    assert added_id in processed  # Should link to the newly added ID
