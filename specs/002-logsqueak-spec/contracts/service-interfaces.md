@@ -404,6 +404,130 @@ async def plan_integrations(
 
 ```
 
+### Decision Batching Strategy
+
+**Problem**: FR-032 requires "all decisions for a knowledge block must arrive before displaying", but NDJSON streaming has no explicit "end of block" marker.
+
+**Solution**: Use **consecutive grouping** with buffer flushing.
+
+**Implementation Strategy**:
+
+```python
+async def batch_decisions_by_block(
+    decision_stream: AsyncIterator[IntegrationDecision]
+) -> AsyncIterator[tuple[str, list[IntegrationDecision]]]:
+    """
+    Group integration decisions by knowledge block.
+
+    Yields complete batches when all decisions for a block have arrived.
+    Assumes LLM returns decisions consecutively per knowledge_block_id.
+
+    Args:
+        decision_stream: Raw stream of IntegrationDecision objects from LLM
+
+    Yields:
+        tuple[str, list[IntegrationDecision]]: (knowledge_block_id, decisions_list)
+
+    Batching Logic:
+        1. Buffer decisions with same knowledge_block_id
+        2. When new knowledge_block_id appears → flush previous buffer
+        3. When stream ends → flush final buffer
+        4. If buffer contains ANY skip_exists → mark block as "already recorded"
+
+    Example:
+        Stream: [A, A, A, B, B, C] → Yields: (A, [A,A,A]), (B, [B,B]), (C, [C])
+    """
+    current_block_id = None
+    current_decisions = []
+
+    async for decision in decision_stream:
+        # New block starts - flush previous batch
+        if current_block_id is not None and decision.knowledge_block_id != current_block_id:
+            yield (current_block_id, current_decisions)
+            current_decisions = []
+
+        # Accumulate decision
+        current_block_id = decision.knowledge_block_id
+        current_decisions.append(decision)
+
+    # Flush final batch when stream ends
+    if current_block_id is not None and current_decisions:
+        yield (current_block_id, current_decisions)
+
+
+async def filter_skip_exists_blocks(
+    batched_stream: AsyncIterator[tuple[str, list[IntegrationDecision]]]
+) -> AsyncIterator[tuple[str, list[IntegrationDecision]]]:
+    """
+    Filter out knowledge blocks that have skip_exists decisions.
+
+    If ANY decision in a batch has action="skip_exists", the entire block
+    is filtered out (not yielded). These are counted separately in the UI
+    status as "already recorded".
+
+    Args:
+        batched_stream: Stream of (block_id, decisions) tuples
+
+    Yields:
+        tuple[str, list[IntegrationDecision]]: Only blocks with actionable decisions
+
+    Side Effect:
+        Updates global counter for "already recorded" blocks (or returns count)
+    """
+    async for block_id, decisions in batched_stream:
+        # Check if any decision is skip_exists
+        has_skip_exists = any(d.action == "skip_exists" for d in decisions)
+
+        if has_skip_exists:
+            # Filter out entire block - it's already recorded
+            logger.info(
+                "knowledge_block_already_exists",
+                knowledge_block_id=block_id,
+                num_skip_decisions=sum(1 for d in decisions if d.action == "skip_exists")
+            )
+            continue  # Don't yield this block
+
+        # Yield only actionable decisions (non-skip_exists)
+        actionable_decisions = [d for d in decisions if d.action != "skip_exists"]
+        if actionable_decisions:
+            yield (block_id, actionable_decisions)
+
+
+# Usage in Phase 3 Screen:
+async def process_decisions(self):
+    """Process integration decisions with batching and filtering."""
+    # Get raw decision stream from LLM
+    raw_decisions = plan_integrations(
+        self.edited_content,
+        self.candidate_pages,
+        self.page_contents,
+        self.original_contexts,
+        self.llm_client
+    )
+
+    # Batch by knowledge block
+    batched = batch_decisions_by_block(raw_decisions)
+
+    # Filter out skip_exists blocks
+    filtered = filter_skip_exists_blocks(batched)
+
+    # Display each batch
+    async for block_id, decisions in filtered:
+        self.show_decisions_for_block(block_id, decisions)
+```
+
+**Contract**:
+- LLM MUST return decisions consecutively per `knowledge_block_id`
+- System MUST NOT display partial decision sets (wait for block boundary)
+- Blocks with ANY `skip_exists` decision are filtered out entirely
+
+**Edge Case Handling**:
+- If LLM returns out-of-order decisions (A, B, A again), this strategy flushes too early
+- **Mitigation**: Document in LLM prompt that decisions must be consecutive per block
+- **Alternative**: Use two-pass buffering (collect all decisions, then group) - adds latency
+
+**Recommendation**: Use consecutive grouping for MVP (lower latency, simpler). Add prompt constraint to ensure LLM outputs consecutively.
+
 ---
 
 ## PageIndexer Interface
@@ -681,6 +805,84 @@ class RAGSearch:
             )
 
         return results
+
+    async def load_page_contents(
+        self,
+        candidate_pages: dict[str, list[str]],
+        graph_paths: GraphPaths
+    ) -> dict[str, LogseqOutline]:
+        """
+        Load and parse page contents for all candidate pages.
+
+        This is the critical step between RAG search completion and LLM decision
+        generation. It loads the actual page files from disk and parses them
+        into LogseqOutline objects.
+
+        Args:
+            candidate_pages: Mapping of block_id to candidate page names (from find_candidates)
+            graph_paths: GraphPaths instance for resolving page paths
+
+        Returns:
+            dict mapping page_name to parsed LogseqOutline
+
+        Raises:
+            FileNotFoundError: If a candidate page file doesn't exist
+            ValueError: If page parsing fails
+
+        Usage:
+            # After RAG search completes:
+            candidate_pages = await rag_search.find_candidates(...)
+
+            # Load page contents:
+            page_contents = await rag_search.load_page_contents(
+                candidate_pages,
+                graph_paths
+            )
+
+            # Then call LLM decisions:
+            async for decision in plan_integrations(..., page_contents=page_contents)
+        """
+        from logseq_outline.parser import LogseqOutline
+
+        page_contents = {}
+
+        # Collect unique page names across all blocks
+        unique_pages = set()
+        for page_names in candidate_pages.values():
+            unique_pages.update(page_names)
+
+        # Load each unique page once
+        for page_name in unique_pages:
+            page_path = graph_paths.get_page_path(page_name)
+
+            if not page_path.exists():
+                logger.warning(
+                    "candidate_page_not_found",
+                    page_name=page_name,
+                    path=str(page_path)
+                )
+                continue  # Skip missing pages (RAG might have stale index)
+
+            try:
+                page_text = page_path.read_text()
+                outline = LogseqOutline.parse(page_text)
+                page_contents[page_name] = outline
+
+                logger.debug(
+                    "page_loaded",
+                    page_name=page_name,
+                    num_blocks=len(outline.blocks)
+                )
+            except Exception as e:
+                logger.error(
+                    "page_parse_failed",
+                    page_name=page_name,
+                    error=str(e)
+                )
+                # Don't fail entire operation - skip this page
+                continue
+
+        return page_contents
 
     def _rank_pages(
         self,

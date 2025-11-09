@@ -155,8 +155,8 @@ def generate_integration_id(
     Returns:
         str: Deterministic UUID string
     """
-    # Logsqueak namespace UUID
-    namespace = uuid.UUID('6ba7b810-9dad-11d1-80b4-00c04fd430c8')
+    # Logsqueak namespace UUID (from utils/ids.py)
+    namespace = uuid.UUID('32e497fc-abf0-4d71-8cff-e302eb3e2bb0')
 
     # Combine inputs to create reproducible identifier
     parts = [knowledge_block_id, target_page, action]
@@ -825,6 +825,137 @@ except PermissionError as e:
 
 - File I/O errors include full path and suggested remediation
 - All errors preserve original exception chain (use `from e`)
+
+---
+
+## File Race Condition Mitigation
+
+### Problem
+
+The FileMonitor checks modification **before** write, but there's a timing gap between check and actual write where external modification could occur:
+
+1. System: `is_modified()` → False (file unchanged)
+2. User: Edits file in Logseq (between check and write)
+3. System: Writes file → **overwrites user's changes**
+
+### Solution: Atomic File Write Pattern
+
+Use a **write-to-temp-then-rename** pattern to minimize the window of vulnerability and enable detection of concurrent modifications.
+
+```python
+import os
+import tempfile
+from pathlib import Path
+
+def atomic_write(
+    file_path: Path,
+    content: str,
+    file_monitor: FileMonitor
+) -> None:
+    """
+    Write file atomically with concurrent modification detection.
+
+    Uses temp file + rename pattern to minimize data loss risk.
+    Checks modification time before final rename.
+
+    Args:
+        file_path: Target file path
+        content: Content to write
+        file_monitor: FileMonitor for concurrent modification detection
+
+    Raises:
+        FileModifiedError: If file modified during write operation
+        OSError: On file I/O errors
+
+    Implementation:
+        1. Check if file modified (early detection)
+        2. Write content to temp file in same directory
+        3. Fsync temp file (ensure data on disk)
+        4. Check modification time again (late detection)
+        5. Rename temp to target (atomic operation on POSIX)
+        6. Update FileMonitor with new mtime
+    """
+    from .exceptions import FileModifiedError
+
+    # Step 1: Early modification check
+    if file_monitor.is_modified(file_path):
+        raise FileModifiedError(
+            f"File modified externally before write: {file_path}\n"
+            f"Reload file and retry operation."
+        )
+
+    # Step 2: Write to temp file in same directory (for atomic rename)
+    temp_fd, temp_path = tempfile.mkstemp(
+        dir=file_path.parent,
+        prefix=f".{file_path.name}.",
+        suffix=".tmp"
+    )
+
+    try:
+        # Write content
+        os.write(temp_fd, content.encode('utf-8'))
+
+        # Step 3: Fsync to ensure data on disk
+        os.fsync(temp_fd)
+        os.close(temp_fd)
+
+        # Step 4: Late modification check (narrow window)
+        if file_monitor.is_modified(file_path):
+            # File changed during our write - abort
+            os.unlink(temp_path)
+            raise FileModifiedError(
+                f"File modified externally during write: {file_path}\n"
+                f"Reload file and retry operation."
+            )
+
+        # Step 5: Atomic rename (POSIX guarantees atomicity)
+        os.rename(temp_path, file_path)
+
+        # Step 6: Update monitor with new mtime
+        file_monitor.refresh(file_path)
+
+    except Exception as e:
+        # Cleanup temp file on any error
+        try:
+            os.unlink(temp_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+# Exception class (add to src/logsqueak/services/exceptions.py):
+class FileModifiedError(Exception):
+    """Raised when file modified externally during write operation."""
+    pass
+```
+
+**Contract**:
+- Two modification checks: before temp write and before rename
+- Temp file in same directory as target (ensures same filesystem for atomic rename)
+- Fsync before rename (ensures data persisted)
+- Temp file cleanup on errors
+- FileMonitor updated only after successful rename
+
+**Race Window Reduction**:
+- **Before**: Entire time between check and write completion (~10-100ms)
+- **After**: Only between late check and rename (~1-5ms)
+- **Residual Risk**: Still possible but much less likely
+
+**Platform Notes**:
+- POSIX systems (Linux, macOS): `os.rename()` is atomic
+- Windows: May need `os.replace()` for atomicity (Python 3.3+)
+- Both work on same filesystem only (temp in same directory)
+
+**Alternative Approaches Considered**:
+
+1. **File Locking**: `fcntl.flock()` on POSIX, but Logseq doesn't use locks
+2. **Compare-and-Swap**: Check mtime before/after, but still race-prone
+3. **Exclusive Open**: `O_EXCL` flag, but prevents concurrent reads
+
+**Recommendation**: Use atomic write pattern for POC. For production, consider:
+- Advisory locks if Logseq adds lock support
+- User education: "Don't edit files while TUI is running"
+- Auto-reload with merge conflict detection (advanced)
 
 ---
 

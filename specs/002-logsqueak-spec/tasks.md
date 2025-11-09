@@ -146,8 +146,10 @@
 
 - [x] T057 [P] [US2] Implement PageIndexer class with ChromaDB integration in src/logsqueak/services/page_indexer.py
 - [x] T058 [P] [US2] Implement RAGSearch class with semantic search and explicit link boosting in src/logsqueak/services/rag_search.py
+- [ ] T058a [P] [US2] Add load_page_contents() method to RAGSearch class in src/logsqueak/services/rag_search.py (loads and parses candidate pages from disk for LLM)
 - [x] T059 Write unit tests for PageIndexer in tests/unit/test_page_indexer.py and run with pytest
 - [x] T060 Write unit tests for RAGSearch in tests/unit/test_rag_search.py and run with pytest
+- [ ] T060a Write unit tests for RAGSearch.load_page_contents() in tests/unit/test_rag_search.py and run with pytest
 - [x] T061 Write integration test for RAG pipeline (index + search) in tests/integration/test_rag_pipeline.py and run with pytest
 
 ### Implementation for User Story 2
@@ -241,9 +243,13 @@ All P1 user stories (US1, US3) are independently functional. This is the MVP fou
 
 - [ ] T096 [P] Add LLM classification worker to Phase 1 in src/logsqueak/tui/screens/block_selection.py (connect to LLMClient.classify_blocks)
 - [ ] T097 [P] Add LLM rewording worker to Phase 2 in src/logsqueak/tui/screens/content_editing.py (connect to LLMClient.reword_content)
+- [ ] T097a [P] Add RAG page loading after search completes in Phase 2 using RAGSearch.load_page_contents() in src/logsqueak/tui/screens/content_editing.py
 - [ ] T098 [P] Add LLM integration decisions worker to Phase 3 in src/logsqueak/tui/screens/integration_review.py (connect to LLMClient.plan_integrations, handle action="skip_exists" for duplicate detection)
+- [ ] T098a [P] Implement batch_decisions_by_block() helper function for consecutive grouping in src/logsqueak/services/llm_helpers.py
+- [ ] T098b [P] Implement filter_skip_exists_blocks() helper function to filter entire blocks in src/logsqueak/services/llm_helpers.py
+- [ ] T098c [P] Wire up decision batching pipeline (raw → batched → filtered) in Phase 3 worker in src/logsqueak/tui/screens/integration_review.py
 - [ ] T099 [P] Add decisions_ready tracking to block navigation in Phase 3 until LLM generates decisions for next block in src/logsqueak/tui/screens/integration_review.py
-- [ ] T099a [P] Update DecisionList widget to filter out decisions with action="skip_exists" by default in src/logsqueak/tui/widgets/decision_list.py (per FR-053a)
+- [ ] T099a [P] Update DecisionList widget to filter out decisions with action="skip_exists" by default (already handled by T098b) in src/logsqueak/tui/widgets/decision_list.py (per FR-053a)
 - [ ] T099b [P] Update Phase3Screen status display to show summary count of new vs already-recorded decisions (e.g., "2 new integrations, 3 already recorded") in src/logsqueak/tui/screens/integration_review.py (per FR-053b)
 
 ### Application Integration
@@ -274,8 +280,11 @@ All P1 user stories (US1, US3) are independently functional. This is the MVP fou
 - [ ] T114 [P] Implement malformed JSON handling in NDJSON streaming in src/logsqueak/services/llm_client.py
 - [ ] T115 [P] Implement "No knowledge blocks identified" message in Phase 1 in src/logsqueak/tui/screens/block_selection.py
 - [ ] T116 [P] Implement "No relevant pages found" message in Phase 3 in src/logsqueak/tui/screens/integration_review.py
-- [ ] T117 [P] Implement concurrent modification detection and reload in Phase 3 writes in src/logsqueak/services/file_operations.py
+- [ ] T117 [P] Implement atomic_write() function with temp-file-rename pattern (early+late modification checks, fsync, atomic rename) in src/logsqueak/services/file_operations.py
+- [ ] T117a [P] Add FileModifiedError exception class in src/logsqueak/services/exceptions.py
+- [ ] T117b [P] Replace direct Path.write_text() calls with atomic_write() in write_integration_atomic() function in src/logsqueak/services/file_operations.py
 - [ ] T118 [P] Implement external file modification handling (reload, revalidate) in src/logsqueak/services/file_monitor.py
+- [ ] T118a Write unit tests for atomic_write() with concurrent modification detection in tests/unit/test_atomic_write.py and run with pytest
 - [ ] T119 [P] Implement Ctrl+C cancellation warning in Phase 3 (partial journal state) in src/logsqueak/tui/screens/integration_review.py
 - [ ] T120 Write integration tests for all edge cases in tests/integration/test_edge_cases.py and run with pytest
 

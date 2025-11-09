@@ -100,8 +100,8 @@ The user wants to review integration suggestions for each knowledge block, see w
 **Acceptance Scenarios**:
 
 1. **Given** 5 knowledge blocks need integration and the LLM is evaluating candidate pages from RAG search, **When** the user enters Phase 3, **Then** they see a "Processing knowledge blocks..." status while the system waits for ALL decisions for the first knowledge block to arrive (the system does NOT display any decisions until all decisions for that block are ready)
-2. **Given** all decisions for a knowledge block have arrived from the LLM, **When** the system displays them, **Then** the user sees only the active/relevant decisions with decisions where `action="skip_exists"` filtered out by default (e.g., if 10 candidate pages were searched but only 2 are relevant and 3 are duplicates, only the 2 new integration decisions are shown in the list)
-3. **Given** the LLM detected that knowledge already exists in some candidate pages, **When** displaying the block status, **Then** the system shows a summary like "Block 2 of 5 (2 new integrations, 3 already recorded)" indicating both actionable decisions and skipped duplicates
+2. **Given** all decisions for a knowledge block have arrived from the LLM, **When** the system processes them, **Then** if ANY decision has `action="skip_exists"`, the system skips that entire knowledge block (showing nothing for it, as the knowledge is already recorded elsewhere); otherwise the user sees only the actionable integration decisions
+3. **Given** 5 knowledge blocks were selected in Phase 2 and the LLM found that 3 of them already exist in the knowledge base, **When** displaying progress in Phase 3, **Then** the system shows only the 2 blocks with new integrations and displays a summary like "2 knowledge blocks to integrate (3 already recorded)" in the status area
 4. **Given** a knowledge block has multiple relevant target pages, **When** displaying decisions, **Then** the system shows at most 2 decisions per (knowledge block, target page) pair (the LLM filters to the most relevant integration points)
 5. **Given** a knowledge block is displayed with its decisions, **When** user reviews it, **Then** they see:
 
@@ -221,9 +221,8 @@ The user wants to review integration suggestions for each knowledge block, see w
 - **FR-051**: System MUST support full Logseq markdown rendering in all displayed content
 - **FR-052**: System MUST show "Processing knowledge blocks..." status while waiting for all decisions for a knowledge block to arrive
 - **FR-053**: System MUST show "No relevant pages found" message if LLM returns no active decisions for a knowledge block
-- **FR-053a**: System MUST filter out decisions with `action="skip_exists"` from the interactive decision list by default
-- **FR-053b**: System MUST display a summary count of skipped decisions (e.g., "2 new integrations, 3 already recorded") in the status display
-- **FR-053c**: System MUST mark `skip_exists` decisions with a distinct visual indicator (↷) if displayed in the decision list
+- **FR-053a**: When a knowledge block has at least one decision with `action="skip_exists"`, the system MUST skip that entire knowledge block (do not show any decisions for that block, as the knowledge is already recorded elsewhere)
+- **FR-053b**: System MUST display a summary count showing how many knowledge blocks were skipped due to existing content (e.g., "2 knowledge blocks integrated, 3 already recorded")
 
 #### Completion & Error Handling
 

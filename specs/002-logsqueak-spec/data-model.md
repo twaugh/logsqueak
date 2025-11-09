@@ -291,11 +291,11 @@ class IntegrationDecision(BaseModel):
   - `add_section`: Create new top-level section
   - `add_under`: Add as child under specific block
   - `replace`: Replace existing block content (all content lines) while preserving properties and children
-  - `skip_exists`: Skip integration because similar/identical knowledge already exists in target page
+  - `skip_exists`: Knowledge already exists in target page - signals that this entire knowledge block should be skipped (no integration needed, as content is already recorded elsewhere)
 
 - `target_block_id`: Identifies target block for `add_under`, `replace`, or `skip_exists` (None for `add_section`). For `skip_exists`, points to the existing block containing duplicate content.
 - `target_block_title`: Human-readable description (e.g., "Under 'Project Timeline'" or "Already exists at 'Async Patterns'")
-- `confidence`: LLM's confidence (shown as percentage in UI)
+- `confidence`: LLM's confidence (shown as percentage in UI for actionable decisions)
 - `refined_text`: The actual content to write (comes from EditedContent.current_content)
 - `reasoning`: LLM's explanation for why this integration makes sense (or why it's a duplicate for `skip_exists`)
 - `write_status`: Tracks whether decision has been accepted and written
