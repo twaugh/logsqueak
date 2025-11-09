@@ -1,23 +1,15 @@
 #!/usr/bin/env python3
 """Demo for Phase 3: Integration Review Screen.
 
-Demonstrates the integration review workflow with:
-- Knowledge block display with context
-- Decision list showing target pages
-- Target page preview with insertion indicator
-- Navigation and approval actions
+Demonstrates the integration review workflow using the actual Phase3Screen class.
 """
 
 from textual.app import App, ComposeResult
-from textual.containers import Container, Horizontal, Vertical, VerticalScroll
-from textual.widgets import Header, Footer, Static, Label
-from textual.binding import Binding
-from textual.reactive import reactive
-from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
-from logsqueak.tui.widgets.decision_list import DecisionList
+from textual.widgets import Header
+from logsqueak.tui.screens.integration_review import Phase3Screen
 from logsqueak.models.integration_decision import IntegrationDecision
+from logsqueak.models.edited_content import EditedContent
 from logseq_outline.parser import LogseqOutline, LogseqBlock
-from logseq_outline.context import generate_full_context, generate_content_hash
 import logging
 
 # Set up file logging
@@ -164,298 +156,66 @@ TARGET_PAGES = {
 }
 
 
-class Phase3Demo(App):
-    """Demo app for Phase 3 integration review."""
+def create_demo_data():
+    """Create demo data for Phase3Screen.
 
-    CSS = """
-    #main-container {
-        height: 100%;
-    }
-
-    #content-row {
-        height: 1fr;
-    }
-
-    #left-panel {
-        width: 1fr;
-        border: solid $primary;
-        padding: 1;
-    }
-
-    #knowledge-block {
-        height: auto;
-        border: solid green;
-        padding: 1;
-        margin-bottom: 1;
-    }
-
-    #context {
-        color: $text-muted;
-        margin-bottom: 1;
-    }
-
-    #decisions-container {
-        height: 1fr;
-        border: solid yellow;
-        padding: 1;
-    }
-
-    DecisionList {
-        height: 100%;
-    }
-
-    #right-panel {
-        width: 2fr;
-    }
-
-    #preview-header {
-        height: 3;
-        background: $boost;
-        padding: 1;
-    }
-
-    TargetPagePreview {
-        height: 1fr;
-    }
-
-    #status-bar {
-        height: 3;
-        background: $panel;
-        padding: 1;
-    }
+    Returns:
+        tuple: (journal_blocks, edited_content, decisions)
     """
+    # Create journal blocks (mock LogseqBlock objects)
+    journal_blocks = []
+    edited_content_list = []
+    all_decisions = []
 
-    BINDINGS = [
-        Binding("j", "next_decision", "Next Decision", show=True),
-        Binding("k", "prev_decision", "Prev Decision", show=True),
-        Binding("down", "next_decision", "Next Decision", show=False),
-        Binding("up", "prev_decision", "Prev Decision", show=False),
-        Binding("y", "accept", "Accept (✓)", show=True),
-        Binding("n", "next_block", "Next Block", show=True),
-        Binding("a", "accept_all", "Accept All", show=True),
-        Binding("q", "quit", "Quit", show=True),
-    ]
+    for kb in KNOWLEDGE_BLOCKS:
+        # Create a mock LogseqBlock
+        block = LogseqBlock(
+            content=[kb["content"]],
+            indent_level=0,
+            block_id=kb["id"]
+        )
+        journal_blocks.append(block)
 
-    # Reactive state
-    current_block_idx = reactive(0)
-    current_decision_idx = reactive(0)
+        # Create EditedContent for this block
+        ec = EditedContent(
+            block_id=kb["id"],
+            original_content=kb["content"],
+            hierarchical_context=kb["context"],
+            reworded_content=kb["content"],  # Same as original for demo
+            current_content=kb["content"],
+            rewording_complete=True
+        )
+        edited_content_list.append(ec)
 
-    def __init__(self):
-        super().__init__()
-        self.completed_decisions = set()  # Set of (block_id, decision_idx)
+        # Add the decisions for this block
+        all_decisions.extend(kb["decisions"])
+
+    return journal_blocks, edited_content_list, all_decisions
+
+
+class Phase3Demo(App):
+    """Demo app that uses the actual Phase3Screen class."""
 
     def compose(self) -> ComposeResult:
-        """Compose the Phase 3 UI."""
+        """Compose the demo app with just a header."""
         yield Header()
 
-        with Vertical(id="main-container"):
-            with Horizontal(id="content-row"):
-                # Left panel: Knowledge block + decision list
-                with Container(id="left-panel"):
-                    yield Static(id="knowledge-block")
-                    with Container(id="decisions-container"):
-                        yield DecisionList()
-
-                # Right panel: Target page preview
-                with Vertical(id="right-panel"):
-                    yield Static(id="preview-header")
-                    yield TargetPagePreview()
-
-            yield Static(id="status-bar")
-
-        yield Footer()
-
     async def on_mount(self) -> None:
-        """Load initial content."""
-        self.call_later(self.update_display)
+        """Push the Phase3Screen when app mounts."""
+        # Create demo data
+        journal_blocks, edited_content, decisions = create_demo_data()
 
-    def watch_current_block_idx(self, old_idx: int, new_idx: int) -> None:
-        """React to changes in current_block_idx.
-
-        This is called automatically by Textual's reactive system whenever
-        current_block_idx changes, regardless of how it changed.
-        """
-        if old_idx != new_idx:
-            logger.debug(f"Block index changed from {old_idx} to {new_idx}")
-            self.call_later(self.update_display)
-
-    def watch_current_decision_idx(self, old_idx: int, new_idx: int) -> None:
-        """React to changes in current_decision_idx.
-
-        This is called automatically by Textual's reactive system whenever
-        current_decision_idx changes, regardless of how it changed.
-        """
-        if old_idx != new_idx:
-            logger.debug(f"Decision index changed from {old_idx} to {new_idx}")
-            self.call_later(self.update_display)
-
-    async def _do_update_display(self) -> None:
-        """Internal method to update all display elements for current state."""
-        block = KNOWLEDGE_BLOCKS[self.current_block_idx]
-
-        # Update knowledge block display
-        context_lines = block["context"].split("\n")
-        context_text = "\n".join(f"[dim]{line}[/dim]" for line in context_lines)
-
-        kb_widget = self.query_one("#knowledge-block", Static)
-        kb_widget.update(
-            f"[bold]Knowledge Block {block['number']} of {block['total']}[/bold]\n\n"
-            f"{context_text}\n\n"
-            f"{block['content']}"
+        # Create and push Phase3Screen
+        screen = Phase3Screen(
+            journal_blocks=journal_blocks,
+            edited_content=edited_content,
+            decisions=decisions,
+            journal_date="2025-01-15",
+            graph_paths=None,
+            file_monitor=None,
+            auto_start_workers=False  # Don't start background workers in demo
         )
-
-        # Update decisions list with DecisionList widget
-        # First, update write_status for completed decisions
-        for idx, decision in enumerate(block["decisions"]):
-            if (block["id"], idx) in self.completed_decisions:
-                decision.write_status = "completed"
-
-        decisions_list = self.query_one(DecisionList)
-        decisions_list.load_decisions(block["decisions"], self.current_decision_idx)
-
-        # Update preview header
-        if block["decisions"]:
-            decision = block["decisions"][self.current_decision_idx]
-            header = self.query_one("#preview-header", Static)
-            header.update(
-                f"[bold]Target Page: {decision.target_page}[/bold]\n"
-                f"Reasoning: {decision.reasoning}"
-            )
-
-        # Update target page preview
-        if not block["decisions"]:
-            return
-
-        preview = self.query_one(TargetPagePreview)
-        page_content = TARGET_PAGES.get(decision.target_page, "*Page not found*")
-
-        # Generate preview with integrated new block
-        preview_content = page_content
-        highlight_block_id = None
-
-        if page_content != "*Page not found*":
-            # Parse the target page
-            outline = LogseqOutline.parse(page_content)
-
-            # Create a new block for the knowledge content
-            new_block_content = decision.refined_text
-            new_block_id = f"new-kb-{block['id']}"  # Temporary ID for highlighting
-
-            # Find where to insert based on action
-            action = decision.action
-            target_title = decision.target_block_title
-
-            if action == "add_under" and target_title:
-                # Find the target block and add as child
-                def add_under_block(blocks, parents=[]):
-                    for parent_block in blocks:
-                        if parent_block.content and target_title.lower() in parent_block.content[0].lower():
-                            # Found the target - add new block as child
-                            new_child = LogseqBlock(
-                                content=[new_block_content],
-                                indent_level=parent_block.indent_level + 1,
-                                block_id=new_block_id
-                            )
-                            parent_block.children.append(new_child)
-                            return True
-                        # Recursively search children
-                        if add_under_block(parent_block.children, parents + [parent_block]):
-                            return True
-                    return False
-
-                add_under_block(outline.blocks)
-            elif action == "add_section":
-                # Add as new root-level block
-                new_root = LogseqBlock(
-                    content=[new_block_content],
-                    indent_level=0,
-                    block_id=new_block_id
-                )
-                outline.blocks.append(new_root)
-
-            # Render the modified outline
-            preview_content = outline.render()
-
-            # Re-parse to get the actual hash IDs that were generated
-            reparsed = LogseqOutline.parse(preview_content)
-
-            # Find the block with our new content
-            def find_new_block(blocks, parents=[]):
-                for blk in blocks:
-                    # Check if this block contains our new content
-                    if blk.content and new_block_content in blk.content[0]:
-                        # Generate its hash
-                        full_context = generate_full_context(blk, parents)
-                        return generate_content_hash(full_context)
-                    # Search children
-                    result = find_new_block(blk.children, parents + [blk])
-                    if result:
-                        return result
-                return None
-
-            highlight_block_id = find_new_block(reparsed.blocks)
-        else:
-            highlight_block_id = None
-
-        await preview.load_preview(preview_content, highlight_block_id=highlight_block_id)
-
-        # Update status bar
-        completed_count = sum(
-            1 for bid, _ in self.completed_decisions if bid == block["id"]
-        )
-        pending_count = len(block["decisions"]) - completed_count
-
-        status = self.query_one("#status-bar", Static)
-        status.update(
-            f"Block {block['number']} of {block['total']} | "
-            f"{len(block['decisions'])} decisions: "
-            f"✓ {completed_count} completed, ⊙ {pending_count} pending"
-        )
-
-    async def update_display(self) -> None:
-        """Update all display elements for current state."""
-        await self._do_update_display()
-
-    def action_next_decision(self) -> None:
-        """Navigate to next decision."""
-        block = KNOWLEDGE_BLOCKS[self.current_block_idx]
-        if self.current_decision_idx < len(block["decisions"]) - 1:
-            self.current_decision_idx += 1
-            # The watch_current_decision_idx watcher will handle the update
-
-    def action_prev_decision(self) -> None:
-        """Navigate to previous decision."""
-        if self.current_decision_idx > 0:
-            self.current_decision_idx -= 1
-            # The watch_current_decision_idx watcher will handle the update
-
-    def action_accept(self) -> None:
-        """Accept current decision."""
-        block = KNOWLEDGE_BLOCKS[self.current_block_idx]
-        self.completed_decisions.add((block["id"], self.current_decision_idx))
-        # Update display to show the checkmark
-        self.call_later(self.update_display)
-
-    async def action_accept_all(self) -> None:
-        """Accept all pending decisions for current block."""
-        block = KNOWLEDGE_BLOCKS[self.current_block_idx]
-        for idx in range(len(block["decisions"])):
-            self.completed_decisions.add((block["id"], idx))
-        await self.action_next_block()
-
-    async def action_next_block(self) -> None:
-        """Move to next knowledge block."""
-        if self.current_block_idx < len(KNOWLEDGE_BLOCKS) - 1:
-            self.current_block_idx += 1
-            self.current_decision_idx = 0
-            # Reactive properties will trigger update
-        else:
-            # Show completion
-            status = self.query_one("#status-bar", Static)
-            total_completed = len(self.completed_decisions)
-            status.update(
-                f"[green]✓ All blocks reviewed! {total_completed} decisions accepted.[/green]"
-            )
+        await self.push_screen(screen)
 
 
 if __name__ == "__main__":
