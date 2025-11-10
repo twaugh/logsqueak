@@ -17,7 +17,7 @@ Run: python demos/demo_phase1.py
 from textual.app import App, ComposeResult
 from logsqueak.tui.screens.block_selection import Phase1Screen
 from logsqueak.models.block_state import BlockState
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
 
 
 def create_sample_blocks() -> list[LogseqBlock]:
@@ -250,9 +250,20 @@ class Phase1DemoApp(App):
 
     def on_mount(self) -> None:
         """Push Phase1Screen on mount."""
+        # Create journal outline from blocks
+        # Note: source_text is required but not actually used in demo
+        journal_outline = LogseqOutline(
+            blocks=self.blocks,
+            source_text="# Demo journal content",
+            indent_str="  ",
+            frontmatter=[]
+        )
+
         screen = Phase1Screen(
             blocks=self.blocks,
             journal_date="2025-01-15",
+            journal_outline=journal_outline,
+            llm_client=None,  # No real LLM client in demo
             llm_stream_fn=mock_llm_stream,  # Provide mock streaming function
             auto_start_workers=True  # Enable workers to show streaming
         )

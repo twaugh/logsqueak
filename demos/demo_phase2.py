@@ -18,11 +18,13 @@ Features demonstrated:
 Run: python demos/demo_phase2.py
 """
 
+from pathlib import Path
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer
 from logsqueak.tui.screens.content_editing import Phase2Screen
 from logsqueak.models.edited_content import EditedContent
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
+from logseq_outline.graph import GraphPaths
 
 
 def create_sample_blocks() -> list[LogseqBlock]:
@@ -162,9 +164,31 @@ class Phase2DemoApp(App):
 
     def on_mount(self) -> None:
         """Push Phase2Screen on mount."""
+        # Create journal outline from blocks
+        # Note: source_text is required but not actually used in demo
+        journal_outline = LogseqOutline(
+            blocks=self.blocks,
+            source_text="# Demo journal content",
+            indent_str="  ",
+            frontmatter=[]
+        )
+
+        # Create a dummy graph_paths (demo doesn't need real paths)
+        # Create temporary directory for demo
+        demo_graph_path = Path("/tmp/demo-graph")
+        demo_graph_path.mkdir(parents=True, exist_ok=True)
+        (demo_graph_path / "pages").mkdir(exist_ok=True)
+        (demo_graph_path / "journals").mkdir(exist_ok=True)
+
+        graph_paths = GraphPaths(demo_graph_path)
+
         screen = Phase2Screen(
             blocks=self.blocks,
             edited_content=self.edited_content,
+            journal_outline=journal_outline,
+            graph_paths=graph_paths,
+            llm_client=None,  # No real LLM client in demo
+            rag_search=None,  # No real RAG search in demo
             auto_start_workers=False  # Disable workers for demo
         )
         self.push_screen(screen)
