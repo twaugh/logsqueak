@@ -456,19 +456,19 @@ These can be implemented in parallel after LLM wrappers complete:
 
 **Component 4: Service Wiring & End-to-End**
 
-- [ ] T107 Wire up all services (LLMClient, PageIndexer, RAGSearch, FileMonitor) to TUI app in src/logsqueak/cli.py
+- [x] T107 Wire up all services (LLMClient, PageIndexer, RAGSearch, FileMonitor) to TUI app in src/logsqueak/cli.py
   - Initialize services in CLI extract command
   - Pass services to App via constructor
   - App shares services with all phases
 
-- [ ] T108 Write integration test for full workflow (Phase 1 → Phase 2 → Phase 3) in tests/integration/test_workflow.py and run with pytest
+- [x] T108 Write integration test for full workflow (Phase 1 → Phase 2 → Phase 3) in tests/integration/test_workflow.py and run with pytest
   - Use pytest-textual pilot to simulate full session
   - Mock LLM responses with fixture data
   - Verify: Block selection → Content editing → Integration → Writes succeed
   - Verify: Journal gets processed:: markers
   - Verify: Target pages get new blocks with id:: properties
 
-- [ ] T108a Run pytest tests/integration/test_workflow.py -v and verify it PASSES
+- [x] T108a Run pytest tests/integration/test_workflow.py -v and verify it PASSES (3/3 passing ✅)
   - This is the final gate - if this passes, Phase 6 is complete
 
 **Checkpoint 6.7**: Complete end-to-end workflow functional from CLI to file writes

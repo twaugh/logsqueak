@@ -192,10 +192,60 @@ def extract(date_or_range: str = None):
 
     click.echo(f"Loaded {len(journals)} journal(s) successfully")
 
-    # TODO: T107 - Initialize services and launch TUI
-    # - Create LLMClient, PageIndexer, RAGSearch, FileMonitor
-    # - Initialize App with services
-    # - Launch TUI
+    # T107: Initialize services
+    from logsqueak.services.llm_client import LLMClient
+    from logsqueak.services.page_indexer import PageIndexer
+    from logsqueak.services.rag_search import RAGSearch
+    from logsqueak.services.file_monitor import FileMonitor
+    from logsqueak.tui.app import LogsqueakApp
+
+    logger.info("initializing_services")
+
+    # Create LLM client (pass the LLMConfig object)
+    llm_client = LLMClient(config=config.llm)
+    logger.info("llm_client_initialized", endpoint=str(config.llm.endpoint), model=config.llm.model)
+
+    # Create GraphPaths and ChromaDB path
+    graph_paths = GraphPaths(graph_path)
+    chroma_db_path = Path.home() / ".cache" / "logsqueak" / "chromadb"
+    chroma_db_path.mkdir(parents=True, exist_ok=True)
+
+    # Create page indexer (will build index during Phase 1 background task)
+    page_indexer = PageIndexer(graph_paths=graph_paths, db_path=chroma_db_path)
+    logger.info("page_indexer_initialized", graph_path=str(graph_path), db_path=str(chroma_db_path))
+
+    # Create RAG search service (uses same db_path as page_indexer)
+    rag_search = RAGSearch(db_path=chroma_db_path)
+    logger.info("rag_search_initialized", db_path=str(chroma_db_path))
+
+    # Create file monitor
+    file_monitor = FileMonitor()
+    logger.info("file_monitor_initialized")
+
+    # For single-journal case, use the only journal
+    # For multi-journal case, use the first one (or could show picker in future)
+    journal_date = list(journals.keys())[0]
+    journal_outline = journals[journal_date]
+
+    # Record initial journal file
+    journal_path = graph_paths.get_journal_path(journal_date.replace("-", "_"))
+    file_monitor.record(journal_path)
+    logger.info("journal_recorded_in_file_monitor", date=journal_date, path=str(journal_path))
+
+    # Initialize and launch TUI app
+    logger.info("launching_tui", journal_date=journal_date)
+    app = LogsqueakApp(
+        journal_outline=journal_outline,
+        journal_date=journal_date,
+        config=config,
+        llm_client=llm_client,
+        page_indexer=page_indexer,
+        rag_search=rag_search,
+        file_monitor=file_monitor,
+    )
+
+    # Run the TUI app
+    app.run()
 
     logger.info("extract_command_completed")
 
