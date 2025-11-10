@@ -334,33 +334,33 @@ These can be implemented in parallel after decision batching helpers complete:
 
 These can be implemented in parallel after LLM wrappers complete:
 
-- [ ] T096 [P] Add LLM classification worker to Phase 1 in src/logsqueak/tui/screens/block_selection.py
+- [x] T096 [P] Add LLM classification worker to Phase 1 in src/logsqueak/tui/screens/block_selection.py
   - Connect to classify_blocks() wrapper
   - Update BlockState as chunks arrive
   - Handle errors with user-friendly messages
 
-- [ ] T097 [P] Add LLM rewording worker to Phase 2 in src/logsqueak/tui/screens/content_editing.py
+- [x] T097 [P] Add LLM rewording worker to Phase 2 in src/logsqueak/tui/screens/content_editing.py
   - Connect to reword_content() wrapper
   - Update EditedContent as chunks arrive
   - Handle errors with user-friendly messages
 
-- [ ] T097a [P] Add RAG page loading after search completes in Phase 2 using RAGSearch.load_page_contents() in src/logsqueak/tui/screens/content_editing.py
+- [x] T097a [P] Add RAG page loading after search completes in Phase 2 using RAGSearch.load_page_contents() in src/logsqueak/tui/screens/content_editing.py
   - Store page_contents in screen state for Phase 3
 
-- [ ] T098 [P] Add LLM integration decisions worker to Phase 3 in src/logsqueak/tui/screens/integration_review.py
+- [x] T098 [P] Add LLM integration decisions worker to Phase 3 in src/logsqueak/tui/screens/integration_review.py
   - Connect to plan_integrations() wrapper
   - Handle action="skip_exists" for duplicate detection
 
-- [ ] T098c [P] Wire up decision batching pipeline (raw → batched → filtered) in Phase 3 worker in src/logsqueak/tui/screens/integration_review.py
+- [x] T098c [P] Wire up decision batching pipeline (raw → batched → filtered) in Phase 3 worker in src/logsqueak/tui/screens/integration_review.py
   - Pipeline: plan_integrations() → batch_decisions_by_block() → filter_skip_exists_blocks() → UI display
 
-- [ ] T099 [P] Add decisions_ready tracking to block navigation in Phase 3 until LLM generates decisions for next block in src/logsqueak/tui/screens/integration_review.py
+- [x] T099 [P] Add decisions_ready tracking to block navigation in Phase 3 until LLM generates decisions for next block in src/logsqueak/tui/screens/integration_review.py
   - Show "Processing knowledge blocks..." status while waiting
 
-- [ ] T099a [P] Update DecisionList widget to filter out decisions with action="skip_exists" by default in src/logsqueak/tui/widgets/decision_list.py (per FR-053a)
-  - Note: Already handled by T098b filtering, but widget should validate
+- [x] T099a [P] Update DecisionList widget to filter out decisions with action="skip_exists" by default in src/logsqueak/tui/widgets/decision_list.py (per FR-053a)
+  - Note: Already handled by T098c filtering, but widget should validate
 
-- [ ] T099b [P] Update Phase3Screen status display to show summary count of new vs already-recorded decisions in src/logsqueak/tui/screens/integration_review.py (per FR-053b)
+- [x] T099b [P] Update Phase3Screen status display to show summary count of new vs already-recorded decisions in src/logsqueak/tui/screens/integration_review.py (per FR-053b)
   - Example: "2 new integrations, 3 already recorded"
   - Use skipped_count from filter_skip_exists_blocks()
 

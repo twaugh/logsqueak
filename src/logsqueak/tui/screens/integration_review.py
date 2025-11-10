@@ -4,7 +4,7 @@ This screen allows users to review integration decisions for each knowledge bloc
 see target page previews, and accept/skip decisions for writing to pages.
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.containers import Container, Vertical, VerticalScroll
@@ -15,12 +15,15 @@ from logseq_outline.graph import GraphPaths
 from logseq_outline.context import generate_full_context, generate_content_hash
 from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.models.edited_content import EditedContent
-from logsqueak.models.background_task import BackgroundTaskState
+from logsqueak.models.background_task import BackgroundTask, BackgroundTaskState
 from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
 from logsqueak.tui.widgets.decision_list import DecisionList
 from logsqueak.tui.widgets.status_panel import StatusPanel
 from logsqueak.services.file_operations import write_integration_atomic
 from logsqueak.services.file_monitor import FileMonitor
+from logsqueak.services.llm_client import LLMClient
+from logsqueak.services.llm_wrappers import plan_integrations
+from logsqueak.services.llm_helpers import batch_decisions_by_block, filter_skip_exists_blocks
 import structlog
 
 logger = structlog.get_logger()
@@ -113,10 +116,12 @@ class Phase3Screen(Screen):
         self,
         journal_blocks: list[LogseqBlock],
         edited_content: list[EditedContent],
-        decisions: list[IntegrationDecision],
+        page_contents: Dict[str, LogseqOutline],
         journal_date: str,
+        llm_client: Optional[LLMClient] = None,
         graph_paths: Optional[GraphPaths] = None,
         file_monitor: Optional[FileMonitor] = None,
+        decisions: Optional[list[IntegrationDecision]] = None,
         auto_start_workers: bool = True,
         **kwargs
     ):
@@ -125,17 +130,20 @@ class Phase3Screen(Screen):
         Args:
             journal_blocks: Original journal blocks (for context)
             edited_content: Refined content from Phase 2
-            decisions: List of all integration decisions (for all blocks)
+            page_contents: Dict mapping page names to LogseqOutline (from Phase 2 RAG)
             journal_date: Journal date (YYYY-MM-DD)
+            llm_client: LLM client instance (None for testing with pre-generated decisions)
             graph_paths: GraphPaths instance for file operations
             file_monitor: FileMonitor for concurrent modification detection
+            decisions: Pre-generated decisions (for testing, None to generate with LLM)
             auto_start_workers: Whether to auto-start background workers (default True)
         """
         super().__init__(**kwargs)
         self.journal_blocks = journal_blocks
         self.edited_content = edited_content
-        self.decisions = decisions
+        self.page_contents = page_contents
         self.journal_date = journal_date
+        self.llm_client = llm_client
         self.graph_paths = graph_paths
         self.file_monitor = file_monitor or FileMonitor()
         self.auto_start_workers = auto_start_workers
@@ -143,8 +151,18 @@ class Phase3Screen(Screen):
         # Map block_id to EditedContent for quick lookup
         self.edited_content_map = {ec.block_id: ec for ec in edited_content}
 
-        # Map block_id to decisions for batching
-        self.decisions_by_block = self._group_decisions_by_block(decisions)
+        # Decisions will be populated by LLM worker or passed in for testing
+        self.decisions = decisions or []
+        self.decisions_by_block = self._group_decisions_by_block(self.decisions) if decisions else {}
+
+        # Background tasks tracking
+        self.background_tasks: Dict[str, BackgroundTask] = {}
+
+        # Track which blocks have decisions ready (for navigation blocking)
+        self.decisions_ready: Dict[str, bool] = {}
+
+        # Track skipped blocks (for status display)
+        self.skipped_block_count = 0
 
     def _group_decisions_by_block(self, decisions: List[IntegrationDecision]) -> dict:
         """Group decisions by knowledge_block_id.
@@ -190,8 +208,7 @@ class Phase3Screen(Screen):
                         yield TargetPagePreview()
 
             # Status panel for background tasks
-            # For Phase 3, we track LLM decision generation
-            yield StatusPanel({})
+            yield StatusPanel(background_tasks=self.background_tasks)
 
         # Footer with keyboard shortcuts
         yield Footer()
@@ -202,10 +219,10 @@ class Phase3Screen(Screen):
         self.call_later(self._display_current_block)
 
         # Start background workers if enabled
-        if self.auto_start_workers:
-            # Background workers would generate decisions via LLM
-            # For now, we're using pre-generated decisions
-            pass
+        if self.auto_start_workers and self.llm_client:
+            # Start LLM decision generation worker
+            self.run_worker(self._llm_decisions_worker(), name="llm_decisions")
+            logger.info("llm_decisions_worker_started")
 
     def watch_current_decision_index(self, old_index: int, new_index: int) -> None:
         """React to changes in current_decision_index.
@@ -496,11 +513,28 @@ Confidence: {decision.confidence:.0%}
             )
 
     def action_next_block(self) -> None:
-        """Advance to next knowledge block."""
-        if self.current_block_index < len(self.journal_blocks) - 1:
-            self.current_block_index += 1
-            self.current_decision_index = 0
-            self.call_later(self._display_current_block)
+        """Advance to next knowledge block.
+
+        Blocks navigation if next block's decisions aren't ready yet.
+        """
+        if self.current_block_index >= len(self.journal_blocks) - 1:
+            return  # Already at last block
+
+        # Check if next block's decisions are ready
+        next_block_id = self.journal_blocks[self.current_block_index + 1].block_id
+        if not self.decisions_ready.get(next_block_id, False):
+            # Block not ready yet - show message
+            logger.info(
+                "navigation_blocked_decisions_pending",
+                next_block_id=next_block_id
+            )
+            # TODO: Show user feedback about waiting for decisions
+            return
+
+        # Navigate to next block
+        self.current_block_index += 1
+        self.current_decision_index = 0
+        self.call_later(self._display_current_block)
 
     async def action_accept_all(self) -> None:
         """Accept all pending decisions for current block."""
@@ -531,3 +565,112 @@ Confidence: {decision.confidence:.0%}
     def action_back(self) -> None:
         """Return to previous screen."""
         self.dismiss()
+
+    # Background worker methods
+
+    async def _llm_decisions_worker(self) -> None:
+        """Worker: Generate integration decisions using LLM with batching and filtering."""
+        # Create background task
+        self.background_tasks["llm_decisions"] = BackgroundTask(
+            task_type="llm_decisions",
+            status="running",
+            progress_current=0,
+            progress_total=len(self.edited_content),
+        )
+
+        status_panel = self.query_one(StatusPanel)
+        status_panel.update_status()
+
+        try:
+            # Step 1: Stream raw decisions from LLM
+            logger.info("llm_decisions_starting", num_blocks=len(self.edited_content))
+
+            raw_decision_stream = plan_integrations(
+                self.llm_client,
+                self.edited_content,
+                self.page_contents
+            )
+
+            # Step 2: Batch decisions by block
+            batched_stream = batch_decisions_by_block(raw_decision_stream)
+
+            # Step 3: Filter out skip_exists blocks and track count
+            filtered_stream = filter_skip_exists_blocks(batched_stream)
+
+            # Step 4: Process filtered batches
+            block_count = 0
+            async for decision_batch in filtered_stream:
+                if not decision_batch:
+                    continue
+
+                # All decisions in batch have same block_id
+                block_id = decision_batch[0].knowledge_block_id
+
+                # Add decisions to our lists
+                self.decisions.extend(decision_batch)
+                self.decisions_by_block[block_id] = decision_batch
+
+                # Mark block as ready for navigation
+                self.decisions_ready[block_id] = True
+
+                # Update display if this is the current block
+                current_block_id = self.journal_blocks[self.current_block_index].block_id
+                if block_id == current_block_id:
+                    self.call_later(self._display_current_block)
+
+                block_count += 1
+
+                # Update progress
+                self.background_tasks["llm_decisions"].progress_current = block_count
+                status_panel.update_status()
+
+                logger.info(
+                    "llm_decisions_batch_complete",
+                    block_id=block_id,
+                    num_decisions=len(decision_batch)
+                )
+
+            # Get skipped count from filter
+            self.skipped_block_count = filtered_stream.skipped_count
+
+            # Mark complete
+            self.background_tasks["llm_decisions"].status = "completed"
+            self.background_tasks["llm_decisions"].progress_percentage = 100.0
+            self.llm_decisions_state = BackgroundTaskState.COMPLETED
+            status_panel.update_status()
+
+            # Update block counter to show skipped count
+            self._update_block_counter_with_skip_count()
+
+            logger.info(
+                "llm_decisions_complete",
+                total_blocks=block_count,
+                skipped_blocks=self.skipped_block_count
+            )
+
+        except Exception as e:
+            # Mark failed
+            self.background_tasks["llm_decisions"].status = "failed"
+            self.background_tasks["llm_decisions"].error_message = str(e)
+            self.llm_decisions_state = BackgroundTaskState.FAILED
+            self.llm_decisions_error = str(e)
+            status_panel.update_status()
+
+            logger.error(
+                "llm_decisions_error",
+                error=str(e),
+                exc_info=True
+            )
+
+    def _update_block_counter_with_skip_count(self) -> None:
+        """Update block counter to show new integrations vs already recorded."""
+        try:
+            counter = self.query_one("#block-counter", Label)
+            total_blocks = len(self.edited_content)
+            new_integrations = total_blocks - self.skipped_block_count
+            counter.update(
+                f"Block {self.current_block_index + 1} of {len(self.journal_blocks)} | "
+                f"{new_integrations} new integrations, {self.skipped_block_count} already recorded"
+            )
+        except Exception:
+            pass  # Widget not mounted yet
