@@ -137,9 +137,7 @@ class LLMClient:
         logger.debug(
             "llm_request_payload",
             request_id=request_id,
-            payload=payload,  # Full raw payload
-            system_prompt=system_prompt,  # Raw system prompt
-            user_prompt=prompt,  # Raw user prompt
+            payload=payload,  # Full raw payload (includes messages with system/user prompts)
         )
 
         attempt = 0
