@@ -246,3 +246,97 @@ class TestLLMClient:
                     max_retries=1
                 ):
                     pass
+
+    @pytest.mark.asyncio
+    async def test_stream_sse_format(self, llm_client):
+        """Test SSE format (Server-Sent Events) with 'data: ' prefix."""
+        # Mock SSE response data (Ollama/OpenAI format with data: prefix)
+        mock_lines = [
+            'data: {"type": "classification", "block_id": "abc123", "confidence": 0.92, "reason": "SSE test"}',
+            'data: {"type": "classification", "block_id": "def456", "confidence": 0.20}',
+            'data: [DONE]',  # SSE termination message
+        ]
+
+        # Mock httpx response
+        mock_response = AsyncMock()
+        mock_response.raise_for_status = Mock()
+
+        async def mock_aiter_lines():
+            for line in mock_lines:
+                yield line
+
+        mock_response.aiter_lines = mock_aiter_lines
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
+
+        # Mock httpx client
+        mock_client = AsyncMock()
+        mock_client.stream = Mock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('httpx.AsyncClient', return_value=mock_client):
+            chunks = []
+            async for chunk in llm_client.stream_ndjson(
+                prompt="Test SSE",
+                system_prompt="Test system",
+                chunk_model=KnowledgeClassificationChunk
+            ):
+                chunks.append(chunk)
+
+            # Should parse 2 chunks (skip [DONE] message)
+            assert len(chunks) == 2
+            assert chunks[0].block_id == "abc123"
+            assert chunks[0].confidence == 0.92
+            assert chunks[1].block_id == "def456"
+            assert chunks[1].confidence == 0.20
+
+    @pytest.mark.asyncio
+    async def test_stream_openai_incremental_format(self, llm_client):
+        """Test OpenAI incremental streaming format where JSON is built token-by-token."""
+        # Mock OpenAI-style streaming where content comes in fragments
+        # The LLM streams the JSON response token-by-token
+        mock_lines = [
+            'data: {"choices":[{"delta":{"content":"{\\"block"}}]}',
+            'data: {"choices":[{"delta":{"content":"_id\\": \\"abc"}}]}',
+            'data: {"choices":[{"delta":{"content":"123\\", \\"confidence\\": 0.9"}}]}',
+            'data: {"choices":[{"delta":{"content":"2}\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"{\\"block_id\\": \\"def456\\", \\"confidence\\": 0.25}"}}]}',
+            'data: [DONE]',
+        ]
+
+        # Mock httpx response
+        mock_response = AsyncMock()
+        mock_response.raise_for_status = Mock()
+        mock_response.status_code = 200
+        mock_response.headers = {"content-type": "text/event-stream"}
+
+        async def mock_aiter_lines():
+            for line in mock_lines:
+                yield line
+
+        mock_response.aiter_lines = mock_aiter_lines
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
+
+        # Mock httpx client
+        mock_client = AsyncMock()
+        mock_client.stream = Mock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('httpx.AsyncClient', return_value=mock_client):
+            chunks = []
+            async for chunk in llm_client.stream_ndjson(
+                prompt="Test OpenAI incremental",
+                system_prompt="Test system",
+                chunk_model=KnowledgeClassificationChunk
+            ):
+                chunks.append(chunk)
+
+            # Should accumulate fragments and parse 2 complete JSON objects
+            assert len(chunks) == 2
+            assert chunks[0].block_id == "abc123"
+            assert chunks[0].confidence == 0.92
+            assert chunks[1].block_id == "def456"
+            assert chunks[1].confidence == 0.25
