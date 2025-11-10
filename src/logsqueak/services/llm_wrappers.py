@@ -158,15 +158,16 @@ async def classify_blocks(
     journal_content = journal_outline.render()
 
     system_prompt = (
-        f"You are an AI assistant that identifies lasting knowledge in Logseq journal entries. "
-        f"Logseq uses markdown with indented bullets ({indent_style}). "
-        f"Blocks can have continuation lines (indented text without bullets) and properties (key:: value). "
-        f"Each block has an id:: property for identification.\n\n"
-        f"Analyze the journal entry and return ONLY blocks that contain lasting insights worth preserving "
-        f"(skip temporal events/tasks/activities). When a child block contains knowledge that depends on parent context, "
-        f"return ONLY the specific child block ID - not all parent blocks. "
-        f"Output one JSON object per line (NDJSON format), not a JSON array. "
-        f"Each object must have: block_id (string), confidence (float 0-1), reason (string explaining why this is knowledge worth preserving)."
+        f"Identify lasting knowledge in Logseq journal entries.\n\n"
+        f"Format notes:\n"
+        f"- Markdown bullets with {indent_style}\n"
+        f"- Each block has id:: property\n"
+        f"- Properties format: key:: value\n\n"
+        f"Task: Return ONLY blocks with lasting insights (skip events/tasks).\n"
+        f"If child block needs parent context, return ONLY the child block ID.\n\n"
+        f"Output: One JSON per line (NDJSON):\n"
+        f'{{"block_id": "...", "confidence": 0.85, "reason": "..."}}\n\n'
+        f"Output nothing for activity blocks."
     )
 
     prompt = f"Analyze this Logseq journal entry:\n\n{journal_content}"
@@ -174,7 +175,8 @@ async def classify_blocks(
     async for chunk in llm_client.stream_ndjson(
         prompt=prompt,
         system_prompt=system_prompt,
-        chunk_model=KnowledgeClassificationChunk
+        chunk_model=KnowledgeClassificationChunk,
+        temperature=0.3  # Low temperature for deterministic classification
     ):
         yield chunk
 
@@ -205,19 +207,20 @@ async def reword_content(
     xml_blocks = _generate_xml_blocks_for_rewording(edited_contents, journal_outline)
 
     system_prompt = (
-        f"You are an AI assistant that transforms journal-style content into evergreen knowledge. "
-        f"You will receive blocks wrapped in XML, each with full parent context including page properties. "
-        f"The blocks are properly indented following Logseq's indentation ({indent_style}).\n\n"
-        f"Remove temporal context (dates, 'today', 'yesterday'), convert first-person to third-person or neutral, "
-        f"and make the content timeless. Preserve technical details and insights. "
-        f"Use parent context to understand meaning, but only reword the specific block "
-        f"(the deepest/last block in each context hierarchy).\n\n"
-        f"IMPORTANT: Resolve all pronouns and references using parent context. "
-        f"If the block says 'this' or 'it', replace with the actual subject from parent context. "
-        f"Example: if parent says 'Tried Textual framework' and child says 'This is Python-specific', "
-        f"reword as 'The Textual framework is Python-specific'.\n\n"
-        f"Output one JSON object per line (NDJSON format), not a JSON array. "
-        f"Each object must have: block_id (string), reworded_content (string)."
+        f"Transform journal content to evergreen knowledge.\n\n"
+        f"Input: XML blocks with parent context ({indent_style})\n\n"
+        f"Rules:\n"
+        f"1. Remove temporal context (today, yesterday, dates)\n"
+        f"2. Convert first-person → third-person or neutral\n"
+        f"3. Resolve pronouns using parent context\n"
+        f"4. Keep technical details intact\n"
+        f"5. Reword ONLY the deepest block, not parents\n\n"
+        f"Example pronoun resolution:\n"
+        f'Parent: "Tried Textual framework"\n'
+        f'Child: "This is Python-specific"\n'
+        f'→ Reword: "The Textual framework is Python-specific"\n\n'
+        f"Output: One JSON per line:\n"
+        f'{{"block_id": "...", "reworded_content": "..."}}'
     )
 
     prompt = xml_blocks
@@ -225,7 +228,8 @@ async def reword_content(
     async for chunk in llm_client.stream_ndjson(
         prompt=prompt,
         system_prompt=system_prompt,
-        chunk_model=ContentRewordingChunk
+        chunk_model=ContentRewordingChunk,
+        temperature=0.5  # Moderate temperature for creative rewording
     ):
         yield chunk
 
@@ -264,33 +268,27 @@ async def plan_integrations(
     )
 
     system_prompt = (
-        "You are an AI assistant that decides where to integrate knowledge into a Logseq knowledge base. "
-        "You will receive knowledge blocks with their original journal context and candidate target pages with their structure.\n\n"
-        "RELEVANCE FILTERING:\n"
-        "- Only output decisions where confidence ≥ 0.30 (30%)\n"
-        "- Only output decisions where semantic connection is clear and actionable\n"
-        "- Maximum 2 decisions per (knowledge_block, target_page) pair - choose the 2 best integration points if multiple locations are relevant\n"
-        "- If a candidate page is not relevant, omit it entirely (do not output a decision for it)\n"
-        "- If NO candidate pages meet the threshold, output nothing (empty stream)\n\n"
-        "DUPLICATE DETECTION:\n"
-        "- FIRST check if similar/identical knowledge already exists in each candidate page\n"
-        "- If duplicate found, use action='skip_exists' with target_block_id pointing to existing block\n"
-        "- For skip_exists: provide reasoning explaining why it's a duplicate\n"
-        "- For skip_exists: set target_block_title to describe location (e.g., \"Already exists at 'Section Name'\")\n\n"
-        "For each relevant NEW integration, choose the best action:\n"
-        "- 'add_section': Create new top-level section on the page\n"
-        "- 'add_under': Add as child under an existing block (provide target_block_id)\n"
-        "- 'replace': Replace an existing block's content (provide target_block_id)\n"
-        "- 'skip_exists': Knowledge already exists in target page (provide target_block_id of existing block)\n\n"
-        "OUTPUT ORDERING (CRITICAL):\n"
-        "- Output ALL decisions for a given knowledge_block_id CONSECUTIVELY before moving to the next knowledge block\n"
-        "- Example correct order: [blockA-decision1, blockA-decision2, blockB-decision1, blockC-decision1, blockC-decision2]\n"
-        "- Example INCORRECT order: [blockA-decision1, blockB-decision1, blockA-decision2] ← DO NOT DO THIS\n"
-        "- This ordering is required for the system to batch decisions correctly\n\n"
-        "Output one JSON object per line (NDJSON format), not a JSON array. "
-        "Each object must have: knowledge_block_id (string), target_page (string), action (string), "
-        "target_block_id (string or null), target_block_title (string or null), confidence (float 0-1), "
-        "reasoning (string explaining why this integration makes sense or why it's a duplicate)."
+        "Decide where to integrate knowledge into Logseq pages.\n\n"
+        "Input: Knowledge blocks + candidate pages with structure\n\n"
+        "FILTERING:\n"
+        "• Confidence ≥ 0.30 only\n"
+        "• Max 2 decisions per (block, page) pair\n"
+        "• Omit irrelevant pages\n\n"
+        "ACTIONS:\n"
+        "• add_section: New top-level section\n"
+        "• add_under: Child of existing block (needs target_block_id)\n"
+        "• replace: Replace existing block (needs target_block_id)\n"
+        "• skip_exists: Duplicate found (needs target_block_id)\n\n"
+        "DUPLICATE CHECK:\n"
+        "First check if knowledge exists in page. If yes → skip_exists\n\n"
+        "OUTPUT ORDER (CRITICAL):\n"
+        "All decisions for blockA, then blockB, then blockC\n"
+        "✓ [A1, A2, B1, C1, C2]\n"
+        "✗ [A1, B1, A2]\n\n"
+        "Format: One JSON per line:\n"
+        '{"knowledge_block_id": "...", "target_page": "...", "action": "...", '
+        '"target_block_id": null|"...", "target_block_title": null|"...", '
+        '"confidence": 0.85, "reasoning": "..."}'
     )
 
     prompt = xml_formatted_content
@@ -298,6 +296,7 @@ async def plan_integrations(
     async for chunk in llm_client.stream_ndjson(
         prompt=prompt,
         system_prompt=system_prompt,
-        chunk_model=IntegrationDecisionChunk
+        chunk_model=IntegrationDecisionChunk,
+        temperature=0.4  # Balanced temperature for structured decisions
     ):
         yield chunk

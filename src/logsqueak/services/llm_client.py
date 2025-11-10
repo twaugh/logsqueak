@@ -44,7 +44,8 @@ class LLMClient:
         system_prompt: str,
         chunk_model: Type[T],
         max_retries: int = 1,
-        retry_delay: float = 2.0
+        retry_delay: float = 2.0,
+        temperature: float = 0.7
     ) -> AsyncIterator[T]:
         """
         Stream NDJSON responses from LLM API.
@@ -57,6 +58,7 @@ class LLMClient:
             chunk_model: Pydantic model class to parse each NDJSON line
             max_retries: Number of automatic retries on transient errors (default: 1)
             retry_delay: Delay in seconds between retries (default: 2.0)
+            temperature: Sampling temperature 0.0-1.0 (default: 0.7)
 
         Yields:
             Parsed chunk_model instances
@@ -90,7 +92,7 @@ class LLMClient:
                 {"role": "user", "content": prompt}
             ],
             "stream": True,
-            "temperature": 0.7,
+            "temperature": temperature,
         }
 
         # Add num_ctx for Ollama
