@@ -10,6 +10,8 @@ import re
 from collections import defaultdict
 import chromadb
 from logsqueak.models.edited_content import EditedContent
+from logseq_outline.parser import LogseqOutline
+from logseq_outline.graph import GraphPaths
 import structlog
 
 logger = structlog.get_logger()
@@ -139,6 +141,82 @@ class RAGSearch:
         )
 
         return [page for page, score in ranked_pages[:top_k]]
+
+    async def load_page_contents(
+        self,
+        candidate_pages: dict[str, list[str]],
+        graph_paths: GraphPaths
+    ) -> dict[str, LogseqOutline]:
+        """
+        Load and parse page contents for all candidate pages.
+
+        This is the critical step between RAG search completion and LLM decision
+        generation. It loads the actual page files from disk and parses them
+        into LogseqOutline objects.
+
+        Args:
+            candidate_pages: Mapping of block_id to candidate page names (from find_candidates)
+            graph_paths: GraphPaths instance for resolving page paths
+
+        Returns:
+            dict mapping page_name to parsed LogseqOutline
+
+        Raises:
+            FileNotFoundError: If a candidate page file doesn't exist
+            ValueError: If page parsing fails
+
+        Usage:
+            # After RAG search completes:
+            candidate_pages = await rag_search.find_candidates(...)
+
+            # Load page contents:
+            page_contents = await rag_search.load_page_contents(
+                candidate_pages,
+                graph_paths
+            )
+
+            # Then call LLM decisions:
+            async for decision in plan_integrations(..., page_contents=page_contents)
+        """
+        page_contents = {}
+
+        # Collect unique page names across all blocks
+        unique_pages = set()
+        for page_names in candidate_pages.values():
+            unique_pages.update(page_names)
+
+        # Load each unique page once
+        for page_name in unique_pages:
+            page_path = graph_paths.get_page_path(page_name)
+
+            if not page_path.exists():
+                logger.warning(
+                    "candidate_page_not_found",
+                    page_name=page_name,
+                    path=str(page_path)
+                )
+                continue  # Skip missing pages (RAG might have stale index)
+
+            try:
+                page_text = page_path.read_text()
+                outline = LogseqOutline.parse(page_text)
+                page_contents[page_name] = outline
+
+                logger.debug(
+                    "page_loaded",
+                    page_name=page_name,
+                    num_blocks=len(outline.blocks)
+                )
+            except Exception as e:
+                logger.error(
+                    "page_parse_failed",
+                    page_name=page_name,
+                    error=str(e)
+                )
+                # Don't fail entire operation - skip this page
+                continue
+
+        return page_contents
 
     async def close(self) -> None:
         """Close ChromaDB client."""

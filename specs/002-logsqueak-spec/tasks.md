@@ -146,10 +146,10 @@
 
 - [x] T057 [P] [US2] Implement PageIndexer class with ChromaDB integration in src/logsqueak/services/page_indexer.py
 - [x] T058 [P] [US2] Implement RAGSearch class with semantic search and explicit link boosting in src/logsqueak/services/rag_search.py
-- [ ] T058a [P] [US2] Add load_page_contents() method to RAGSearch class in src/logsqueak/services/rag_search.py (loads and parses candidate pages from disk for LLM)
+- [x] T058a [P] [US2] Add load_page_contents() method to RAGSearch class in src/logsqueak/services/rag_search.py (loads and parses candidate pages from disk for LLM)
 - [x] T059 Write unit tests for PageIndexer in tests/unit/test_page_indexer.py and run with pytest
 - [x] T060 Write unit tests for RAGSearch in tests/unit/test_rag_search.py and run with pytest
-- [ ] T060a Write unit tests for RAGSearch.load_page_contents() in tests/unit/test_rag_search.py and run with pytest
+- [x] T060a Write unit tests for RAGSearch.load_page_contents() in tests/unit/test_rag_search_readonly.py and run with pytest
 - [x] T061 Write integration test for RAG pipeline (index + search) in tests/integration/test_rag_pipeline.py and run with pytest
 
 ### Implementation for User Story 2
@@ -267,9 +267,9 @@ def mock_decision_stream():
 
 **Purpose**: Implement missing service methods needed by workers
 
-- [ ] T058a [P] Add load_page_contents() method to RAGSearch class in src/logsqueak/services/rag_search.py (loads and parses candidate pages from disk for LLM)
-- [ ] T060a Write unit tests for RAGSearch.load_page_contents() in tests/unit/test_rag_search.py and run with pytest
-- [ ] T060b Run pytest tests/unit/test_rag_search.py -v and verify load_page_contents() tests PASS
+- [x] T058a [P] Add load_page_contents() method to RAGSearch class in src/logsqueak/services/rag_search.py (loads and parses candidate pages from disk for LLM)
+- [x] T060a Write unit tests for RAGSearch.load_page_contents() in tests/unit/test_rag_search_readonly.py and run with pytest
+- [x] T060b Run pytest tests/unit/test_rag_search_readonly.py -v and verify load_page_contents() tests PASS
 
 **Checkpoint 6.0**: All service prerequisites complete and tested
 

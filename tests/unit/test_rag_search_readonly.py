@@ -310,3 +310,92 @@ async def test_empty_results_when_no_matches(indexed_db):
     # But may have fewer candidates or low relevance scores
 
     await search.close()
+
+
+@pytest.mark.asyncio
+async def test_load_page_contents_loads_all_candidate_pages(indexed_db, temp_graph):
+    """Test that load_page_contents loads all unique candidate pages."""
+    search = RAGSearch(indexed_db)
+    graph_paths = GraphPaths(temp_graph)
+
+    # Mock candidate pages for multiple blocks
+    candidate_pages = {
+        "block-1": ["Python Programming", "Machine Learning"],
+        "block-2": ["JavaScript", "Python Programming"]  # Python Programming appears twice
+    }
+
+    page_contents = await search.load_page_contents(candidate_pages, graph_paths)
+
+    # Should load 3 unique pages (Python Programming only loaded once)
+    assert len(page_contents) == 3
+    assert "Python Programming" in page_contents
+    assert "Machine Learning" in page_contents
+    assert "JavaScript" in page_contents
+
+    # Each should be a LogseqOutline
+    from logseq_outline.parser import LogseqOutline
+    for page_name, outline in page_contents.items():
+        assert isinstance(outline, LogseqOutline)
+        assert len(outline.blocks) > 0
+
+    await search.close()
+
+
+@pytest.mark.asyncio
+async def test_load_page_contents_skips_missing_pages(indexed_db, temp_graph):
+    """Test that load_page_contents skips pages that don't exist."""
+    search = RAGSearch(indexed_db)
+    graph_paths = GraphPaths(temp_graph)
+
+    # Include a non-existent page
+    candidate_pages = {
+        "block-1": ["Python Programming", "Nonexistent Page"]
+    }
+
+    page_contents = await search.load_page_contents(candidate_pages, graph_paths)
+
+    # Should only load existing page
+    assert "Python Programming" in page_contents
+    assert "Nonexistent Page" not in page_contents
+
+    await search.close()
+
+
+@pytest.mark.asyncio
+async def test_load_page_contents_handles_empty_candidates(indexed_db, temp_graph):
+    """Test that load_page_contents handles empty candidate dictionary."""
+    search = RAGSearch(indexed_db)
+    graph_paths = GraphPaths(temp_graph)
+
+    candidate_pages = {}
+
+    page_contents = await search.load_page_contents(candidate_pages, graph_paths)
+
+    # Should return empty dict
+    assert page_contents == {}
+
+    await search.close()
+
+
+@pytest.mark.asyncio
+async def test_load_page_contents_parses_page_structure(indexed_db, temp_graph):
+    """Test that load_page_contents correctly parses page structure."""
+    search = RAGSearch(indexed_db)
+    graph_paths = GraphPaths(temp_graph)
+
+    candidate_pages = {
+        "block-1": ["Python Programming"]
+    }
+
+    page_contents = await search.load_page_contents(candidate_pages, graph_paths)
+
+    # Check that page structure is preserved
+    python_outline = page_contents["Python Programming"]
+    assert len(python_outline.blocks) > 0
+
+    # Check that content is present
+    full_text = python_outline.render()
+    assert "Python" in full_text
+    assert "programming language" in full_text
+
+    await search.close()
