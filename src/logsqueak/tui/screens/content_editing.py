@@ -4,18 +4,22 @@ This screen allows users to review and refine knowledge blocks before integratio
 Users can see LLM-suggested rewordings, manually edit content, and review RAG search results.
 """
 
-from typing import Optional
+from typing import Optional, Dict
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.containers import Container, Horizontal, Vertical
 from textual.widgets import Footer, Label
 from textual.reactive import reactive
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
 from logsqueak.models.edited_content import EditedContent
-from logsqueak.models.background_task import BackgroundTaskState
+from logsqueak.models.background_task import BackgroundTask, BackgroundTaskState
 from logsqueak.tui.widgets.content_editor import ContentEditor
 from logsqueak.tui.widgets.status_panel import StatusPanel
 from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
+from logsqueak.services.llm_client import LLMClient
+from logsqueak.services.llm_wrappers import reword_content
+from logsqueak.services.rag_search import RAGSearch
+from logseq_outline.graph import GraphPaths
 import structlog
 
 logger = structlog.get_logger()
@@ -109,6 +113,10 @@ class Phase2Screen(Screen):
         self,
         blocks: list[LogseqBlock],
         edited_content: list[EditedContent],
+        journal_outline: LogseqOutline,
+        graph_paths: GraphPaths,
+        llm_client: Optional[LLMClient] = None,
+        rag_search: Optional[RAGSearch] = None,
         auto_start_workers: bool = True,
         **kwargs
     ):
@@ -117,15 +125,30 @@ class Phase2Screen(Screen):
         Args:
             blocks: List of selected knowledge blocks
             edited_content: List of EditedContent for each block
+            journal_outline: Full journal outline (for LLM rewording)
+            graph_paths: GraphPaths instance for loading page contents
+            llm_client: LLM client instance (None for testing)
+            rag_search: RAG search service instance (None for testing)
             auto_start_workers: Whether to auto-start background workers (default True)
         """
         super().__init__(**kwargs)
         self.blocks = blocks
         self.edited_content = edited_content
+        self.journal_outline = journal_outline
+        self.graph_paths = graph_paths
+        self.llm_client = llm_client
+        self.rag_search = rag_search
         self.auto_start_workers = auto_start_workers
 
         # Map block_id to EditedContent for quick lookup
         self.edited_content_map = {ec.block_id: ec for ec in edited_content}
+
+        # Background tasks tracking
+        self.background_tasks: Dict[str, BackgroundTask] = {}
+
+        # Storage for RAG search results (for Phase 3)
+        self.candidate_page_names: Dict[str, list[str]] = {}  # block_id -> page names
+        self.page_contents: Dict[str, LogseqOutline] = {}  # page_name -> outline
 
     def compose(self) -> ComposeResult:
         """Compose the Phase 2 screen layout."""
@@ -148,8 +171,7 @@ class Phase2Screen(Screen):
                     yield ContentEditor()
 
             # Status panel for background tasks
-            # TODO: Pass actual background tasks
-            yield StatusPanel(background_tasks={})
+            yield StatusPanel(background_tasks=self.background_tasks)
 
             # Footer with keyboard shortcuts
             yield Footer()
@@ -170,10 +192,15 @@ class Phase2Screen(Screen):
 
     def _start_background_workers(self) -> None:
         """Start background workers for LLM rewording and RAG search."""
-        # TODO: Implement worker startup
-        # self.run_worker(self._llm_rewording_worker(), name="llm_rewording")
-        # self.run_worker(self._page_indexing_worker(), name="page_indexing")
-        pass
+        if self.llm_client:
+            # Start LLM rewording worker
+            self.run_worker(self._llm_rewording_worker(), name="llm_rewording")
+            logger.info("llm_rewording_worker_started")
+
+        if self.rag_search:
+            # Start RAG search worker (will be implemented in T097a)
+            self.run_worker(self._rag_search_worker(), name="rag_search")
+            logger.info("rag_search_worker_started")
 
     def _convert_to_logseq_bullets(self, text: str) -> str:
         """Convert plain indented text to Logseq bullet format.
@@ -368,12 +395,83 @@ class Phase2Screen(Screen):
         # Update current content from editor
         current_ec.current_content = editor.get_content()
 
-    # Background worker methods (stubs for now)
+    # Background worker methods
 
     async def _llm_rewording_worker(self) -> None:
-        """Worker: Generate LLM reworded versions."""
-        # TODO: Implement LLM rewording streaming
-        pass
+        """Worker: Generate LLM reworded versions using reword_content wrapper."""
+        # Create background task
+        self.background_tasks["llm_rewording"] = BackgroundTask(
+            task_type="llm_rewording",
+            status="running",
+            progress_current=0,
+            progress_total=len(self.edited_content),
+        )
+
+        status_panel = self.query_one(StatusPanel)
+        status_panel.update_status()
+
+        try:
+            # Stream reworded content from LLM
+            count = 0
+            async for chunk in reword_content(
+                self.llm_client,
+                self.edited_content,
+                self.journal_outline
+            ):
+                block_id = chunk.block_id
+                if block_id in self.edited_content_map:
+                    ec = self.edited_content_map[block_id]
+
+                    # Update reworded content
+                    ec.reworded_content = chunk.reworded_content
+                    ec.rewording_complete = True
+
+                    # Update display if this is the current block
+                    current_ec = self.edited_content[self.current_block_index]
+                    if block_id == current_ec.block_id:
+                        # Update LLM panel
+                        llm_reworded = self.query_one("#llm-reworded", TargetPagePreview)
+                        content_as_block = f"- {chunk.reworded_content}"
+                        await llm_reworded.load_preview(content_as_block)
+
+                    logger.info(
+                        "llm_rewording_chunk",
+                        block_id=block_id,
+                        reworded_length=len(chunk.reworded_content)
+                    )
+                else:
+                    logger.warning(
+                        "llm_rewording_unknown_block",
+                        block_id=block_id
+                    )
+
+                count += 1
+
+                # Update progress
+                self.background_tasks["llm_rewording"].progress_current = count
+                status_panel.update_status()
+
+            # Mark complete
+            self.background_tasks["llm_rewording"].status = "completed"
+            self.background_tasks["llm_rewording"].progress_percentage = 100.0
+            status_panel.update_status()
+
+            logger.info(
+                "llm_rewording_complete",
+                total_blocks=count
+            )
+
+        except Exception as e:
+            # Mark failed
+            self.background_tasks["llm_rewording"].status = "failed"
+            self.background_tasks["llm_rewording"].error_message = str(e)
+            status_panel.update_status()
+
+            logger.error(
+                "llm_rewording_error",
+                error=str(e),
+                exc_info=True
+            )
 
     async def _page_indexing_worker(self) -> None:
         """Worker: Build page index with progress."""
@@ -381,6 +479,76 @@ class Phase2Screen(Screen):
         pass
 
     async def _rag_search_worker(self) -> None:
-        """Worker: Perform RAG search for candidate pages."""
-        # TODO: Implement RAG search with progress
-        pass
+        """Worker: Perform RAG search for candidate pages and load page contents."""
+        # Create background task
+        self.background_tasks["rag_search"] = BackgroundTask(
+            task_type="rag_search",
+            status="running",
+            progress_current=0,
+            progress_total=2,  # Two steps: search + load
+        )
+
+        status_panel = self.query_one(StatusPanel)
+        status_panel.update_status()
+
+        try:
+            # Step 1: Find candidate pages for each block
+            logger.info("rag_search_starting", num_blocks=len(self.edited_content))
+
+            # Build original_contexts dict for RAG search
+            original_contexts = {
+                ec.block_id: ec.hierarchical_context
+                for ec in self.edited_content
+            }
+
+            # Find candidates
+            self.candidate_page_names = await self.rag_search.find_candidates(
+                edited_content=self.edited_content,
+                original_contexts=original_contexts,
+                top_k=10  # TODO: Get from config
+            )
+
+            # Update progress
+            self.background_tasks["rag_search"].progress_current = 1
+            status_panel.update_status()
+
+            logger.info(
+                "rag_search_candidates_found",
+                unique_pages=len(set(
+                    page for pages in self.candidate_page_names.values() for page in pages
+                ))
+            )
+
+            # Step 2: Load page contents from disk
+            logger.info("rag_page_loading_starting")
+
+            self.page_contents = await self.rag_search.load_page_contents(
+                candidate_pages=self.candidate_page_names,
+                graph_paths=self.graph_paths
+            )
+
+            # Update progress
+            self.background_tasks["rag_search"].progress_current = 2
+            self.background_tasks["rag_search"].status = "completed"
+            self.background_tasks["rag_search"].progress_percentage = 100.0
+            self.rag_search_state = BackgroundTaskState.COMPLETED
+            status_panel.update_status()
+
+            logger.info(
+                "rag_search_complete",
+                pages_loaded=len(self.page_contents)
+            )
+
+        except Exception as e:
+            # Mark failed
+            self.background_tasks["rag_search"].status = "failed"
+            self.background_tasks["rag_search"].error_message = str(e)
+            self.rag_search_state = BackgroundTaskState.FAILED
+            self.rag_search_error = str(e)
+            status_panel.update_status()
+
+            logger.error(
+                "rag_search_error",
+                error=str(e),
+                exc_info=True
+            )
