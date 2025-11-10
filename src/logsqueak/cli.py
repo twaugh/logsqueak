@@ -228,7 +228,7 @@ def extract(date_or_range: str = None):
     journal_outline = journals[journal_date]
 
     # Record initial journal file
-    journal_path = graph_paths.get_journal_path(journal_date.replace("-", "_"))
+    journal_path = graph_paths.get_journal_path(journal_date)
     file_monitor.record(journal_path)
     logger.info("journal_recorded_in_file_monitor", date=journal_date, path=str(journal_path))
 

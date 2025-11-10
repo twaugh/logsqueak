@@ -51,12 +51,19 @@ class GraphPaths:
         """Get path to specific journal file.
 
         Args:
-            date_str: Date string in YYYY_MM_DD format (e.g., "2025_01_15")
+            date_str: Date string in YYYY-MM-DD or YYYY_MM_DD format
+                     (e.g., "2025-01-15" or "2025_01_15")
 
         Returns:
             Path to journal file (e.g., journals/2025_01_15.md)
+
+        Note:
+            Logseq uses underscore format (YYYY_MM_DD) for journal filenames.
+            This method automatically converts hyphens to underscores.
         """
-        return self.journals_dir / f"{date_str}.md"
+        # Convert to Logseq's underscore convention
+        normalized_date = date_str.replace("-", "_")
+        return self.journals_dir / f"{normalized_date}.md"
 
     def get_page_path(self, page_name: str) -> Path:
         """Get path to specific page file.
@@ -73,7 +80,7 @@ class GraphPaths:
         """Check if journal file exists for given date.
 
         Args:
-            date_str: Date string in YYYY_MM_DD format
+            date_str: Date string in YYYY-MM-DD or YYYY_MM_DD format
 
         Returns:
             True if journal file exists

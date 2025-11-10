@@ -337,7 +337,7 @@ async def write_integration_atomic(
 
     Args:
         decision: Integration decision to execute
-        journal_date: Journal date for provenance link (YYYY-MM-DD)
+        journal_date: Journal date for provenance link (YYYY-MM-DD or YYYY_MM_DD)
         graph_paths: GraphPaths instance for path resolution
         file_monitor: FileMonitor for concurrent modification detection
 
