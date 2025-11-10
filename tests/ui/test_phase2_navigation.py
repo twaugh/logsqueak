@@ -9,7 +9,8 @@ from textual.app import App
 from textual.pilot import Pilot
 from logsqueak.tui.screens.content_editing import Phase2Screen
 from logsqueak.models.edited_content import EditedContent
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
+from logseq_outline.graph import GraphPaths
 
 
 class Phase2TestApp(App):
@@ -75,12 +76,30 @@ def sample_edited_content(sample_blocks):
     ]
 
 
+@pytest.fixture
+def journal_outline(sample_blocks):
+    """Create a LogseqOutline from sample blocks."""
+    return LogseqOutline(blocks=sample_blocks, source_text="", frontmatter=[])
+
+
+@pytest.fixture
+def graph_paths(tmp_path):
+    """Create a temporary GraphPaths instance."""
+    graph_dir = tmp_path / "test-graph"
+    graph_dir.mkdir()
+    (graph_dir / "pages").mkdir()
+    (graph_dir / "journals").mkdir()
+    return GraphPaths(graph_dir)
+
+
 @pytest.mark.asyncio
-async def test_navigate_with_j_key(sample_blocks, sample_edited_content):
+async def test_navigate_with_j_key(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test j key navigates to next block."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -100,11 +119,13 @@ async def test_navigate_with_j_key(sample_blocks, sample_edited_content):
 
 
 @pytest.mark.asyncio
-async def test_navigate_with_k_key(sample_blocks, sample_edited_content):
+async def test_navigate_with_k_key(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test k key navigates to previous block."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -127,11 +148,13 @@ async def test_navigate_with_k_key(sample_blocks, sample_edited_content):
 
 
 @pytest.mark.asyncio
-async def test_navigate_with_arrow_keys(sample_blocks, sample_edited_content):
+async def test_navigate_with_arrow_keys(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test arrow keys also work for navigation."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -156,11 +179,13 @@ async def test_navigate_with_arrow_keys(sample_blocks, sample_edited_content):
 
 
 @pytest.mark.asyncio
-async def test_auto_save_on_navigation(sample_blocks, sample_edited_content):
+async def test_auto_save_on_navigation(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that navigating saves editor content automatically."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -184,11 +209,13 @@ async def test_auto_save_on_navigation(sample_blocks, sample_edited_content):
 
 
 @pytest.mark.asyncio
-async def test_navigation_only_works_when_editor_unfocused(sample_blocks, sample_edited_content):
+async def test_navigation_only_works_when_editor_unfocused(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that j/k keys only navigate when editor is unfocused."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -224,11 +251,13 @@ async def test_navigation_only_works_when_editor_unfocused(sample_blocks, sample
 
 
 @pytest.mark.asyncio
-async def test_navigation_wraps_at_boundaries(sample_blocks, sample_edited_content):
+async def test_navigation_wraps_at_boundaries(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that navigation stops at first and last blocks."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -254,11 +283,13 @@ async def test_navigation_wraps_at_boundaries(sample_blocks, sample_edited_conte
 
 
 @pytest.mark.asyncio
-async def test_block_indicator_updates_on_navigation(sample_blocks, sample_edited_content):
+async def test_block_indicator_updates_on_navigation(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that block count indicator updates when navigating."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)

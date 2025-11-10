@@ -10,7 +10,7 @@ from textual.app import App
 from logsqueak.tui.screens.integration_review import Phase3Screen
 from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.models.edited_content import EditedContent
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
 
 
 class Phase3TestApp(App):
@@ -76,14 +76,46 @@ def sample_decisions():
     ]
 
 
+@pytest.fixture
+def sample_page_contents():
+    """Create sample page contents for testing."""
+    return {
+        "Python/Concurrency": LogseqOutline(
+            blocks=[
+                LogseqBlock(
+                    content=["# Python Concurrency"],
+                    indent_level=0,
+                    block_id="concurrency-page-block-1",
+                    children=[]
+                )
+            ],
+            source_text="",
+            frontmatter=[]
+        ),
+        "Python/Best Practices": LogseqOutline(
+            blocks=[
+                LogseqBlock(
+                    content=["# Python Best Practices"],
+                    indent_level=0,
+                    block_id="best-practices-page-block-1",
+                    children=[]
+                )
+            ],
+            source_text="",
+            frontmatter=[]
+        )
+    }
+
+
 @pytest.mark.asyncio
 async def test_y_key_accepts_current_decision(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test y key accepts current decision and triggers write."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -112,12 +144,13 @@ async def test_y_key_accepts_current_decision(
 
 @pytest.mark.asyncio
 async def test_accept_decision_shows_checkmark(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test that accepted decision shows checkmark (✓) indicator."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -140,12 +173,13 @@ async def test_accept_decision_shows_checkmark(
 
 @pytest.mark.asyncio
 async def test_accept_multiple_decisions_for_same_block(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test that user can accept multiple decisions for the same block."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -179,12 +213,13 @@ async def test_accept_multiple_decisions_for_same_block(
 
 @pytest.mark.asyncio
 async def test_write_failure_marks_decision_as_failed(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test that write failure marks decision as failed with error indicator."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -211,12 +246,13 @@ async def test_write_failure_marks_decision_as_failed(
 
 @pytest.mark.asyncio
 async def test_failed_decision_shows_warning_indicator(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test that failed decision shows warning (⚠) indicator."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -240,12 +276,13 @@ async def test_failed_decision_shows_warning_indicator(
 
 @pytest.mark.asyncio
 async def test_continue_after_write_failure(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test that user can continue with remaining decisions after a failure."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -279,12 +316,13 @@ async def test_continue_after_write_failure(
 
 @pytest.mark.asyncio
 async def test_cannot_accept_already_completed_decision(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test that pressing y on a completed decision does nothing."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False

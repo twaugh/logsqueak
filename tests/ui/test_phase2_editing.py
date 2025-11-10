@@ -9,7 +9,8 @@ from textual.app import App
 from textual.pilot import Pilot
 from logsqueak.tui.screens.content_editing import Phase2Screen
 from logsqueak.models.edited_content import EditedContent
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
+from logseq_outline.graph import GraphPaths
 
 
 class Phase2TestApp(App):
@@ -51,12 +52,30 @@ def sample_edited_content():
     ]
 
 
+@pytest.fixture
+def journal_outline(sample_blocks):
+    """Create a LogseqOutline from sample blocks."""
+    return LogseqOutline(blocks=sample_blocks, source_text="", frontmatter=[])
+
+
+@pytest.fixture
+def graph_paths(tmp_path):
+    """Create a temporary GraphPaths instance."""
+    graph_dir = tmp_path / "test-graph"
+    graph_dir.mkdir()
+    (graph_dir / "pages").mkdir()
+    (graph_dir / "journals").mkdir()
+    return GraphPaths(graph_dir)
+
+
 @pytest.mark.asyncio
-async def test_tab_focuses_editor(sample_blocks, sample_edited_content):
+async def test_tab_focuses_editor(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test Tab key focuses the text editor."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -78,11 +97,13 @@ async def test_tab_focuses_editor(sample_blocks, sample_edited_content):
 
 
 @pytest.mark.asyncio
-async def test_tab_unfocuses_editor(sample_blocks, sample_edited_content):
+async def test_tab_unfocuses_editor(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test Tab key unfocuses the text editor when already focused."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -106,11 +127,13 @@ async def test_tab_unfocuses_editor(sample_blocks, sample_edited_content):
 
 
 @pytest.mark.asyncio
-async def test_editor_border_highlights_when_focused(sample_blocks, sample_edited_content):
+async def test_editor_border_highlights_when_focused(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that editor border highlights when focused."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -130,11 +153,13 @@ async def test_editor_border_highlights_when_focused(sample_blocks, sample_edite
 
 
 @pytest.mark.asyncio
-async def test_can_type_in_focused_editor(sample_blocks, sample_edited_content):
+async def test_can_type_in_focused_editor(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that user can type in the editor when focused."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -163,11 +188,13 @@ async def test_can_type_in_focused_editor(sample_blocks, sample_edited_content):
 
 
 @pytest.mark.asyncio
-async def test_keyboard_shortcuts_disabled_when_focused(sample_blocks, sample_edited_content):
+async def test_keyboard_shortcuts_disabled_when_focused(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that keyboard shortcuts (a, r, j, k) are typed when editor focused."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -203,11 +230,13 @@ async def test_keyboard_shortcuts_disabled_when_focused(sample_blocks, sample_ed
 
 
 @pytest.mark.asyncio
-async def test_cursor_appears_in_focused_editor(sample_blocks, sample_edited_content):
+async def test_cursor_appears_in_focused_editor(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that cursor appears when editor is focused."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -229,7 +258,7 @@ async def test_cursor_appears_in_focused_editor(sample_blocks, sample_edited_con
 
 
 @pytest.mark.asyncio
-async def test_editor_loads_current_content_on_display(sample_blocks, sample_edited_content):
+async def test_editor_loads_current_content_on_display(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that editor displays current_content when block is shown."""
     # Set up edited content with modified current_content
     edited_content = [
@@ -245,6 +274,8 @@ async def test_editor_loads_current_content_on_display(sample_blocks, sample_edi
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)

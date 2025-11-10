@@ -123,9 +123,23 @@ async def test_phase1_to_phase2_transition(
 
 @pytest.mark.asyncio
 async def test_phase2_to_phase3_transition(
-    sample_journal_outline, mock_config, mock_services
+    sample_journal_outline, mock_config, mock_services, tmp_path
 ):
     """Test that pressing 'n' in Phase 2 transitions to Phase 3 with edited content."""
+    from logsqueak.models.block_state import BlockState
+    from logsqueak.models.edited_content import EditedContent
+    from logseq_outline.graph import GraphPaths
+
+    # Create test graph structure
+    graph_dir = tmp_path / "test-graph"
+    graph_dir.mkdir()
+    (graph_dir / "pages").mkdir()
+    (graph_dir / "journals").mkdir()
+
+    # Create sample pages for RAG
+    ml_page = graph_dir / "pages" / "Machine Learning.md"
+    ml_page.write_text("- # Machine Learning\n  - Introduction to ML")
+
     app = LogsqueakApp(
         journal_outline=sample_journal_outline,
         journal_date="2025-01-15",
@@ -134,10 +148,7 @@ async def test_phase2_to_phase3_transition(
     )
 
     # Pre-populate selected blocks (simulate Phase 1 completion)
-    from logsqueak.models.block_state import BlockState
-    from logsqueak.models.edited_content import EditedContent
-
-    app.selected_blocks = [
+    selected_blocks = [
         BlockState(
             block_id="block-001",
             classification="knowledge",
@@ -146,26 +157,25 @@ async def test_phase2_to_phase3_transition(
         )
     ]
 
-    app.edited_content = [
-        EditedContent(
-            block_id="block-001",
-            original_content="Today I learned about async patterns in Python",
-            hierarchical_context="Journal entry 2025-01-15\n  Morning reflection\n    Today I learned about async patterns in Python",
-            current_content="Learned about async patterns in Python",
-        )
-    ]
-
     async with app.run_test() as pilot:
-        # Push Phase 2 screen
-        app.push_screen("phase2")
+        await pilot.pause()
+
+        # Transition to Phase 2 (creates the screen properly)
+        app.transition_to_phase2(selected_blocks)
         await pilot.pause()
 
         # Verify we're on Phase 2
         assert app.screen.name == "phase2"
 
         # Wait for RAG search to complete (mocked, should be instant)
-        # In real implementation, would wait for status
         await pilot.pause()
+
+        # Manually populate candidate pages and page contents (simulate RAG completion)
+        phase2_screen = app.screen
+        phase2_screen.candidate_page_names = {"block-001": ["Machine Learning"]}
+        phase2_screen.page_contents = {
+            "Machine Learning": LogseqOutline.parse("- # Machine Learning\n  - Introduction to ML")
+        }
 
         # Press 'n' to proceed to Phase 3
         await pilot.press("n")
@@ -178,12 +188,18 @@ async def test_phase2_to_phase3_transition(
         assert app.edited_content is not None
         assert len(app.edited_content) > 0
 
+        # Verify page contents were passed
+        assert app.page_contents is not None
+
 
 @pytest.mark.asyncio
 async def test_state_preservation_across_phases(
     sample_journal_outline, mock_config, mock_services
 ):
     """Test that state is correctly preserved across all phase transitions."""
+    from logsqueak.models.block_state import BlockState
+    from logsqueak.models.edited_content import EditedContent
+
     app = LogsqueakApp(
         journal_outline=sample_journal_outline,
         journal_date="2025-01-15",
@@ -191,14 +207,11 @@ async def test_state_preservation_across_phases(
         **mock_services,
     )
 
-    # Pre-populate full state
-    from logsqueak.models.block_state import BlockState
-    from logsqueak.models.edited_content import EditedContent
-
     test_block_id = "block-001"
     test_content = "Test content"
 
-    app.selected_blocks = [
+    # Prepare selected blocks (Phase 1 output)
+    selected_blocks = [
         BlockState(
             block_id=test_block_id,
             classification="knowledge",
@@ -209,40 +222,36 @@ async def test_state_preservation_across_phases(
         )
     ]
 
-    app.edited_content = [
-        EditedContent(
-            block_id=test_block_id,
-            original_content="Original test content",
-            hierarchical_context="Context\n  Original test content",
-            current_content=test_content,
-            reworded_content="Reworded test content",
-            rewording_complete=True,
-        )
-    ]
-
-    app.candidate_pages = ["Page1", "Page2"]
-    app.page_contents = {"Page1": "Content 1", "Page2": "Content 2"}
-    app.original_contexts = {test_block_id: "Original context"}
-
     async with app.run_test() as pilot:
-        # Navigate through all phases
-        app.push_screen("phase1")
         await pilot.pause()
+
+        # Start at Phase 1
         assert app.screen.name == "phase1"
 
-        # Verify Phase 1 can access selected_blocks
-        assert app.selected_blocks is not None
-        assert app.selected_blocks[0].block_id == test_block_id
-
-        app.push_screen("phase2")
+        # Transition to Phase 2 using proper transition method
+        app.transition_to_phase2(selected_blocks)
         await pilot.pause()
         assert app.screen.name == "phase2"
 
-        # Verify Phase 2 can access edited_content
+        # Verify Phase 2 can access edited_content (created by transition_to_phase2)
         assert app.edited_content is not None
-        assert app.edited_content[0].current_content == test_content
+        assert len(app.edited_content) > 0
+        assert app.selected_blocks is not None
 
-        app.push_screen("phase3")
+        # Manually populate RAG results (simulate Phase 2 completion)
+        phase2_screen = app.screen
+        phase2_screen.candidate_page_names = {test_block_id: ["Page1", "Page2"]}
+        phase2_screen.page_contents = {
+            "Page1": LogseqOutline.parse("- Page 1 content"),
+            "Page2": LogseqOutline.parse("- Page 2 content")
+        }
+
+        # Transition to Phase 3 using proper transition method
+        app.transition_to_phase3(
+            edited_content=app.edited_content,
+            candidate_pages=["Page1", "Page2"],
+            page_contents=phase2_screen.page_contents
+        )
         await pilot.pause()
         assert app.screen.name == "phase3"
 

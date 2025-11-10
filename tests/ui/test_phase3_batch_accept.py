@@ -11,7 +11,7 @@ from textual.app import App
 from logsqueak.tui.screens.integration_review import Phase3Screen
 from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.models.edited_content import EditedContent
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
 
 
 class Phase3TestApp(App):
@@ -119,14 +119,70 @@ def sample_decisions():
     ]
 
 
+@pytest.fixture
+def sample_page_contents():
+    """Create sample page contents for testing."""
+    return {
+        "Python/Concurrency": LogseqOutline(
+            blocks=[
+                LogseqBlock(
+                    content=["# Python Concurrency"],
+                    indent_level=0,
+                    block_id="concurrency-page-block-1",
+                    children=[]
+                )
+            ],
+            source_text="",
+            frontmatter=[]
+        ),
+        "Python/Best Practices": LogseqOutline(
+            blocks=[
+                LogseqBlock(
+                    content=["# Python Best Practices"],
+                    indent_level=0,
+                    block_id="best-practices-page-block-1",
+                    children=[]
+                )
+            ],
+            source_text="",
+            frontmatter=[]
+        ),
+        "Textual/Architecture": LogseqOutline(
+            blocks=[
+                LogseqBlock(
+                    content=["# Textual Architecture"],
+                    indent_level=0,
+                    block_id="textual-arch-page-block-1",
+                    children=[]
+                )
+            ],
+            source_text="",
+            frontmatter=[]
+        ),
+        "Textual/Widgets": LogseqOutline(
+            blocks=[
+                LogseqBlock(
+                    content=["# Textual Widgets"],
+                    indent_level=0,
+                    block_id="textual-widgets-page-block-1",
+                    children=[]
+                )
+            ],
+            source_text="",
+            frontmatter=[]
+        )
+    }
+
+
 @pytest.mark.asyncio
 async def test_a_key_accepts_all_pending_decisions_for_block(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test a key accepts all pending decisions for current block."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -158,12 +214,13 @@ async def test_a_key_accepts_all_pending_decisions_for_block(
 
 @pytest.mark.asyncio
 async def test_a_key_advances_to_next_block_after_accepting(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test a key advances to next block after accepting all decisions."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -188,12 +245,13 @@ async def test_a_key_advances_to_next_block_after_accepting(
 
 @pytest.mark.asyncio
 async def test_a_key_skips_already_completed_decisions(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test a key only writes pending decisions, skips completed ones."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -227,12 +285,13 @@ async def test_a_key_skips_already_completed_decisions(
 
 @pytest.mark.asyncio
 async def test_a_key_continues_if_some_writes_fail(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test a key continues writing remaining decisions if some fail."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -262,12 +321,13 @@ async def test_a_key_continues_if_some_writes_fail(
 
 @pytest.mark.asyncio
 async def test_a_key_shows_progress_during_batch_write(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test a key shows progress status during batch write operation."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -289,12 +349,13 @@ async def test_a_key_shows_progress_during_batch_write(
 
 @pytest.mark.asyncio
 async def test_a_key_at_last_block_shows_completion_summary(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test a key at last block shows completion summary after writing."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -322,12 +383,13 @@ async def test_a_key_at_last_block_shows_completion_summary(
 
 @pytest.mark.asyncio
 async def test_a_key_with_no_pending_decisions_advances_immediately(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test a key with all decisions completed just advances to next block."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False

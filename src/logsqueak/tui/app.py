@@ -14,6 +14,7 @@ from textual.widgets import Footer, Header
 import structlog
 
 from logseq_outline.parser import LogseqOutline
+from logseq_outline.graph import GraphPaths
 from logsqueak.models.config import Config
 from logsqueak.models.block_state import BlockState
 from logsqueak.models.edited_content import EditedContent
@@ -221,14 +222,14 @@ class LogsqueakApp(App):
         self,
         edited_content: List[EditedContent],
         candidate_pages: List[str],
-        page_contents: Dict[str, str],
+        page_contents: Dict[str, LogseqOutline],
     ) -> None:
         """Transition from Phase 2 to Phase 3.
 
         Args:
             edited_content: List of EditedContent from Phase 2
             candidate_pages: List of candidate page names from RAG search
-            page_contents: Dict mapping page names to their content
+            page_contents: Dict mapping page names to LogseqOutline objects
         """
         logger.info(
             "transitioning_to_phase3",
@@ -248,13 +249,12 @@ class LogsqueakApp(App):
 
         # Create and push Phase 3 screen
         phase3_screen = Phase3Screen(
-            edited_content_list=edited_content,
-            candidate_pages=candidate_pages,
+            journal_blocks=self.journal_outline.blocks,
+            edited_content=edited_content,
             page_contents=page_contents,
-            original_contexts=self.original_contexts,
-            llm_client=self.llm_client,
             journal_date=self.journal_date,
-            journal_outline=self.journal_outline,
+            llm_client=self.llm_client,
+            graph_paths=GraphPaths(Path(self.config.logseq.graph_path)),
             file_monitor=self.file_monitor,
             name="phase3",
         )

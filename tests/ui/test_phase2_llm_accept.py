@@ -9,7 +9,8 @@ from textual.app import App
 from textual.pilot import Pilot
 from logsqueak.tui.screens.content_editing import Phase2Screen
 from logsqueak.models.edited_content import EditedContent
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
+from logseq_outline.graph import GraphPaths
 
 
 class Phase2TestApp(App):
@@ -82,12 +83,30 @@ def sample_edited_content_pending_rewording():
     ]
 
 
+@pytest.fixture
+def journal_outline(sample_blocks):
+    """Create a LogseqOutline from sample blocks."""
+    return LogseqOutline(blocks=sample_blocks, source_text="", frontmatter=[])
+
+
+@pytest.fixture
+def graph_paths(tmp_path):
+    """Create a temporary GraphPaths instance."""
+    graph_dir = tmp_path / "test-graph"
+    graph_dir.mkdir()
+    (graph_dir / "pages").mkdir()
+    (graph_dir / "journals").mkdir()
+    return GraphPaths(graph_dir)
+
+
 @pytest.mark.asyncio
-async def test_accept_llm_version_when_available(sample_blocks, sample_edited_content_with_rewording):
+async def test_accept_llm_version_when_available(sample_blocks, sample_edited_content_with_rewording, journal_outline, graph_paths):
     """Test 'a' key accepts LLM reworded version when available."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_with_rewording,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -112,11 +131,13 @@ async def test_accept_llm_version_when_available(sample_blocks, sample_edited_co
 
 
 @pytest.mark.asyncio
-async def test_accept_llm_disabled_when_not_available(sample_blocks, sample_edited_content_pending_rewording):
+async def test_accept_llm_disabled_when_not_available(sample_blocks, sample_edited_content_pending_rewording, journal_outline, graph_paths):
     """Test 'a' key does nothing when LLM rewording is not yet available."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_pending_rewording,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -139,11 +160,13 @@ async def test_accept_llm_disabled_when_not_available(sample_blocks, sample_edit
 
 
 @pytest.mark.asyncio
-async def test_accept_llm_only_works_when_unfocused(sample_blocks, sample_edited_content_with_rewording):
+async def test_accept_llm_only_works_when_unfocused(sample_blocks, sample_edited_content_with_rewording, journal_outline, graph_paths):
     """Test 'a' key only works when editor is unfocused."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_with_rewording,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -184,11 +207,13 @@ async def test_accept_llm_only_works_when_unfocused(sample_blocks, sample_edited
 
 
 @pytest.mark.asyncio
-async def test_accept_llm_updates_indicator(sample_blocks, sample_edited_content_with_rewording):
+async def test_accept_llm_updates_indicator(sample_blocks, sample_edited_content_with_rewording, journal_outline, graph_paths):
     """Test that accepting LLM version updates visual indicator."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_with_rewording,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -207,11 +232,13 @@ async def test_accept_llm_updates_indicator(sample_blocks, sample_edited_content
 
 
 @pytest.mark.asyncio
-async def test_accept_llm_after_manual_edit(sample_blocks, sample_edited_content_with_rewording):
+async def test_accept_llm_after_manual_edit(sample_blocks, sample_edited_content_with_rewording, journal_outline, graph_paths):
     """Test that accepting LLM version replaces manually edited content."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_with_rewording,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -241,11 +268,13 @@ async def test_accept_llm_after_manual_edit(sample_blocks, sample_edited_content
 
 
 @pytest.mark.asyncio
-async def test_llm_version_display_when_available(sample_blocks, sample_edited_content_with_rewording):
+async def test_llm_version_display_when_available(sample_blocks, sample_edited_content_with_rewording, journal_outline, graph_paths):
     """Test that LLM reworded version is displayed alongside original."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_with_rewording,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -261,11 +290,13 @@ async def test_llm_version_display_when_available(sample_blocks, sample_edited_c
 
 
 @pytest.mark.asyncio
-async def test_llm_version_shows_loading_when_pending(sample_blocks, sample_edited_content_pending_rewording):
+async def test_llm_version_shows_loading_when_pending(sample_blocks, sample_edited_content_pending_rewording, journal_outline, graph_paths):
     """Test that a loading indicator is shown while LLM rewording is pending."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_pending_rewording,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)

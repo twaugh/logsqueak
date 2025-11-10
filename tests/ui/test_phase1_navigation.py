@@ -9,7 +9,7 @@ from textual.app import App
 from textual.pilot import Pilot
 from logsqueak.tui.screens.block_selection import Phase1Screen
 from logsqueak.models.block_state import BlockState
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
 
 
 class Phase1TestApp(App):
@@ -57,10 +57,16 @@ def sample_blocks():
     return blocks
 
 
+@pytest.fixture
+def journal_outline(sample_blocks):
+    """Create a LogseqOutline from sample blocks."""
+    return LogseqOutline(blocks=sample_blocks, source_text="", frontmatter=[])
+
+
 @pytest.mark.asyncio
-async def test_navigate_with_j_k_keys(sample_blocks):
+async def test_navigate_with_j_k_keys(sample_blocks, journal_outline):
     """Test j/k keys navigate through block tree."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15")
+    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", journal_outline=journal_outline)
     app = Phase1TestApp(screen)
 
     async with app.run_test() as pilot:
@@ -81,9 +87,9 @@ async def test_navigate_with_j_k_keys(sample_blocks):
 
 
 @pytest.mark.asyncio
-async def test_navigate_with_arrow_keys(sample_blocks):
+async def test_navigate_with_arrow_keys(sample_blocks, journal_outline):
     """Test arrow keys also work for navigation."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15")
+    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", journal_outline=journal_outline)
     app = Phase1TestApp(screen)
 
     async with app.run_test() as pilot:
@@ -104,7 +110,7 @@ async def test_navigate_with_arrow_keys(sample_blocks):
 
 
 @pytest.mark.asyncio
-async def test_jump_to_next_knowledge_block(sample_blocks):
+async def test_jump_to_next_knowledge_block(sample_blocks, journal_outline):
     """Test Shift+j jumps to next LLM-suggested knowledge block."""
     # Set up block states with some marked as knowledge
     block_states = {
@@ -136,6 +142,7 @@ async def test_jump_to_next_knowledge_block(sample_blocks):
     screen = Phase1Screen(
         blocks=sample_blocks,
         journal_date="2025-01-15",
+        journal_outline=journal_outline,
         initial_block_states=block_states
     )
     app = Phase1TestApp(screen)
@@ -158,7 +165,7 @@ async def test_jump_to_next_knowledge_block(sample_blocks):
 
 
 @pytest.mark.asyncio
-async def test_jump_to_previous_knowledge_block(sample_blocks):
+async def test_jump_to_previous_knowledge_block(sample_blocks, journal_outline):
     """Test Shift+k jumps to previous LLM-suggested knowledge block."""
     # Set up block states with some marked as knowledge
     block_states = {
@@ -190,6 +197,7 @@ async def test_jump_to_previous_knowledge_block(sample_blocks):
     screen = Phase1Screen(
         blocks=sample_blocks,
         journal_date="2025-01-15",
+        journal_outline=journal_outline,
         initial_block_states=block_states
     )
     app = Phase1TestApp(screen)
@@ -213,9 +221,9 @@ async def test_jump_to_previous_knowledge_block(sample_blocks):
 
 
 @pytest.mark.asyncio
-async def test_bottom_panel_updates_on_navigation(sample_blocks):
+async def test_bottom_panel_updates_on_navigation(sample_blocks, journal_outline):
     """Test bottom panel shows selected block details."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15")
+    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", journal_outline=journal_outline)
     app = Phase1TestApp(screen)
 
     async with app.run_test() as pilot:

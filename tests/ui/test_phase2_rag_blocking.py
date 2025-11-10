@@ -10,7 +10,8 @@ from textual.pilot import Pilot
 from logsqueak.tui.screens.content_editing import Phase2Screen
 from logsqueak.models.edited_content import EditedContent
 from logsqueak.models.background_task import BackgroundTaskState
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
+from logseq_outline.graph import GraphPaths
 
 
 class Phase2TestApp(App):
@@ -52,12 +53,30 @@ def sample_edited_content():
     ]
 
 
+@pytest.fixture
+def journal_outline(sample_blocks):
+    """Create a LogseqOutline from sample blocks."""
+    return LogseqOutline(blocks=sample_blocks, source_text="", frontmatter=[])
+
+
+@pytest.fixture
+def graph_paths(tmp_path):
+    """Create a temporary GraphPaths instance."""
+    graph_dir = tmp_path / "test-graph"
+    graph_dir.mkdir()
+    (graph_dir / "pages").mkdir()
+    (graph_dir / "journals").mkdir()
+    return GraphPaths(graph_dir)
+
+
 @pytest.mark.asyncio
-async def test_n_key_blocked_when_page_indexing_running(sample_blocks, sample_edited_content):
+async def test_n_key_blocked_when_page_indexing_running(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test 'n' key is blocked while page indexing is still running."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -77,11 +96,13 @@ async def test_n_key_blocked_when_page_indexing_running(sample_blocks, sample_ed
 
 
 @pytest.mark.asyncio
-async def test_n_key_blocked_when_rag_search_running(sample_blocks, sample_edited_content):
+async def test_n_key_blocked_when_rag_search_running(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test 'n' key is blocked while RAG search is still running."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -102,11 +123,13 @@ async def test_n_key_blocked_when_rag_search_running(sample_blocks, sample_edite
 
 
 @pytest.mark.asyncio
-async def test_n_key_enabled_when_all_tasks_complete(sample_blocks, sample_edited_content):
+async def test_n_key_enabled_when_all_tasks_complete(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test 'n' key works when both page indexing and RAG search are complete."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -125,11 +148,13 @@ async def test_n_key_enabled_when_all_tasks_complete(sample_blocks, sample_edite
 
 
 @pytest.mark.asyncio
-async def test_status_message_when_waiting_for_page_index(sample_blocks, sample_edited_content):
+async def test_status_message_when_waiting_for_page_index(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that status shows 'Waiting for page index...' message."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -147,11 +172,13 @@ async def test_status_message_when_waiting_for_page_index(sample_blocks, sample_
 
 
 @pytest.mark.asyncio
-async def test_status_message_when_waiting_for_rag_search(sample_blocks, sample_edited_content):
+async def test_status_message_when_waiting_for_rag_search(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that status shows 'Finding relevant pages...' message."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -168,11 +195,13 @@ async def test_status_message_when_waiting_for_rag_search(sample_blocks, sample_
 
 
 @pytest.mark.asyncio
-async def test_rag_search_starts_after_page_indexing_completes(sample_blocks, sample_edited_content):
+async def test_rag_search_starts_after_page_indexing_completes(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that RAG search automatically starts when page indexing completes."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -195,11 +224,13 @@ async def test_rag_search_starts_after_page_indexing_completes(sample_blocks, sa
 
 
 @pytest.mark.asyncio
-async def test_footer_shows_n_disabled_while_waiting(sample_blocks, sample_edited_content):
+async def test_footer_shows_n_disabled_while_waiting(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that footer indicates 'n' key is disabled while waiting."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -217,11 +248,13 @@ async def test_footer_shows_n_disabled_while_waiting(sample_blocks, sample_edite
 
 
 @pytest.mark.asyncio
-async def test_status_updates_with_rag_search_progress(sample_blocks, sample_edited_content):
+async def test_status_updates_with_rag_search_progress(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that status shows RAG search progress (e.g., '2/5 complete')."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -241,11 +274,13 @@ async def test_status_updates_with_rag_search_progress(sample_blocks, sample_edi
 
 
 @pytest.mark.asyncio
-async def test_page_indexing_error_shows_message(sample_blocks, sample_edited_content):
+async def test_page_indexing_error_shows_message(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that page indexing errors are displayed to user."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -264,11 +299,13 @@ async def test_page_indexing_error_shows_message(sample_blocks, sample_edited_co
 
 
 @pytest.mark.asyncio
-async def test_rag_search_error_shows_message(sample_blocks, sample_edited_content):
+async def test_rag_search_error_shows_message(sample_blocks, sample_edited_content, journal_outline, graph_paths):
     """Test that RAG search errors are displayed to user."""
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)

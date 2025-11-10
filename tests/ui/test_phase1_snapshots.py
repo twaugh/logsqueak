@@ -7,7 +7,7 @@ import pytest
 from textual.app import App
 from logsqueak.tui.screens.block_selection import Phase1Screen
 from logsqueak.models.block_state import BlockState
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
 
 
 
@@ -63,9 +63,15 @@ def sample_blocks():
     return blocks
 
 
-def test_phase1_initial_render(snap_compare, sample_blocks):
+@pytest.fixture
+def journal_outline(sample_blocks):
+    """Create a LogseqOutline from sample blocks."""
+    return LogseqOutline(blocks=sample_blocks, source_text="", frontmatter=[])
+
+
+def test_phase1_initial_render(snap_compare, sample_blocks, journal_outline):
     """Test Phase 1 screen initial appearance matches snapshot."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15")
+    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", journal_outline=journal_outline)
     app = Phase1TestApp(screen)
 
     assert snap_compare(
@@ -74,7 +80,7 @@ def test_phase1_initial_render(snap_compare, sample_blocks):
     )
 
 
-def test_phase1_with_llm_suggestions(snap_compare, sample_blocks):
+def test_phase1_with_llm_suggestions(snap_compare, sample_blocks, journal_outline):
     """Test Phase 1 screen with LLM suggestions displayed."""
     # Set up block states with LLM suggestions
     block_states = {
@@ -111,6 +117,7 @@ def test_phase1_with_llm_suggestions(snap_compare, sample_blocks):
     screen = Phase1Screen(
         blocks=sample_blocks,
         journal_date="2025-01-15",
+        journal_outline=journal_outline,
         initial_block_states=block_states
     )
     app = Phase1TestApp(screen)
@@ -121,7 +128,7 @@ def test_phase1_with_llm_suggestions(snap_compare, sample_blocks):
     )
 
 
-def test_phase1_with_user_selections(snap_compare, sample_blocks):
+def test_phase1_with_user_selections(snap_compare, sample_blocks, journal_outline):
     """Test Phase 1 screen with user selections (green highlights)."""
     # Set up block states with user selections
     block_states = {
@@ -156,6 +163,7 @@ def test_phase1_with_user_selections(snap_compare, sample_blocks):
     screen = Phase1Screen(
         blocks=sample_blocks,
         journal_date="2025-01-15",
+        journal_outline=journal_outline,
         initial_block_states=block_states
     )
     app = Phase1TestApp(screen)
@@ -166,13 +174,14 @@ def test_phase1_with_user_selections(snap_compare, sample_blocks):
     )
 
 
-def test_phase1_with_background_tasks(snap_compare, sample_blocks):
+def test_phase1_with_background_tasks(snap_compare, sample_blocks, journal_outline):
     """Test Phase 1 screen with background tasks in progress."""
     from logsqueak.models.background_task import BackgroundTask
 
     test_screen = Phase1Screen(
         blocks=sample_blocks,
-        journal_date="2025-01-15"
+        journal_date="2025-01-15",
+        journal_outline=journal_outline
     )
 
     # Set up background tasks

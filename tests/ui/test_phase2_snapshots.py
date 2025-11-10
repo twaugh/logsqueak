@@ -9,7 +9,8 @@ from textual.app import App
 from logsqueak.tui.screens.content_editing import Phase2Screen
 from logsqueak.models.edited_content import EditedContent
 from logsqueak.models.background_task import BackgroundTaskState
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
+from logseq_outline.graph import GraphPaths
 
 
 class Phase2TestApp(App):
@@ -77,15 +78,35 @@ def sample_edited_content_for_snapshot():
     ]
 
 
+@pytest.fixture
+def journal_outline(sample_blocks_for_snapshot):
+    """Create a LogseqOutline from sample blocks."""
+    return LogseqOutline(blocks=sample_blocks_for_snapshot, source_text="", frontmatter=[])
+
+
+@pytest.fixture
+def graph_paths(tmp_path):
+    """Create a temporary GraphPaths instance."""
+    graph_dir = tmp_path / "test-graph"
+    graph_dir.mkdir()
+    (graph_dir / "pages").mkdir()
+    (graph_dir / "journals").mkdir()
+    return GraphPaths(graph_dir)
+
+
 def test_phase2_initial_render_snapshot(
     snap_compare,
     sample_blocks_for_snapshot,
-    sample_edited_content_for_snapshot
+    sample_edited_content_for_snapshot,
+    journal_outline,
+    graph_paths
 ):
     """Test Phase 2 screen initial render matches snapshot."""
     screen = Phase2Screen(
         blocks=sample_blocks_for_snapshot,
         edited_content=sample_edited_content_for_snapshot,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -97,12 +118,16 @@ def test_phase2_initial_render_snapshot(
 def test_phase2_with_llm_rewording_complete(
     snap_compare,
     sample_blocks_for_snapshot,
-    sample_edited_content_for_snapshot
+    sample_edited_content_for_snapshot,
+    journal_outline,
+    graph_paths
 ):
     """Test Phase 2 screen with LLM rewording complete."""
     screen = Phase2Screen(
         blocks=sample_blocks_for_snapshot,
         edited_content=sample_edited_content_for_snapshot,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -114,12 +139,16 @@ def test_phase2_with_llm_rewording_complete(
 def test_phase2_second_block_snapshot(
     snap_compare,
     sample_blocks_for_snapshot,
-    sample_edited_content_for_snapshot
+    sample_edited_content_for_snapshot,
+    journal_outline,
+    graph_paths
 ):
     """Test Phase 2 screen on second block matches snapshot."""
     screen = Phase2Screen(
         blocks=sample_blocks_for_snapshot,
         edited_content=sample_edited_content_for_snapshot,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
 
@@ -135,12 +164,16 @@ def test_phase2_second_block_snapshot(
 def test_phase2_three_panel_layout_snapshot(
     snap_compare,
     sample_blocks_for_snapshot,
-    sample_edited_content_for_snapshot
+    sample_edited_content_for_snapshot,
+    journal_outline,
+    graph_paths
 ):
     """Test that three-panel layout is visible in snapshot."""
     screen = Phase2Screen(
         blocks=sample_blocks_for_snapshot,
         edited_content=sample_edited_content_for_snapshot,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)
@@ -155,12 +188,16 @@ def test_phase2_three_panel_layout_snapshot(
 def test_phase2_status_panel_snapshot(
     snap_compare,
     sample_blocks_for_snapshot,
-    sample_edited_content_for_snapshot
+    sample_edited_content_for_snapshot,
+    journal_outline,
+    graph_paths
 ):
     """Test that status panel shows background task progress."""
     screen = Phase2Screen(
         blocks=sample_blocks_for_snapshot,
         edited_content=sample_edited_content_for_snapshot,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
 
@@ -177,12 +214,16 @@ def test_phase2_status_panel_snapshot(
 def test_phase2_footer_snapshot(
     snap_compare,
     sample_blocks_for_snapshot,
-    sample_edited_content_for_snapshot
+    sample_edited_content_for_snapshot,
+    journal_outline,
+    graph_paths
 ):
     """Test that footer shows keyboard shortcuts."""
     screen = Phase2Screen(
         blocks=sample_blocks_for_snapshot,
         edited_content=sample_edited_content_for_snapshot,
+        journal_outline=journal_outline,
+        graph_paths=graph_paths,
         auto_start_workers=False
     )
     app = Phase2TestApp(screen)

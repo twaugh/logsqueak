@@ -190,7 +190,8 @@ def test_app_augments_outline_with_ids(mock_services, sample_journal_outline):
     check_blocks_have_ids(app.journal_outline.blocks)
 
 
-def test_transition_to_phase2_filters_id_property(mock_services, sample_journal_outline):
+@pytest.mark.asyncio
+async def test_transition_to_phase2_filters_id_property(mock_services, sample_journal_outline):
     """Test that transition_to_phase2 excludes id:: property from editable content."""
     from logsqueak.models.block_state import BlockState
 
@@ -200,29 +201,33 @@ def test_transition_to_phase2_filters_id_property(mock_services, sample_journal_
         **mock_services,
     )
 
-    # Create a selected block (simulating Phase 1 completion)
-    # The augmented outline will have id:: properties added
-    first_block = app.journal_outline.blocks[0]
+    async with app.run_test() as pilot:
+        await pilot.pause()
 
-    selected_blocks = [
-        BlockState(
-            block_id=first_block.block_id,
-            classification="knowledge",
-            source="user",
-        )
-    ]
+        # Create a selected block (simulating Phase 1 completion)
+        # The augmented outline will have id:: properties added
+        first_block = app.journal_outline.blocks[0]
 
-    # Transition to Phase 2
-    app.transition_to_phase2(selected_blocks)
+        selected_blocks = [
+            BlockState(
+                block_id=first_block.block_id,
+                classification="knowledge",
+                source="user",
+            )
+        ]
 
-    # Verify edited_content was created
-    assert app.edited_content is not None
-    assert len(app.edited_content) == 1
+        # Transition to Phase 2
+        app.transition_to_phase2(selected_blocks)
+        await pilot.pause()
 
-    # Verify the id:: property is NOT in the editable content
-    edited = app.edited_content[0]
-    assert "id::" not in edited.original_content, "id:: property should be filtered out from original_content"
-    assert "id::" not in edited.current_content, "id:: property should be filtered out from current_content"
+        # Verify edited_content was created
+        assert app.edited_content is not None
+        assert len(app.edited_content) == 1
 
-    # Verify the actual block content is present
-    assert "Root block 1" in edited.original_content
+        # Verify the id:: property is NOT in the editable content
+        edited = app.edited_content[0]
+        assert "id::" not in edited.original_content, "id:: property should be filtered out from original_content"
+        assert "id::" not in edited.current_content, "id:: property should be filtered out from current_content"
+
+        # Verify the actual block content is present
+        assert "Root block 1" in edited.original_content

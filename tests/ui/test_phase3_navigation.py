@@ -9,7 +9,7 @@ from textual.app import App
 from logsqueak.tui.screens.integration_review import Phase3Screen
 from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.models.edited_content import EditedContent
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
 
 
 class Phase3TestApp(App):
@@ -117,14 +117,70 @@ def sample_decisions():
     ]
 
 
+@pytest.fixture
+def sample_page_contents():
+    """Create sample page contents for testing."""
+    return {
+        "Python/Concurrency": LogseqOutline(
+            blocks=[
+                LogseqBlock(
+                    content=["# Python Concurrency"],
+                    indent_level=0,
+                    block_id="concurrency-page-block-1",
+                    children=[]
+                )
+            ],
+            source_text="",
+            frontmatter=[]
+        ),
+        "Python/Best Practices": LogseqOutline(
+            blocks=[
+                LogseqBlock(
+                    content=["# Python Best Practices"],
+                    indent_level=0,
+                    block_id="best-practices-page-block-1",
+                    children=[]
+                )
+            ],
+            source_text="",
+            frontmatter=[]
+        ),
+        "Textual/Architecture": LogseqOutline(
+            blocks=[
+                LogseqBlock(
+                    content=["# Textual Architecture"],
+                    indent_level=0,
+                    block_id="textual-arch-page-block-1",
+                    children=[]
+                )
+            ],
+            source_text="",
+            frontmatter=[]
+        ),
+        "Textual/Widgets": LogseqOutline(
+            blocks=[
+                LogseqBlock(
+                    content=["# Textual Widgets"],
+                    indent_level=0,
+                    block_id="textual-widgets-page-block-1",
+                    children=[]
+                )
+            ],
+            source_text="",
+            frontmatter=[]
+        )
+    }
+
+
 @pytest.mark.asyncio
 async def test_navigate_between_decisions_with_j_key(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test j key navigates to next decision for current block."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -149,12 +205,13 @@ async def test_navigate_between_decisions_with_j_key(
 
 @pytest.mark.asyncio
 async def test_navigate_between_decisions_with_k_key(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test k key navigates to previous decision for current block."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -180,12 +237,13 @@ async def test_navigate_between_decisions_with_k_key(
 
 @pytest.mark.asyncio
 async def test_navigate_with_arrow_keys(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test arrow keys also work for decision navigation."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -213,12 +271,13 @@ async def test_navigate_with_arrow_keys(
 
 @pytest.mark.asyncio
 async def test_navigation_wraps_at_decision_boundaries(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test that navigation stops at first and last decisions for current block."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -247,12 +306,13 @@ async def test_navigation_wraps_at_decision_boundaries(
 
 @pytest.mark.asyncio
 async def test_target_page_preview_updates_on_navigation(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test that target page preview updates when navigating between decisions."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
@@ -278,12 +338,13 @@ async def test_target_page_preview_updates_on_navigation(
 
 @pytest.mark.asyncio
 async def test_decision_list_highlights_current_selection(
-    sample_journal_blocks, sample_edited_content, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
 ):
     """Test that decision list highlights the currently selected decision."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
         auto_start_workers=False
