@@ -430,25 +430,25 @@ These can be implemented in parallel after LLM wrappers complete:
   - Validate date formats (YYYY-MM-DD)
   - Handle ".." range syntax
 
-- [ ] T105 Implement journal loading with multiple date support (grouped by date in tree) in src/logsqueak/cli.py
+- [x] T105 Implement journal loading with multiple date support (grouped by date in tree) in src/logsqueak/cli.py
   - Add load_journal_entries() function
   - Use GraphPaths.get_journal_path() for each date
   - Parse with LogseqOutline.parse()
   - Return dict[str, LogseqOutline] mapping date → outline
 
-- [ ] T106 Implement config loading with helpful error messages in src/logsqueak/cli.py
+- [x] T106 Implement config loading with helpful error messages in src/logsqueak/cli.py
   - Try to load config from ~/.config/logsqueak/config.yaml
   - Show example YAML if missing (FR-072b)
   - Check file permissions mode 600 (FR-074)
   - Handle validation failures with clear messages (FR-072f)
 
-- [ ] T109 Write CLI integration tests in tests/integration/test_cli.py and run with pytest
+- [x] T109 Write CLI integration tests in tests/integration/test_cli.py and run with pytest
   - Test: CLI with valid date launches app
   - Test: CLI with date range loads multiple journals
   - Test: CLI with missing config shows helpful error
   - Test: CLI with invalid permissions shows error
 
-- [ ] T104b Run pytest tests/unit/test_cli.py tests/integration/test_cli.py -v and verify all PASS
+- [x] T104b Run pytest tests/unit/test_cli.py tests/integration/test_cli.py -v and verify all PASS
 
 **Checkpoint 6.6**: CLI can parse arguments, load config, and launch TUI
 

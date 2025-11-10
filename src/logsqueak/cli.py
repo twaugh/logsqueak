@@ -4,6 +4,9 @@ import click
 from pathlib import Path
 from datetime import date, timedelta
 from logsqueak.utils.logging import configure_logging, get_logger
+from logsqueak.models.config import Config
+from logseq_outline.parser import LogseqOutline
+from logseq_outline.graph import GraphPaths
 
 
 logger = get_logger(__name__)
@@ -69,6 +72,75 @@ def parse_date_or_range(date_or_range: str | None) -> list[date]:
             raise ValueError(f"Invalid date format: {date_or_range}. Expected: YYYY-MM-DD") from e
 
 
+def load_journal_entries(graph_path: Path, dates: list[date]) -> dict[str, LogseqOutline]:
+    """
+    Load journal entries for given dates from Logseq graph.
+
+    Args:
+        graph_path: Path to Logseq graph directory
+        dates: List of dates to load journals for
+
+    Returns:
+        Dictionary mapping date string (YYYY-MM-DD) to LogseqOutline
+
+    Raises:
+        ValueError: If graph_path is invalid
+        FileNotFoundError: If journal file doesn't exist for a date
+    """
+    graph = GraphPaths(graph_path)
+    journals = {}
+
+    for journal_date in dates:
+        # Convert date to Logseq journal format (YYYY_MM_DD)
+        date_str = journal_date.strftime("%Y_%m_%d")
+        journal_path = graph.get_journal_path(date_str)
+
+        # Check if journal exists
+        if not journal_path.exists():
+            raise FileNotFoundError(
+                f"Journal file not found: {journal_path}\n"
+                f"Expected journal for date: {journal_date.strftime('%Y-%m-%d')}"
+            )
+
+        # Read and parse journal file
+        logger.info("loading_journal", date=str(journal_date), path=str(journal_path))
+        journal_text = journal_path.read_text(encoding="utf-8")
+        outline = LogseqOutline.parse(journal_text)
+
+        # Store using ISO format (YYYY-MM-DD) for consistency with user input
+        journals[journal_date.strftime("%Y-%m-%d")] = outline
+
+    logger.info("journals_loaded", count=len(journals))
+    return journals
+
+
+def load_config() -> Config:
+    """
+    Load configuration from ~/.config/logsqueak/config.yaml.
+
+    Returns:
+        Validated Config instance
+
+    Raises:
+        click.ClickException: If config is missing, has invalid permissions, or validation fails
+    """
+    config_path = Path.home() / ".config" / "logsqueak" / "config.yaml"
+
+    try:
+        config = Config.load(config_path)
+        logger.info("config_loaded", path=str(config_path))
+        return config
+    except FileNotFoundError as e:
+        logger.error("config_not_found", path=str(config_path))
+        raise click.ClickException(str(e))
+    except PermissionError as e:
+        logger.error("config_permission_error", path=str(config_path))
+        raise click.ClickException(str(e))
+    except Exception as e:
+        logger.error("config_validation_error", error=str(e))
+        raise click.ClickException(f"Configuration validation failed:\n{e}")
+
+
 @click.group()
 @click.version_option(version="0.1.0", prog_name="logsqueak")
 def cli():
@@ -105,10 +177,25 @@ def extract(date_or_range: str = None):
     else:
         click.echo(f"Extracting from {len(dates)} journal entries: {dates[0]} to {dates[-1]}")
 
-    # TODO: Remaining implementation in T105-T107
-    # - Load journal entries (T105)
-    # - Load config (T106)
-    # - Initialize services and launch TUI (T107)
+    # Load configuration
+    config = load_config()
+
+    # Load journal entries
+    try:
+        graph_path = Path(config.logseq.graph_path).expanduser()
+        journals = load_journal_entries(graph_path, dates)
+        logger.info("extract_ready", journal_count=len(journals))
+    except (ValueError, FileNotFoundError) as e:
+        logger.error("journal_load_error", error=str(e))
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+
+    click.echo(f"Loaded {len(journals)} journal(s) successfully")
+
+    # TODO: T107 - Initialize services and launch TUI
+    # - Create LLMClient, PageIndexer, RAGSearch, FileMonitor
+    # - Initialize App with services
+    # - Launch TUI
 
     logger.info("extract_command_completed")
 
