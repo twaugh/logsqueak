@@ -12,11 +12,16 @@ from textual.widgets import Footer, Header, Static
 from textual.reactive import reactive
 from textual.worker import Worker
 from textual.binding import Binding
+import structlog
 
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
 from logsqueak.models.block_state import BlockState
 from logsqueak.models.background_task import BackgroundTask
 from logsqueak.tui.widgets import BlockTree, StatusPanel, BlockDetailPanel
+from logsqueak.services.llm_client import LLMClient
+from logsqueak.services.llm_wrappers import classify_blocks
+
+logger = structlog.get_logger()
 
 
 class Phase1Screen(Screen):
@@ -60,6 +65,8 @@ class Phase1Screen(Screen):
         self,
         blocks: list[LogseqBlock],
         journal_date: str,
+        journal_outline: LogseqOutline,
+        llm_client: Optional[LLMClient] = None,
         initial_block_states: Optional[Dict[str, BlockState]] = None,
         llm_stream_fn: Optional[Callable] = None,
         auto_start_workers: bool = True,
@@ -71,6 +78,8 @@ class Phase1Screen(Screen):
         Args:
             blocks: List of LogseqBlock objects from journal
             journal_date: Date string for journal (e.g., "2025-01-15")
+            journal_outline: Full journal outline (for LLM classification)
+            llm_client: LLM client instance (None for testing with mock)
             initial_block_states: Optional pre-populated block states
             llm_stream_fn: Optional mock LLM streaming function (for testing)
             auto_start_workers: Whether to auto-start background workers on mount
@@ -78,6 +87,8 @@ class Phase1Screen(Screen):
         super().__init__(*args, **kwargs)
         self.blocks = blocks
         self.journal_date = journal_date
+        self.journal_outline = journal_outline
+        self.llm_client = llm_client
         self.llm_stream_fn = llm_stream_fn
         self.auto_start_workers = auto_start_workers
 
@@ -366,9 +377,15 @@ class Phase1Screen(Screen):
                 exclusive=False,
                 thread=False
             )
+        elif self.llm_client:
+            # Use real LLM client
+            self._llm_worker = self.run_worker(
+                self._llm_classification_worker(),
+                exclusive=False,
+                thread=False
+            )
         else:
-            # Use real LLM client (not yet implemented)
-            pass
+            logger.warning("No LLM client or mock function provided, skipping classification")
 
     async def _llm_classification_worker_mock(self) -> None:
         """Mock LLM classification worker (for testing)."""
@@ -415,6 +432,82 @@ class Phase1Screen(Screen):
         status_panel.update_status()
 
         self._update_selected_count()
+
+    async def _llm_classification_worker(self) -> None:
+        """Real LLM classification worker using classify_blocks wrapper."""
+        # Create background task
+        self.background_tasks["llm_classification"] = BackgroundTask(
+            task_type="llm_classification",
+            status="running",
+            progress_current=0,
+            progress_total=len(self.block_states),
+        )
+
+        status_panel = self.query_one(StatusPanel)
+        status_panel.update_status()
+
+        try:
+            # Stream results from LLM (only returns knowledge blocks)
+            count = 0
+            async for chunk in classify_blocks(self.llm_client, self.journal_outline):
+                block_id = chunk.block_id
+                if block_id in self.block_states:
+                    state = self.block_states[block_id]
+
+                    # All chunks are knowledge blocks (LLM filters out activity blocks)
+                    state.llm_classification = "knowledge"
+                    state.llm_confidence = chunk.confidence
+                    state.reason = chunk.reason
+
+                    # Update visual (shows robot emoji but block not selected yet)
+                    tree = self.query_one(BlockTree)
+                    tree.update_block_label(block_id)
+
+                    # Update bottom panel if this is the currently selected block
+                    if block_id == self.current_block_id:
+                        self._update_current_block()
+
+                    logger.info(
+                        "llm_classification_chunk",
+                        block_id=block_id,
+                        confidence=chunk.confidence,
+                        reason=chunk.reason[:100] if chunk.reason else None
+                    )
+                else:
+                    logger.warning(
+                        "llm_classification_unknown_block",
+                        block_id=block_id
+                    )
+
+                count += 1
+
+                # Update progress
+                self.background_tasks["llm_classification"].progress_current = count
+                status_panel.update_status()
+
+            # Mark complete
+            self.background_tasks["llm_classification"].status = "completed"
+            self.background_tasks["llm_classification"].progress_percentage = 100.0
+            status_panel.update_status()
+
+            self._update_selected_count()
+
+            logger.info(
+                "llm_classification_complete",
+                total_knowledge_blocks=count
+            )
+
+        except Exception as e:
+            # Mark failed
+            self.background_tasks["llm_classification"].status = "failed"
+            self.background_tasks["llm_classification"].error_message = str(e)
+            status_panel.update_status()
+
+            logger.error(
+                "llm_classification_error",
+                error=str(e),
+                exc_info=True
+            )
 
     def start_page_indexing(self) -> None:
         """Start page indexing worker."""
