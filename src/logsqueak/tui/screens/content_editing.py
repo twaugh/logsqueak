@@ -373,8 +373,21 @@ class Phase2Screen(Screen):
         # Save current content
         self._save_current_content()
 
-        # TODO: Transition to Phase 3
         logger.info("phase2_complete", blocks_edited=len(self.edited_content))
+
+        # Call app transition method
+        from logsqueak.tui.app import LogsqueakApp
+        if isinstance(self.app, LogsqueakApp):
+            # Convert candidate_page_names dict to list of unique page names
+            unique_pages = sorted(set(
+                page for pages in self.candidate_page_names.values() for page in pages
+            ))
+
+            self.app.transition_to_phase3(
+                edited_content=self.edited_content,
+                candidate_pages=unique_pages,
+                page_contents=self.page_contents,
+            )
 
     def action_back(self) -> None:
         """Go back to Phase 1 ('q' key)."""

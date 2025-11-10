@@ -163,6 +163,8 @@ class Phase1Screen(Screen):
 
     def on_mount(self) -> None:
         """Called when screen is mounted."""
+        logger.info("phase1_on_mount_started")
+
         # Start background tasks automatically (unless disabled for testing)
         if self.auto_start_workers:
             self.start_llm_classification()
@@ -170,6 +172,8 @@ class Phase1Screen(Screen):
 
         # Update bottom panel with initial block
         self._update_current_block()
+
+        logger.info("phase1_on_mount_finished")
 
     def on_unmount(self) -> None:
         """Called when screen is unmounted."""
@@ -297,9 +301,21 @@ class Phase1Screen(Screen):
     def action_next_phase(self) -> None:
         """Proceed to Phase 2 (only if blocks selected)."""
         if self.selected_count > 0:
-            # TODO: Transition to Phase2Screen
-            # For now, just a placeholder
-            pass
+            # Collect all selected blocks
+            selected_blocks = [
+                state for state in self.block_states.values()
+                if state.classification == "knowledge"
+            ]
+
+            logger.info(
+                "phase1_next_requested",
+                num_selected=len(selected_blocks),
+            )
+
+            # Call app transition method
+            from logsqueak.tui.app import LogsqueakApp
+            if isinstance(self.app, LogsqueakApp):
+                self.app.transition_to_phase2(selected_blocks)
 
     def action_quit(self) -> None:
         """Quit application."""
