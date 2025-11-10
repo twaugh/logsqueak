@@ -297,6 +297,101 @@ The user wants to review integration suggestions for each knowledge block, see w
 
 - **BackgroundTask**: Represents a long-running background task (task_type: Literal["llm_classification", "page_indexing", "rag_search", "llm_rewording", "llm_decisions"], status: Literal["running", "completed", "failed"], progress_percentage: float | None)
 
+## Architecture
+
+### Worker Dependencies & Lifecycle
+
+The TUI application uses background workers for LLM operations and resource-intensive tasks. Workers have specific dependency ordering to ensure correct execution:
+
+#### Phase 1: Block Selection
+
+**Workers Started on Mount:**
+1. **LLM Classification Worker** (immediate)
+   - Classifies journal blocks as knowledge vs activity
+   - Streams results to BlockTree widget
+   - Independent, no dependencies
+
+2. **SentenceTransformer Loading** (immediate, app-level)
+   - Lazy-loads embedding model in background
+   - Runs in thread pool to avoid blocking UI
+   - Prerequisite for PageIndexer
+
+3. **Page Indexing Worker** (immediate, but waits internally)
+   - **Depends on**: SentenceTransformer loading complete
+   - Builds ChromaDB vector index of all pages
+   - Indexes pages using `generate_chunks()` for semantic search
+   - Updates progress as indexing proceeds
+
+#### Phase 2: Content Editing
+
+**Workers Started on Mount:**
+1. **LLM Rewording Worker** (immediate)
+   - Generates reworded versions of knowledge blocks
+   - Removes temporal context from content
+   - Streams results to ContentEditor panels
+   - Independent, no dependencies
+
+2. **RAG Search Worker** (immediate, but waits internally)
+   - **Depends on**: PageIndexer complete (from Phase 1)
+   - Searches for candidate target pages using semantic search
+   - Loads full page contents for LLM integration planning
+   - **Blocks Phase 2 → Phase 3 transition** until complete
+
+**Workers Started After Other Workers Complete:**
+3. **Integration Decision Worker** (opportunistic)
+   - **Depends on**: RAG Search complete
+   - **Starts when**: RAG search finishes (could be in Phase 2 or Phase 3)
+   - Generates integration suggestions for each block
+   - Streams decisions to shared list (app.integration_decisions)
+   - **Scenarios:**
+     - **Fast user**: Presses 'n' before RAG completes → Worker starts in Phase 3
+     - **Slow user**: Stays in Phase 2 → Worker starts in Phase 2, decisions ready when Phase 3 mounts
+
+#### Phase 3: Integration Review
+
+**Workers:**
+- If decisions were generated in Phase 2: Polls for new decisions being added to shared list
+- If no decisions exist: Starts Integration Decision Worker (same as Phase 2)
+- User reviews and accepts/skips decisions
+- Writes are synchronous (not background workers)
+
+#### Dependency Flow Diagram
+
+```
+[Phase 1 Mount]
+├─┬─ LLM Classification (immediate, independent)
+│ └─ Streams to BlockTree
+│
+├─┬─ SentenceTransformer Loading (immediate, app-level)
+│ └─┬─ [BLOCKS] PageIndexer
+│   └─ Builds vector index
+
+[Phase 1 → 2 Transition]
+
+[Phase 2 Mount]
+├─┬─ LLM Rewording (immediate, independent)
+│ └─ Streams to ContentEditor
+│
+└─┬─ RAG Search
+  └─ [WAITS FOR] PageIndexer complete
+    └─┬─ Searches for candidates
+      └─┬─ [TRIGGERS] Integration Decision Worker
+        └─ Streams decisions to shared list
+
+[Phase 2 → 3 Transition]
+└─ [BLOCKS ON] RAG Search complete
+
+[Phase 3 Mount]
+└─ Displays decisions (polls for new ones if Phase 2 worker still running)
+```
+
+#### Coordination Mechanisms
+
+- **Shared State**: `app.integration_decisions` list is shared between Phase 2 and Phase 3
+- **Background Tasks Dict**: Each screen maintains `background_tasks` dict for status tracking
+- **Blocking Transitions**: Phase 2 → 3 transition checks `rag_search_state` reactive attribute
+- **Worker Polling**: Phase 3 polls for new decisions if Phase 2 worker is still streaming
+
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes

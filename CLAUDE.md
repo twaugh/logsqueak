@@ -226,19 +226,28 @@ The TUI application will have **3 interactive phases**:
 - Display journal blocks in hierarchical tree view
 - LLM classifies blocks as "knowledge" vs "activity logs" (streaming results)
 - User manually selects/deselects blocks for extraction
-- Background: Page indexing for semantic search
+- Background workers:
+  - LLM Classification Worker (immediate, independent)
+  - SentenceTransformer Loading (immediate, app-level)
+  - Page Indexing Worker (waits for SentenceTransformer, then indexes pages)
 
 **Phase 2: Content Editing**
 - Display selected knowledge blocks with full context
 - LLM generates reworded versions (removes temporal context)
 - User can accept LLM version, edit manually, or revert to original
-- Background: RAG search for candidate pages
+- Background workers:
+  - LLM Rewording Worker (immediate, independent)
+  - RAG Search Worker (waits for PageIndexer from Phase 1)
+  - Integration Decision Worker (opportunistic - starts when RAG completes)
 
 **Phase 3: Integration Decisions**
 - LLM suggests where to integrate each knowledge block (streaming decisions)
 - User reviews preview showing new content in target page context
 - Accept/skip each decision (writes immediately on accept)
 - Atomic provenance: Add `processed::` marker to journal only after successful write
+- Workers:
+  - Polls for new decisions if Phase 2 worker still streaming
+  - Starts Integration Decision Worker if no decisions exist yet
 
 ### Configuration
 
@@ -309,6 +318,60 @@ From `specs/002-logsqueak-spec/spec.md` and project constitution:
 - Users must explicitly approve all integrations (no auto-write)
 - Can override any LLM suggestion at any phase
 - Can skip/cancel operations without side effects
+
+### Worker Dependencies & Lifecycle
+
+Background workers execute in a specific dependency order to ensure correct operation:
+
+#### Dependency Chain
+
+```
+Phase 1:
+  LLM Classification (immediate) ─┐
+                                   ├─ Independent workers
+  SentenceTransformer Loading     ─┤
+    └─ [BLOCKS] → PageIndexer     ─┘
+
+Phase 2:
+  LLM Rewording (immediate) ───────┐
+                                    ├─ Independent workers
+  RAG Search                        │
+    └─ [WAITS FOR] PageIndexer ────┤
+      └─ [TRIGGERS] Integration    │
+         Decision Worker            ─┘
+         (opportunistic)
+
+Phase 3:
+  Integration Decision Worker (if not started in Phase 2)
+  OR polls for decisions from Phase 2 worker
+```
+
+#### Worker Details
+
+**Phase 1 Workers:**
+1. **LLM Classification** - Streams block classifications immediately
+2. **SentenceTransformer Loading** (app-level) - Lazy-loads embedding model in thread pool
+3. **PageIndexer** - Waits for SentenceTransformer, then builds ChromaDB vector index
+
+**Phase 2 Workers:**
+1. **LLM Rewording** - Streams reworded content immediately (independent)
+2. **RAG Search** - Waits for PageIndexer completion, then searches for candidate pages
+   - **Blocks Phase 2 → 3 transition** until complete
+3. **Integration Decision** (opportunistic) - Starts when RAG completes
+   - If user waits in Phase 2: Worker starts there, decisions ready for Phase 3
+   - If user presses 'n' quickly: Worker starts in Phase 3 instead
+
+**Phase 3 Workers:**
+- If decisions already streaming from Phase 2: Polls for new decisions
+- If no decisions exist: Starts Integration Decision Worker
+
+#### Key Constraints
+
+1. **PageIndexer cannot start** until SentenceTransformer loads
+2. **RAG search cannot start** until PageIndexer completes
+3. **Integration decisions cannot start** until RAG search completes
+4. **Phase 2 → 3 transition is blocked** until RAG search completes
+5. **Integration Decision Worker is opportunistic** (starts whenever RAG completes)
 
 ## Development Commands
 
