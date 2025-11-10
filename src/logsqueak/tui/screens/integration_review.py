@@ -591,15 +591,15 @@ Confidence: {decision.confidence:.0%}
                 self.page_contents
             )
 
-            # Step 2: Batch decisions by block
-            batched_stream = batch_decisions_by_block(raw_decision_stream)
+            # Step 2: Filter out skip_exists blocks and track count
+            filtered_stream = filter_skip_exists_blocks(raw_decision_stream)
 
-            # Step 3: Filter out skip_exists blocks and track count
-            filtered_stream = filter_skip_exists_blocks(batched_stream)
+            # Step 3: Batch decisions by block
+            batched_stream = batch_decisions_by_block(filtered_stream)
 
             # Step 4: Process filtered batches
             block_count = 0
-            async for decision_batch in filtered_stream:
+            async for decision_batch in batched_stream:
                 if not decision_batch:
                     continue
 
