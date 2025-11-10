@@ -372,19 +372,19 @@ These can be implemented in parallel after LLM wrappers complete:
 
 **Component 1: Main App Shell**
 
-- [ ] T100a Write unit tests for App class screen management in tests/unit/test_app.py - should FAIL initially
+- [x] T100a Write unit tests for App class screen management in tests/unit/test_app.py - should FAIL initially
   - Test: App instantiates without errors
   - Test: App can install Phase1Screen, Phase2Screen, Phase3Screen
   - Test: App tracks current phase state
 
-- [ ] T100 Implement main TUI App class with screen management (Phase1Screen → Phase2Screen → Phase3Screen) in src/logsqueak/tui/app.py
+- [x] T100 Implement main TUI App class with screen management (Phase1Screen → Phase2Screen → Phase3Screen) in src/logsqueak/tui/app.py
   - Class inherits from textual.app.App
   - Implements screen stack management
   - Stores shared state (config, services, file_monitor)
 
-- [ ] T100b Run pytest tests/unit/test_app.py -v and verify tests NOW PASS
+- [x] T100b Run pytest tests/unit/test_app.py -v and verify tests NOW PASS (5/5 passing ✅)
 
-**Checkpoint 6.4**: App shell instantiates and loads screens
+**Checkpoint 6.4**: ✅ App shell instantiates and loads screens
 
 ---
 

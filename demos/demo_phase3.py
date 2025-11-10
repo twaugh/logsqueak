@@ -231,7 +231,13 @@ def create_demo_data():
     # Create mock GraphPaths
     graph_paths = MockGraphPaths()
 
-    return journal_blocks, edited_content_list, all_decisions, graph_paths
+    # Create page_contents dict (mapping page names to LogseqOutline)
+    page_contents = {}
+    for page_name, page_text in TARGET_PAGES.items():
+        outline = LogseqOutline.parse(page_text)
+        page_contents[page_name] = outline
+
+    return journal_blocks, edited_content_list, all_decisions, graph_paths, page_contents
 
 
 class Phase3Demo(App):
@@ -244,12 +250,13 @@ class Phase3Demo(App):
     async def on_mount(self) -> None:
         """Push the Phase3Screen when app mounts."""
         # Create demo data
-        journal_blocks, edited_content, decisions, graph_paths = create_demo_data()
+        journal_blocks, edited_content, decisions, graph_paths, page_contents = create_demo_data()
 
         # Create and push Phase3Screen
         screen = Phase3Screen(
             journal_blocks=journal_blocks,
             edited_content=edited_content,
+            page_contents=page_contents,
             decisions=decisions,
             journal_date="2025-01-15",
             graph_paths=graph_paths,
