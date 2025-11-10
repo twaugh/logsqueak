@@ -13,7 +13,7 @@ from textual.binding import Binding
 from textual.widgets import Footer, Header
 import structlog
 
-from logseq_outline.parser import LogseqOutline
+from logseq_outline.parser import LogseqOutline, LogseqBlock
 from logseq_outline.graph import GraphPaths
 from logsqueak.models.config import Config
 from logsqueak.models.block_state import BlockState
@@ -247,9 +247,16 @@ class LogsqueakApp(App):
         for content in edited_content:
             self.original_contexts[content.block_id] = content.hierarchical_context
 
+        # Filter journal blocks to only include edited ones (preserving order)
+        edited_block_ids = {ec.block_id for ec in edited_content}
+        filtered_journal_blocks = self._filter_blocks_by_ids(
+            self.journal_outline.blocks,
+            edited_block_ids
+        )
+
         # Create and push Phase 3 screen
         phase3_screen = Phase3Screen(
-            journal_blocks=self.journal_outline.blocks,
+            journal_blocks=filtered_journal_blocks,
             edited_content=edited_content,
             page_contents=page_contents,
             journal_date=self.journal_date,
@@ -259,6 +266,33 @@ class LogsqueakApp(App):
             name="phase3",
         )
         self.push_screen(phase3_screen)
+
+    def _filter_blocks_by_ids(
+        self,
+        blocks: List[LogseqBlock],
+        block_ids: set[str]
+    ) -> List[LogseqBlock]:
+        """Recursively filter blocks to only include those with IDs in the set.
+
+        Args:
+            blocks: List of LogseqBlock to filter
+            block_ids: Set of block IDs to include
+
+        Returns:
+            Filtered list of LogseqBlock
+        """
+        filtered = []
+        for block in blocks:
+            # Check if this block should be included
+            if block.block_id in block_ids:
+                filtered.append(block)
+            # Recursively filter children
+            elif block.children:
+                child_matches = self._filter_blocks_by_ids(block.children, block_ids)
+                if child_matches:
+                    # If any children match, include them
+                    filtered.extend(child_matches)
+        return filtered
 
     def action_quit(self) -> None:
         """Handle quit action.
