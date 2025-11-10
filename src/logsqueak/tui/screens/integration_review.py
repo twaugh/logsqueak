@@ -4,7 +4,7 @@ This screen allows users to review integration decisions for each knowledge bloc
 see target page previews, and accept/skip decisions for writing to pages.
 """
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, AsyncIterator
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.containers import Container, Vertical, VerticalScroll
@@ -16,6 +16,7 @@ from logseq_outline.context import generate_full_context, generate_content_hash
 from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.models.edited_content import EditedContent
 from logsqueak.models.background_task import BackgroundTask, BackgroundTaskState
+from logsqueak.models.llm_chunks import IntegrationDecisionChunk
 from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
 from logsqueak.tui.widgets.decision_list import DecisionList
 from logsqueak.tui.widgets.status_panel import StatusPanel
@@ -159,7 +160,11 @@ class Phase3Screen(Screen):
         self.background_tasks: Dict[str, BackgroundTask] = {}
 
         # Track which blocks have decisions ready (for navigation blocking)
+        # If decisions are pre-generated, mark all blocks as ready
         self.decisions_ready: Dict[str, bool] = {}
+        if decisions:
+            for block_id in self.decisions_by_block.keys():
+                self.decisions_ready[block_id] = True
 
         # Track skipped blocks (for status display)
         self.skipped_block_count = 0
@@ -568,6 +573,44 @@ Confidence: {decision.confidence:.0%}
 
     # Background worker methods
 
+    async def _convert_chunks_to_decisions(
+        self,
+        chunk_stream: AsyncIterator[IntegrationDecisionChunk]
+    ) -> AsyncIterator[IntegrationDecision]:
+        """Convert IntegrationDecisionChunk stream to IntegrationDecision stream.
+
+        Adds refined_text from edited_content to each chunk.
+
+        Args:
+            chunk_stream: Stream of IntegrationDecisionChunk from LLM
+
+        Yields:
+            IntegrationDecision with refined_text populated
+        """
+        async for chunk in chunk_stream:
+            # Look up the refined_text from edited_content
+            edited_content = self.edited_content_map.get(chunk.knowledge_block_id)
+            if not edited_content:
+                logger.warning(
+                    "chunk_missing_edited_content",
+                    block_id=chunk.knowledge_block_id
+                )
+                continue
+
+            # Convert chunk to full decision
+            decision = IntegrationDecision(
+                knowledge_block_id=chunk.knowledge_block_id,
+                target_page=chunk.target_page,
+                action=chunk.action,
+                target_block_id=chunk.target_block_id,
+                target_block_title=chunk.target_block_title,
+                confidence=chunk.confidence,
+                refined_text=edited_content.current_content,
+                reasoning=chunk.reasoning,
+                write_status="pending",
+            )
+            yield decision
+
     async def _llm_decisions_worker(self) -> None:
         """Worker: Generate integration decisions using LLM with batching and filtering."""
         # Create background task
@@ -591,10 +634,14 @@ Confidence: {decision.confidence:.0%}
                 self.page_contents
             )
 
-            # Step 2: Filter out skip_exists blocks and track count
-            filtered_stream = filter_skip_exists_blocks(raw_decision_stream)
+            # Step 2: Convert IntegrationDecisionChunk to IntegrationDecision
+            # (add refined_text from edited_content)
+            converted_stream = self._convert_chunks_to_decisions(raw_decision_stream)
 
-            # Step 3: Batch decisions by block
+            # Step 3: Filter out skip_exists blocks and track count
+            filtered_stream = filter_skip_exists_blocks(converted_stream)
+
+            # Step 4: Batch decisions by block
             batched_stream = batch_decisions_by_block(filtered_stream)
 
             # Step 4: Process filtered batches
