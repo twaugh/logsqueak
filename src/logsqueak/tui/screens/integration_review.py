@@ -153,8 +153,9 @@ class Phase3Screen(Screen):
         self.edited_content_map = {ec.block_id: ec for ec in edited_content}
 
         # Decisions will be populated by LLM worker or passed in for testing
-        self.decisions = decisions or []
-        self.decisions_by_block = self._group_decisions_by_block(self.decisions) if decisions else {}
+        # IMPORTANT: Use 'is None' check instead of 'or []' to preserve empty list references
+        self.decisions = decisions if decisions is not None else []
+        self.decisions_by_block = self._group_decisions_by_block(self.decisions)
 
         # Background tasks tracking
         self.background_tasks: Dict[str, BackgroundTask] = {}
@@ -168,6 +169,9 @@ class Phase3Screen(Screen):
 
         # Track skipped blocks (for status display)
         self.skipped_block_count = 0
+
+        # Track decision count for polling updates (when using shared list from Phase 2)
+        self._last_known_decision_count = len(self.decisions)
 
     def _group_decisions_by_block(self, decisions: List[IntegrationDecision]) -> dict:
         """Group decisions by knowledge_block_id.
@@ -228,6 +232,10 @@ class Phase3Screen(Screen):
             # Start LLM decision generation worker
             self.run_worker(self._llm_decisions_worker(), name="llm_decisions")
             logger.info("llm_decisions_worker_started")
+        else:
+            # If decisions are pre-generated from Phase 2, start polling for updates
+            # The Phase 2 worker may still be adding decisions to the shared list
+            self.set_interval(0.5, self._check_for_new_decisions)
 
     def watch_current_decision_index(self, old_index: int, new_index: int) -> None:
         """React to changes in current_decision_index.
@@ -572,6 +580,43 @@ Confidence: {decision.confidence:.0%}
         self.dismiss()
 
     # Background worker methods
+
+    def _check_for_new_decisions(self) -> None:
+        """Poll for new decisions added to the shared list by Phase 2 worker.
+
+        This is called periodically when Phase3 receives pre-generated decisions
+        from Phase 2, as the Phase 2 worker may still be streaming in new decisions.
+        """
+        current_count = len(self.decisions)
+
+        logger.debug(
+            "polling_for_decisions",
+            current=current_count,
+            last_known=self._last_known_decision_count
+        )
+
+        # Check if new decisions have been added
+        if current_count != self._last_known_decision_count:
+            # Re-group decisions by block
+            self.decisions_by_block = self._group_decisions_by_block(self.decisions)
+
+            # Mark newly ready blocks
+            for block_id in self.decisions_by_block.keys():
+                if block_id not in self.decisions_ready:
+                    self.decisions_ready[block_id] = True
+                    logger.info(
+                        "new_decisions_detected_phase3",
+                        block_id=block_id,
+                        num_decisions=len(self.decisions_by_block[block_id])
+                    )
+
+            # Update display if we're viewing a block that just got decisions
+            current_block_id = self.journal_blocks[self.current_block_index].block_id
+            if current_block_id in self.decisions_by_block:
+                self.call_later(self._display_current_block)
+
+            # Update the known count
+            self._last_known_decision_count = current_count
 
     async def _convert_chunks_to_decisions(
         self,

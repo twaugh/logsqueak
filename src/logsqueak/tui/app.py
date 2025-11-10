@@ -86,6 +86,7 @@ class LogsqueakApp(App):
         self.candidate_pages: Optional[List[str]] = None
         self.page_contents: Optional[Dict[str, str]] = None
         self.original_contexts: Optional[Dict[str, str]] = None
+        self.integration_decisions: List = []  # Shared list populated by Phase2, read by Phase3
 
         logger.info(
             "app_initialized",
@@ -230,6 +231,10 @@ class LogsqueakApp(App):
             edited_content: List of EditedContent from Phase 2
             candidate_pages: List of candidate page names from RAG search
             page_contents: Dict mapping page names to LogseqOutline objects
+
+        Note:
+            Integration decisions are accessed via self.integration_decisions,
+            which is a shared list populated by Phase 2's background worker.
         """
         logger.info(
             "transitioning_to_phase3",
@@ -254,15 +259,19 @@ class LogsqueakApp(App):
             edited_block_ids
         )
 
-        # Create and push Phase 3 screen
+        # Create and push Phase 3 screen with shared decisions list
+        # Phase 3 will use self.integration_decisions which is being populated
+        # by Phase 2's background worker
         phase3_screen = Phase3Screen(
             journal_blocks=filtered_journal_blocks,
             edited_content=edited_content,
             page_contents=page_contents,
             journal_date=self.journal_date,
-            llm_client=self.llm_client,
+            llm_client=None,  # Decisions are generated in Phase 2
             graph_paths=GraphPaths(Path(self.config.logseq.graph_path)),
             file_monitor=self.file_monitor,
+            decisions=self.integration_decisions,  # Pass shared list (may still be populating)
+            auto_start_workers=False,  # Phase 2 worker is already running
             name="phase3",
         )
         self.push_screen(phase3_screen)

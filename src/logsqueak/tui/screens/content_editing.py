@@ -17,8 +17,11 @@ from logsqueak.tui.widgets.content_editor import ContentEditor
 from logsqueak.tui.widgets.status_panel import StatusPanel
 from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
 from logsqueak.services.llm_client import LLMClient
-from logsqueak.services.llm_wrappers import reword_content
+from logsqueak.services.llm_wrappers import reword_content, plan_integrations
+from logsqueak.services.llm_helpers import batch_decisions_by_block, filter_skip_exists_blocks
 from logsqueak.services.rag_search import RAGSearch
+from logsqueak.models.integration_decision import IntegrationDecision
+from logsqueak.models.llm_chunks import IntegrationDecisionChunk
 from logseq_outline.graph import GraphPaths
 import structlog
 
@@ -410,6 +413,12 @@ class Phase2Screen(Screen):
         # Save current content
         self._save_current_content()
 
+        # Start LLM decisions worker if not already running
+        # (normally starts after rewording completes, but user might press 'n' before that)
+        if self.llm_client and "llm_decisions" not in self.background_tasks:
+            logger.info("llm_decisions_worker_starting_on_transition")
+            self.run_worker(self._llm_decisions_worker(), name="llm_decisions")
+
         logger.info("phase2_complete", blocks_edited=len(self.edited_content))
 
         # Call app transition method
@@ -420,6 +429,7 @@ class Phase2Screen(Screen):
                 page for pages in self.candidate_page_names.values() for page in pages
             ))
 
+            # No need to pass decisions - Phase3 will access app.integration_decisions directly
             self.app.transition_to_phase3(
                 edited_content=self.edited_content,
                 candidate_pages=unique_pages,
@@ -511,6 +521,14 @@ class Phase2Screen(Screen):
                 total_blocks=count
             )
 
+            # Start LLM decisions worker now that rewording is complete
+            # This allows decisions to stream in during Phase 2, so they're
+            # ready when user reaches Phase 3
+            # Only start if not already running (user might have pressed 'n' already)
+            if self.llm_client and "llm_decisions" not in self.background_tasks:
+                self.run_worker(self._llm_decisions_worker(), name="llm_decisions")
+                logger.info("llm_decisions_worker_started_after_rewording")
+
         except Exception as e:
             # Mark failed
             self.background_tasks["llm_rewording"].status = "failed"
@@ -519,6 +537,125 @@ class Phase2Screen(Screen):
 
             logger.error(
                 "llm_rewording_error",
+                error=str(e),
+                exc_info=True
+            )
+
+    async def _llm_decisions_worker(self) -> None:
+        """Worker: Generate integration decisions using LLM.
+
+        This runs in Phase 2 after rewording completes, so decisions
+        are ready when user transitions to Phase 3.
+        """
+        # Create background task
+        self.background_tasks["llm_decisions"] = BackgroundTask(
+            task_type="llm_decisions",
+            status="running",
+            progress_current=0,
+            progress_total=len(self.edited_content),
+        )
+
+        status_panel = self.query_one(StatusPanel)
+        status_panel.update_status()
+
+        try:
+            # Stream raw decisions from LLM
+            logger.info("llm_decisions_starting_phase2", num_blocks=len(self.edited_content))
+
+            raw_decision_stream = plan_integrations(
+                self.llm_client,
+                self.edited_content,
+                self.page_contents
+            )
+
+            # Convert chunks to full decisions (add refined_text)
+            async def convert_chunks():
+                async for chunk in raw_decision_stream:
+                    edited_content = self.edited_content_map.get(chunk.knowledge_block_id)
+                    if not edited_content:
+                        logger.warning(
+                            "chunk_missing_edited_content_phase2",
+                            block_id=chunk.knowledge_block_id
+                        )
+                        continue
+
+                    decision = IntegrationDecision(
+                        knowledge_block_id=chunk.knowledge_block_id,
+                        target_page=chunk.target_page,
+                        action=chunk.action,
+                        target_block_id=chunk.target_block_id,
+                        target_block_title=chunk.target_block_title,
+                        confidence=chunk.confidence,
+                        refined_text=edited_content.current_content,
+                        reasoning=chunk.reasoning,
+                        write_status="pending",
+                    )
+                    yield decision
+
+            converted_stream = convert_chunks()
+
+            # Filter out skip_exists blocks
+            filtered_stream = filter_skip_exists_blocks(converted_stream)
+
+            # Batch decisions by block
+            batched_stream = batch_decisions_by_block(filtered_stream)
+
+            # Collect all decisions
+            block_count = 0
+            async for decision_batch in batched_stream:
+                if not decision_batch:
+                    continue
+
+                # Store decisions in app's shared list for Phase 3
+                from logsqueak.tui.app import LogsqueakApp
+                if isinstance(self.app, LogsqueakApp):
+                    before_count = len(self.app.integration_decisions)
+                    self.app.integration_decisions.extend(decision_batch)
+                    after_count = len(self.app.integration_decisions)
+                    logger.info(
+                        "decisions_added_to_shared_list",
+                        before=before_count,
+                        after=after_count,
+                        batch_size=len(decision_batch)
+                    )
+
+                block_count += 1
+
+                # Update progress
+                self.background_tasks["llm_decisions"].progress_current = block_count
+                status_panel.update_status()
+
+                logger.info(
+                    "llm_decisions_batch_complete_phase2",
+                    block_id=decision_batch[0].knowledge_block_id,
+                    num_decisions=len(decision_batch)
+                )
+
+            # Mark complete
+            self.background_tasks["llm_decisions"].status = "completed"
+            self.background_tasks["llm_decisions"].progress_percentage = 100.0
+            status_panel.update_status()
+
+            # Get total count from app's shared list
+            total_decisions = 0
+            from logsqueak.tui.app import LogsqueakApp
+            if isinstance(self.app, LogsqueakApp):
+                total_decisions = len(self.app.integration_decisions)
+
+            logger.info(
+                "llm_decisions_complete_phase2",
+                total_blocks=block_count,
+                total_decisions=total_decisions
+            )
+
+        except Exception as e:
+            # Mark failed
+            self.background_tasks["llm_decisions"].status = "failed"
+            self.background_tasks["llm_decisions"].error_message = str(e)
+            status_panel.update_status()
+
+            logger.error(
+                "llm_decisions_error_phase2",
                 error=str(e),
                 exc_info=True
             )
