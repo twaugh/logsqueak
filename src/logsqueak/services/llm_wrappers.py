@@ -279,9 +279,9 @@ async def reword_content(
 
     system_prompt = (
         f"Transform journal content to evergreen knowledge.\n\n"
-        f"Input: XML blocks with parent context ({indent_style})\n"
-        f"Each <block id=\"...\"> contains hierarchical context.\n"
-        f"The deepest (most indented) block is the target to reword.\n\n"
+        f"Input: XML blocks with hierarchical context ({indent_style})\n"
+        f"The deepest (most indented) block is the target to reword.\n"
+        f"Parent blocks provide context for pronoun resolution.\n\n"
         f"Rules:\n"
         f"1. Remove temporal context (today, yesterday, dates)\n"
         f"2. Convert first-person → third-person or neutral\n"
@@ -293,8 +293,7 @@ async def reword_content(
         f'Child: "This is Python-specific"\n'
         f'→ Reword: "The Textual framework is Python-specific"\n\n'
         f"Output: One JSON per line:\n"
-        f'{{"block_id": \"<use the id from XML attribute>\", \"reworded_content\": \"...\"}}\n\n'
-        f"CRITICAL: Use the block_id from the <block id=\"...\"> XML attribute, NOT from id:: properties in the content."
+        f'{{"block_id": \"<id from XML attribute>\", \"reworded_content\": \"...\"}}'
     )
 
     prompt = xml_blocks
