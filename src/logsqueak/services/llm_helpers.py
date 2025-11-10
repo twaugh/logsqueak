@@ -54,7 +54,6 @@ class FilteredStreamWithCount:
         self.stream = stream
         self.skipped_count = 0
         self._skip_block_ids: set[str] = set()
-        self._buffered_decisions: list[IntegrationDecision] = []
         self._current_block_id: str | None = None
         self._current_batch: list[IntegrationDecision] = []
 
@@ -70,8 +69,9 @@ class FilteredStreamWithCount:
                 self._current_block_id is not None
                 and decision.knowledge_block_id != self._current_block_id
             ):
-                # Process completed batch
-                await self._process_batch()
+                # Process completed batch - yield decisions immediately
+                async for yielded_decision in self._process_batch():
+                    yield yielded_decision
 
             # Add to current batch
             self._current_batch.append(decision)
@@ -79,14 +79,14 @@ class FilteredStreamWithCount:
 
         # Process final batch
         if self._current_batch:
-            await self._process_batch()
-
-        # Yield buffered decisions
-        for buffered_decision in self._buffered_decisions:
-            yield buffered_decision
+            async for yielded_decision in self._process_batch():
+                yield yielded_decision
 
     async def _process_batch(self):
-        """Process a completed batch of decisions for one block."""
+        """Process a completed batch of decisions for one block.
+
+        Yields decisions from the batch if the block should not be skipped.
+        """
         # Check if any decision in batch has skip_exists
         has_skip = any(d.action == "skip_exists" for d in self._current_batch)
 
@@ -95,8 +95,9 @@ class FilteredStreamWithCount:
             self.skipped_count += 1
             self._skip_block_ids.add(self._current_block_id)
         else:
-            # Keep all decisions from this block
-            self._buffered_decisions.extend(self._current_batch)
+            # Yield all decisions from this block immediately
+            for decision in self._current_batch:
+                yield decision
 
         # Clear batch
         self._current_batch = []

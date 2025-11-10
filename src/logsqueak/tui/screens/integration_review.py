@@ -235,6 +235,19 @@ class Phase3Screen(Screen):
         else:
             # If decisions are pre-generated from Phase 2, start polling for updates
             # The Phase 2 worker may still be adding decisions to the shared list
+
+            # Create a placeholder background task to show progress
+            # (the actual worker is running in Phase 2)
+            self.background_tasks["llm_decisions"] = BackgroundTask(
+                task_type="llm_decisions",
+                status="running",
+                progress_current=len(self.decisions_ready),
+                progress_total=len(self.edited_content),
+            )
+
+            status_panel = self.query_one(StatusPanel)
+            status_panel.update_status()
+
             self.set_interval(0.5, self._check_for_new_decisions)
 
     def watch_current_decision_index(self, old_index: int, new_index: int) -> None:
@@ -601,14 +614,37 @@ Confidence: {decision.confidence:.0%}
             self.decisions_by_block = self._group_decisions_by_block(self.decisions)
 
             # Mark newly ready blocks
+            newly_ready_count = 0
             for block_id in self.decisions_by_block.keys():
                 if block_id not in self.decisions_ready:
                     self.decisions_ready[block_id] = True
+                    newly_ready_count += 1
                     logger.info(
                         "new_decisions_detected_phase3",
                         block_id=block_id,
                         num_decisions=len(self.decisions_by_block[block_id])
                     )
+
+            # Update progress in background task if it exists
+            if "llm_decisions" in self.background_tasks:
+                # Update progress based on blocks with decisions ready
+                blocks_ready = len(self.decisions_ready)
+                total_blocks = len(self.edited_content)
+                self.background_tasks["llm_decisions"].progress_current = blocks_ready
+
+                # Check if all decisions are complete
+                if blocks_ready >= total_blocks:
+                    self.background_tasks["llm_decisions"].status = "completed"
+                    self.background_tasks["llm_decisions"].progress_percentage = 100.0
+                    logger.info(
+                        "llm_decisions_complete_phase3_polling",
+                        total_blocks=blocks_ready,
+                        total_decisions=current_count
+                    )
+
+                # Update status panel
+                status_panel = self.query_one(StatusPanel)
+                status_panel.update_status()
 
             # Update display if we're viewing a block that just got decisions
             current_block_id = self.journal_blocks[self.current_block_index].block_id
