@@ -281,9 +281,9 @@ def mock_decision_stream():
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T095a [P] Write unit tests for batch_decisions_by_block() in tests/unit/test_llm_helpers.py - should FAIL initially
-- [ ] T095b [P] Write unit tests for filter_skip_exists_blocks() with count tracking in tests/unit/test_llm_helpers.py - should FAIL initially
-- [ ] T095c Run pytest tests/unit/test_llm_helpers.py -v and verify tests FAIL as expected
+- [x] T095a [P] Write unit tests for batch_decisions_by_block() in tests/unit/test_llm_helpers.py - should FAIL initially
+- [x] T095b [P] Write unit tests for filter_skip_exists_blocks() with count tracking in tests/unit/test_llm_helpers.py - should FAIL initially
+- [x] T095c Run pytest tests/unit/test_llm_helpers.py -v and verify tests FAIL as expected
 
 **Step 2: Implement Helper Functions**
 
@@ -291,14 +291,14 @@ def mock_decision_stream():
 
 These can be implemented in parallel:
 
-- [ ] T098a [P] Implement batch_decisions_by_block() helper function for consecutive grouping in src/logsqueak/services/llm_helpers.py
-- [ ] T098b [P] Implement filter_skip_exists_blocks() helper function to filter entire blocks AND track skipped count in src/logsqueak/services/llm_helpers.py
-  - Function should return tuple: (filtered_stream, skipped_count) OR use class with .skipped_count property
-  - Must count blocks that have ANY decision with action="skip_exists"
+- [x] T098a [P] Implement batch_decisions_by_block() helper function for consecutive grouping in src/logsqueak/services/llm_helpers.py
+- [x] T098b [P] Implement filter_skip_exists_blocks() helper function to filter entire blocks AND track skipped count in src/logsqueak/services/llm_helpers.py
+  - Function returns FilteredStreamWithCount class with .skipped_count property
+  - Counts blocks that have ANY decision with action="skip_exists"
 
 **Step 3: Verify Helper Tests Pass**
 
-- [ ] T095d Run pytest tests/unit/test_llm_helpers.py -v and verify tests NOW PASS
+- [x] T095d Run pytest tests/unit/test_llm_helpers.py -v and verify tests NOW PASS (10/10 passing ✅)
 
 **Checkpoint 6.1**: Decision batching helpers implemented and tested
 
