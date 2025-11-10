@@ -202,6 +202,42 @@ class Phase2Screen(Screen):
             self.run_worker(self._rag_search_worker(), name="rag_search")
             logger.info("rag_search_worker_started")
 
+    def _clean_context_for_display(self, text: str) -> str:
+        """Clean context text for display by removing internal markers and id:: properties.
+
+        Removes:
+        - Outdent markers (\\x00N\\x00 format)
+        - id:: property lines (internal metadata)
+
+        Args:
+            text: Context text with potential markers
+
+        Returns:
+            Clean text for display
+        """
+        if not text:
+            return ""
+
+        lines = text.split('\n')
+        clean_lines = []
+
+        for line in lines:
+            # Remove outdent markers (\x00N\x00)
+            if '\x00' in line:
+                parts = line.split('\x00', 2)
+                if len(parts) == 3:
+                    # Format is \x00{reduction}\x00{content}
+                    line = parts[2]
+
+            # Skip id:: property lines
+            stripped = line.strip()
+            if stripped.startswith('id::'):
+                continue
+
+            clean_lines.append(line)
+
+        return '\n'.join(clean_lines)
+
     def _convert_to_logseq_bullets(self, text: str) -> str:
         """Convert plain indented text to Logseq bullet format.
 
@@ -258,8 +294,9 @@ class Phase2Screen(Screen):
 
         # Update original context panel using TargetPagePreview
         original_context = self.query_one("#original-context", TargetPagePreview)
-        # Convert hierarchical context to Logseq bullets if needed
-        context_with_bullets = self._convert_to_logseq_bullets(current_ec.hierarchical_context)
+        # Clean context (remove outdent markers and id:: properties), then convert to bullets
+        clean_context = self._clean_context_for_display(current_ec.hierarchical_context)
+        context_with_bullets = self._convert_to_logseq_bullets(clean_context)
         await original_context.load_preview(context_with_bullets)
 
         # Update LLM reworded panel using TargetPagePreview

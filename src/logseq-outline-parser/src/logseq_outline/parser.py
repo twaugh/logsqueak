@@ -61,6 +61,60 @@ class LogseqBlock:
             return "\n".join(line.strip() for line in self.content)
         return "\n".join(self.content)
 
+    def get_user_content(self) -> str:
+        """Get user-facing content without id:: property or internal markers.
+
+        Returns block content suitable for display/editing by users:
+        - Excludes id:: property (internal metadata)
+        - Preserves other user properties (tags::, author::, etc.)
+        - Cleans internal outdent markers (\\x00N\\x00 format)
+        - Preserves actual content lines and continuation lines
+
+        Returns:
+            Clean user-facing content
+
+        Examples:
+            >>> block.get_user_content()
+            "First line\\ncontinuation text\\ntags:: important"  # No id::, but keeps other properties
+        """
+        return "\n".join(self.get_user_content_lines())
+
+    def get_user_content_lines(self) -> list[str]:
+        """Get user-facing content lines without id:: property or internal markers.
+
+        Returns list of clean content lines suitable for display/editing:
+        - Excludes id:: property (internal metadata)
+        - Preserves other user properties (tags::, author::, etc.)
+        - Cleans internal outdent markers (\\x00N\\x00 format)
+        - Preserves actual content lines and continuation lines
+
+        Returns:
+            List of clean content lines
+
+        Examples:
+            >>> block.get_user_content_lines()
+            ["First line", "continuation text", "tags:: important"]
+        """
+        user_lines = []
+        for line in self.content:
+            clean_line = line
+
+            # Remove outdent markers (\x00N\x00)
+            if '\x00' in clean_line:
+                parts = clean_line.split('\x00', 2)
+                if len(parts) == 3:
+                    # Format is \x00{reduction}\x00{content}
+                    clean_line = parts[2]
+
+            # Skip id:: property specifically (but keep other properties)
+            stripped = clean_line.strip()
+            if stripped.startswith('id::'):
+                continue
+
+            user_lines.append(clean_line)
+
+        return user_lines
+
     def add_child(
         self, content: str, position: Optional[int] = None
     ) -> "LogseqBlock":

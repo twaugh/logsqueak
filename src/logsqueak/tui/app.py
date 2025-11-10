@@ -21,6 +21,7 @@ from logsqueak.services.llm_client import LLMClient
 from logsqueak.services.page_indexer import PageIndexer
 from logsqueak.services.rag_search import RAGSearch
 from logsqueak.services.file_monitor import FileMonitor
+from logsqueak.services.llm_wrappers import _augment_outline_with_ids
 from logsqueak.tui.screens import Phase1Screen, Phase2Screen, Phase3Screen
 
 logger = structlog.get_logger()
@@ -66,8 +67,9 @@ class LogsqueakApp(App):
         """
         super().__init__()
 
-        # Store journal data
-        self.journal_outline = journal_outline
+        # Augment journal outline with temporary IDs for blocks without explicit id:: properties
+        # This ensures all blocks have stable IDs for LLM classification and tracking
+        self.journal_outline = _augment_outline_with_ids(journal_outline)
         self.journal_date = journal_date
 
         # Store services
@@ -177,12 +179,15 @@ class LogsqueakApp(App):
                     break
 
             if block:
+                # Get user-facing content (excludes id:: property and cleans outdent markers)
+                user_content = block.get_user_content()
+
                 # Create EditedContent
                 edited = EditedContent(
                     block_id=block_state.block_id,
-                    original_content=block.get_full_content(),
+                    original_content=user_content,
                     hierarchical_context=hierarchical_context,
-                    current_content=block.get_full_content(),
+                    current_content=user_content,
                 )
                 self.edited_content.append(edited)
 

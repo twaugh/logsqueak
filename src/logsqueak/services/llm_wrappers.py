@@ -1,8 +1,9 @@
 """LLM wrapper functions that wrap LLMClient.stream_ndjson with specific prompts."""
 
 from typing import AsyncIterator
+import copy
 from logseq_outline.parser import LogseqOutline, LogseqBlock
-from logseq_outline.context import generate_full_context
+from logseq_outline.context import generate_full_context, generate_content_hash
 from logsqueak.services.llm_client import LLMClient
 from logsqueak.models.llm_chunks import (
     KnowledgeClassificationChunk,
@@ -21,6 +22,51 @@ def _detect_indent_style(outline: LogseqOutline) -> str:
     """
     # Logseq uses 2 spaces by default
     return "2 spaces per level"
+
+
+def _augment_outline_with_ids(outline: LogseqOutline) -> LogseqOutline:
+    """
+    Augment outline blocks with temporary IDs using the hybrid ID system.
+
+    For blocks without explicit id:: properties, adds a temporary ID based on
+    content hash. This allows the LLM to reference specific blocks in its response.
+
+    Args:
+        outline: Original outline
+
+    Returns:
+        Deep copy of outline with all blocks having id:: properties
+    """
+    # Deep copy to avoid modifying the original
+    augmented = copy.deepcopy(outline)
+
+    def augment_block(block: LogseqBlock, parents: list[LogseqBlock]) -> LogseqBlock:
+        """Recursively augment a block and its children with IDs."""
+        # If block already has an explicit ID, keep it
+        if block.block_id is not None:
+            block_id = block.block_id
+        else:
+            # Generate content hash as temporary ID
+            # Use generate_full_context to get hierarchical context, then hash it
+            full_context = generate_full_context(block, parents)
+            block_id = generate_content_hash(full_context)
+
+        # Ensure block has id:: property
+        if block.get_property("id") is None:
+            block.set_property("id", block_id)
+
+        # Recursively augment children
+        new_parents = parents + [block]
+        for child in block.children:
+            augment_block(child, new_parents)
+
+        return block
+
+    # Augment all root blocks
+    for block in augmented.blocks:
+        augment_block(block, [])
+
+    return augmented
 
 
 def _generate_xml_blocks_for_rewording(
@@ -145,7 +191,7 @@ async def classify_blocks(
 
     Args:
         llm_client: LLM client instance
-        journal_outline: Parsed journal entry outline
+        journal_outline: Parsed journal entry outline (should be pre-augmented with IDs)
 
     Yields:
         KnowledgeClassificationChunk for each block classified as knowledge
@@ -155,6 +201,8 @@ async def classify_blocks(
         ...     print(f"Block {chunk.block_id}: {chunk.confidence}")
     """
     indent_style = _detect_indent_style(journal_outline)
+
+    # Render the outline (expecting it to already have IDs from _augment_outline_with_ids)
     journal_content = journal_outline.render()
 
     system_prompt = (

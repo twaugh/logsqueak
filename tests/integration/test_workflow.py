@@ -206,7 +206,8 @@ async def test_full_workflow_phase1_to_phase2_to_phase3(
 
     # Verify app initialized with correct state
     assert app.journal_date == "2025-01-15"
-    assert app.journal_outline == sample_journal_outline
+    # Note: app.journal_outline is augmented with IDs, so it won't equal the original
+    assert len(app.journal_outline.blocks) == len(sample_journal_outline.blocks)
     assert app.config == mock_config
     assert app.llm_client == client
     assert app.page_indexer == mock_page_indexer
@@ -253,10 +254,13 @@ async def test_app_initialization_with_services(
     assert app.file_monitor is not None
     assert app.config is not None
 
-    # Verify journal data is stored
+    # Verify journal data is stored (outline is augmented with IDs)
     assert app.journal_outline is not None
     assert app.journal_date == "2025-01-15"
     assert len(app.journal_outline.blocks) == 3
+    # All blocks should have IDs after augmentation
+    for block in app.journal_outline.blocks:
+        assert block.block_id is not None
 
 
 @pytest.mark.asyncio
