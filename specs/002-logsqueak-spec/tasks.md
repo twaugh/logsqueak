@@ -308,10 +308,10 @@ These can be implemented in parallel:
 
 > **NOTE: Write these tests FIRST using mock LLMClient**
 
-- [ ] T096a [P] Write unit tests for classify_blocks() wrapper in tests/unit/test_llm_wrappers.py - should FAIL initially
-- [ ] T096b [P] Write unit tests for reword_content() wrapper in tests/unit/test_llm_wrappers.py - should FAIL initially
-- [ ] T096c [P] Write unit tests for plan_integrations() wrapper in tests/unit/test_llm_wrappers.py - should FAIL initially
-- [ ] T096d Run pytest tests/unit/test_llm_wrappers.py -v and verify tests FAIL as expected
+- [x] T096a [P] Write unit tests for classify_blocks() wrapper in tests/unit/test_llm_wrappers.py - should FAIL initially
+- [x] T096b [P] Write unit tests for reword_content() wrapper in tests/unit/test_llm_wrappers.py - should FAIL initially
+- [x] T096c [P] Write unit tests for plan_integrations() wrapper in tests/unit/test_llm_wrappers.py - should FAIL initially
+- [x] T096d Run pytest tests/unit/test_llm_wrappers.py -v and verify tests FAIL as expected
 
 **Step 5: Implement LLM Wrapper Functions**
 
@@ -319,12 +319,12 @@ These can be implemented in parallel:
 
 These can be implemented in parallel after decision batching helpers complete:
 
-- [ ] T096e [P] Implement classify_blocks() wrapper function in src/logsqueak/services/llm_wrappers.py (wraps LLMClient.stream_ndjson with Phase 1 prompt)
-- [ ] T096f [P] Implement reword_content() wrapper function in src/logsqueak/services/llm_wrappers.py (wraps LLMClient.stream_ndjson with Phase 2 prompt)
-- [ ] T096g [P] Implement plan_integrations() wrapper function in src/logsqueak/services/llm_wrappers.py (wraps LLMClient.stream_ndjson with Phase 3 prompt, returns raw stream)
-- [ ] T096h Run pytest tests/unit/test_llm_wrappers.py -v and verify tests NOW PASS
+- [x] T096e [P] Implement classify_blocks() wrapper function in src/logsqueak/services/llm_wrappers.py (wraps LLMClient.stream_ndjson with Phase 1 prompt)
+- [x] T096f [P] Implement reword_content() wrapper function in src/logsqueak/services/llm_wrappers.py (wraps LLMClient.stream_ndjson with Phase 2 prompt)
+- [x] T096g [P] Implement plan_integrations() wrapper function in src/logsqueak/services/llm_wrappers.py (wraps LLMClient.stream_ndjson with Phase 3 prompt, returns raw stream)
+- [x] T096h Run pytest tests/unit/test_llm_wrappers.py -v and verify tests NOW PASS
 
-**Checkpoint 6.2**: LLM wrapper functions implemented and tested
+**Checkpoint 6.2**: ✅ LLM wrapper functions implemented and tested (7/7 tests passing)
 
 ---
 

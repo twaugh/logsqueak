@@ -303,9 +303,7 @@ async def reword_content(
 
 async def plan_integrations(
     edited_content: list[EditedContent],
-    candidate_pages: dict[str, list[str]],  # block_id -> [page_name, ...]
     page_contents: dict[str, LogseqOutline],  # page_name -> LogseqOutline
-    original_contexts: dict[str, str],  # block_id -> hierarchical context
     client: LLMClient
 ) -> AsyncIterator[IntegrationDecision]:
     """
@@ -313,15 +311,21 @@ async def plan_integrations(
 
     Streams IntegrationDecision objects as LLM evaluates candidate pages.
 
+    Note: The EditedContent objects contain both the original hierarchical
+    context and the refined content, so no separate original_contexts parameter
+    is needed.
+
     Args:
-        edited_content: List of EditedContent to integrate
-        candidate_pages: Mapping of block_id to candidate page names
-        page_contents: Mapping of page_name to parsed LogseqOutline
-        original_contexts: Mapping of block_id to original hierarchical context
+        edited_content: List of EditedContent to integrate (contains original
+                       context and refined content)
+        page_contents: Mapping of page_name to parsed LogseqOutline (full page
+                      structures loaded via RAGSearch.load_page_contents())
         client: LLM client for API requests
 
     Yields:
-        IntegrationDecision: Integration decisions as they arrive
+        IntegrationDecision: Integration decisions as they arrive (raw stream
+                            including skip_exists decisions - caller should use
+                            batch_decisions_by_block() and filter_skip_exists_blocks())
 
     Raises:
         httpx.HTTPError: On network/API errors
