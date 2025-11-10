@@ -40,9 +40,27 @@ class RAGSearch:
         self.embedding_model = embedding_model
         self._encoder: Optional[Any] = None  # Lazy-loaded SentenceTransformer
 
-        # Load ChromaDB
+        # Load ChromaDB (create collection if it doesn't exist)
         self.chroma_client = chromadb.PersistentClient(path=str(db_path))
-        self.collection = self.chroma_client.get_collection("logsqueak_blocks")
+        try:
+            self.collection = self.chroma_client.get_collection("logsqueak_blocks")
+        except Exception:
+            # Collection doesn't exist yet - create it
+            logger.info("creating_chromadb_collection", name="logsqueak_blocks")
+            self.collection = self.chroma_client.create_collection("logsqueak_blocks")
+
+    def has_indexed_data(self) -> bool:
+        """Check if the ChromaDB collection exists and has data.
+
+        Returns:
+            True if collection has indexed blocks, False otherwise
+        """
+        try:
+            count = self.collection.count()
+            return count > 0
+        except Exception as e:
+            logger.warning("collection_count_check_failed", error=str(e))
+            return False
 
     @property
     def encoder(self) -> Any:
@@ -69,10 +87,19 @@ class RAGSearch:
 
         Returns:
             dict mapping block_id to list of candidate page names (ranked by relevance)
+            Empty lists if no indexed data exists
 
         Raises:
             ValueError: If ChromaDB collection doesn't exist
         """
+        # Early return if no indexed data - but encoder already preloaded in background
+        if not self.has_indexed_data():
+            logger.info(
+                "rag_search_skipped_no_data",
+                message="ChromaDB collection is empty, returning empty results"
+            )
+            return {ec.block_id: [] for ec in edited_content}
+
         results = {}
 
         for ec in edited_content:
