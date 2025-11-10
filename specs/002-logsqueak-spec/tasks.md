@@ -419,13 +419,13 @@ These can be implemented in parallel after LLM wrappers complete:
 
 **Component 3: CLI Integration**
 
-- [ ] T104a Write unit tests for date parsing in tests/unit/test_cli.py - should FAIL initially
+- [x] T104a Write unit tests for date parsing in tests/unit/test_cli.py - should FAIL initially
   - Test: parse_date_or_range("2025-01-15") returns single date
   - Test: parse_date_or_range("2025-01-10..2025-01-15") returns date list
   - Test: parse_date_or_range(None) returns today's date
   - Test: Invalid formats raise helpful errors
 
-- [ ] T104 Implement CLI 'extract' command with date/range parsing in src/logsqueak/cli.py
+- [x] T104 Implement CLI 'extract' command with date/range parsing in src/logsqueak/cli.py
   - Add parse_date_or_range() helper function
   - Validate date formats (YYYY-MM-DD)
   - Handle ".." range syntax
