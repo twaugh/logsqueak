@@ -145,47 +145,20 @@ def _generate_xml_formatted_content(
     xml_lines.append('')
     xml_lines.append('<candidate_pages>')
 
-    # Add candidate pages with structure
+    # Add candidate pages as Logseq markdown with hybrid IDs
     for page_name, page_outline in page_contents.items():
-        xml_lines.append(f'  <page name="{page_name}">')
-
-        # Add page properties if present
-        if page_outline.frontmatter:
-            xml_lines.append('    <page_properties>')
-            for line in page_outline.frontmatter:
-                if line.strip():
-                    xml_lines.append('      ' + line)
-            xml_lines.append('    </page_properties>')
-
-        # Add existing blocks
-        xml_lines.append('    <existing_blocks>')
-
-        def render_block(block: LogseqBlock, indent: str = "- ") -> list[str]:
-            """Recursively render a block and its children."""
-            lines = []
-            # Render block content
-            for i, content_line in enumerate(block.content):
-                if i == 0:
-                    lines.append(f"{indent}{content_line}")
-                else:
-                    lines.append(f"  {content_line}")
-            # Render children
-            for child in block.children:
-                child_lines = render_block(child, indent + "  ")
-                lines.extend(child_lines)
-            return lines
-
-        for block in page_outline.blocks:
-            xml_lines.append('      <block>')
-            block_lines = render_block(block)
-            for line in block_lines:
-                if line.strip():
-                    xml_lines.append('        ' + line)
-            xml_lines.append('      </block>')
-        xml_lines.append('    </existing_blocks>')
-
-        xml_lines.append('  </page>')
+        xml_lines.append(f'<page name="{page_name}">')
         xml_lines.append('')
+
+        # Augment page with hybrid IDs (preserves existing IDs, adds hashes for blocks without)
+        augmented_page = _augment_outline_with_ids(page_outline)
+
+        # Render full page as clean Logseq markdown
+        page_markdown = augmented_page.render()
+        xml_lines.append(page_markdown)
+
+        xml_lines.append('')
+        xml_lines.append('</page>')
 
     xml_lines.append('</candidate_pages>')
     return '\n'.join(xml_lines)
@@ -330,16 +303,17 @@ async def plan_integrations(
 
     system_prompt = (
         "Decide where to integrate knowledge into Logseq pages.\n\n"
-        "Input: Knowledge blocks + candidate pages with structure\n\n"
+        "Input: Knowledge blocks + candidate pages as Logseq markdown.\n"
+        "Each block in candidate pages has an id:: property.\n\n"
         "FILTERING:\n"
         "• Confidence ≥ 0.30 only\n"
         "• Max 2 decisions per (block, page) pair\n"
         "• Omit irrelevant pages\n\n"
         "ACTIONS:\n"
         "• add_section: New top-level section\n"
-        "• add_under: Child of existing block (needs target_block_id)\n"
-        "• replace: Replace existing block (needs target_block_id)\n"
-        "• skip_exists: Duplicate found (needs target_block_id)\n\n"
+        "• add_under: Child of existing block (needs target_block_id from id:: property)\n"
+        "• replace: Replace existing block (needs target_block_id from id:: property)\n"
+        "• skip_exists: Duplicate found (needs target_block_id from id:: property)\n\n"
         "DUPLICATE CHECK:\n"
         "First check if knowledge exists in page. If yes → skip_exists\n\n"
         "OUTPUT ORDER (CRITICAL):\n"
@@ -348,7 +322,8 @@ async def plan_integrations(
         "✗ [A1, B1, A2]\n\n"
         "Format: One JSON per line:\n"
         '{"knowledge_block_id": "...", "target_page": "...", "action": "...", '
-        '"target_block_id": null|"...", "target_block_title": null|"...", '
+        '"target_block_id": null|"<id from target block\'s id:: property>", '
+        '"target_block_title": null|"...", '
         '"confidence": 0.85, "reasoning": "..."}'
     )
 
