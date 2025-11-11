@@ -190,19 +190,30 @@ async def classify_blocks(
     journal_content = journal_outline.render()
 
     system_prompt = (
-        f"Identify lasting knowledge in Logseq journal entries.\n\n"
-        f"Format notes:\n"
+        f"You are a JSON-only knowledge classifier. Output ONLY valid JSON lines (NDJSON format).\n"
+        f"NO markdown. NO explanations. NO conversational text. ONLY JSON objects.\n\n"
+        f"Task: Identify lasting knowledge in Logseq journal entries (skip activity logs/events/tasks).\n\n"
+        f"Input format:\n"
         f"- Markdown bullets with {indent_style}\n"
         f"- Each block has id:: property\n"
         f"- Properties format: key:: value\n\n"
-        f"Task: Return ONLY blocks with lasting insights (skip events/tasks).\n"
-        f"If child block needs parent context, return ONLY the child block ID.\n\n"
-        f"Output: One JSON per line (NDJSON):\n"
-        f'{{"block_id": "...", "confidence": 0.85, "reason": "..."}}\n\n'
-        f"Output nothing for activity blocks."
+        f"Rules:\n"
+        f"1. Return ONLY blocks with lasting insights/lessons/concepts\n"
+        f"2. If child block needs parent context, return ONLY the child block ID (not parent)\n"
+        f"3. Skip activity logs, events, tasks, temporal notes\n"
+        f"4. Output nothing for non-knowledge blocks\n\n"
+        f"Output format (STRICT NDJSON - one JSON object per line):\n"
+        f'{{"block_id": "abc123", "confidence": 0.85, "reason": "Technical insight about testing"}}\n'
+        f'{{"block_id": "def456", "confidence": 0.70, "reason": "Conceptual understanding of frameworks"}}\n\n'
+        f"CRITICAL: Output ONLY JSON lines. No markdown, no prose, no preamble."
     )
 
-    prompt = f"Analyze this Logseq journal entry:\n\n{journal_content}"
+    # User prompt: Instruction BEFORE data (critical for attention)
+    prompt = (
+        f"Classify knowledge blocks and output as NDJSON (one JSON object per line).\n"
+        f"Output first JSON object now:\n\n"
+        f"{journal_content}"
+    )
 
     async for chunk in llm_client.stream_ndjson(
         prompt=prompt,
@@ -239,25 +250,35 @@ async def reword_content(
     xml_blocks = _generate_xml_blocks_for_rewording(edited_contents, journal_outline)
 
     system_prompt = (
-        f"Transform journal content to evergreen knowledge.\n\n"
-        f"Input: XML blocks with hierarchical context ({indent_style})\n"
-        f"The deepest (most indented) block is the target to reword.\n"
-        f"Parent blocks provide context for pronoun resolution.\n\n"
+        f"You are a JSON-only content rewriter. Output ONLY valid JSON lines (NDJSON format).\n"
+        f"NO markdown. NO explanations. NO conversational text. ONLY JSON objects.\n\n"
+        f"Task: Transform journal content to evergreen knowledge (remove temporal context).\n\n"
+        f"Input format:\n"
+        f"- XML blocks with hierarchical context ({indent_style})\n"
+        f"- The deepest (most indented) block is the target to reword\n"
+        f"- Parent blocks provide context for pronoun resolution\n\n"
         f"Rules:\n"
-        f"1. Remove temporal context (today, yesterday, dates)\n"
-        f"2. Convert first-person → third-person or neutral\n"
-        f"3. Resolve pronouns using parent context\n"
-        f"4. Keep technical details intact\n"
-        f"5. Reword ONLY the deepest block, not parents\n\n"
+        f"1. Remove temporal context (today, yesterday, dates, times)\n"
+        f"2. Convert first-person → third-person or neutral voice\n"
+        f"3. Resolve pronouns using parent block context\n"
+        f"4. Keep technical details, links, and code intact\n"
+        f"5. Reword ONLY the deepest block (target), not parent blocks\n\n"
         f"Example pronoun resolution:\n"
         f'Parent: "Tried Textual framework"\n'
         f'Child: "This is Python-specific"\n'
-        f'→ Reword: "The Textual framework is Python-specific"\n\n'
-        f"Output: One JSON per line:\n"
-        f'{{"block_id": \"<id from XML attribute>\", \"reworded_content\": \"...\"}}'
+        f'→ Reword child to: "The Textual framework is Python-specific"\n\n'
+        f"Output format (STRICT NDJSON - one JSON object per line):\n"
+        f'{{"block_id": "abc123", "reworded_content": "PyTest supports fixture dependency injection"}}\n'
+        f'{{"block_id": "def456", "reworded_content": "The Textual framework is Python-specific"}}\n\n'
+        f"CRITICAL: Output ONLY JSON lines. Use block_id from XML attribute. No markdown, no prose."
     )
 
-    prompt = xml_blocks
+    # User prompt: Instruction BEFORE data (critical for attention)
+    prompt = (
+        f"Reword the deepest block in each XML block and output as NDJSON (one JSON object per line).\n"
+        f"Output first JSON object now:\n\n"
+        f"{xml_blocks}"
+    )
 
     async for chunk in llm_client.stream_ndjson(
         prompt=prompt,
@@ -302,37 +323,51 @@ async def plan_integrations(
     )
 
     system_prompt = (
-        "Decide where to integrate knowledge into Logseq pages.\n\n"
-        "Input: Knowledge blocks + candidate pages as Logseq markdown.\n"
-        "Each block in candidate pages has an id:: property.\n\n"
-        "FILTERING:\n"
-        "• Confidence ≥ 0.30 only\n"
-        "• Max 2 decisions per (block, page) pair\n"
-        "• Omit irrelevant pages\n\n"
+        "CRITICAL CONSTRAINTS:\n"
+        "- NO conversational responses (\"Great\", \"Here's\", \"I'll\", \"Let me\", etc.)\n"
+        "- NO markdown formatting (no bullets, no headers, no bold)\n"
+        "- NO preambles, explanations, or summaries\n"
+        "- Output ONLY raw NDJSON (newline-delimited JSON objects)\n"
+        "- Start output immediately with first JSON object\n\n"
+        "TASK: Generate integration decisions for knowledge blocks.\n\n"
+        "INPUT:\n"
+        "- <knowledge_blocks>: Content to integrate (with block IDs)\n"
+        "- <candidate_pages>: Target pages (Logseq markdown with id:: properties)\n\n"
+        "DECISION RULES:\n"
+        "1. Check if duplicate exists → use skip_exists\n"
+        "2. Confidence ≥ 0.30 only\n"
+        "3. Max 2 decisions per (knowledge_block, page)\n"
+        "4. Skip irrelevant pages\n"
+        "5. Group by knowledge_block_id\n\n"
         "ACTIONS:\n"
-        "• add_section: New top-level section\n"
-        "• add_under: Child of existing block (needs target_block_id from id:: property)\n"
-        "• replace: Replace existing block (needs target_block_id from id:: property)\n"
-        "• skip_exists: Duplicate found (needs target_block_id from id:: property)\n\n"
-        "DUPLICATE CHECK:\n"
-        "First check if knowledge exists in page. If yes → skip_exists\n\n"
-        "OUTPUT ORDER (CRITICAL):\n"
-        "All decisions for blockA, then blockB, then blockC\n"
-        "✓ [A1, A2, B1, C1, C2]\n"
-        "✗ [A1, B1, A2]\n\n"
-        "Format: One JSON per line:\n"
-        '{"knowledge_block_id": "...", "target_page": "...", "action": "...", '
-        '"target_block_id": null|"<id from target block\'s id:: property>", '
-        '"target_block_title": null|"...", '
-        '"confidence": 0.85, "reasoning": "..."}'
+        "- add_section: New top-level (target_block_id: null)\n"
+        "- add_under: Child of block (target_block_id: from id::)\n"
+        "- replace: Replace block (target_block_id: from id::)\n"
+        "- skip_exists: Duplicate (target_block_id: from id::)\n\n"
+        "REQUIRED JSON SCHEMA (one object per line):\n"
+        '{"knowledge_block_id": "string", "target_page": "string", "action": "add_section|add_under|replace|skip_exists", '
+        '"target_block_id": "string|null", "target_block_title": "string|null", '
+        '"confidence": 0.0-1.0, "reasoning": "string"}\n\n'
+        "EXAMPLE OUTPUT:\n"
+        '{"knowledge_block_id": "abc123", "target_page": "Software/Python", "action": "add_under", '
+        '"target_block_id": "def456", "target_block_title": "Testing", "confidence": 0.85, "reasoning": "Fits under testing"}\n'
+        '{"knowledge_block_id": "abc123", "target_page": "Tools/TDD", "action": "add_section", '
+        '"target_block_id": null, "target_block_title": null, "confidence": 0.70, "reasoning": "New section"}\n\n'
+        "START OUTPUT NOW (first character must be '{'):"
     )
 
-    prompt = xml_formatted_content
+    # User prompt: Instruction BEFORE data (critical for attention)
+    prompt = (
+        f"Generate integration decisions as NDJSON (one JSON object per line).\n"
+        f"Output first JSON object now:\n\n"
+        f"{xml_formatted_content}"
+    )
 
     async for chunk in llm_client.stream_ndjson(
         prompt=prompt,
         system_prompt=system_prompt,
         chunk_model=IntegrationDecisionChunk,
-        temperature=0.4  # Balanced temperature for structured decisions
+        temperature=0.2  # Low temperature to reduce conversational responses
+        # Note: json_mode not used because it expects single JSON object, not NDJSON
     ):
         yield chunk

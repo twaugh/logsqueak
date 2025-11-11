@@ -156,7 +156,8 @@ class LLMClient:
         chunk_model: Type[T],
         max_retries: int = 1,
         retry_delay: float = 2.0,
-        temperature: float = 0.7
+        temperature: float = 0.7,
+        json_mode: bool = False
     ) -> AsyncIterator[T]:
         """
         Stream responses from LLM API.
@@ -174,6 +175,7 @@ class LLMClient:
             max_retries: Number of automatic retries on transient errors (default: 1)
             retry_delay: Delay in seconds between retries (default: 2.0)
             temperature: Sampling temperature 0.0-1.0 (default: 0.7)
+            json_mode: Enable JSON mode (forces JSON output, OpenAI only, default: False)
 
         Yields:
             Parsed chunk_model instances
@@ -208,6 +210,11 @@ class LLMClient:
         # Add num_ctx for Ollama in options object
         if is_ollama and self.config.num_ctx:
             payload["options"] = {"num_ctx": self.config.num_ctx}
+
+        # Add JSON mode for OpenAI (forces JSON output, reduces conversational responses)
+        # Note: Ollama doesn't support response_format parameter
+        if json_mode and not is_ollama:
+            payload["response_format"] = {"type": "json_object"}
 
         # Log the complete request payload (raw input to LLM)
         logger.info(
