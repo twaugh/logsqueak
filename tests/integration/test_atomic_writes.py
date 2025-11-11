@@ -537,6 +537,7 @@ async def test_atomic_write_skip_exists_adds_id_if_missing(
     page_path.write_text(page_content)
 
     # Get the content hash for the block (hybrid ID system)
+    # Hash is now stable regardless of parsing mode
     page_outline = LogseqOutline.parse(page_content)
     content_hash = page_outline.blocks[0].get_hybrid_id()
 

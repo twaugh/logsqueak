@@ -361,13 +361,13 @@ async def write_integration_atomic(
     # Step 1: Check and reload page if modified
     if file_monitor.is_modified(page_path):
         logger.info("file_modified_reload", path=str(page_path))
-        page_outline = LogseqOutline.parse(page_path.read_text())
+        page_outline = LogseqOutline.parse(page_path.read_text(), strict_indent_preservation=True)
         file_monitor.refresh(page_path)
 
         # Re-validate decision
         validate_decision(decision, page_outline)
     else:
-        page_outline = LogseqOutline.parse(page_path.read_text())
+        page_outline = LogseqOutline.parse(page_path.read_text(), strict_indent_preservation=True)
 
     # Step 2: Check if block already exists (idempotency / retry detection)
     # Generate deterministic UUID to check for existing integration
@@ -426,10 +426,10 @@ async def write_integration_atomic(
     # Step 5: Check and reload journal if modified
     if file_monitor.is_modified(journal_path):
         logger.info("file_modified_reload", path=str(journal_path))
-        journal_outline = LogseqOutline.parse(journal_path.read_text())
+        journal_outline = LogseqOutline.parse(journal_path.read_text(), strict_indent_preservation=True)
         file_monitor.refresh(journal_path)
     else:
-        journal_outline = LogseqOutline.parse(journal_path.read_text())
+        journal_outline = LogseqOutline.parse(journal_path.read_text(), strict_indent_preservation=True)
 
     # Step 6: Add provenance to journal
     journal_block = journal_outline.find_block_by_id(decision.knowledge_block_id)
