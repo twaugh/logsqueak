@@ -92,12 +92,6 @@ def _generate_xml_blocks_for_rewording(
         # Clean hierarchical context to avoid confusing the LLM
         # The LLM should use the XML attribute, not id:: properties in content
         for line in edited.hierarchical_context.split('\n'):
-            # Remove outdent markers (\x00N\x00)
-            if '\x00' in line:
-                parts = line.split('\x00', 2)
-                if len(parts) == 3:
-                    line = parts[2]
-
             # Skip id:: property lines (LLM should use XML attribute instead)
             stripped = line.strip()
             if stripped.startswith('id::'):
@@ -133,14 +127,8 @@ def _generate_xml_formatted_content(
         xml_lines.append(f'  <block id="{edited.block_id}">')
         xml_lines.append('    <original_journal_context>')
 
-        # Clean and add original context (remove id:: and outdent markers)
+        # Clean and add original context (remove id:: properties)
         for line in edited.hierarchical_context.split('\n'):
-            # Remove outdent markers (\x00N\x00)
-            if '\x00' in line:
-                parts = line.split('\x00', 2)
-                if len(parts) == 3:
-                    line = parts[2]
-
             # Skip id:: property lines (block ID is in XML attribute)
             stripped = line.strip()
             if stripped.startswith('id::'):
