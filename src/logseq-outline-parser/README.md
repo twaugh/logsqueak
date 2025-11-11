@@ -75,8 +75,18 @@ This enables precise block targeting while supporting existing Logseq content.
 ### Parsing
 
 ```python
+# Parse with default settings (normalized indentation)
 outline = LogseqOutline.parse(markdown_string)
+
+# Parse with strict indent preservation (for write operations)
+outline = LogseqOutline.parse(markdown_string, strict_indent_preservation=True)
 ```
+
+**Indent Preservation Modes:**
+
+- **Default mode** (`strict_indent_preservation=False`): Continuation line indentation is normalized. Outdent markers are NOT created. Use this for all read-only operations (LLM prompts, display, analysis).
+
+- **Strict mode** (`strict_indent_preservation=True`): Exact indentation is preserved using internal outdent markers (`\x00N\x00`) for continuation lines with non-standard indentation. Only use when re-parsing content for modification and writing back to files.
 
 ### Rendering
 

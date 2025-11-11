@@ -248,7 +248,7 @@ class LogseqOutline:
     frontmatter: list[str] = field(default_factory=list)  # Page-level content
 
     @classmethod
-    def parse(cls, markdown: str) -> "LogseqOutline":
+    def parse(cls, markdown: str, strict_indent_preservation: bool = False) -> "LogseqOutline":
         """Parse Logseq markdown into outline structure.
 
         IMPORTANT: Preserves exact order:
@@ -260,6 +260,10 @@ class LogseqOutline:
 
         Args:
             markdown: Logseq markdown content
+            strict_indent_preservation: If True, preserve exact indentation using outdent
+                markers (\x00N\x00) for continuation lines with non-standard indentation.
+                If False (default), continuation line indentation is normalized.
+                Only set to True when re-parsing content for modification and writing back.
 
         Returns:
             Parsed LogseqOutline
@@ -276,7 +280,7 @@ class LogseqOutline:
         indent_str = _detect_indentation(lines)
 
         # Parse blocks and frontmatter using the detected indentation
-        frontmatter, blocks = _parse_blocks(lines, indent_str)
+        frontmatter, blocks = _parse_blocks(lines, indent_str, strict_indent_preservation)
 
         return cls(blocks=blocks, source_text=markdown, indent_str=indent_str, frontmatter=frontmatter)
 
@@ -404,7 +408,7 @@ def _is_bullet_line(line: str) -> bool:
     )
 
 
-def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], list[LogseqBlock]]:
+def _parse_blocks(lines: list[str], indent_str: str = "  ", strict_indent_preservation: bool = False) -> tuple[list[str], list[LogseqBlock]]:
     """Parse lines into hierarchical blocks.
 
     A block consists of:
@@ -412,13 +416,16 @@ def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], 
     - All continuation lines until the next bullet (or end of file)
 
     All lines are stored in the block's content list. Continuation line
-    whitespace is normalized (stripped) during parsing and re-added during rendering.
+    whitespace is normalized (stripped) during parsing and re-added during rendering,
+    unless strict_indent_preservation is True.
 
     Lines before the first bullet are captured as frontmatter (page-level properties).
 
     Args:
         lines: Markdown lines
         indent_str: Indentation string (e.g., "  ", "\t", "    ")
+        strict_indent_preservation: If True, use outdent markers for non-standard indents.
+            If False (default), normalize continuation line indentation.
 
     Returns:
         Tuple of (frontmatter_lines, root_blocks)
@@ -505,12 +512,16 @@ def _parse_blocks(lines: list[str], indent_str: str = "  ") -> tuple[list[str], 
                     continuation_content = next_line[len(continuation_base_indent):]
                 else:
                     # Line doesn't have the expected indentation
-                    # Preserve the ACTUAL indentation by calculating the difference
-                    actual_leading = next_line[: len(next_line) - len(next_line.lstrip())]
-                    # Store with a marker showing how much to reduce from base indent
-                    # Format: "\x00{reduction}{content}" where reduction is base - actual
-                    reduction = len(continuation_base_indent) - len(actual_leading)
-                    continuation_content = f"\x00{reduction}\x00{next_line.lstrip()}"
+                    if strict_indent_preservation:
+                        # Preserve the ACTUAL indentation by calculating the difference
+                        actual_leading = next_line[: len(next_line) - len(next_line.lstrip())]
+                        # Store with a marker showing how much to reduce from base indent
+                        # Format: "\x00{reduction}\x00{content}" where reduction is base - actual
+                        reduction = len(continuation_base_indent) - len(actual_leading)
+                        continuation_content = f"\x00{reduction}\x00{next_line.lstrip()}"
+                    else:
+                        # Non-strict mode: just strip all leading whitespace
+                        continuation_content = next_line.lstrip()
 
                 content.append(continuation_content)
                 j += 1
