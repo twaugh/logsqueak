@@ -202,8 +202,10 @@ class LogsqueakApp(App):
                     _load_model
                 )
 
-                # Store the loaded encoder in rag_search
+                # Store the loaded encoder in both rag_search and page_indexer
+                # Both services need the same encoder instance to avoid re-loading
                 self.rag_search._encoder = encoder
+                self.page_indexer._encoder = encoder
 
             # Mark complete and remove from background tasks
             del self.background_tasks["model_preload"]
