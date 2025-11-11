@@ -63,8 +63,11 @@ The parser preserves **exact structure and order** from source files:
 ```python
 from logseq_outline.parser import LogseqOutline
 
-# Parse Logseq markdown
+# Parse Logseq markdown (default mode - for read operations)
 outline = LogseqOutline.parse(markdown_text)
+
+# Parse with strict indent preservation (for write operations only)
+outline = LogseqOutline.parse(markdown_text, strict_indent_preservation=True)
 
 # Access blocks
 for block in outline.blocks:
@@ -74,6 +77,16 @@ for block in outline.blocks:
 # Render back to markdown
 output = outline.render()  # Preserves exact formatting
 ```
+
+**Indent Preservation Modes:**
+
+The parser supports two modes for handling continuation line indentation:
+
+- **Default mode** (`strict_indent_preservation=False`): Continuation line indentation is normalized during parsing. No internal outdent markers are created. **Use this for all read-only operations** including LLM prompts, UI display, semantic search, and analysis. This is the recommended mode for application-layer code.
+
+- **Strict mode** (`strict_indent_preservation=True`): Exact indentation is preserved using internal outdent markers (`\x00N\x00`) for continuation lines with non-standard indentation. **Only use this when re-parsing content for modification and writing back to files.** This mode is necessary for file operations that require perfect round-trip fidelity.
+
+**Why this matters:** Outdent markers are an implementation detail for preserving formatting during write operations. By defaulting to normalized mode, the parser prevents these markers from leaking into application code, simplifying LLM prompts and UI rendering.
 
 #### 2. Hybrid ID System
 
@@ -108,10 +121,12 @@ context = generate_full_context(block, parent_list)
 # "- Parent content\n  - Child content\n    - Current block content"
 ```
 
+**Important:** When using the default parsing mode (`strict_indent_preservation=False`), the generated context strings contain clean, normalized indentation without internal markers. This makes them safe to use directly in LLM prompts, UI display, and semantic search.
+
 This is used for:
 - Content-based hashing (hybrid ID system)
-- Semantic search embeddings (planned)
-- LLM context windows (planned)
+- Semantic search embeddings (via RAG pipeline)
+- LLM context windows (hierarchical_context in EditedContent)
 
 ### Parser API Reference
 
@@ -147,8 +162,15 @@ class LogseqOutline:
     frontmatter: str             # Text before first bullet
 
     @classmethod
-    def parse(cls, text: str) -> LogseqOutline:
-        """Parse Logseq markdown into outline tree."""
+    def parse(cls, text: str, strict_indent_preservation: bool = False) -> LogseqOutline:
+        """Parse Logseq markdown into outline tree.
+
+        Args:
+            text: Logseq markdown content
+            strict_indent_preservation: If True, preserve exact indentation with
+                outdent markers. If False (default), normalize indentation.
+                Only use True for write operations.
+        """
 
     def render(self, indent_str: str = "  ") -> str:
         """Render outline back to markdown."""
@@ -190,9 +212,7 @@ Implemented services in `src/logsqueak/services/`:
 - **journal_loader.py**: Load and parse journal entries with date range support
 - **page_indexer.py**: ChromaDB vector indexing with lazy-loaded SentenceTransformer, uses `generate_chunks()`
 - **rag_search.py**: Semantic search with explicit link boosting and page-level ranking
-
-Planned services (not yet implemented):
-- **file_operations.py**: Atomic two-phase writes with provenance markers (required for US3)
+- **file_operations.py**: Atomic two-phase writes with provenance markers (implemented, uses strict mode for write operations)
 
 ### Configuration & CLI
 
@@ -519,6 +539,8 @@ Logseq uses indented bullets (2 spaces per level) with special features:
 ### Parser Behavior
 
 - `LogseqOutline.parse()`: Returns tree of LogseqBlock objects
+  - Default mode: Normalizes continuation line indentation (recommended for app code)
+  - Strict mode (`strict_indent_preservation=True`): Preserves exact indentation for writes
 - Properties detected by `key:: value` pattern
 - Continuation lines: Lines at same/deeper indent without bullet
 - Frontmatter: Lines before first bullet (page-level content)
@@ -578,6 +600,13 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
 
 ## Recent Changes
 
+- 2025-11-11: **Parser Refactoring** - Added strict_indent_preservation parameter
+  - Parser now defaults to normalized indentation (no outdent markers)
+  - Added strict_indent_preservation parameter for write operations only
+  - Removed redundant outdent marker cleaning from llm_wrappers, TUI modules
+  - Simplifies application code by handling markers at parser level
+  - All 86 parser tests passing, 6 new tests for indent preservation modes
+  - Prevents implementation details from leaking into LLM prompts and UI
 - 2025-11-06: **Phase 4 Complete** - Content Editing TUI implemented and tested (T050-T070)
   - RAG services (PageIndexer, RAGSearch) with lazy SentenceTransformer loading
   - Fixed PageIndexer to use `generate_chunks()` for proper semantic chunking
