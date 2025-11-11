@@ -6,7 +6,7 @@
 
 ## Overview
 
-This document defines the expected request and response formats for LLM API interactions. The application supports both OpenAI-compatible APIs (OpenAI, Ollama with `/v1/chat/completions` endpoint) and Ollama's native API (`/api/chat`).
+This document defines the expected request and response formats for LLM API interactions. The application **automatically detects** whether the endpoint is Ollama (via `/api/version` probe) and uses the appropriate API format. OpenAI endpoints use `/v1/chat/completions`, while Ollama uses the native `/api/chat` endpoint for proper `num_ctx` support.
 
 All LLM requests use **streaming responses** with **NDJSON (Newline-Delimited JSON)** format for incremental results. Each response is a single JSON object per line, not wrapped in SSE or arrays.
 
@@ -583,12 +583,14 @@ Request completion logged as:
 
 ### Ollama API
 
-- Endpoint: `http://localhost:11434/v1/chat/completions` (OpenAI-compatible)
-- Alternative: `http://localhost:11434/api/chat` (native)
+- **Provider Detection**: Automatically detected via `/api/version` endpoint probe (cached after first request)
+- **Native Endpoint**: `http://localhost:11434/api/chat` (preferred for num_ctx support)
+- **OpenAI-compatible Endpoint**: `http://localhost:11434/v1/chat/completions` (NOT used - ignores num_ctx)
 - Recommended models: `llama2`, `mistral`, `mixtral`
-- **Streaming format**: Native NDJSON (newline-delimited JSON)
-- **Client handling**: Parse each line as JSON directly
-- Extra config: `num_ctx` controls context window (VRAM usage)
+- **Streaming format**: Native NDJSON with `{"message": {"content": "..."}}` structure
+- **Client handling**: Extracts content from `data.message.content` field
+- **Context window control**: `num_ctx` sent in `options` object: `{"options": {"num_ctx": 20480}}`
+- **Detection caching**: Provider type cached after first detection to avoid repeated probes
 
 ### Other OpenAI-Compatible Services
 

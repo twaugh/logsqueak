@@ -271,6 +271,8 @@ rag:
 ```yaml
 llm:
   num_ctx: 32768  # Ollama context window size (controls VRAM usage)
+                  # Automatically sent via native Ollama API when Ollama is detected
+                  # Ignored for OpenAI endpoints (use model's default context window)
 ```
 
 **Configuration behavior** (from spec clarifications):
