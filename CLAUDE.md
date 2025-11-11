@@ -397,6 +397,33 @@ Phase 3:
 4. **Phase 2 → 3 transition is blocked** until RAG search completes
 5. **Integration Decision Worker is opportunistic** (starts whenever RAG completes)
 
+#### Background Task Lifecycle
+
+Background tasks are tracked in `app.background_tasks` dictionary and displayed in the StatusPanel.
+
+**Task Lifecycle:**
+1. Worker creates task entry: `app.background_tasks["task_name"] = BackgroundTask(...)`
+2. Worker updates progress: `app.background_tasks["task_name"].progress_current = X`
+3. **Worker deletes task on completion**: `del app.background_tasks["task_name"]`
+
+**Polling for Completion:**
+- Workers check `if task is None` to detect completion (task has been deleted)
+- Do NOT check `task.status == "completed"` - completed tasks are deleted, not marked
+
+**Example:**
+```python
+# Worker polls for dependency completion
+while True:
+    dependency_task = self.app.background_tasks.get("dependency_name")
+    if dependency_task is None:
+        # Task deleted - dependency completed successfully
+        break
+    elif dependency_task.status == "failed":
+        # Dependency failed
+        raise RuntimeError(f"Dependency failed: {dependency_task.error_message}")
+    await asyncio.sleep(0.1)
+```
+
 ## Development Commands
 
 ### Environment Setup

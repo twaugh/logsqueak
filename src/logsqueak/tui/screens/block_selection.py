@@ -12,6 +12,7 @@ from textual.widgets import Footer, Header, Static
 from textual.reactive import reactive
 from textual.worker import Worker
 from textual.binding import Binding
+from textual._context import NoActiveAppError
 import structlog
 
 from logseq_outline.parser import LogseqBlock, LogseqOutline
@@ -98,8 +99,8 @@ class Phase1Screen(Screen):
         else:
             self.block_states = self._initialize_block_states(blocks)
 
-        # Background tasks
-        self.background_tasks: Dict[str, BackgroundTask] = {}
+        # Background tasks tracking - use app.background_tasks in production, local dict in tests
+        self._test_background_tasks: Dict[str, BackgroundTask] = {}
 
         # Workers
         self._llm_worker: Optional[Worker] = None
@@ -158,8 +159,39 @@ class Phase1Screen(Screen):
                 # Selected block details (bottom panel)
                 yield BlockDetailPanel()
 
-        yield StatusPanel(background_tasks=self.background_tasks)
+        # Status panel for background tasks (uses app-level shared dict or test dict)
+        from logsqueak.tui.app import LogsqueakApp
+        if isinstance(self.app, LogsqueakApp):
+            yield StatusPanel(background_tasks=self.app.background_tasks)
+        else:
+            # Test environment - use test dict
+            yield StatusPanel(background_tasks=self._test_background_tasks)
         yield Footer()
+
+    @property
+    def _background_tasks(self) -> Dict[str, BackgroundTask]:
+        """Get app-level background tasks dict (or test dict in test mode)."""
+        from logsqueak.tui.app import LogsqueakApp
+        if isinstance(self.app, LogsqueakApp):
+            return self.app.background_tasks
+        return self._test_background_tasks
+
+    @property
+    def background_tasks(self) -> Dict[str, BackgroundTask]:
+        """Backwards compatibility property for tests."""
+        return self._background_tasks
+
+    @background_tasks.setter
+    def background_tasks(self, value: Dict[str, BackgroundTask]) -> None:
+        """Allow tests to set background tasks dict."""
+        # In test mode (or before app is created), replace the test dict
+        from logsqueak.tui.app import LogsqueakApp
+        try:
+            if not isinstance(self.app, LogsqueakApp):
+                self._test_background_tasks = value
+        except NoActiveAppError:
+            # App not created yet (common in tests)
+            self._test_background_tasks = value
 
     def on_mount(self) -> None:
         """Called when screen is mounted."""
@@ -406,7 +438,7 @@ class Phase1Screen(Screen):
     async def _llm_classification_worker_mock(self) -> None:
         """Mock LLM classification worker (for testing)."""
         # Create background task
-        self.background_tasks["llm_classification"] = BackgroundTask(
+        self._background_tasks["llm_classification"] = BackgroundTask(
             task_type="llm_classification",
             status="running",
             progress_current=0,
@@ -439,12 +471,11 @@ class Phase1Screen(Screen):
             count += 1
 
             # Update progress
-            self.background_tasks["llm_classification"].progress_current = count
+            self._background_tasks["llm_classification"].progress_current = count
             status_panel.update_status()
 
-        # Mark complete
-        self.background_tasks["llm_classification"].status = "completed"
-        self.background_tasks["llm_classification"].progress_percentage = 100.0
+        # Mark complete and remove from background tasks
+        del self._background_tasks["llm_classification"]
         status_panel.update_status()
 
         self._update_selected_count()
@@ -452,7 +483,7 @@ class Phase1Screen(Screen):
     async def _llm_classification_worker(self) -> None:
         """Real LLM classification worker using classify_blocks wrapper."""
         # Create background task
-        self.background_tasks["llm_classification"] = BackgroundTask(
+        self._background_tasks["llm_classification"] = BackgroundTask(
             task_type="llm_classification",
             status="running",
             progress_current=0,
@@ -498,12 +529,11 @@ class Phase1Screen(Screen):
                 count += 1
 
                 # Update progress
-                self.background_tasks["llm_classification"].progress_current = count
+                self._background_tasks["llm_classification"].progress_current = count
                 status_panel.update_status()
 
-            # Mark complete
-            self.background_tasks["llm_classification"].status = "completed"
-            self.background_tasks["llm_classification"].progress_percentage = 100.0
+            # Mark complete and remove from background tasks
+            del self._background_tasks["llm_classification"]
             status_panel.update_status()
 
             self._update_selected_count()
@@ -515,8 +545,8 @@ class Phase1Screen(Screen):
 
         except Exception as e:
             # Mark failed
-            self.background_tasks["llm_classification"].status = "failed"
-            self.background_tasks["llm_classification"].error_message = str(e)
+            self._background_tasks["llm_classification"].status = "failed"
+            self._background_tasks["llm_classification"].error_message = str(e)
             status_panel.update_status()
 
             logger.error(
@@ -528,7 +558,7 @@ class Phase1Screen(Screen):
     def start_page_indexing(self) -> None:
         """Start page indexing worker."""
         # Create background task
-        self.background_tasks["page_indexing"] = BackgroundTask(
+        self._background_tasks["page_indexing"] = BackgroundTask(
             task_type="page_indexing",
             status="running",
             progress_percentage=0.0,
@@ -562,10 +592,11 @@ class Phase1Screen(Screen):
         while True:
             if isinstance(self.app, LogsqueakApp):
                 model_task = self.app.background_tasks.get("model_preload")
-                if model_task and model_task.status == "completed":
+                if model_task is None:
+                    # Task deleted - it completed successfully
                     logger.info("page_indexing_model_ready", phase="phase1")
                     break
-                elif model_task and model_task.status == "failed":
+                elif model_task.status == "failed":
                     # Model failed to load - proceed anyway (will load on-demand)
                     logger.warning(
                         "page_indexing_model_failed",
@@ -592,9 +623,9 @@ class Phase1Screen(Screen):
             def on_progress(current: int, total: int):
                 """Update progress percentage as pages are indexed."""
                 percentage = (current / total) * 100.0
-                self.background_tasks["page_indexing"].progress_percentage = percentage
-                self.background_tasks["page_indexing"].progress_current = current
-                self.background_tasks["page_indexing"].progress_total = total
+                self._background_tasks["page_indexing"].progress_percentage = percentage
+                self._background_tasks["page_indexing"].progress_current = current
+                self._background_tasks["page_indexing"].progress_total = total
 
                 # Update status panel
                 try:
@@ -620,17 +651,8 @@ class Phase1Screen(Screen):
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, _run_indexing)
 
-            # Mark complete in shared background_tasks
-            if isinstance(self.app, LogsqueakApp):
-                self.app.background_tasks["page_indexing"] = BackgroundTask(
-                    task_type="page_indexing",
-                    status="completed",
-                    progress_percentage=100.0,
-                )
-
-            # Mark complete in local background_tasks (for status panel)
-            self.background_tasks["page_indexing"].status = "completed"
-            self.background_tasks["page_indexing"].progress_percentage = 100.0
+            # Mark complete and remove from background tasks
+            del self._background_tasks["page_indexing"]
 
             # Update status panel
             try:
@@ -643,16 +665,8 @@ class Phase1Screen(Screen):
 
         except Exception as e:
             # Mark failed
-            self.background_tasks["page_indexing"].status = "failed"
-            self.background_tasks["page_indexing"].error_message = str(e)
-
-            # Also mark in shared dict
-            if isinstance(self.app, LogsqueakApp):
-                self.app.background_tasks["page_indexing"] = BackgroundTask(
-                    task_type="page_indexing",
-                    status="failed",
-                    error_message=str(e),
-                )
+            self._background_tasks["page_indexing"].status = "failed"
+            self._background_tasks["page_indexing"].error_message = str(e)
 
             # Update status panel
             try:

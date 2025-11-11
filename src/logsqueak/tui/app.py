@@ -205,9 +205,8 @@ class LogsqueakApp(App):
                 # Store the loaded encoder in rag_search
                 self.rag_search._encoder = encoder
 
-            # Mark complete
-            self.background_tasks["model_preload"].status = "completed"
-            self.background_tasks["model_preload"].progress_percentage = 100.0
+            # Mark complete and remove from background tasks
+            del self.background_tasks["model_preload"]
 
             logger.info("embedding_model_preloaded", phase="phase1")
         except Exception as e:

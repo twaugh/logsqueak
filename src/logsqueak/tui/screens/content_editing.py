@@ -146,8 +146,8 @@ class Phase2Screen(Screen):
         # Map block_id to EditedContent for quick lookup
         self.edited_content_map = {ec.block_id: ec for ec in edited_content}
 
-        # Background tasks tracking
-        self.background_tasks: Dict[str, BackgroundTask] = {}
+        # Background tasks tracking - use app.background_tasks in production, local dict in tests
+        self._test_background_tasks: Dict[str, BackgroundTask] = {}
 
         # Storage for RAG search results (for Phase 3)
         self.candidate_page_names: Dict[str, list[str]] = {}  # block_id -> page names
@@ -173,11 +173,40 @@ class Phase2Screen(Screen):
                 with Container(id="editor-panel"):
                     yield ContentEditor()
 
-            # Status panel for background tasks
-            yield StatusPanel(background_tasks=self.background_tasks)
+            # Status panel for background tasks (uses app-level shared dict or test dict)
+            from logsqueak.tui.app import LogsqueakApp
+            if isinstance(self.app, LogsqueakApp):
+                yield StatusPanel(background_tasks=self.app.background_tasks)
+            else:
+                # Test environment - use test dict
+                yield StatusPanel(background_tasks=self._test_background_tasks)
 
             # Footer with keyboard shortcuts
             yield Footer()
+
+    @property
+    def _background_tasks(self) -> Dict[str, BackgroundTask]:
+        """Get app-level background tasks dict (or test dict in test mode)."""
+        from logsqueak.tui.app import LogsqueakApp
+        if isinstance(self.app, LogsqueakApp):
+            return self.app.background_tasks
+        return self._test_background_tasks
+
+    @property
+    def background_tasks(self) -> Dict[str, BackgroundTask]:
+        """Backwards compatibility property for tests."""
+        return self._background_tasks
+
+    @background_tasks.setter
+    def background_tasks(self, value: Dict[str, BackgroundTask]) -> None:
+        """Allow tests to set background tasks dict."""
+        from logsqueak.tui.app import LogsqueakApp
+        from textual._context import NoActiveAppError
+        try:
+            if not isinstance(self.app, LogsqueakApp):
+                self._test_background_tasks = value
+        except NoActiveAppError:
+            self._test_background_tasks = value
 
     async def on_mount(self) -> None:
         """Handle screen mount event."""
@@ -407,7 +436,12 @@ class Phase2Screen(Screen):
 
         # Start LLM decisions worker if not already running
         # (normally starts after rewording completes, but user might press 'n' before that)
-        if self.llm_client and "llm_decisions" not in self.background_tasks:
+        from logsqueak.tui.app import LogsqueakApp
+        task_exists = False
+        if isinstance(self.app, LogsqueakApp):
+            task_exists = "llm_decisions" in self.app.background_tasks
+
+        if self.llm_client and not task_exists:
             logger.info("llm_decisions_worker_starting_on_transition")
             self.run_worker(self._llm_decisions_worker(), name="llm_decisions")
 
@@ -452,7 +486,7 @@ class Phase2Screen(Screen):
     async def _llm_rewording_worker(self) -> None:
         """Worker: Generate LLM reworded versions using reword_content wrapper."""
         # Create background task
-        self.background_tasks["llm_rewording"] = BackgroundTask(
+        self._background_tasks["llm_rewording"] = BackgroundTask(
             task_type="llm_rewording",
             status="running",
             progress_current=0,
@@ -500,12 +534,11 @@ class Phase2Screen(Screen):
                 count += 1
 
                 # Update progress
-                self.background_tasks["llm_rewording"].progress_current = count
+                self._background_tasks["llm_rewording"].progress_current = count
                 status_panel.update_status()
 
-            # Mark complete
-            self.background_tasks["llm_rewording"].status = "completed"
-            self.background_tasks["llm_rewording"].progress_percentage = 100.0
+            # Mark complete and remove from background tasks
+            del self._background_tasks["llm_rewording"]
             status_panel.update_status()
 
             logger.info(
@@ -519,8 +552,8 @@ class Phase2Screen(Screen):
 
         except Exception as e:
             # Mark failed
-            self.background_tasks["llm_rewording"].status = "failed"
-            self.background_tasks["llm_rewording"].error_message = str(e)
+            self._background_tasks["llm_rewording"].status = "failed"
+            self._background_tasks["llm_rewording"].error_message = str(e)
             status_panel.update_status()
 
             logger.error(
@@ -535,16 +568,18 @@ class Phase2Screen(Screen):
         This runs in Phase 2 after rewording completes, so decisions
         are ready when user transitions to Phase 3.
         """
-        # Create background task
-        self.background_tasks["llm_decisions"] = BackgroundTask(
-            task_type="llm_decisions",
-            status="running",
-            progress_current=0,
-            progress_total=len(self.edited_content),
-        )
+        # Create background task in shared app dict
+        from logsqueak.tui.app import LogsqueakApp
+        if isinstance(self.app, LogsqueakApp):
+            self.app.background_tasks["llm_decisions"] = BackgroundTask(
+                task_type="llm_decisions",
+                status="running",
+                progress_current=0,
+                progress_total=len(self.edited_content),
+            )
 
-        status_panel = self.query_one(StatusPanel)
-        status_panel.update_status()
+            status_panel = self.query_one(StatusPanel)
+            status_panel.update_status()
 
         try:
             # Stream raw decisions from LLM
@@ -610,8 +645,11 @@ class Phase2Screen(Screen):
                 block_count += 1
 
                 # Update progress
-                self.background_tasks["llm_decisions"].progress_current = block_count
-                status_panel.update_status()
+                from logsqueak.tui.app import LogsqueakApp
+                if isinstance(self.app, LogsqueakApp):
+                    self.app.background_tasks["llm_decisions"].progress_current = block_count
+                    status_panel = self.query_one(StatusPanel)
+                    status_panel.update_status()
 
                 logger.info(
                     "llm_decisions_batch_complete_phase2",
@@ -619,10 +657,15 @@ class Phase2Screen(Screen):
                     num_decisions=len(decision_batch)
                 )
 
-            # Mark complete
-            self.background_tasks["llm_decisions"].status = "completed"
-            self.background_tasks["llm_decisions"].progress_percentage = 100.0
-            status_panel.update_status()
+            # Mark complete and remove from background tasks
+            from logsqueak.tui.app import LogsqueakApp
+            if isinstance(self.app, LogsqueakApp):
+                logger.info("phase2_removing_llm_decisions_task")
+                del self.app.background_tasks["llm_decisions"]
+                logger.info("phase2_task_removed", remaining_tasks=list(self.app.background_tasks.keys()))
+                status_panel = self.query_one(StatusPanel)
+                status_panel.update_status()
+                logger.info("phase2_status_panel_updated")
 
             # Get total count from app's shared list
             total_decisions = 0
@@ -638,9 +681,12 @@ class Phase2Screen(Screen):
 
         except Exception as e:
             # Mark failed
-            self.background_tasks["llm_decisions"].status = "failed"
-            self.background_tasks["llm_decisions"].error_message = str(e)
-            status_panel.update_status()
+            from logsqueak.tui.app import LogsqueakApp
+            if isinstance(self.app, LogsqueakApp):
+                self.app.background_tasks["llm_decisions"].status = "failed"
+                self.app.background_tasks["llm_decisions"].error_message = str(e)
+                status_panel = self.query_one(StatusPanel)
+                status_panel.update_status()
 
             logger.error(
                 "llm_decisions_error_phase2",
@@ -665,7 +711,7 @@ class Phase2Screen(Screen):
         from logsqueak.tui.app import LogsqueakApp
 
         # Create background task
-        self.background_tasks["rag_search"] = BackgroundTask(
+        self._background_tasks["rag_search"] = BackgroundTask(
             task_type="rag_search",
             status="running",
             progress_current=0,
@@ -683,10 +729,11 @@ class Phase2Screen(Screen):
             while True:
                 if isinstance(self.app, LogsqueakApp):
                     indexing_task = self.app.background_tasks.get("page_indexing")
-                    if indexing_task and indexing_task.status == "completed":
+                    if indexing_task is None:
+                        # Task deleted - it completed successfully
                         logger.info("rag_search_indexer_ready", phase="phase2")
                         break
-                    elif indexing_task and indexing_task.status == "failed":
+                    elif indexing_task.status == "failed":
                         # Indexing failed - cannot proceed with RAG search
                         error_msg = indexing_task.error_message or "Unknown error"
                         raise RuntimeError(f"Page indexing failed: {error_msg}")
@@ -711,7 +758,7 @@ class Phase2Screen(Screen):
             )
 
             # Update progress
-            self.background_tasks["rag_search"].progress_current = 1
+            self._background_tasks["rag_search"].progress_current = 1
             status_panel.update_status()
 
             logger.info(
@@ -729,11 +776,9 @@ class Phase2Screen(Screen):
                 graph_paths=self.graph_paths
             )
 
-            # Update progress
-            self.background_tasks["rag_search"].progress_current = 2
-            self.background_tasks["rag_search"].status = "completed"
-            self.background_tasks["rag_search"].progress_percentage = 100.0
+            # Mark complete and remove from background tasks
             self.rag_search_state = BackgroundTaskState.COMPLETED
+            del self._background_tasks["rag_search"]
             status_panel.update_status()
 
             logger.info(
@@ -745,14 +790,19 @@ class Phase2Screen(Screen):
             # This allows decisions to stream in during Phase 2, so they're
             # ready when user reaches Phase 3
             # Only start if not already running (user might have pressed 'n' already)
-            if self.llm_client and "llm_decisions" not in self.background_tasks:
+            from logsqueak.tui.app import LogsqueakApp
+            task_exists = False
+            if isinstance(self.app, LogsqueakApp):
+                task_exists = "llm_decisions" in self.app.background_tasks
+
+            if self.llm_client and not task_exists:
                 self.run_worker(self._llm_decisions_worker(), name="llm_decisions")
                 logger.info("llm_decisions_worker_started_after_rag")
 
         except Exception as e:
             # Mark failed
-            self.background_tasks["rag_search"].status = "failed"
-            self.background_tasks["rag_search"].error_message = str(e)
+            self._background_tasks["rag_search"].status = "failed"
+            self._background_tasks["rag_search"].error_message = str(e)
             self.rag_search_state = BackgroundTaskState.FAILED
             self.rag_search_error = str(e)
             status_panel.update_status()
