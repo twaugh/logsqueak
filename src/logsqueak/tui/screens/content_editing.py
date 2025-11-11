@@ -206,14 +206,13 @@ class Phase2Screen(Screen):
             logger.info("rag_search_worker_started")
 
     def _clean_context_for_display(self, text: str) -> str:
-        """Clean context text for display by removing internal markers and id:: properties.
+        """Clean context text for display by removing id:: properties.
 
         Removes:
-        - Outdent markers (\\x00N\\x00 format)
         - id:: property lines (internal metadata)
 
         Args:
-            text: Context text with potential markers
+            text: Context text
 
         Returns:
             Clean text for display
@@ -225,13 +224,6 @@ class Phase2Screen(Screen):
         clean_lines = []
 
         for line in lines:
-            # Remove outdent markers (\x00N\x00)
-            if '\x00' in line:
-                parts = line.split('\x00', 2)
-                if len(parts) == 3:
-                    # Format is \x00{reduction}\x00{content}
-                    line = parts[2]
-
             # Skip id:: property lines
             stripped = line.strip()
             if stripped.startswith('id::'):
@@ -297,7 +289,7 @@ class Phase2Screen(Screen):
 
         # Update original context panel using TargetPagePreview
         original_context = self.query_one("#original-context", TargetPagePreview)
-        # Clean context (remove outdent markers and id:: properties), then convert to bullets
+        # Clean context (remove id:: properties), then convert to bullets
         clean_context = self._clean_context_for_display(current_ec.hierarchical_context)
         context_with_bullets = self._convert_to_logseq_bullets(clean_context)
         await original_context.load_preview(context_with_bullets)

@@ -252,7 +252,7 @@ class LogsqueakApp(App):
                     break
 
             if block:
-                # Get user-facing content (excludes id:: property and cleans outdent markers)
+                # Get user-facing content (excludes id:: property)
                 user_content = block.get_user_content()
 
                 # Create EditedContent

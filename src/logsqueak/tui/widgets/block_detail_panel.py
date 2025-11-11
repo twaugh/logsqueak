@@ -184,7 +184,7 @@ class BlockDetailPanel(Widget):
         if parent_blocks:
             for parent in parent_blocks:
                 # Render parent as Logseq markdown (no indentation)
-                # Use get_user_content_lines() to exclude id:: and clean outdent markers
+                # Use get_user_content_lines() to exclude id:: properties
                 # First line gets the bullet, continuation lines get proper indent
                 parent_lines = parent.get_user_content_lines()
                 for i, content_line in enumerate(parent_lines):
@@ -195,7 +195,7 @@ class BlockDetailPanel(Widget):
 
         # Add the current block (only the block itself, not its children)
         # Always render at indent level 0
-        # Use get_user_content_lines() to exclude id:: and clean outdent markers
+        # Use get_user_content_lines() to exclude id:: properties
         # First line gets the bullet, continuation lines get hanging indent
         block_lines = block.get_user_content_lines()
         for i, content_line in enumerate(block_lines):
