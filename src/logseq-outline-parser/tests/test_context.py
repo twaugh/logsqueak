@@ -305,3 +305,27 @@ class TestGenerateChunks:
 
         # Same block content but different frontmatter should have different hashes
         assert chunks_with[0][2] != chunks_without[0][2]
+
+    def test_hash_stable_across_parsing_modes(self):
+        """Test that content hash is identical in strict and default parsing modes."""
+        from textwrap import dedent
+        # Markdown with outdented continuation line
+        markdown = dedent("""
+            - Block with continuation
+            Outdented line
+              - Child block
+                More content
+        """).strip()
+
+        # Parse in default mode (no outdent markers)
+        outline_default = LogseqOutline.parse(markdown)
+        chunks_default = generate_chunks(outline_default)
+
+        # Parse in strict mode (with outdent markers)
+        outline_strict = LogseqOutline.parse(markdown, strict_indent_preservation=True)
+        chunks_strict = generate_chunks(outline_strict)
+
+        # Should produce identical hashes despite different internal representation
+        assert len(chunks_default) == len(chunks_strict)
+        for (block_default, context_default, hash_default), (block_strict, context_strict, hash_strict) in zip(chunks_default, chunks_strict):
+            assert hash_default == hash_strict, f"Hashes should match: {hash_default} vs {hash_strict}"

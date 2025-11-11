@@ -70,11 +70,13 @@ def generate_full_context(
 
     # Add all parent blocks with proper indentation
     # Use full content (all lines) to maximize uniqueness
+    # Normalize content to remove outdent markers for stable hashing
     for i, parent in enumerate(parents):
         indent = indent_str * i
         # Join all content lines with proper continuation indentation
         parent_lines = []
-        for j, line in enumerate(parent.content):
+        normalized_content = _normalize_content_for_hashing(parent.content)
+        for j, line in enumerate(normalized_content):
             if j == 0:
                 # First line gets the bullet
                 parent_lines.append(f"{indent}- {line}")
@@ -85,8 +87,10 @@ def generate_full_context(
 
     # Add this block with its indentation
     # Use full content (all lines) to maximize uniqueness
+    # Normalize content to remove outdent markers for stable hashing
     indent = indent_str * len(parents)
-    for j, line in enumerate(block.content):
+    normalized_content = _normalize_content_for_hashing(block.content)
+    for j, line in enumerate(normalized_content):
         if j == 0:
             # First line gets the bullet
             context_parts.append(f"{indent}- {line}")
@@ -100,6 +104,30 @@ def generate_full_context(
     # Blocks with identical content+context will share IDs, which is acceptable.
 
     return "\n".join(context_parts)
+
+
+def _normalize_content_for_hashing(content_lines: list[str]) -> list[str]:
+    """Normalize block content for stable hash generation.
+
+    Removes outdent markers (\x00N\x00) to ensure hash stability regardless
+    of parsing mode (strict_indent_preservation=True/False).
+
+    Args:
+        content_lines: Block content lines (may contain outdent markers)
+
+    Returns:
+        Normalized content lines without outdent markers
+    """
+    normalized = []
+    for line in content_lines:
+        # Remove outdent markers if present
+        if '\x00' in line:
+            parts = line.split('\x00', 2)
+            if len(parts) == 3:
+                # Extract just the content (skip reduction marker)
+                line = parts[2]
+        normalized.append(line)
+    return normalized
 
 
 def generate_content_hash(full_context: str, page_name: str | None = None) -> str:
