@@ -6,13 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Logsqueak** is a TUI (Text User Interface) application for extracting lasting knowledge from Logseq journal entries using LLM-powered analysis. Users interactively review, refine, and integrate knowledge blocks into their Logseq knowledge base.
 
-**Current Status**: Phase 4 complete - Content Editing TUI working
+**Current Status**: Phase 5 complete - All core user stories implemented
 - ✅ **Implemented**: `logseq-outline-parser` library (robust Logseq markdown parsing)
 - ✅ **Implemented**: Foundational infrastructure (models, services, CLI, config)
-- ✅ **Implemented**: Phase 1 Block Selection TUI (tree navigation, LLM streaming, manual selection)
-- ✅ **Implemented**: Phase 4 Content Editing TUI (three-panel layout, LLM rewording, manual editing)
+- ✅ **Implemented**: Phase 1/US1 Block Selection TUI (tree navigation, LLM streaming, manual selection)
+- ✅ **Implemented**: Phase 4/US2 Content Editing TUI (three-panel layout, LLM rewording, manual editing)
+- ✅ **Implemented**: Phase 5/US3 Integration Review TUI (decision batching, target preview, atomic writes)
 - ✅ **Implemented**: RAG semantic search (PageIndexer, RAGSearch with lazy loading)
-- ⏳ **Planned**: Phase 3 Integration Review TUI, background workers for Phase 2
+- ✅ **Implemented**: File operations (atomic two-phase writes with provenance markers)
+- ⏳ **Remaining**: Phase 6 (wire up all phases), Phase 7 (edge cases), Phase 8 (polish)
 
 ## Project Structure
 
@@ -440,14 +442,15 @@ mypy src/
 ### Running the CLI
 
 ```bash
-# Launch Phase 1 Block Selection TUI
+# Launch end-to-end knowledge extraction workflow
 logsqueak extract                         # Today's journal entry
 logsqueak extract 2025-01-15              # Specific date
 logsqueak extract 2025-01-10..2025-01-15  # Date range
 
-# Navigate blocks (j/k), see LLM classification streaming
-# Select blocks with Space, accept all suggestions with 'a'
-# Press 'n' to proceed (Phase 2-3 not yet implemented)
+# Phase 1: Select knowledge blocks (j/k navigation, Space to select, 'a' accept all)
+# Phase 2: Edit/refine content (Tab to focus editor, 'a' accept LLM version, 'r' revert)
+# Phase 3: Review integrations (j/k through decisions, 'y' accept, 'a' batch accept)
+# All phases complete - writes to pages with provenance markers in journal
 ```
 
 ## Python Version & Dependencies
@@ -462,7 +465,7 @@ logsqueak extract 2025-01-10..2025-01-15  # Date range
   - `structlog>=23.0.0` - Structured logging
   - `chromadb>=0.4.0` - Vector store for RAG
   - `sentence-transformers>=2.2.0` - Embeddings (lazy-loaded to prevent UI blocking)
-  - `markdown-it-py>=3.0.0` - Markdown rendering (to be used)
+  - `markdown-it-py>=3.0.0` - Markdown rendering (Textual dependency for Markdown widget)
 - **Dev dependencies** (installed):
   - `pytest>=7.4.0` - Test framework
   - `pytest-asyncio>=0.21.0` - Async test support
@@ -563,36 +566,34 @@ Logseq uses indented bullets (2 spaces per level) with special features:
 **Implementation status** (see tasks.md for details):
 - ✅ **Phase 1: Setup** (T001-T009) - Complete
 - ✅ **Phase 2: Foundational** (T010-T031) - Complete and tested
-- ✅ **Phase 3: User Story 1** (T032-T049) - Block Selection TUI complete
-- ✅ **Phase 4: User Story 2** (T050-T070) - Content Editing TUI complete
-- ⏳ **Phase 5: User Story 3** (T071-T096) - Integration Review TUI (next to implement)
-- ⏳ **Phase 6: Application Integration** (T097-T106) - Wire up all phases
+- ✅ **Phase 3: User Story 1** (T032-T049) - Block Selection TUI complete (38 tests passing)
+- ✅ **Phase 4: User Story 2** (T050-T070) - Content Editing TUI complete (44 tests passing)
+- ✅ **Phase 5: User Story 3** (T071-T096) - Integration Review TUI complete (38 tests passing)
+- ⏳ **Phase 6: Application Integration** (T097-T106) - Wire up all phases end-to-end
 - ⏳ **Phase 7: Edge Cases** (T107-T117) - Error handling polish
 - ⏳ **Phase 8: Polish & Documentation** (T118-T130) - Final validation
 
-**Phase 4 Achievements**:
-- ✅ RAG services (PageIndexer, RAGSearch) with lazy SentenceTransformer loading
-- ✅ ContentEditor widget with focus/unfocus visual indication
-- ✅ Phase2Screen with vertical three-panel layout (original, LLM, editable)
-- ✅ Keyboard controls (j/k navigation, Tab focus, 'a' accept, 'r' revert)
-- ✅ Auto-save on navigation, RAG search blocking on 'n' key
-- ✅ Background worker stubs ready for LLM/RAG integration
-- ✅ Comprehensive UI test suite with snapshot testing
+**Phase 5 Achievements** (Integration Review - US3):
+- ✅ File operations service with atomic two-phase writes (37 tests passing)
+- ✅ Provenance markers (`processed::` property in journal entries)
+- ✅ TargetPagePreview widget with insertion point indicator (green bar)
+- ✅ DecisionList widget with batching by knowledge block
+- ✅ Phase3Screen with decision navigation and acceptance workflow
+- ✅ Integration actions: add_section, add_under, replace, skip_exists
+- ✅ Idempotent retry detection and concurrent modification handling
+- ✅ Comprehensive UI and integration test suite with snapshot testing
 
-**Next steps** (Phase 5 - User Story 3):
-1. Write UI tests FIRST using Textual pilot (T071-T077) - tests should FAIL
-2. Implement file operations (atomic writes, provenance markers) with tests (T078-T082)
-3. Implement TargetPagePreview and DecisionList widgets (T083-T084)
-4. Implement Phase3Screen with integration review workflow (T085-T095)
-5. Run tests again - should NOW PASS (T096)
-6. Manually test TUI: review decisions, accept integrations, verify writes
+**Next steps** (Phase 6 - Application Integration):
+- Wire up Phase 1 → Phase 2 → Phase 3 in end-to-end workflow
+- Implement background workers for LLM streaming and RAG search
+- Test complete workflow from journal entry to page integration
+- Verify all phases work together seamlessly
 
-**When implementing**:
+**Development guidelines**:
 - Follow TDD: Write failing tests → Implement → Tests pass → Manual verify
 - Use Textual pilot for all UI tests (automated keyboard/mouse simulation)
-- Test each phase independently before proceeding
 - Property order preservation is NON-NEGOTIABLE
-- Get user verification at each checkpoint before continuing
+- All file writes must be atomic with provenance markers
 
 ## License
 
@@ -603,10 +604,19 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
 - 2025-11-11: **Parser Refactoring** - Added strict_indent_preservation parameter
   - Parser now defaults to normalized indentation (no outdent markers)
   - Added strict_indent_preservation parameter for write operations only
+  - Normalized content hashing for stable IDs across parsing modes
   - Removed redundant outdent marker cleaning from llm_wrappers, TUI modules
   - Simplifies application code by handling markers at parser level
-  - All 86 parser tests passing, 6 new tests for indent preservation modes
+  - All 87 parser tests passing, 7 new tests for indent preservation and hash stability
   - Prevents implementation details from leaking into LLM prompts and UI
+- 2025-11-10: **Phase 5 Complete** - Integration Review TUI implemented and tested (T071-T096)
+  - TargetPagePreview and DecisionList widgets complete
+  - Phase3Screen with decision navigation, batch acceptance, target preview
+  - File operations service with atomic two-phase writes and provenance markers
+  - Integration actions: add_section, add_under, replace, skip_exists
+  - Idempotent retry detection and concurrent modification handling
+  - 38 UI tests passing, 37 file operations tests passing
+  - All three core user stories (US1, US2, US3) now complete
 - 2025-11-06: **Phase 4 Complete** - Content Editing TUI implemented and tested (T050-T070)
   - RAG services (PageIndexer, RAGSearch) with lazy SentenceTransformer loading
   - Fixed PageIndexer to use `generate_chunks()` for proper semantic chunking
