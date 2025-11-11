@@ -126,8 +126,11 @@ class LogsqueakApp(App):
 
         # Shared background task status tracking (for worker dependency coordination)
         # This dict is shared across all screens so workers can check dependencies
-        from logsqueak.models.background_task import BackgroundTask
+        from logsqueak.models.background_task import BackgroundTask, IntegrationWorkerState
         self.background_tasks: Dict[str, BackgroundTask] = {}
+
+        # Integration decision worker state (prevents duplicate workers)
+        self.integration_worker_state: IntegrationWorkerState = IntegrationWorkerState.NOT_STARTED
 
         logger.info(
             "app_initialized",
@@ -150,11 +153,20 @@ class LogsqueakApp(App):
             name="phase1",
         )
         logger.info("pushing_phase1_screen")
+        # Create model_preload task BEFORE pushing screen so workers can see it exists
+        # This prevents race condition where page_indexing worker starts before preload task exists
+        from logsqueak.models.background_task import BackgroundTask
+        self.background_tasks["model_preload"] = BackgroundTask(
+            task_type="page_indexing",  # Reuse task_type since it's related
+            status="running",
+            progress_percentage=0.0,
+        )
+
         self.push_screen(phase1_screen)
         logger.info("phase1_screen_pushed")
 
-        # Defer model preloading with a delay so UI renders first
-        # Use set_timer instead of call_later to ensure UI is visible
+        # Defer actual model preloading with a delay so UI renders first
+        # The task exists now, so workers can poll it
         self.set_timer(0.1, self._start_model_preload)
         logger.info("app_on_mount_finished")
 
@@ -171,16 +183,11 @@ class LogsqueakApp(App):
 
         Worker Dependency: PageIndexer cannot start until this completes because it uses
         the SentenceTransformer model to generate embeddings for blocks.
+
+        Note: The background task is created in on_mount() before this worker starts,
+        so dependent workers can see it exists and poll for completion.
         """
         import asyncio
-        from logsqueak.models.background_task import BackgroundTask
-
-        # Register task in shared dict
-        self.background_tasks["model_preload"] = BackgroundTask(
-            task_type="page_indexing",  # Reuse task_type since it's related
-            status="running",
-            progress_percentage=0.0,
-        )
 
         try:
             logger.info("preloading_embedding_model", phase="phase1")

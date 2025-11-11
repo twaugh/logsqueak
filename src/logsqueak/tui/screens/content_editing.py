@@ -434,14 +434,15 @@ class Phase2Screen(Screen):
         # Save current content
         self._save_current_content()
 
-        # Start LLM decisions worker if not already running
+        # Start LLM decisions worker if not already started
         # (normally starts after rewording completes, but user might press 'n' before that)
         from logsqueak.tui.app import LogsqueakApp
-        task_exists = False
+        from logsqueak.models.background_task import IntegrationWorkerState
+        worker_not_started = False
         if isinstance(self.app, LogsqueakApp):
-            task_exists = "llm_decisions" in self.app.background_tasks
+            worker_not_started = self.app.integration_worker_state == IntegrationWorkerState.NOT_STARTED
 
-        if self.llm_client and not task_exists:
+        if self.llm_client and worker_not_started:
             logger.info("llm_decisions_worker_starting_on_transition")
             self.run_worker(self._llm_decisions_worker(), name="llm_decisions")
 
@@ -568,8 +569,13 @@ class Phase2Screen(Screen):
         This runs in Phase 2 after rewording completes, so decisions
         are ready when user transitions to Phase 3.
         """
-        # Create background task in shared app dict
+        # Mark worker as running (prevents duplicate workers)
         from logsqueak.tui.app import LogsqueakApp
+        from logsqueak.models.background_task import IntegrationWorkerState
+        if isinstance(self.app, LogsqueakApp):
+            self.app.integration_worker_state = IntegrationWorkerState.RUNNING
+
+        # Create background task in shared app dict
         if isinstance(self.app, LogsqueakApp):
             self.app.background_tasks["llm_decisions"] = BackgroundTask(
                 task_type="llm_decisions",
@@ -659,9 +665,11 @@ class Phase2Screen(Screen):
 
             # Mark complete and remove from background tasks
             from logsqueak.tui.app import LogsqueakApp
+            from logsqueak.models.background_task import IntegrationWorkerState
             if isinstance(self.app, LogsqueakApp):
                 logger.info("phase2_removing_llm_decisions_task")
                 del self.app.background_tasks["llm_decisions"]
+                self.app.integration_worker_state = IntegrationWorkerState.COMPLETED
                 logger.info("phase2_task_removed", remaining_tasks=list(self.app.background_tasks.keys()))
                 status_panel = self.query_one(StatusPanel)
                 status_panel.update_status()

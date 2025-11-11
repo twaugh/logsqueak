@@ -270,17 +270,23 @@ class Phase3Screen(Screen):
             total_blocks = len(self.edited_content)
             all_complete = blocks_ready >= total_blocks
 
-            # Create a placeholder background task to show progress if it doesn't exist
-            # (the actual worker is running in Phase 2, so task may already exist)
+            # Check worker state to determine what to do
             from logsqueak.tui.app import LogsqueakApp
+            from logsqueak.models.background_task import IntegrationWorkerState
             task_exists = False
+            worker_state = IntegrationWorkerState.NOT_STARTED
             if isinstance(self.app, LogsqueakApp):
                 task_exists = "llm_decisions" in self.app.background_tasks
-                if not task_exists:
-                    # Task doesn't exist - Phase 2 worker has completed
-                    # Only create placeholder if we have decisions to show progress for
-                    # If blocks_ready == 0, the worker finished but produced no valid decisions
-                    if blocks_ready > 0:
+                worker_state = self.app.integration_worker_state
+
+            # If worker never started and we have an LLM client, start it now
+            if self.llm_client and worker_state == IntegrationWorkerState.NOT_STARTED:
+                logger.info("phase3_starting_worker", reason="worker never started")
+                self.run_worker(self._llm_decisions_worker(), name="llm_decisions")
+            elif not task_exists and worker_state == IntegrationWorkerState.COMPLETED:
+                # Worker completed - create placeholder if we have decisions
+                if blocks_ready > 0:
+                    if isinstance(self.app, LogsqueakApp):
                         self.app.background_tasks["llm_decisions"] = BackgroundTask(
                             task_type="llm_decisions",
                             status="completed" if all_complete else "running",
@@ -288,12 +294,12 @@ class Phase3Screen(Screen):
                             progress_total=total_blocks,
                             progress_percentage=100.0 if all_complete else None,
                         )
-                        logger.info("phase3_created_placeholder_task", blocks_ready=blocks_ready, all_complete=all_complete)
-                    else:
-                        logger.info("phase3_no_placeholder_task", reason="worker completed with 0 decisions")
+                    logger.info("phase3_created_placeholder_task", blocks_ready=blocks_ready, all_complete=all_complete)
                 else:
-                    # Task already exists from Phase 2 - don't overwrite it
-                    logger.info("phase3_using_existing_task", blocks_ready=blocks_ready)
+                    logger.info("phase3_no_placeholder_task", reason="worker completed with 0 decisions")
+            elif task_exists:
+                # Task already exists from Phase 2 - don't overwrite it
+                logger.info("phase3_using_existing_task", blocks_ready=blocks_ready)
 
             status_panel = self.query_one(StatusPanel)
             status_panel.update_status()
@@ -694,6 +700,8 @@ Confidence: {decision.confidence:.0%}
                 # Check if all decisions are complete
                 if blocks_ready >= total_blocks:
                     del self.app.background_tasks["llm_decisions"]
+                    from logsqueak.models.background_task import IntegrationWorkerState
+                    self.app.integration_worker_state = IntegrationWorkerState.COMPLETED
                     logger.info(
                         "llm_decisions_complete_phase3_polling",
                         total_blocks=blocks_ready,
@@ -752,8 +760,13 @@ Confidence: {decision.confidence:.0%}
 
     async def _llm_decisions_worker(self) -> None:
         """Worker: Generate integration decisions using LLM with batching and filtering."""
-        # Create background task
+        # Mark worker as running (prevents duplicate workers)
         from logsqueak.tui.app import LogsqueakApp
+        from logsqueak.models.background_task import IntegrationWorkerState
+        if isinstance(self.app, LogsqueakApp):
+            self.app.integration_worker_state = IntegrationWorkerState.RUNNING
+
+        # Create background task
         if isinstance(self.app, LogsqueakApp):
             self.app.background_tasks["llm_decisions"] = BackgroundTask(
                 task_type="llm_decisions",
@@ -827,8 +840,10 @@ Confidence: {decision.confidence:.0%}
             # Mark complete and remove from background tasks
             self.llm_decisions_state = BackgroundTaskState.COMPLETED
             from logsqueak.tui.app import LogsqueakApp
+            from logsqueak.models.background_task import IntegrationWorkerState
             if isinstance(self.app, LogsqueakApp):
                 del self.app.background_tasks["llm_decisions"]
+                self.app.integration_worker_state = IntegrationWorkerState.COMPLETED
                 status_panel = self.query_one(StatusPanel)
                 status_panel.update_status()
 
