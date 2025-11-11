@@ -157,8 +157,8 @@ class Phase3Screen(Screen):
         self.decisions = decisions if decisions is not None else []
         self.decisions_by_block = self._group_decisions_by_block(self.decisions)
 
-        # Background tasks tracking
-        self.background_tasks: Dict[str, BackgroundTask] = {}
+        # Background tasks tracking - use app.background_tasks in production, local dict in tests
+        self._test_background_tasks: Dict[str, BackgroundTask] = {}
 
         # Track which blocks have decisions ready (for navigation blocking)
         # If decisions are pre-generated, mark all blocks as ready
@@ -216,11 +216,40 @@ class Phase3Screen(Screen):
                         yield Label("Target Page Preview", classes="panel-header")
                         yield TargetPagePreview()
 
-            # Status panel for background tasks
-            yield StatusPanel(background_tasks=self.background_tasks)
+            # Status panel for background tasks (uses app-level shared dict or test dict)
+            from logsqueak.tui.app import LogsqueakApp
+            if isinstance(self.app, LogsqueakApp):
+                yield StatusPanel(background_tasks=self.app.background_tasks)
+            else:
+                # Test environment - use test dict
+                yield StatusPanel(background_tasks=self._test_background_tasks)
 
         # Footer with keyboard shortcuts
         yield Footer()
+
+    @property
+    def _background_tasks(self) -> Dict[str, BackgroundTask]:
+        """Get app-level background tasks dict (or test dict in test mode)."""
+        from logsqueak.tui.app import LogsqueakApp
+        if isinstance(self.app, LogsqueakApp):
+            return self.app.background_tasks
+        return self._test_background_tasks
+
+    @property
+    def background_tasks(self) -> Dict[str, BackgroundTask]:
+        """Backwards compatibility property for tests."""
+        return self._background_tasks
+
+    @background_tasks.setter
+    def background_tasks(self, value: Dict[str, BackgroundTask]) -> None:
+        """Allow tests to set background tasks dict."""
+        from logsqueak.tui.app import LogsqueakApp
+        from textual._context import NoActiveAppError
+        try:
+            if not isinstance(self.app, LogsqueakApp):
+                self._test_background_tasks = value
+        except NoActiveAppError:
+            self._test_background_tasks = value
 
     def on_mount(self) -> None:
         """Initialize screen when mounted."""
@@ -241,21 +270,36 @@ class Phase3Screen(Screen):
             total_blocks = len(self.edited_content)
             all_complete = blocks_ready >= total_blocks
 
-            # Create a placeholder background task to show progress
-            # (the actual worker is running in Phase 2)
-            self.background_tasks["llm_decisions"] = BackgroundTask(
-                task_type="llm_decisions",
-                status="completed" if all_complete else "running",
-                progress_current=blocks_ready,
-                progress_total=total_blocks,
-                progress_percentage=100.0 if all_complete else None,
-            )
+            # Create a placeholder background task to show progress if it doesn't exist
+            # (the actual worker is running in Phase 2, so task may already exist)
+            from logsqueak.tui.app import LogsqueakApp
+            task_exists = False
+            if isinstance(self.app, LogsqueakApp):
+                task_exists = "llm_decisions" in self.app.background_tasks
+                if not task_exists:
+                    # Task doesn't exist - Phase 2 worker has completed
+                    # Only create placeholder if we have decisions to show progress for
+                    # If blocks_ready == 0, the worker finished but produced no valid decisions
+                    if blocks_ready > 0:
+                        self.app.background_tasks["llm_decisions"] = BackgroundTask(
+                            task_type="llm_decisions",
+                            status="completed" if all_complete else "running",
+                            progress_current=blocks_ready,
+                            progress_total=total_blocks,
+                            progress_percentage=100.0 if all_complete else None,
+                        )
+                        logger.info("phase3_created_placeholder_task", blocks_ready=blocks_ready, all_complete=all_complete)
+                    else:
+                        logger.info("phase3_no_placeholder_task", reason="worker completed with 0 decisions")
+                else:
+                    # Task already exists from Phase 2 - don't overwrite it
+                    logger.info("phase3_using_existing_task", blocks_ready=blocks_ready)
 
             status_panel = self.query_one(StatusPanel)
             status_panel.update_status()
 
-            # Only poll for updates if not all complete
-            if not all_complete:
+            # Only poll for updates if task exists and not all complete
+            if task_exists and not all_complete:
                 self.set_interval(0.5, self._check_for_new_decisions)
             else:
                 logger.info(
@@ -640,16 +684,16 @@ Confidence: {decision.confidence:.0%}
                     )
 
             # Update progress in background task if it exists
-            if "llm_decisions" in self.background_tasks:
+            from logsqueak.tui.app import LogsqueakApp
+            if isinstance(self.app, LogsqueakApp) and "llm_decisions" in self.app.background_tasks:
                 # Update progress based on blocks with decisions ready
                 blocks_ready = len(self.decisions_ready)
                 total_blocks = len(self.edited_content)
-                self.background_tasks["llm_decisions"].progress_current = blocks_ready
+                self.app.background_tasks["llm_decisions"].progress_current = blocks_ready
 
                 # Check if all decisions are complete
                 if blocks_ready >= total_blocks:
-                    self.background_tasks["llm_decisions"].status = "completed"
-                    self.background_tasks["llm_decisions"].progress_percentage = 100.0
+                    del self.app.background_tasks["llm_decisions"]
                     logger.info(
                         "llm_decisions_complete_phase3_polling",
                         total_blocks=blocks_ready,
@@ -709,15 +753,17 @@ Confidence: {decision.confidence:.0%}
     async def _llm_decisions_worker(self) -> None:
         """Worker: Generate integration decisions using LLM with batching and filtering."""
         # Create background task
-        self.background_tasks["llm_decisions"] = BackgroundTask(
-            task_type="llm_decisions",
-            status="running",
-            progress_current=0,
-            progress_total=len(self.edited_content),
-        )
+        from logsqueak.tui.app import LogsqueakApp
+        if isinstance(self.app, LogsqueakApp):
+            self.app.background_tasks["llm_decisions"] = BackgroundTask(
+                task_type="llm_decisions",
+                status="running",
+                progress_current=0,
+                progress_total=len(self.edited_content),
+            )
 
-        status_panel = self.query_one(StatusPanel)
-        status_panel.update_status()
+            status_panel = self.query_one(StatusPanel)
+            status_panel.update_status()
 
         try:
             # Step 1: Stream raw decisions from LLM
@@ -763,8 +809,11 @@ Confidence: {decision.confidence:.0%}
                 block_count += 1
 
                 # Update progress
-                self.background_tasks["llm_decisions"].progress_current = block_count
-                status_panel.update_status()
+                from logsqueak.tui.app import LogsqueakApp
+                if isinstance(self.app, LogsqueakApp):
+                    self.app.background_tasks["llm_decisions"].progress_current = block_count
+                    status_panel = self.query_one(StatusPanel)
+                    status_panel.update_status()
 
                 logger.info(
                     "llm_decisions_batch_complete",
@@ -775,11 +824,13 @@ Confidence: {decision.confidence:.0%}
             # Get skipped count from filter
             self.skipped_block_count = filtered_stream.skipped_count
 
-            # Mark complete
-            self.background_tasks["llm_decisions"].status = "completed"
-            self.background_tasks["llm_decisions"].progress_percentage = 100.0
+            # Mark complete and remove from background tasks
             self.llm_decisions_state = BackgroundTaskState.COMPLETED
-            status_panel.update_status()
+            from logsqueak.tui.app import LogsqueakApp
+            if isinstance(self.app, LogsqueakApp):
+                del self.app.background_tasks["llm_decisions"]
+                status_panel = self.query_one(StatusPanel)
+                status_panel.update_status()
 
             # Update block counter to show skipped count
             self._update_block_counter_with_skip_count()
@@ -792,11 +843,14 @@ Confidence: {decision.confidence:.0%}
 
         except Exception as e:
             # Mark failed
-            self.background_tasks["llm_decisions"].status = "failed"
-            self.background_tasks["llm_decisions"].error_message = str(e)
             self.llm_decisions_state = BackgroundTaskState.FAILED
             self.llm_decisions_error = str(e)
-            status_panel.update_status()
+            from logsqueak.tui.app import LogsqueakApp
+            if isinstance(self.app, LogsqueakApp):
+                self.app.background_tasks["llm_decisions"].status = "failed"
+                self.app.background_tasks["llm_decisions"].error_message = str(e)
+                status_panel = self.query_one(StatusPanel)
+                status_panel.update_status()
 
             logger.error(
                 "llm_decisions_error",

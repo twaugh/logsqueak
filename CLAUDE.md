@@ -388,6 +388,9 @@ Phase 3:
 **Phase 3 Workers:**
 - If decisions already streaming from Phase 2: Polls for new decisions
 - If no decisions exist: Starts Integration Decision Worker
+- **Placeholder task edge case**: If Phase 2 worker completed before Phase 3 mounts:
+  - If `blocks_ready > 0`: Creates placeholder task to show "Processing blocks X/Y"
+  - If `blocks_ready == 0`: No placeholder (worker finished with no valid decisions)
 
 #### Key Constraints
 
