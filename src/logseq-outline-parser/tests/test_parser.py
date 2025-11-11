@@ -515,3 +515,111 @@ class TestHybridID:
         id2 = block.get_hybrid_id()
 
         assert id1 == id2
+
+
+class TestStrictIndentPreservation:
+    """Tests for strict_indent_preservation parameter."""
+
+    def test_default_mode_normalizes_indentation(self):
+        """Test that default mode (strict=False) normalizes continuation indentation."""
+        markdown = dedent("""
+            - Block with continuation
+            Outdented continuation line
+        """).strip()
+
+        outline = LogseqOutline.parse(markdown)
+        block = outline.blocks[0]
+
+        # In default mode, continuation lines are stripped (no outdent markers)
+        assert len(block.content) == 2
+        assert block.content[0] == "Block with continuation"
+        assert block.content[1] == "Outdented continuation line"
+        # Verify no outdent markers present
+        assert "\x00" not in block.content[1]
+
+    def test_strict_mode_preserves_outdents(self):
+        """Test that strict mode (strict=True) preserves outdents with markers."""
+        markdown = dedent("""
+            - Block with continuation
+            Outdented continuation line
+        """).strip()
+
+        outline = LogseqOutline.parse(markdown, strict_indent_preservation=True)
+        block = outline.blocks[0]
+
+        # In strict mode, outdented lines get markers
+        assert len(block.content) == 2
+        assert block.content[0] == "Block with continuation"
+        # Should have outdent marker because line has less indent than expected
+        assert "\x00" in block.content[1]
+        # Marker format: \x00{reduction}\x00{content}
+        assert block.content[1].startswith("\x00")
+
+    def test_default_mode_normal_indentation_no_markers(self):
+        """Test that properly indented continuation lines work in default mode."""
+        markdown = dedent("""
+            - Block with continuation
+              Properly indented continuation
+        """).strip()
+
+        outline = LogseqOutline.parse(markdown)
+        block = outline.blocks[0]
+
+        # Properly indented lines work fine in default mode (no markers needed)
+        assert len(block.content) == 2
+        assert block.content[0] == "Block with continuation"
+        assert block.content[1] == "Properly indented continuation"
+        assert "\x00" not in block.content[1]
+
+    def test_strict_mode_normal_indentation_no_markers(self):
+        """Test that properly indented lines don't get markers even in strict mode."""
+        markdown = dedent("""
+            - Block with continuation
+              Properly indented continuation
+        """).strip()
+
+        outline = LogseqOutline.parse(markdown, strict_indent_preservation=True)
+        block = outline.blocks[0]
+
+        # Properly indented lines don't need markers even in strict mode
+        assert len(block.content) == 2
+        assert block.content[0] == "Block with continuation"
+        assert block.content[1] == "Properly indented continuation"
+        assert "\x00" not in block.content[1]
+
+    def test_render_works_with_both_modes(self):
+        """Test that rendering works correctly for both modes."""
+        markdown = dedent("""
+            - Block with continuation
+            Outdented line
+              Properly indented line
+        """).strip()
+
+        # Default mode
+        outline_default = LogseqOutline.parse(markdown)
+        rendered_default = outline_default.render()
+
+        # Strict mode
+        outline_strict = LogseqOutline.parse(markdown, strict_indent_preservation=True)
+        rendered_strict = outline_strict.render()
+
+        # Both should render to valid markdown
+        assert "- Block with continuation" in rendered_default
+        assert "- Block with continuation" in rendered_strict
+
+    def test_default_mode_prevents_outdent_marker_leakage(self):
+        """Test that default mode prevents outdent markers in generate_chunks."""
+        from logseq_outline.context import generate_chunks
+
+        markdown = dedent("""
+            - Parent block
+            Outdented continuation
+              - Child block
+        """).strip()
+
+        outline = LogseqOutline.parse(markdown)  # Default mode
+        chunks = generate_chunks(outline)
+
+        # Verify no outdent markers in any chunk contexts
+        for block, context, hybrid_id in chunks:
+            assert "\x00" not in context, f"Outdent marker found in context: {context}"
