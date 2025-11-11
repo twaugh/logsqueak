@@ -173,6 +173,9 @@ class Phase3Screen(Screen):
         # Track decision count for polling updates (when using shared list from Phase 2)
         self._last_known_decision_count = len(self.decisions)
 
+        # Store polling timer so we can stop it when complete
+        self._polling_timer = None
+
     def _group_decisions_by_block(self, decisions: List[IntegrationDecision]) -> dict:
         """Group decisions by knowledge_block_id.
 
@@ -306,7 +309,8 @@ class Phase3Screen(Screen):
 
             # Only poll for updates if task exists and not all complete
             if task_exists and not all_complete:
-                self.set_interval(0.5, self._check_for_new_decisions)
+                self._polling_timer = self.set_interval(0.5, self._check_for_new_decisions)
+                logger.info("phase3_started_polling", blocks_ready=blocks_ready, total_blocks=total_blocks)
             else:
                 logger.info(
                     "llm_decisions_already_complete_phase3",
@@ -702,6 +706,13 @@ Confidence: {decision.confidence:.0%}
                     del self.app.background_tasks["llm_decisions"]
                     from logsqueak.models.background_task import IntegrationWorkerState
                     self.app.integration_worker_state = IntegrationWorkerState.COMPLETED
+
+                    # Stop polling now that all decisions are complete
+                    if self._polling_timer is not None:
+                        self._polling_timer.stop()
+                        self._polling_timer = None
+                        logger.info("phase3_stopped_polling", reason="all decisions complete")
+
                     logger.info(
                         "llm_decisions_complete_phase3_polling",
                         total_blocks=blocks_ready,
