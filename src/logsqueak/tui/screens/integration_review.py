@@ -236,19 +236,33 @@ class Phase3Screen(Screen):
             # If decisions are pre-generated from Phase 2, start polling for updates
             # The Phase 2 worker may still be adding decisions to the shared list
 
+            # Check if all decisions are already complete
+            blocks_ready = len(self.decisions_ready)
+            total_blocks = len(self.edited_content)
+            all_complete = blocks_ready >= total_blocks
+
             # Create a placeholder background task to show progress
             # (the actual worker is running in Phase 2)
             self.background_tasks["llm_decisions"] = BackgroundTask(
                 task_type="llm_decisions",
-                status="running",
-                progress_current=len(self.decisions_ready),
-                progress_total=len(self.edited_content),
+                status="completed" if all_complete else "running",
+                progress_current=blocks_ready,
+                progress_total=total_blocks,
+                progress_percentage=100.0 if all_complete else None,
             )
 
             status_panel = self.query_one(StatusPanel)
             status_panel.update_status()
 
-            self.set_interval(0.5, self._check_for_new_decisions)
+            # Only poll for updates if not all complete
+            if not all_complete:
+                self.set_interval(0.5, self._check_for_new_decisions)
+            else:
+                logger.info(
+                    "llm_decisions_already_complete_phase3",
+                    total_blocks=blocks_ready,
+                    total_decisions=len(self.decisions)
+                )
 
     def watch_current_decision_index(self, old_index: int, new_index: int) -> None:
         """React to changes in current_decision_index.
