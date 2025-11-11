@@ -43,6 +43,34 @@ def _extract_content_from_openai_chunk(data: Dict[str, Any]) -> str | None:
     return None
 
 
+def _extract_content_from_ollama_chunk(data: Dict[str, Any]) -> str | None:
+    """
+    Extract content from Ollama native streaming chunk.
+
+    Ollama's /api/chat returns chunks like:
+    {
+        "model": "...",
+        "message": {
+            "role": "assistant",
+            "content": "..."
+        },
+        "done": false
+    }
+
+    Args:
+        data: Parsed JSON chunk from Ollama /api/chat
+
+    Returns:
+        Content string if present, None otherwise
+    """
+    try:
+        if "message" in data and "content" in data["message"]:
+            return data["message"]["content"]
+    except (KeyError, TypeError):
+        pass
+    return None
+
+
 class LLMClient:
     """
     HTTP client for LLM API with NDJSON streaming support.
@@ -65,6 +93,61 @@ class LLMClient:
             write=10.0,
             pool=10.0
         )
+        self._is_ollama: bool | None = None  # Cached provider detection
+
+    async def _detect_ollama(self) -> bool:
+        """
+        Detect if the LLM endpoint is Ollama by probing /api/version.
+
+        This detection is cached after the first call.
+
+        Returns:
+            True if Ollama detected, False otherwise
+        """
+        if self._is_ollama is not None:
+            return self._is_ollama
+
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
+                # Probe Ollama-specific version endpoint
+                base_url = str(self.config.endpoint).rstrip("/")
+                # Remove /v1 suffix if present (OpenAI-compatible path)
+                if base_url.endswith("/v1"):
+                    base_url = base_url[:-3]
+
+                version_url = f"{base_url}/api/version"
+
+                logger.debug(
+                    "llm_provider_detection",
+                    version_url=version_url,
+                )
+
+                response = await client.get(version_url)
+
+                # If we get a successful response, it's Ollama
+                if response.status_code == 200:
+                    logger.info(
+                        "llm_provider_detected",
+                        provider="ollama",
+                        version_url=version_url,
+                    )
+                    self._is_ollama = True
+                    return True
+
+        except (httpx.HTTPError, Exception) as e:
+            logger.debug(
+                "llm_provider_detection_failed",
+                error=str(e),
+                assumed_provider="openai",
+            )
+
+        # Default to OpenAI-compatible if probe fails
+        logger.info(
+            "llm_provider_detected",
+            provider="openai",
+        )
+        self._is_ollama = False
+        return False
 
     async def stream_ndjson(
         self,
@@ -108,6 +191,9 @@ class LLMClient:
         """
         request_id = str(asyncio.current_task().get_name() if asyncio.current_task() else "unknown")
 
+        # Detect provider (cached after first call)
+        is_ollama = await self._detect_ollama()
+
         # Prepare request payload
         payload = {
             "model": self.config.model,
@@ -119,9 +205,9 @@ class LLMClient:
             "temperature": temperature,
         }
 
-        # Add num_ctx for Ollama
-        if self.config.num_ctx:
-            payload["num_ctx"] = self.config.num_ctx
+        # Add num_ctx for Ollama in options object
+        if is_ollama and self.config.num_ctx:
+            payload["options"] = {"num_ctx": self.config.num_ctx}
 
         # Log the complete request payload (raw input to LLM)
         logger.info(
@@ -129,6 +215,7 @@ class LLMClient:
             request_id=request_id,
             model=self.config.model,
             endpoint=str(self.config.endpoint),
+            provider="ollama" if is_ollama else "openai",
             prompt_length=len(prompt),
             system_prompt_length=len(system_prompt),
             temperature=temperature,
@@ -148,8 +235,16 @@ class LLMClient:
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
                     headers = {"Authorization": f"Bearer {self.config.api_key}"}
 
-                    # Use chat completions endpoint
-                    url = str(self.config.endpoint).rstrip("/") + "/chat/completions"
+                    # Choose endpoint based on provider
+                    if is_ollama:
+                        # Use native Ollama endpoint (supports options)
+                        base_url = str(self.config.endpoint).rstrip("/")
+                        if base_url.endswith("/v1"):
+                            base_url = base_url[:-3]
+                        url = base_url + "/api/chat"
+                    else:
+                        # Use OpenAI-compatible endpoint
+                        url = str(self.config.endpoint).rstrip("/") + "/chat/completions"
 
                     chunk_count = 0
                     accumulated_content = ""  # Accumulate content from OpenAI-style streaming
@@ -170,15 +265,18 @@ class LLMClient:
                             headers=response_headers,
                         )
 
-                        # Check if response is OpenAI-style streaming (text/event-stream)
+                        # Check if response needs content extraction
                         content_type = response_headers.get("content-type", "")
-                        is_openai_streaming = "text/event-stream" in content_type
+                        # For Ollama native API, we always need to extract from message.content
+                        # For OpenAI, we need to extract from choices[].delta.content if SSE
+                        needs_content_extraction = is_ollama or "text/event-stream" in content_type
 
                         logger.debug(
                             "llm_response_format_detected",
                             request_id=request_id,
                             content_type=content_type,
-                            is_openai_streaming=is_openai_streaming,
+                            needs_content_extraction=needs_content_extraction,
+                            provider="ollama" if is_ollama else "openai",
                         )
 
                         async for line in response.aiter_lines():
@@ -203,10 +301,13 @@ class LLMClient:
                                 # Parse JSON line
                                 data = json.loads(json_line)
 
-                                # Handle OpenAI-style streaming format
-                                if is_openai_streaming:
-                                    # Extract content from OpenAI chunk
-                                    content_fragment = _extract_content_from_openai_chunk(data)
+                                # Handle streaming formats that need content extraction
+                                if needs_content_extraction:
+                                    # Extract content using appropriate extractor
+                                    if is_ollama:
+                                        content_fragment = _extract_content_from_ollama_chunk(data)
+                                    else:
+                                        content_fragment = _extract_content_from_openai_chunk(data)
 
                                     if content_fragment:
                                         accumulated_content += content_fragment
@@ -296,7 +397,7 @@ class LLMClient:
                                 continue
 
                         # After stream ends, try to parse any remaining accumulated content
-                        if is_openai_streaming and accumulated_content.strip():
+                        if needs_content_extraction and accumulated_content.strip():
                             logger.debug(
                                 "llm_processing_final_accumulated_content",
                                 request_id=request_id,

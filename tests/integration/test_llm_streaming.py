@@ -228,3 +228,119 @@ class TestLLMStreamingIntegration:
 
             # Should handle empty stream gracefully
             assert len(results) == 0
+
+    @pytest.mark.asyncio
+    async def test_ollama_detection_and_num_ctx_formatting(self):
+        """Test that Ollama is detected and num_ctx is sent in options object."""
+        # Create config with num_ctx
+        config = LLMConfig(
+            endpoint="http://localhost:11434/v1",
+            api_key="test-key",
+            model="llama2",
+            num_ctx=16384
+        )
+        client = LLMClient(config)
+
+        # Mock the version endpoint to simulate Ollama
+        mock_version_response = AsyncMock()
+        mock_version_response.status_code = 200
+
+        # Mock the streaming response (Ollama native format)
+        mock_lines = [
+            '{"message": {"role": "assistant", "content": "{\\"type\\": \\"classification\\", \\"block_id\\": \\"block-1\\", \\"confidence\\": 0.92, \\"reason\\": \\"test\\"}"}, "done": false}',
+            '{"message": {"role": "assistant", "content": ""}, "done": true}',
+        ]
+        mock_stream_response = create_mock_streaming_client(mock_lines)
+
+        # Track what payload and URL were sent
+        captured_payload = {}
+        captured_url = None
+
+        def mock_stream_method(method, url, json=None, headers=None):
+            nonlocal captured_payload, captured_url
+            captured_payload.update(json or {})
+            captured_url = url
+            return mock_stream_response.stream(method, url, json=json, headers=headers)
+
+        mock_http_client = AsyncMock()
+        mock_http_client.get = AsyncMock(return_value=mock_version_response)
+        mock_http_client.stream = mock_stream_method
+        mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
+        mock_http_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('httpx.AsyncClient', return_value=mock_http_client):
+            results = []
+            async for chunk in client.stream_ndjson(
+                prompt="Test",
+                system_prompt="Test",
+                chunk_model=KnowledgeClassificationChunk
+            ):
+                results.append(chunk)
+
+            # Verify Ollama was detected
+            assert client._is_ollama is True
+
+            # Verify native Ollama endpoint is used
+            assert captured_url == "http://localhost:11434/api/chat"
+
+            # Verify num_ctx is in options object (not top-level)
+            assert "options" in captured_payload
+            assert captured_payload["options"]["num_ctx"] == 16384
+            assert "num_ctx" not in captured_payload  # Should NOT be top-level
+
+    @pytest.mark.asyncio
+    async def test_openai_detection_and_num_ctx_not_sent(self):
+        """Test that OpenAI is detected and num_ctx is NOT sent."""
+        # Create config with num_ctx
+        config = LLMConfig(
+            endpoint="https://api.openai.com/v1",
+            api_key="sk-test-key",
+            model="gpt-4",
+            num_ctx=16384
+        )
+        client = LLMClient(config)
+
+        # Mock the version endpoint to fail (not Ollama)
+        mock_version_response = AsyncMock()
+        mock_version_response.status_code = 404
+
+        # Mock the streaming response
+        mock_lines = [
+            '{"type": "classification", "block_id": "block-1", "confidence": 0.92, "reason": "test"}',
+        ]
+        mock_stream_response = create_mock_streaming_client(mock_lines)
+
+        # Track what payload and URL were sent
+        captured_payload = {}
+        captured_url = None
+
+        def mock_stream_method(method, url, json=None, headers=None):
+            nonlocal captured_payload, captured_url
+            captured_payload.update(json or {})
+            captured_url = url
+            return mock_stream_response.stream(method, url, json=json, headers=headers)
+
+        mock_http_client = AsyncMock()
+        mock_http_client.get = AsyncMock(return_value=mock_version_response)
+        mock_http_client.stream = mock_stream_method
+        mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
+        mock_http_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('httpx.AsyncClient', return_value=mock_http_client):
+            results = []
+            async for chunk in client.stream_ndjson(
+                prompt="Test",
+                system_prompt="Test",
+                chunk_model=KnowledgeClassificationChunk
+            ):
+                results.append(chunk)
+
+            # Verify OpenAI was detected (not Ollama)
+            assert client._is_ollama is False
+
+            # Verify OpenAI-compatible endpoint is used
+            assert captured_url == "https://api.openai.com/v1/chat/completions"
+
+            # Verify num_ctx is NOT sent in any form for OpenAI
+            assert "options" not in captured_payload
+            assert "num_ctx" not in captured_payload
