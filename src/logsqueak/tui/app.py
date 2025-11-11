@@ -3,6 +3,42 @@
 This module defines the main Textual App class that manages screen transitions
 between Phase 1 (Block Selection), Phase 2 (Content Editing), and Phase 3
 (Integration Review).
+
+## Worker Dependency Coordination
+
+The app coordinates background workers across phases to ensure correct execution order:
+
+**Dependency Chain:**
+```
+Phase 1:
+  model_preload (app-level) ──► SentenceTransformer loads in thread pool
+    └─ [BLOCKS] → page_indexing (Phase1Screen) ──► PageIndexer.build_index()
+
+Phase 2:
+  rag_search (Phase2Screen)
+    └─ [WAITS FOR] page_indexing ──► RAGSearch.find_candidates()
+      └─ [TRIGGERS] llm_decisions (opportunistic)
+
+Phase 3:
+  llm_decisions (Phase3Screen or Phase2Screen)
+    └─ [WAITS FOR] rag_search completion
+```
+
+**Coordination Mechanism:**
+- `app.background_tasks: Dict[str, BackgroundTask]` is a shared dict accessible from all screens
+- Workers register their status in this dict when they start/complete/fail
+- Dependent workers poll this dict to check if their dependencies are ready
+- Polling uses `asyncio.sleep(0.1)` to avoid busy-waiting
+
+**Key Dependencies:**
+1. **model_preload → page_indexing**: PageIndexer uses the SentenceTransformer
+   model to generate embeddings, so the model must be loaded before indexing can start.
+2. **page_indexing → rag_search**: RAG search cannot query ChromaDB until the
+   vector index is built.
+3. **rag_search → llm_decisions**: Integration decisions need candidate pages
+   from RAG search results.
+
+See tests/integration/test_worker_dependencies.py for dependency ordering tests.
 """
 
 from typing import Dict, List, Optional
@@ -88,6 +124,11 @@ class LogsqueakApp(App):
         self.original_contexts: Optional[Dict[str, str]] = None
         self.integration_decisions: List = []  # Shared list populated by Phase2, read by Phase3
 
+        # Shared background task status tracking (for worker dependency coordination)
+        # This dict is shared across all screens so workers can check dependencies
+        from logsqueak.models.background_task import BackgroundTask
+        self.background_tasks: Dict[str, BackgroundTask] = {}
+
         logger.info(
             "app_initialized",
             journal_date=journal_date,
@@ -124,26 +165,56 @@ class LogsqueakApp(App):
     async def _preload_embedding_model(self) -> None:
         """Preload SentenceTransformer model in background during Phase 1.
 
-        This triggers lazy loading of the embedding model so it's ready
-        by the time user transitions to Phase 2, avoiding UI delays.
+        This triggers lazy loading of the embedding model so it's ready for PageIndexer
+        to use. The model is loaded in a thread pool to avoid blocking the async event loop
+        (model initialization is CPU-intensive).
 
-        Uses run_in_executor to prevent blocking the async event loop.
+        Worker Dependency: PageIndexer cannot start until this completes because it uses
+        the SentenceTransformer model to generate embeddings for blocks.
         """
         import asyncio
+        from logsqueak.models.background_task import BackgroundTask
+
+        # Register task in shared dict
+        self.background_tasks["model_preload"] = BackgroundTask(
+            task_type="page_indexing",  # Reuse task_type since it's related
+            status="running",
+            progress_percentage=0.0,
+        )
 
         try:
             logger.info("preloading_embedding_model", phase="phase1")
 
-            # Run the model loading in a thread pool to avoid blocking
-            # the async event loop (SentenceTransformer import is CPU-heavy)
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
-                None,  # Use default executor
-                lambda: self.rag_search.encoder  # Trigger lazy load
-            )
+            # Check if encoder is already set (e.g., mocked in tests)
+            if self.rag_search._encoder is not None:
+                logger.info("embedding_model_already_loaded", phase="phase1")
+            else:
+                # Run the model loading in a thread pool to avoid blocking
+                # the async event loop (SentenceTransformer import and init is CPU-heavy)
+                def _load_model():
+                    """Load SentenceTransformer model (runs in executor thread)."""
+                    from sentence_transformers import SentenceTransformer
+                    return SentenceTransformer(self.rag_search.embedding_model)
+
+                loop = asyncio.get_event_loop()
+                encoder = await loop.run_in_executor(
+                    None,  # Use default executor
+                    _load_model
+                )
+
+                # Store the loaded encoder in rag_search
+                self.rag_search._encoder = encoder
+
+            # Mark complete
+            self.background_tasks["model_preload"].status = "completed"
+            self.background_tasks["model_preload"].progress_percentage = 100.0
 
             logger.info("embedding_model_preloaded", phase="phase1")
         except Exception as e:
+            # Mark failed
+            self.background_tasks["model_preload"].status = "failed"
+            self.background_tasks["model_preload"].error_message = str(e)
+
             # Non-fatal - model will load on-demand in Phase 2 if preload fails
             logger.warning(
                 "embedding_model_preload_failed",

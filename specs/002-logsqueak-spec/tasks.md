@@ -480,38 +480,39 @@ These can be implemented in parallel after LLM wrappers complete:
 
 **Tasks to implement correct dependency flow:**
 
-- [ ] T108b Fix Phase 1 `_page_indexing_worker()` to wait for SentenceTransformer loading
+- [x] T108b Fix Phase 1 `_page_indexing_worker()` to wait for SentenceTransformer loading
   - Poll or check app's `model_preload` worker status
   - Only proceed with indexing once SentenceTransformer is loaded
   - Use worker coordination mechanism (check worker state)
 
-- [ ] T108c Implement real PageIndexer worker in Phase 1
+- [x] T108c Implement real PageIndexer worker in Phase 1
   - Replace mock simulation (lines 547-572 in block_selection.py) with actual `page_indexer.build_index()` call
-  - Update progress based on actual indexing progress (if available from PageIndexer)
+  - Update progress based on actual indexing progress using progress_callback(current, total)
+  - Status panel shows real-time progress percentage as pages are indexed
   - Mark background task as complete when indexing finishes
 
-- [ ] T108d Fix Phase 2 `_rag_search_worker()` to wait for PageIndexer completion
+- [x] T108d Fix Phase 2 `_rag_search_worker()` to wait for PageIndexer completion
   - Check Phase 1's `page_indexing` background task status via shared state
   - Block RAG search start until PageIndexer is complete
   - Use app-level coordination or shared background_tasks reference
 
-- [ ] T108e Add coordination mechanism between screens for worker dependencies
+- [x] T108e Add coordination mechanism between screens for worker dependencies
   - Decide on coordination pattern (shared background_tasks dict via app, reactive state, or worker events)
   - Implement mechanism for Phase 2 to check Phase 1's page_indexing status
   - Document the coordination pattern in code comments
 
-- [ ] T108f Write integration test for worker dependency ordering
+- [x] T108f Write integration test for worker dependency ordering
   - Test: SentenceTransformer loads → PageIndexer starts → RAG search waits
   - Verify correct sequencing with controlled timing (mock workers with delays)
   - Verify blocking behavior prevents RAG from starting prematurely
 
-- [ ] T108g Update inline documentation for worker dependencies
+- [x] T108g Update inline documentation for worker dependencies
   - Add docstring comments in Phase1Screen explaining SentenceTransformer → PageIndexer flow
   - Add docstring comments in Phase2Screen explaining PageIndexer → RAG search dependency
   - Document opportunistic integration decisions worker pattern (starts after RAG, in Phase 2 or Phase 3)
   - Update app.py docstring to explain model preload coordination
 
-**Checkpoint 6.7**: Complete end-to-end workflow functional from CLI to file writes
+**Checkpoint 6.7**: ✅ Complete! Worker dependencies implemented, tested, and documented.
 
 ---
 

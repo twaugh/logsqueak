@@ -666,7 +666,16 @@ class Phase2Screen(Screen):
         pass
 
     async def _rag_search_worker(self) -> None:
-        """Worker: Perform RAG search for candidate pages and load page contents."""
+        """Worker: Perform RAG search for candidate pages and load page contents.
+
+        Worker Dependency: This worker MUST wait for page_indexing to complete before starting.
+        The ChromaDB vector index must be built before RAG search can query it.
+
+        Coordination: Polls app.background_tasks["page_indexing"] until status="completed".
+        """
+        import asyncio
+        from logsqueak.tui.app import LogsqueakApp
+
         # Create background task
         self.background_tasks["rag_search"] = BackgroundTask(
             task_type="rag_search",
@@ -679,6 +688,24 @@ class Phase2Screen(Screen):
         status_panel.update_status()
 
         try:
+            # Wait for PageIndexer to complete (T108d)
+            logger.info("rag_search_waiting_for_indexer", phase="phase2")
+
+            # Poll for page indexing completion
+            while True:
+                if isinstance(self.app, LogsqueakApp):
+                    indexing_task = self.app.background_tasks.get("page_indexing")
+                    if indexing_task and indexing_task.status == "completed":
+                        logger.info("rag_search_indexer_ready", phase="phase2")
+                        break
+                    elif indexing_task and indexing_task.status == "failed":
+                        # Indexing failed - cannot proceed with RAG search
+                        error_msg = indexing_task.error_message or "Unknown error"
+                        raise RuntimeError(f"Page indexing failed: {error_msg}")
+
+                # Wait before polling again
+                await asyncio.sleep(0.1)
+
             # Step 1: Find candidate pages for each block
             logger.info("rag_search_starting", num_blocks=len(self.edited_content))
 

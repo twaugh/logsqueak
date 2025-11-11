@@ -545,28 +545,125 @@ class Phase1Screen(Screen):
         )
 
     async def _page_indexing_worker(self) -> None:
-        """Page indexing worker (simulated for now)."""
+        """Page indexing worker - builds ChromaDB vector index for RAG search.
+
+        Worker Dependency: This worker MUST wait for model_preload to complete before starting.
+        The SentenceTransformer model must be loaded before PageIndexer can generate embeddings.
+
+        Coordination: Polls app.background_tasks["model_preload"] until status="completed".
+        """
         import asyncio
+        from logsqueak.tui.app import LogsqueakApp
 
-        # Simulate indexing progress
-        for progress in range(0, 101, 10):
-            await asyncio.sleep(0.2)
+        # Wait for SentenceTransformer model to load (T108b)
+        logger.info("page_indexing_waiting_for_model", phase="phase1")
 
-            self.background_tasks["page_indexing"].progress_percentage = float(progress)
+        # Poll for model preload completion
+        while True:
+            if isinstance(self.app, LogsqueakApp):
+                model_task = self.app.background_tasks.get("model_preload")
+                if model_task and model_task.status == "completed":
+                    logger.info("page_indexing_model_ready", phase="phase1")
+                    break
+                elif model_task and model_task.status == "failed":
+                    # Model failed to load - proceed anyway (will load on-demand)
+                    logger.warning(
+                        "page_indexing_model_failed",
+                        phase="phase1",
+                        fallback="will load on-demand"
+                    )
+                    break
 
-            # Update status panel if it's mounted
+            # Wait before polling again
+            await asyncio.sleep(0.1)
+
+        # Now implement real PageIndexer (T108c)
+        try:
+            logger.info("page_indexing_starting", phase="phase1")
+
+            # Get PageIndexer from app
+            if not isinstance(self.app, LogsqueakApp):
+                logger.error("page_indexing_no_app")
+                return
+
+            page_indexer = self.app.page_indexer
+
+            # Define progress callback to update status panel
+            def on_progress(current: int, total: int):
+                """Update progress percentage as pages are indexed."""
+                percentage = (current / total) * 100.0
+                self.background_tasks["page_indexing"].progress_percentage = percentage
+                self.background_tasks["page_indexing"].progress_current = current
+                self.background_tasks["page_indexing"].progress_total = total
+
+                # Update status panel
+                try:
+                    status_panel = self.query_one(StatusPanel)
+                    status_panel.update_status()
+                except Exception:
+                    pass  # Widget not mounted yet
+
+            # Run PageIndexer in thread pool to avoid blocking UI
+            # (file I/O and SentenceTransformer.encode() are CPU-intensive)
+            # Create a wrapper to run the async function in a new event loop in the thread
+            def _run_indexing():
+                """Run indexing in a thread with its own event loop."""
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(page_indexer.build_index(progress_callback=on_progress))
+                finally:
+                    loop.close()
+
+            # Run in thread pool
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, _run_indexing)
+
+            # Mark complete in shared background_tasks
+            if isinstance(self.app, LogsqueakApp):
+                self.app.background_tasks["page_indexing"] = BackgroundTask(
+                    task_type="page_indexing",
+                    status="completed",
+                    progress_percentage=100.0,
+                )
+
+            # Mark complete in local background_tasks (for status panel)
+            self.background_tasks["page_indexing"].status = "completed"
+            self.background_tasks["page_indexing"].progress_percentage = 100.0
+
+            # Update status panel
             try:
                 status_panel = self.query_one(StatusPanel)
                 status_panel.update_status()
             except Exception:
                 pass  # Widget not mounted yet
 
-        # Mark complete
-        self.background_tasks["page_indexing"].status = "completed"
+            logger.info("page_indexing_complete", phase="phase1")
 
-        # Update status panel if it's mounted
-        try:
-            status_panel = self.query_one(StatusPanel)
-            status_panel.update_status()
-        except Exception:
-            pass  # Widget not mounted yet
+        except Exception as e:
+            # Mark failed
+            self.background_tasks["page_indexing"].status = "failed"
+            self.background_tasks["page_indexing"].error_message = str(e)
+
+            # Also mark in shared dict
+            if isinstance(self.app, LogsqueakApp):
+                self.app.background_tasks["page_indexing"] = BackgroundTask(
+                    task_type="page_indexing",
+                    status="failed",
+                    error_message=str(e),
+                )
+
+            # Update status panel
+            try:
+                status_panel = self.query_one(StatusPanel)
+                status_panel.update_status()
+            except Exception:
+                pass  # Widget not mounted yet
+
+            logger.error(
+                "page_indexing_error",
+                phase="phase1",
+                error=str(e),
+                exc_info=True
+            )
