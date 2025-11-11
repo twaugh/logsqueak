@@ -176,6 +176,9 @@ async def test_phase2_to_phase3_transition(
         phase2_screen.page_contents = {
             "Machine Learning": LogseqOutline.parse("- # Machine Learning\n  - Introduction to ML")
         }
+        # Mark RAG search as completed so 'n' key works
+        from logsqueak.models.background_task import BackgroundTaskState
+        phase2_screen.rag_search_state = BackgroundTaskState.COMPLETED
 
         # Press 'n' to proceed to Phase 3
         await pilot.press("n")

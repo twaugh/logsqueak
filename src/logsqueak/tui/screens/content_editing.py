@@ -521,13 +521,9 @@ class Phase2Screen(Screen):
                 total_blocks=count
             )
 
-            # Start LLM decisions worker now that rewording is complete
-            # This allows decisions to stream in during Phase 2, so they're
-            # ready when user reaches Phase 3
-            # Only start if not already running (user might have pressed 'n' already)
-            if self.llm_client and "llm_decisions" not in self.background_tasks:
-                self.run_worker(self._llm_decisions_worker(), name="llm_decisions")
-                logger.info("llm_decisions_worker_started_after_rewording")
+            # NOTE: LLM decisions worker is NOT started here.
+            # It will start after RAG search completes (in _rag_search_worker),
+            # because it requires page_contents to be populated first.
 
         except Exception as e:
             # Mark failed
@@ -752,6 +748,14 @@ class Phase2Screen(Screen):
                 "rag_search_complete",
                 pages_loaded=len(self.page_contents)
             )
+
+            # Start LLM decisions worker now that page_contents is populated
+            # This allows decisions to stream in during Phase 2, so they're
+            # ready when user reaches Phase 3
+            # Only start if not already running (user might have pressed 'n' already)
+            if self.llm_client and "llm_decisions" not in self.background_tasks:
+                self.run_worker(self._llm_decisions_worker(), name="llm_decisions")
+                logger.info("llm_decisions_worker_started_after_rag")
 
         except Exception as e:
             # Mark failed
