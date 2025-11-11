@@ -105,6 +105,14 @@ class RAGSearch:
         for ec in edited_content:
             context = original_contexts.get(ec.block_id, ec.original_content)
 
+            # Log the full search query
+            logger.info(
+                "rag_search_query",
+                block_id=ec.block_id,
+                query=context,
+                query_length=len(context)
+            )
+
             # Generate embedding
             embedding = self.encoder.encode(context, convert_to_numpy=True)
 
@@ -123,10 +131,11 @@ class RAGSearch:
 
             results[ec.block_id] = candidate_pages
 
-            logger.debug(
-                "rag_search_candidates",
+            logger.info(
+                "rag_search_results",
                 block_id=ec.block_id,
-                num_candidates=len(candidate_pages)
+                num_candidates=len(candidate_pages),
+                candidates=candidate_pages  # Show all candidates
             )
 
         return results
@@ -145,6 +154,14 @@ class RAGSearch:
         # Extract explicit page links from context
         explicit_links = set(re.findall(r'\[\[([^\]]+)\]\]', context))
 
+        # Log if explicit links were found
+        if explicit_links:
+            logger.debug(
+                "rag_search_explicit_links",
+                links=list(explicit_links),
+                link_count=len(explicit_links)
+            )
+
         # Group results by page
         page_scores = defaultdict(float)
         for metadata, distance in zip(
@@ -155,8 +172,10 @@ class RAGSearch:
             similarity = 1.0 - distance  # Convert distance to similarity
 
             # Boost pages mentioned in explicit links
+            boost_applied = False
             if page_name in explicit_links or page_name.replace("/", "___") in explicit_links:
                 similarity *= 1.5
+                boost_applied = True
 
             page_scores[page_name] += similarity
 
@@ -167,7 +186,18 @@ class RAGSearch:
             reverse=True
         )
 
-        return [page for page, score in ranked_pages[:top_k]]
+        # Log all candidates with scores
+        top_results = ranked_pages[:top_k]
+        if top_results:
+            logger.debug(
+                "rag_search_ranked_results",
+                ranked_candidates=[
+                    {"page": page, "score": round(score, 3)}
+                    for page, score in top_results  # Show all results with scores
+                ]
+            )
+
+        return [page for page, score in top_results]
 
     async def load_page_contents(
         self,
