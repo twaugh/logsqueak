@@ -1,9 +1,8 @@
-"""Unit tests for LLM helper functions (decision batching, filtering)."""
+"""Unit tests for LLM helper functions (filtering, formatting)."""
 
 import pytest
 from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.services.llm_helpers import (
-    batch_decisions_by_block,
     filter_skip_exists_blocks,
     format_chunks_for_llm,
 )
@@ -52,137 +51,9 @@ def sample_decisions():
 
 
 # ============================================================================
-# T095a: Tests for batch_decisions_by_block()
+# T095a: Removed batch_decisions_by_block() tests (function removed in T108q)
+# Batching is no longer needed since per-block LLM calls naturally group decisions.
 # ============================================================================
-
-
-class TestBatchDecisionsByBlock:
-    """Test batch_decisions_by_block() helper function."""
-
-    @pytest.mark.asyncio
-    async def test_batch_consecutive_blocks(self, sample_decisions):
-        """Should batch consecutive decisions by knowledge_block_id."""
-        async def decision_stream():
-            for decision in sample_decisions:
-                yield decision
-
-        batches = []
-        async for batch in batch_decisions_by_block(decision_stream()):
-            batches.append(batch)
-
-        # Should produce 3 batches: block-A (2 decisions), block-B (1), block-C (1)
-        assert len(batches) == 3
-        assert len(batches[0]) == 2  # block-A
-        assert len(batches[1]) == 1  # block-B
-        assert len(batches[2]) == 1  # block-C
-
-    @pytest.mark.asyncio
-    async def test_batch_preserves_decision_data(self, sample_decisions):
-        """Should preserve all decision data in batches."""
-        async def decision_stream():
-            for decision in sample_decisions:
-                yield decision
-
-        batches = []
-        async for batch in batch_decisions_by_block(decision_stream()):
-            batches.append(batch)
-
-        # Verify first batch contains block-A decisions
-        assert batches[0][0].knowledge_block_id == "block-A"
-        assert batches[0][0].target_page == "Page1"
-        assert batches[0][1].knowledge_block_id == "block-A"
-        assert batches[0][1].target_page == "Page2"
-
-    @pytest.mark.asyncio
-    async def test_batch_single_decision_per_block(self):
-        """Should handle single decision per block correctly."""
-        decisions = [
-            IntegrationDecision(
-                knowledge_block_id="block-1",
-                target_page="Page1",
-                action="add_section",
-                confidence=0.9,
-                refined_text="Content 1",
-                reasoning="Reason 1",
-            ),
-            IntegrationDecision(
-                knowledge_block_id="block-2",
-                target_page="Page2",
-                action="add_section",
-                confidence=0.8,
-                refined_text="Content 2",
-                reasoning="Reason 2",
-            ),
-        ]
-
-        async def decision_stream():
-            for decision in decisions:
-                yield decision
-
-        batches = []
-        async for batch in batch_decisions_by_block(decision_stream()):
-            batches.append(batch)
-
-        # Should produce 2 batches, each with 1 decision
-        assert len(batches) == 2
-        assert len(batches[0]) == 1
-        assert len(batches[1]) == 1
-
-    @pytest.mark.asyncio
-    async def test_batch_empty_stream(self):
-        """Should handle empty decision stream without errors."""
-        async def decision_stream():
-            return
-            yield  # Make this a generator
-
-        batches = []
-        async for batch in batch_decisions_by_block(decision_stream()):
-            batches.append(batch)
-
-        assert len(batches) == 0
-
-    @pytest.mark.asyncio
-    async def test_batch_maintains_order(self):
-        """Should maintain order of decisions within batches."""
-        decisions = [
-            IntegrationDecision(
-                knowledge_block_id="block-A",
-                target_page="Page1",
-                action="add_section",
-                confidence=0.9,
-                refined_text="First",
-                reasoning="Reason 1",
-            ),
-            IntegrationDecision(
-                knowledge_block_id="block-A",
-                target_page="Page2",
-                action="add_section",
-                confidence=0.8,
-                refined_text="Second",
-                reasoning="Reason 2",
-            ),
-            IntegrationDecision(
-                knowledge_block_id="block-A",
-                target_page="Page3",
-                action="add_section",
-                confidence=0.7,
-                refined_text="Third",
-                reasoning="Reason 3",
-            ),
-        ]
-
-        async def decision_stream():
-            for decision in decisions:
-                yield decision
-
-        batches = []
-        async for batch in batch_decisions_by_block(decision_stream()):
-            batches.append(batch)
-
-        assert len(batches) == 1
-        assert batches[0][0].refined_text == "First"
-        assert batches[0][1].refined_text == "Second"
-        assert batches[0][2].refined_text == "Third"
 
 
 # ============================================================================

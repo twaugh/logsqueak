@@ -19,7 +19,7 @@ from logsqueak.tui.widgets.status_panel import StatusPanel
 from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
 from logsqueak.services.llm_client import LLMClient
 from logsqueak.services.llm_wrappers import reword_content, plan_integrations
-from logsqueak.services.llm_helpers import batch_decisions_by_block, filter_skip_exists_blocks
+from logsqueak.services.llm_helpers import filter_skip_exists_blocks
 from logsqueak.services.rag_search import RAGSearch
 from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.models.llm_chunks import IntegrationDecisionChunk
@@ -657,42 +657,53 @@ class Phase2Screen(Screen):
                 # Filter out skip_exists blocks
                 filtered_stream = filter_skip_exists_blocks(converted_stream)
 
-                # Batch decisions by block
-                batched_stream = batch_decisions_by_block(filtered_stream)
-
-                # Collect all decisions
+                # Collect all decisions (already grouped by block via per-block LLM calls)
                 block_count = 0
-                async for decision_batch in batched_stream:
-                    if not decision_batch:
-                        continue
+                decisions_in_current_block = []
+                current_block_id = None
 
-                    # Store decisions in app's shared list for Phase 3
+                async for decision in filtered_stream:
+                    # Track when we move to a new block
+                    if current_block_id is not None and decision.knowledge_block_id != current_block_id:
+                        # Finished a block - store its decisions
+                        from logsqueak.tui.app import LogsqueakApp
+                        if isinstance(self.app, LogsqueakApp):
+                            before_count = len(self.app.integration_decisions)
+                            self.app.integration_decisions.extend(decisions_in_current_block)
+                            after_count = len(self.app.integration_decisions)
+                            logger.info(
+                                "decisions_added_to_shared_list",
+                                before=before_count,
+                                after=after_count,
+                                batch_size=len(decisions_in_current_block)
+                            )
+
+                        block_count += 1
+                        decisions_in_current_block = []
+
+                    # Add decision to current block
+                    decisions_in_current_block.append(decision)
+                    current_block_id = decision.knowledge_block_id
+
+                # Handle final block if there are any remaining decisions
+                if decisions_in_current_block:
                     from logsqueak.tui.app import LogsqueakApp
                     if isinstance(self.app, LogsqueakApp):
                         before_count = len(self.app.integration_decisions)
-                        self.app.integration_decisions.extend(decision_batch)
+                        self.app.integration_decisions.extend(decisions_in_current_block)
                         after_count = len(self.app.integration_decisions)
                         logger.info(
                             "decisions_added_to_shared_list",
                             before=before_count,
                             after=after_count,
-                            batch_size=len(decision_batch)
+                            batch_size=len(decisions_in_current_block)
                         )
 
                     block_count += 1
-
-                    # Update progress (if task still exists)
-                    from logsqueak.tui.app import LogsqueakApp
-                    if isinstance(self.app, LogsqueakApp):
-                        if "llm_decisions" in self.app.background_tasks:
-                            self.app.background_tasks["llm_decisions"].progress_current = block_count
-                            status_panel = self.query_one(StatusPanel)
-                            status_panel.update_status()
-
                     logger.info(
                         "llm_decisions_batch_complete_phase2",
-                        block_id=decision_batch[0].knowledge_block_id,
-                        num_decisions=len(decision_batch)
+                        block_id=current_block_id,
+                        num_decisions=len(decisions_in_current_block)
                     )
 
                 # Mark complete

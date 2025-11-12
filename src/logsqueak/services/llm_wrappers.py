@@ -349,8 +349,9 @@ async def plan_integrations(
 
     Note:
         The returned stream is RAW and includes all decisions (including skip_exists).
-        Caller should use batch_decisions_by_block() and filter_skip_exists_blocks()
-        to process the stream before displaying to user.
+        Decisions are naturally grouped by block (one LLM call per block).
+        Caller should use filter_skip_exists_blocks() to process the stream before
+        displaying to user.
 
     Example:
         >>> async for chunk in plan_integrations(client, edited_contents, pages, chunks):

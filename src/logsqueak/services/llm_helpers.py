@@ -1,48 +1,10 @@
-"""Helper functions for LLM decision processing and batching."""
+"""Helper functions for LLM decision processing and filtering."""
 
 from typing import AsyncIterator
 from collections import defaultdict
 from logsqueak.models.integration_decision import IntegrationDecision
 from logseq_outline.parser import LogseqOutline
 import re
-
-
-async def batch_decisions_by_block(
-    decision_stream: AsyncIterator[IntegrationDecision]
-) -> AsyncIterator[list[IntegrationDecision]]:
-    """
-    Batch consecutive decisions by knowledge_block_id.
-
-    Takes a stream of IntegrationDecision objects and groups consecutive
-    decisions with the same knowledge_block_id into batches.
-
-    Args:
-        decision_stream: Async iterator yielding IntegrationDecision objects
-
-    Yields:
-        Lists of IntegrationDecision objects grouped by knowledge_block_id
-
-    Example:
-        Input stream: [A1, A2, B1, C1, C2, C3]
-        Output batches: [[A1, A2], [B1], [C1, C2, C3]]
-    """
-    current_batch: list[IntegrationDecision] = []
-    current_block_id: str | None = None
-
-    async for decision in decision_stream:
-        # If this is a new block, yield the current batch and start a new one
-        if current_block_id is not None and decision.knowledge_block_id != current_block_id:
-            if current_batch:
-                yield current_batch
-            current_batch = []
-
-        # Add decision to current batch
-        current_batch.append(decision)
-        current_block_id = decision.knowledge_block_id
-
-    # Yield final batch if not empty
-    if current_batch:
-        yield current_batch
 
 
 class FilteredStreamWithCount:

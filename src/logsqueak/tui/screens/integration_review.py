@@ -24,7 +24,7 @@ from logsqueak.services.file_operations import write_integration_atomic
 from logsqueak.services.file_monitor import FileMonitor
 from logsqueak.services.llm_client import LLMClient
 from logsqueak.services.llm_wrappers import plan_integrations
-from logsqueak.services.llm_helpers import batch_decisions_by_block, filter_skip_exists_blocks
+from logsqueak.services.llm_helpers import filter_skip_exists_blocks
 import structlog
 
 logger = structlog.get_logger()
@@ -796,43 +796,64 @@ Confidence: {decision.confidence:.0%}
                 # Step 3: Filter out skip_exists blocks and track count
                 filtered_stream = filter_skip_exists_blocks(converted_stream)
 
-                # Step 4: Batch decisions by block
-                batched_stream = batch_decisions_by_block(filtered_stream)
-
-                # Step 4: Process filtered batches
+                # Step 4: Process filtered decisions (already grouped by block via per-block LLM calls)
                 block_count = 0
-                async for decision_batch in batched_stream:
-                    if not decision_batch:
-                        continue
+                decisions_in_current_block = []
+                current_block_id = None
 
-                    # All decisions in batch have same block_id
-                    block_id = decision_batch[0].knowledge_block_id
+                async for decision in filtered_stream:
+                    # Track when we move to a new block
+                    if current_block_id is not None and decision.knowledge_block_id != current_block_id:
+                        # Finished a block - store its decisions
+                        self.decisions.extend(decisions_in_current_block)
+                        self.decisions_by_block[current_block_id] = decisions_in_current_block
 
-                    # Add decisions to our lists
-                    self.decisions.extend(decision_batch)
-                    self.decisions_by_block[block_id] = decision_batch
+                        # Mark block as ready for navigation
+                        self.decisions_ready[current_block_id] = True
 
-                    # Mark block as ready for navigation
-                    self.decisions_ready[block_id] = True
+                        # Update display if this is the current block
+                        journal_block_id = self.journal_blocks[self.current_block_index].block_id
+                        if current_block_id == journal_block_id:
+                            self.call_later(self._display_current_block)
+
+                        block_count += 1
+
+                        # Update progress
+                        from logsqueak.tui.app import LogsqueakApp
+                        if isinstance(self.app, LogsqueakApp):
+                            self.app.background_tasks["llm_decisions"].progress_current = block_count
+                            status_panel = self.query_one(StatusPanel)
+                            status_panel.update_status()
+
+                        logger.info(
+                            "llm_decisions_batch_complete",
+                            block_id=current_block_id,
+                            num_decisions=len(decisions_in_current_block)
+                        )
+
+                        decisions_in_current_block = []
+
+                    # Add decision to current block
+                    decisions_in_current_block.append(decision)
+                    current_block_id = decision.knowledge_block_id
+
+                # Handle final block if there are any remaining decisions
+                if decisions_in_current_block:
+                    self.decisions.extend(decisions_in_current_block)
+                    self.decisions_by_block[current_block_id] = decisions_in_current_block
+                    self.decisions_ready[current_block_id] = True
 
                     # Update display if this is the current block
-                    current_block_id = self.journal_blocks[self.current_block_index].block_id
-                    if block_id == current_block_id:
+                    journal_block_id = self.journal_blocks[self.current_block_index].block_id
+                    if current_block_id == journal_block_id:
                         self.call_later(self._display_current_block)
 
                     block_count += 1
 
-                    # Update progress
-                    from logsqueak.tui.app import LogsqueakApp
-                    if isinstance(self.app, LogsqueakApp):
-                        self.app.background_tasks["llm_decisions"].progress_current = block_count
-                        status_panel = self.query_one(StatusPanel)
-                        status_panel.update_status()
-
                     logger.info(
                         "llm_decisions_batch_complete",
-                        block_id=block_id,
-                        num_decisions=len(decision_batch)
+                        block_id=current_block_id,
+                        num_decisions=len(decisions_in_current_block)
                     )
 
                 # Get skipped count from filter

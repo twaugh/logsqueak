@@ -615,14 +615,17 @@ User should manually test:
   - Both now use per-block candidate filtering
   - Prompt size reduced from ~62KB (all pages) to ~6-12KB per block
 
-- [ ] T108q Review and update batch_decisions_by_block() for new per-block streaming
+- [x] T108q Review and update batch_decisions_by_block() for new per-block streaming
   - Current implementation assumes decisions arrive in arbitrary order and batches by consecutive source_knowledge_block_id
   - With new approach, decisions for each block arrive sequentially (one LLM call per block)
   - Consider: Is batching logic still needed, or can we simplify?
   - Option A: Keep current batching (works regardless of order, more robust)
-  - Option B: Simplify to assume consecutive ordering (since we now control call order)
-  - Decision: Document chosen approach and update implementation if needed
-  - Update tests in tests/unit/test_llm_helpers.py to match new behavior
+  - Option B: Simplify to assume consecutive ordering (since we now control call order) ✅ CHOSEN
+  - Decision: Removed batch_decisions_by_block() entirely (redundant with per-block LLM calls)
+  - Rationale: Decisions are naturally grouped by block_id since we process one block at a time
+  - Updated content_editing.py and integration_review.py with inline grouping logic
+  - Removed 5 batch_decisions_by_block() tests from tests/unit/test_llm_helpers.py
+  - Result: 134 fewer lines of code, simpler and more maintainable
 
 ### Testing
 
