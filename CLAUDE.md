@@ -458,19 +458,20 @@ Background tasks are tracked in `app.background_tasks` dictionary and displayed 
 **Task Lifecycle:**
 1. Worker creates task entry: `app.background_tasks["task_name"] = BackgroundTask(...)`
 2. Worker updates progress: `app.background_tasks["task_name"].progress_current = X`
-3. **Worker deletes task on completion**: `del app.background_tasks["task_name"]`
+3. **Worker marks task as "completed"**: `app.background_tasks["task_name"].status = "completed"`
 
 **Polling for Completion:**
-- Workers check `if task is None` to detect completion (task has been deleted)
-- Do NOT check `task.status == "completed"` - completed tasks are deleted, not marked
+- Workers check `task.status == "completed"` OR `task is None` to detect completion
+- Completed tasks stay in the dictionary (same as failed tasks), not deleted
+- Exception: Some screen-level tasks (e.g., `llm_classification`, `llm_rewording`) are deleted on screen transition for cleanup
 
 **Example:**
 ```python
 # Worker polls for dependency completion
 while True:
     dependency_task = self.app.background_tasks.get("dependency_name")
-    if dependency_task is None:
-        # Task deleted - dependency completed successfully
+    if dependency_task is None or dependency_task.status == "completed":
+        # Task deleted or completed - dependency ready
         break
     elif dependency_task.status == "failed":
         # Dependency failed
