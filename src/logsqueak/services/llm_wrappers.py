@@ -106,82 +106,6 @@ def _generate_xml_blocks_for_rewording(
     return '\n'.join(xml_lines)
 
 
-def _generate_pages_xml(page_contents: dict[str, LogseqOutline]) -> str:
-    """
-    Generate XML for candidate pages.
-
-    Args:
-        page_contents: Dict mapping page names to full page outlines
-
-    Returns:
-        XML string with <candidate_pages> section
-    """
-    xml_lines = ['<candidate_pages>']
-
-    # Add candidate pages as Logseq markdown with hybrid IDs
-    for page_name, page_outline in page_contents.items():
-        xml_lines.append(f'<page name="{page_name}">')
-        xml_lines.append('')
-
-        # Augment page with hybrid IDs (preserves existing IDs, adds hashes for blocks without)
-        augmented_page = _augment_outline_with_ids(page_outline)
-
-        # Render full page as clean Logseq markdown
-        page_markdown = augmented_page.render()
-        xml_lines.append(page_markdown)
-
-        xml_lines.append('')
-        xml_lines.append('</page>')
-
-    xml_lines.append('</candidate_pages>')
-    return '\n'.join(xml_lines)
-
-
-def _generate_xml_formatted_content(
-    edited_contents: list[EditedContent],
-    page_contents: dict[str, LogseqOutline]
-) -> str:
-    """
-    Generate XML-formatted content for integration decision planning.
-
-    Args:
-        edited_contents: Knowledge blocks with refined content
-        page_contents: Dict mapping page names to full page outlines
-
-    Returns:
-        XML string with <knowledge_blocks> and <candidate_pages>
-    """
-    xml_lines = ["<knowledge_blocks>"]
-
-    # Add knowledge blocks with original context and refined content
-    for edited in edited_contents:
-        xml_lines.append(f'  <block id="{edited.block_id}">')
-        xml_lines.append('    <original_journal_context>')
-
-        # Clean and add original context (remove id:: properties)
-        for line in edited.hierarchical_context.split('\n'):
-            # Skip id:: property lines (block ID is in XML attribute)
-            stripped = line.strip()
-            if stripped.startswith('id::'):
-                continue
-
-            xml_lines.append('      ' + line if line.strip() else '')
-
-        xml_lines.append('    </original_journal_context>')
-        xml_lines.append(f'    <refined_content>{edited.current_content}</refined_content>')
-        xml_lines.append('  </block>')
-        xml_lines.append('')
-
-    xml_lines.append('</knowledge_blocks>')
-    xml_lines.append('')
-
-    # Use helper function for pages XML
-    pages_xml = _generate_pages_xml(page_contents)
-    xml_lines.append(pages_xml)
-
-    return '\n'.join(xml_lines)
-
-
 async def classify_blocks(
     llm_client: LLMClient,
     journal_outline: LogseqOutline
@@ -310,19 +234,18 @@ async def reword_content(
 async def plan_integration_for_block(
     llm_client: LLMClient,
     edited_content: EditedContent,
-    candidate_chunks: list[tuple[str, LogseqBlock, list[LogseqBlock]]],
+    candidate_chunks: list[tuple[str, str, str]],
     page_contents: dict[str, LogseqOutline]
 ) -> AsyncIterator[IntegrationDecisionChunk]:
     """
     Generate integration decisions for a SINGLE knowledge block.
 
-    Uses hierarchical chunks (block + parents) instead of full pages to
-    drastically reduce prompt size.
+    Uses hierarchical chunks instead of full pages to drastically reduce prompt size.
 
     Args:
         llm_client: LLM client instance
         edited_content: Single knowledge block with refined content
-        candidate_chunks: List of (page_name, block, parents) tuples from RAG
+        candidate_chunks: List of (page_name, block_id, hierarchical_context) tuples from RAG
         page_contents: Dict mapping page names to LogseqOutline (for frontmatter/properties)
 
     Yields:
@@ -334,16 +257,14 @@ async def plan_integration_for_block(
         ... ):
         ...     print(f"Decision: {chunk.target_page}")
     """
-    from logsqueak.services.llm_helpers import format_chunks_for_llm
+    from logsqueak.services.llm_helpers import format_chunks_for_llm, strip_id_properties
 
-    # Generate XML for single block
+    # Generate XML for single block (no indentation, no refined_content, no id:: properties)
+    clean_context = strip_id_properties(edited_content.hierarchical_context)
     knowledge_block_xml = (
-        f"  <block id=\"{edited_content.block_id}\">\n"
-        f"    <original_journal_context>\n"
-        f"      {edited_content.hierarchical_context}\n"
-        f"    </original_journal_context>\n"
-        f"    <refined_content>{edited_content.current_content}</refined_content>\n"
-        f"  </block>\n"
+        f"<block id=\"{edited_content.block_id}\">\n"
+        f"{clean_context}\n"
+        f"</block>"
     )
 
     # Format hierarchical chunks using helper function
@@ -352,7 +273,7 @@ async def plan_integration_for_block(
     xml_formatted_content = (
         f"<knowledge_blocks>\n"
         f"{knowledge_block_xml}\n"
-        f"</knowledge_blocks>\n\n"
+        f"</knowledge_blocks>\n"
         f"{pages_xml}"
     )
 
@@ -365,8 +286,8 @@ async def plan_integration_for_block(
         "- Start output immediately with first JSON object\n\n"
         "TASK: Generate integration decisions for knowledge block.\n\n"
         "INPUT:\n"
-        "- <knowledge_blocks>: Content to integrate (with block ID)\n"
-        "- <candidate_pages>: Target pages (Logseq markdown with id:: properties)\n\n"
+        "- <knowledge_blocks>: Content to integrate (with block ID in XML attribute)\n"
+        "- <pages>: Target pages (Logseq markdown with block IDs in XML attributes)\n\n"
         "DECISION RULES:\n"
         "1. Check if duplicate exists → use skip_exists\n"
         "2. Confidence ≥ 0.30 only\n"
@@ -374,9 +295,9 @@ async def plan_integration_for_block(
         "4. Skip irrelevant pages\n\n"
         "ACTIONS:\n"
         "- add_section: New top-level (target_block_id: null)\n"
-        "- add_under: Child of block (target_block_id: from id::)\n"
-        "- replace: Replace block (target_block_id: from id::)\n"
-        "- skip_exists: Duplicate (target_block_id: from id::)\n\n"
+        "- add_under: Child of block (target_block_id: from XML block id attribute)\n"
+        "- replace: Replace block (target_block_id: from XML block id attribute)\n"
+        "- skip_exists: Duplicate (target_block_id: from XML block id attribute)\n\n"
         "REQUIRED JSON SCHEMA (one object per line):\n"
         '{"knowledge_block_id": "string", "target_page": "string", "action": "add_section|add_under|replace|skip_exists", '
         '"target_block_id": "string|null", "target_block_title": "string|null", '
@@ -409,7 +330,7 @@ async def plan_integrations(
     llm_client: LLMClient,
     edited_contents: list[EditedContent],
     page_contents: dict[str, LogseqOutline],
-    candidate_chunks: dict[str, list[tuple[str, LogseqBlock, list[LogseqBlock]]]]
+    candidate_chunks: dict[str, list[tuple[str, str, str]]]
 ) -> AsyncIterator[IntegrationDecisionChunk]:
     """
     Plan integration decisions for knowledge blocks using LLM.
@@ -421,7 +342,7 @@ async def plan_integrations(
         llm_client: LLM client instance
         edited_contents: Knowledge blocks with refined content
         page_contents: Dict mapping page names to LogseqOutline (for frontmatter/properties)
-        candidate_chunks: Dict mapping block_id to list of (page_name, block, parents) tuples
+        candidate_chunks: Dict mapping block_id to list of (page_name, block_id, hierarchical_context) tuples
 
     Yields:
         IntegrationDecisionChunk for each integration decision (raw stream)

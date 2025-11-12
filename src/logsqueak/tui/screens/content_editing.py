@@ -683,12 +683,13 @@ class Phase2Screen(Screen):
 
                     block_count += 1
 
-                    # Update progress
+                    # Update progress (if task still exists)
                     from logsqueak.tui.app import LogsqueakApp
                     if isinstance(self.app, LogsqueakApp):
-                        self.app.background_tasks["llm_decisions"].progress_current = block_count
-                        status_panel = self.query_one(StatusPanel)
-                        status_panel.update_status()
+                        if "llm_decisions" in self.app.background_tasks:
+                            self.app.background_tasks["llm_decisions"].progress_current = block_count
+                            status_panel = self.query_one(StatusPanel)
+                            status_panel.update_status()
 
                     logger.info(
                         "llm_decisions_batch_complete_phase2",
@@ -725,13 +726,14 @@ class Phase2Screen(Screen):
                 self.app.release_llm_slot(request_id)
 
         except Exception as e:
-            # Mark failed
+            # Mark failed (if task still exists)
             from logsqueak.tui.app import LogsqueakApp
             if isinstance(self.app, LogsqueakApp):
-                self.app.background_tasks["llm_decisions"].status = "failed"
-                self.app.background_tasks["llm_decisions"].error_message = str(e)
-                status_panel = self.query_one(StatusPanel)
-                status_panel.update_status()
+                if "llm_decisions" in self.app.background_tasks:
+                    self.app.background_tasks["llm_decisions"].status = "failed"
+                    self.app.background_tasks["llm_decisions"].error_message = str(e)
+                    status_panel = self.query_one(StatusPanel)
+                    status_panel.update_status()
 
             logger.error(
                 "llm_decisions_error_phase2",
