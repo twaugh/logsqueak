@@ -300,29 +300,28 @@ async def plan_integration_for_block(
         "- NO preambles, explanations, or summaries\n"
         "- Output ONLY raw NDJSON (newline-delimited JSON objects)\n"
         "- Start output immediately with first JSON object\n\n"
-        "TASK: Generate integration decisions for knowledge block.\n\n"
+        "TASK: Find where knowledge belongs in existing pages.\n\n"
         "INPUT:\n"
-        "- <knowledge_blocks>: Content to integrate (with block ID in XML attribute)\n"
-        "- <pages>: Target pages (Logseq markdown with block IDs in XML attributes)\n\n"
+        "- <knowledge_blocks>: Content to integrate (block ID in XML attribute)\n"
+        "- <pages>: Hierarchical page structure (block IDs in XML attributes)\n\n"
+        "HOW TO FIND THE BEST LOCATION:\n"
+        "Pages show hierarchical structure (parent → child → grandchild).\n"
+        "Look for semantic relationships in the hierarchy.\n"
+        "Prefer specific, deeper locations over generic top-level sections.\n"
+        "Return ONLY the best 1-2 locations per page.\n\n"
         "DECISION RULES:\n"
-        "1. Check if duplicate exists → use skip_exists\n"
-        "2. Confidence ≥ 0.30 only\n"
-        "3. Max 2 decisions per page\n"
-        "4. Skip irrelevant pages\n\n"
+        "1. If duplicate exists → use skip_exists\n"
+        "2. Prefer add_under semantically related parent blocks\n"
+        "3. Confidence ≥ 0.30 only\n\n"
         "ACTIONS:\n"
-        "- add_section: New top-level (target_block_id: null)\n"
-        "- add_under: Child of block (target_block_id: from XML block id attribute)\n"
-        "- replace: Replace block (target_block_id: from XML block id attribute)\n"
-        "- skip_exists: Duplicate (target_block_id: from XML block id attribute)\n\n"
+        "- add_under: Best - add as child of semantically related block\n"
+        "- add_section: Add as new top-level section if no good parent exists\n"
+        "- replace: Replace existing block with updated knowledge\n"
+        "- skip_exists: Duplicate already exists\n\n"
         "REQUIRED JSON SCHEMA (one object per line):\n"
         '{"knowledge_block_id": "string", "target_page": "string", "action": "add_section|add_under|replace|skip_exists", '
         '"target_block_id": "string|null", "target_block_title": "string|null", '
         '"confidence": 0.0-1.0, "reasoning": "string"}\n\n'
-        "EXAMPLE OUTPUT:\n"
-        '{"knowledge_block_id": "abc123", "target_page": "Software/Python", "action": "add_under", '
-        '"target_block_id": "def456", "target_block_title": "Testing", "confidence": 0.85, "reasoning": "Fits under testing"}\n'
-        '{"knowledge_block_id": "abc123", "target_page": "Tools/TDD", "action": "add_section", '
-        '"target_block_id": null, "target_block_title": null, "confidence": 0.70, "reasoning": "New section"}\n\n'
         "START OUTPUT NOW (first character must be '{'):"
     )
 
