@@ -1,6 +1,6 @@
 """LLM wrapper functions that wrap LLMClient.stream_ndjson with specific prompts."""
 
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 import copy
 from logseq_outline.parser import LogseqOutline, LogseqBlock
 from logseq_outline.context import generate_full_context, generate_content_hash
@@ -106,6 +106,37 @@ def _generate_xml_blocks_for_rewording(
     return '\n'.join(xml_lines)
 
 
+def _generate_pages_xml(page_contents: dict[str, LogseqOutline]) -> str:
+    """
+    Generate XML for candidate pages.
+
+    Args:
+        page_contents: Dict mapping page names to full page outlines
+
+    Returns:
+        XML string with <candidate_pages> section
+    """
+    xml_lines = ['<candidate_pages>']
+
+    # Add candidate pages as Logseq markdown with hybrid IDs
+    for page_name, page_outline in page_contents.items():
+        xml_lines.append(f'<page name="{page_name}">')
+        xml_lines.append('')
+
+        # Augment page with hybrid IDs (preserves existing IDs, adds hashes for blocks without)
+        augmented_page = _augment_outline_with_ids(page_outline)
+
+        # Render full page as clean Logseq markdown
+        page_markdown = augmented_page.render()
+        xml_lines.append(page_markdown)
+
+        xml_lines.append('')
+        xml_lines.append('</page>')
+
+    xml_lines.append('</candidate_pages>')
+    return '\n'.join(xml_lines)
+
+
 def _generate_xml_formatted_content(
     edited_contents: list[EditedContent],
     page_contents: dict[str, LogseqOutline]
@@ -143,24 +174,11 @@ def _generate_xml_formatted_content(
 
     xml_lines.append('</knowledge_blocks>')
     xml_lines.append('')
-    xml_lines.append('<candidate_pages>')
 
-    # Add candidate pages as Logseq markdown with hybrid IDs
-    for page_name, page_outline in page_contents.items():
-        xml_lines.append(f'<page name="{page_name}">')
-        xml_lines.append('')
+    # Use helper function for pages XML
+    pages_xml = _generate_pages_xml(page_contents)
+    xml_lines.append(pages_xml)
 
-        # Augment page with hybrid IDs (preserves existing IDs, adds hashes for blocks without)
-        augmented_page = _augment_outline_with_ids(page_outline)
-
-        # Render full page as clean Logseq markdown
-        page_markdown = augmented_page.render()
-        xml_lines.append(page_markdown)
-
-        xml_lines.append('')
-        xml_lines.append('</page>')
-
-    xml_lines.append('</candidate_pages>')
     return '\n'.join(xml_lines)
 
 
@@ -289,37 +307,58 @@ async def reword_content(
         yield chunk
 
 
-async def plan_integrations(
+async def plan_integration_for_block(
     llm_client: LLMClient,
-    edited_contents: list[EditedContent],
+    edited_content: EditedContent,
+    candidate_pages: list[str],
     page_contents: dict[str, LogseqOutline]
 ) -> AsyncIterator[IntegrationDecisionChunk]:
     """
-    Plan integration decisions for knowledge blocks using LLM.
+    Generate integration decisions for a SINGLE knowledge block (T108l).
 
-    Wraps LLMClient.stream_ndjson with Phase 3 integration decision prompt.
-    Returns RAW stream (not batched or filtered).
+    Processes one knowledge block at a time with its specific RAG-retrieved
+    candidate pages. Reduces prompt size by only including relevant pages.
 
     Args:
         llm_client: LLM client instance
-        edited_contents: Knowledge blocks with refined content
+        edited_content: Single knowledge block with refined content
+        candidate_pages: List of candidate page names for this block (from RAG)
         page_contents: Dict mapping page names to full page outlines
 
     Yields:
-        IntegrationDecisionChunk for each integration decision (raw stream)
-
-    Note:
-        The returned stream is RAW and includes all decisions (including skip_exists).
-        Caller should use batch_decisions_by_block() and filter_skip_exists_blocks()
-        to process the stream before displaying to user.
+        IntegrationDecisionChunk for each integration decision
 
     Example:
-        >>> async for chunk in plan_integrations(client, edited_contents, pages):
-        ...     print(f"Decision: {chunk.knowledge_block_id} → {chunk.target_page}")
+        >>> async for chunk in plan_integration_for_block(
+        ...     client, block, ["Page1", "Page2"], page_contents
+        ... ):
+        ...     print(f"Decision: {chunk.target_page}")
     """
-    xml_formatted_content = _generate_xml_formatted_content(
-        edited_contents,
-        page_contents
+    # Filter page_contents to only candidate pages for this block
+    filtered_pages = {
+        page_name: outline
+        for page_name, outline in page_contents.items()
+        if page_name in candidate_pages
+    }
+
+    # Generate XML for single block
+    knowledge_block_xml = (
+        f"  <block id=\"{edited_content.block_id}\">\n"
+        f"    <original_journal_context>\n"
+        f"      {edited_content.hierarchical_context}\n"
+        f"    </original_journal_context>\n"
+        f"    <refined_content>{edited_content.current_content}</refined_content>\n"
+        f"  </block>\n"
+    )
+
+    # Generate XML for candidate pages (full pages for now)
+    pages_xml = _generate_pages_xml(filtered_pages)
+
+    xml_formatted_content = (
+        f"<knowledge_blocks>\n"
+        f"{knowledge_block_xml}\n"
+        f"</knowledge_blocks>\n\n"
+        f"{pages_xml}"
     )
 
     system_prompt = (
@@ -329,16 +368,15 @@ async def plan_integrations(
         "- NO preambles, explanations, or summaries\n"
         "- Output ONLY raw NDJSON (newline-delimited JSON objects)\n"
         "- Start output immediately with first JSON object\n\n"
-        "TASK: Generate integration decisions for knowledge blocks.\n\n"
+        "TASK: Generate integration decisions for knowledge block.\n\n"
         "INPUT:\n"
-        "- <knowledge_blocks>: Content to integrate (with block IDs)\n"
+        "- <knowledge_blocks>: Content to integrate (with block ID)\n"
         "- <candidate_pages>: Target pages (Logseq markdown with id:: properties)\n\n"
         "DECISION RULES:\n"
         "1. Check if duplicate exists → use skip_exists\n"
         "2. Confidence ≥ 0.30 only\n"
-        "3. Max 2 decisions per (knowledge_block, page)\n"
-        "4. Skip irrelevant pages\n"
-        "5. Group by knowledge_block_id\n\n"
+        "3. Max 2 decisions per page\n"
+        "4. Skip irrelevant pages\n\n"
         "ACTIONS:\n"
         "- add_section: New top-level (target_block_id: null)\n"
         "- add_under: Child of block (target_block_id: from id::)\n"
@@ -356,7 +394,7 @@ async def plan_integrations(
         "START OUTPUT NOW (first character must be '{'):"
     )
 
-    # User prompt: Instruction BEFORE data (critical for attention)
+    # User prompt
     prompt = (
         f"Generate integration decisions as NDJSON (one JSON object per line).\n"
         f"Output first JSON object now:\n\n"
@@ -367,7 +405,59 @@ async def plan_integrations(
         prompt=prompt,
         system_prompt=system_prompt,
         chunk_model=IntegrationDecisionChunk,
-        temperature=0.2  # Low temperature to reduce conversational responses
-        # Note: json_mode not used because it expects single JSON object, not NDJSON
+        temperature=0.2
     ):
         yield chunk
+
+
+async def plan_integrations(
+    llm_client: LLMClient,
+    edited_contents: list[EditedContent],
+    page_contents: dict[str, LogseqOutline],
+    candidate_pages: Optional[dict[str, list[str]]] = None
+) -> AsyncIterator[IntegrationDecisionChunk]:
+    """
+    Plan integration decisions for knowledge blocks using LLM.
+
+    Wrapper that iterates over blocks and calls plan_integration_for_block()
+    for each one (T108m). Reduces prompt size by processing blocks individually.
+
+    Args:
+        llm_client: LLM client instance
+        edited_contents: Knowledge blocks with refined content
+        page_contents: Dict mapping page names to full page outlines
+        candidate_pages: Optional dict mapping block_id to candidate page names
+            If None, uses all pages for all blocks (legacy behavior)
+
+    Yields:
+        IntegrationDecisionChunk for each integration decision (raw stream)
+
+    Note:
+        The returned stream is RAW and includes all decisions (including skip_exists).
+        Caller should use batch_decisions_by_block() and filter_skip_exists_blocks()
+        to process the stream before displaying to user.
+
+    Example:
+        >>> async for chunk in plan_integrations(client, edited_contents, pages, candidates):
+        ...     print(f"Decision: {chunk.knowledge_block_id} → {chunk.target_page}")
+    """
+    # Legacy behavior: use all pages for all blocks if candidate_pages not provided
+    if candidate_pages is None:
+        all_page_names = list(page_contents.keys())
+        candidate_pages = {ec.block_id: all_page_names for ec in edited_contents}
+
+    # Process each block individually
+    for edited_content in edited_contents:
+        block_candidates = candidate_pages.get(edited_content.block_id, [])
+
+        # Skip if no candidates
+        if not block_candidates:
+            continue
+
+        async for chunk in plan_integration_for_block(
+            llm_client,
+            edited_content,
+            block_candidates,
+            page_contents
+        ):
+            yield chunk

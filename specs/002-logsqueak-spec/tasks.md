@@ -595,25 +595,25 @@ User should manually test:
 
 ### Per-Block Integration Planning
 
-- [ ] T108l Refactor plan_integrations() to plan_integration_for_block() (singular)
-  - New signature: `plan_integration_for_block(llm_client, knowledge_block, rag_chunks, config)`
-  - Input: Single EditedContent object + its RAG search results
-  - Format RAG chunks using format_chunks_for_llm()
-  - Generate prompt for ONE knowledge block only
-  - Stream IntegrationDecision objects with source_knowledge_block_id set
-  - Old plan_integrations() becomes wrapper that calls this per block
+- [x] T108l Refactor plan_integrations() to plan_integration_for_block() (singular)
+  - New signature: `plan_integration_for_block(llm_client, knowledge_block, candidate_pages, page_contents)`
+  - Input: Single EditedContent object + its candidate page names (from RAG)
+  - Filters page_contents to only include candidate pages for this block
+  - Generate prompt for ONE knowledge block only (reduces prompt size)
+  - Still uses full pages (not chunks yet - that's future optimization)
+  - Maintains same streaming interface
 
-- [ ] T108m Update plan_integrations() wrapper to iterate over blocks
-  - For each EditedContent in edited_blocks:
-    - Get RAG results for that block from candidate_pages dict
-    - Call plan_integration_for_block()
-    - Yield decisions with source_knowledge_block_id
-  - This maintains same async generator interface for Phase 3 worker
+- [x] T108m Update plan_integrations() wrapper to iterate over blocks
+  - Added optional candidate_pages parameter (dict[block_id, list[page_names]])
+  - Legacy behavior: if None, uses all pages for all blocks
+  - Per-block mode: calls plan_integration_for_block() for each block
+  - Yields all decisions in stream (maintains same async generator interface)
 
-- [ ] T108n Update Phase 3 worker to pass per-block RAG results
-  - Currently passes all candidate_pages - keep this
-  - Worker should group candidate_pages by knowledge_block_id before calling plan_integrations()
-  - Ensure decision batching still works (batch_decisions_by_block already uses source field)
+- [x] T108n Update Phase 2 and Phase 3 workers to pass per-block RAG results
+  - Phase 2: Pass self.candidate_page_names to plan_integrations()
+  - Phase 3: Pass self.candidate_pages to plan_integrations()
+  - Both now use per-block candidate filtering
+  - Prompt size reduced from ~62KB (all pages) to ~6-12KB per block
 
 - [ ] T108q Review and update batch_decisions_by_block() for new per-block streaming
   - Current implementation assumes decisions arrive in arbitrary order and batches by consecutive source_knowledge_block_id

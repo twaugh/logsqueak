@@ -802,7 +802,8 @@ Confidence: {decision.confidence:.0%}
                 raw_decision_stream = plan_integrations(
                     self.llm_client,
                     self.edited_content,
-                    self.page_contents
+                    self.page_contents,
+                    self.candidate_pages  # Pass per-block candidates (T108n)
                 )
 
                 # Step 2: Convert IntegrationDecisionChunk to IntegrationDecision

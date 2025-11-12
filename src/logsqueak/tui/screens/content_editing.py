@@ -626,7 +626,8 @@ class Phase2Screen(Screen):
                 raw_decision_stream = plan_integrations(
                     self.llm_client,
                     self.edited_content,
-                    self.page_contents
+                    self.page_contents,
+                    self.candidate_page_names  # Pass per-block candidates (T108n)
                 )
 
                 # Convert chunks to full decisions (add refined_text)
