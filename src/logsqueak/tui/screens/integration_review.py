@@ -457,6 +457,10 @@ class Phase3Screen(Screen):
         Returns:
             True if target was found and block added
         """
+        # Get frontmatter and indent_str from outline (needed for hash matching)
+        frontmatter = outline.frontmatter if outline.frontmatter else None
+        indent_str = outline.indent_str
+
         def search_and_add(blocks: list[LogseqBlock], parents: list[LogseqBlock]) -> bool:
             for parent_block in blocks:
                 # Check if this is the target (by explicit ID or content hash)
@@ -464,8 +468,8 @@ class Phase3Screen(Screen):
                 if parent_block.block_id == target_id:
                     block_matches = True
                 else:
-                    # Try content hash (MUST include page_name to match RAG indexing)
-                    full_context = generate_full_context(parent_block, parents)
+                    # Try content hash (MUST include page_name, frontmatter, and indent_str to match RAG indexing)
+                    full_context = generate_full_context(parent_block, parents, indent_str, frontmatter)
                     content_hash = generate_content_hash(full_context, page_name)
                     if content_hash == target_id:
                         block_matches = True
