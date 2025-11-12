@@ -265,7 +265,7 @@ class Phase3Screen(Screen):
             self.run_worker(self._llm_decisions_worker(), name="llm_decisions")
             logger.info("llm_decisions_worker_started")
         else:
-            # If decisions are pre-generated from Phase 2, start polling for updates
+            # If decisions are pre-generated from Phase 2, check task status
             # The Phase 2 worker may still be adding decisions to the shared list
 
             # Check if all decisions are already complete
@@ -273,50 +273,38 @@ class Phase3Screen(Screen):
             total_blocks = len(self.edited_content)
             all_complete = blocks_ready >= total_blocks
 
-            # Check worker state to determine what to do
+            # Check task status to determine what to do
             from logsqueak.tui.app import LogsqueakApp
-            from logsqueak.models.background_task import IntegrationWorkerState
-            task_exists = False
-            worker_state = IntegrationWorkerState.NOT_STARTED
+            task = None
             if isinstance(self.app, LogsqueakApp):
-                task_exists = "llm_decisions" in self.app.background_tasks
-                worker_state = self.app.integration_worker_state
+                task = self.app.background_tasks.get("llm_decisions")
 
-            # If worker never started and we have an LLM client, start it now
-            if self.llm_client and worker_state == IntegrationWorkerState.NOT_STARTED:
-                logger.info("phase3_starting_worker", reason="worker never started")
+            if task is None and self.llm_client:
+                # Worker never started - start it now
+                logger.info("phase3_starting_worker", reason="task not found")
                 self.run_worker(self._llm_decisions_worker(), name="llm_decisions")
-            elif not task_exists and worker_state == IntegrationWorkerState.COMPLETED:
-                # Worker completed - create placeholder if we have decisions
-                if blocks_ready > 0:
-                    if isinstance(self.app, LogsqueakApp):
-                        self.app.background_tasks["llm_decisions"] = BackgroundTask(
-                            task_type="llm_decisions",
-                            status="completed" if all_complete else "running",
-                            progress_current=blocks_ready,
-                            progress_total=total_blocks,
-                            progress_percentage=100.0 if all_complete else None,
-                        )
-                    logger.info("phase3_created_placeholder_task", blocks_ready=blocks_ready, all_complete=all_complete)
+            elif task and task.status == "running":
+                # Still running - poll for updates if not all complete
+                if not all_complete:
+                    self._polling_timer = self.set_interval(0.5, self._check_for_new_decisions)
+                    logger.info("phase3_started_polling", blocks_ready=blocks_ready, total_blocks=total_blocks)
                 else:
-                    logger.info("phase3_no_placeholder_task", reason="worker completed with 0 decisions")
-            elif task_exists:
-                # Task already exists from Phase 2 - don't overwrite it
-                logger.info("phase3_using_existing_task", blocks_ready=blocks_ready)
-
-            status_panel = self.query_one(StatusPanel)
-            status_panel.update_status()
-
-            # Only poll for updates if task exists and not all complete
-            if task_exists and not all_complete:
-                self._polling_timer = self.set_interval(0.5, self._check_for_new_decisions)
-                logger.info("phase3_started_polling", blocks_ready=blocks_ready, total_blocks=total_blocks)
-            else:
+                    logger.info("phase3_all_decisions_ready", blocks_ready=blocks_ready)
+            elif task and task.status == "completed":
+                # Already done
                 logger.info(
                     "llm_decisions_already_complete_phase3",
                     total_blocks=blocks_ready,
                     total_decisions=len(self.decisions)
                 )
+            elif task and task.status == "failed":
+                # Worker failed in Phase 2
+                logger.warning("phase3_worker_failed", error=task.error_message)
+
+            # Update status panel
+            if isinstance(self.app, LogsqueakApp):
+                status_panel = self.query_one(StatusPanel)
+                status_panel.update_status()
 
     def watch_current_decision_index(self, old_index: int, new_index: int) -> None:
         """React to changes in current_decision_index.
@@ -696,28 +684,27 @@ Confidence: {decision.confidence:.0%}
             # Update progress in background task if it exists
             from logsqueak.tui.app import LogsqueakApp
             if isinstance(self.app, LogsqueakApp) and "llm_decisions" in self.app.background_tasks:
+                task = self.app.background_tasks["llm_decisions"]
+
                 # Update progress based on blocks with decisions ready
                 blocks_ready = len(self.decisions_ready)
                 total_blocks = len(self.edited_content)
-                self.app.background_tasks["llm_decisions"].progress_current = blocks_ready
+                task.progress_current = blocks_ready
 
-                # Check if all decisions are complete
-                if blocks_ready >= total_blocks:
-                    del self.app.background_tasks["llm_decisions"]
-                    from logsqueak.models.background_task import IntegrationWorkerState
-                    self.app.integration_worker_state = IntegrationWorkerState.COMPLETED
-
-                    # Stop polling now that all decisions are complete
+                # Check if task finished (completed or failed) - stop polling
+                if task.status in ("completed", "failed"):
+                    # Task finished - stop polling
                     if self._polling_timer is not None:
                         self._polling_timer.stop()
                         self._polling_timer = None
-                        logger.info("phase3_stopped_polling", reason="all decisions complete")
+                        logger.info("phase3_stopped_polling", reason=f"task {task.status}")
 
-                    logger.info(
-                        "llm_decisions_complete_phase3_polling",
-                        total_blocks=blocks_ready,
-                        total_decisions=current_count
-                    )
+                    if task.status == "completed":
+                        logger.info(
+                            "llm_decisions_complete_phase3_polling",
+                            total_blocks=blocks_ready,
+                            total_decisions=current_count
+                        )
 
                 # Update status panel
                 status_panel = self.query_one(StatusPanel)
@@ -771,11 +758,7 @@ Confidence: {decision.confidence:.0%}
 
     async def _llm_decisions_worker(self) -> None:
         """Worker: Generate integration decisions using LLM with batching and filtering."""
-        # Mark worker as running (prevents duplicate workers)
         from logsqueak.tui.app import LogsqueakApp
-        from logsqueak.models.background_task import IntegrationWorkerState
-        if isinstance(self.app, LogsqueakApp):
-            self.app.integration_worker_state = IntegrationWorkerState.RUNNING
 
         # Create background task
         if isinstance(self.app, LogsqueakApp):
@@ -855,13 +838,11 @@ Confidence: {decision.confidence:.0%}
                 # Get skipped count from filter
                 self.skipped_block_count = filtered_stream.skipped_count
 
-                # Mark complete and remove from background tasks
+                # Mark complete
                 self.llm_decisions_state = BackgroundTaskState.COMPLETED
                 from logsqueak.tui.app import LogsqueakApp
-                from logsqueak.models.background_task import IntegrationWorkerState
                 if isinstance(self.app, LogsqueakApp):
-                    del self.app.background_tasks["llm_decisions"]
-                    self.app.integration_worker_state = IntegrationWorkerState.COMPLETED
+                    self.app.background_tasks["llm_decisions"].status = "completed"
                     status_panel = self.query_one(StatusPanel)
                     status_panel.update_status()
 

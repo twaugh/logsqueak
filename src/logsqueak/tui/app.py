@@ -145,11 +145,8 @@ class LogsqueakApp(App):
 
         # Shared background task status tracking (for worker dependency coordination)
         # This dict is shared across all screens so workers can check dependencies
-        from logsqueak.models.background_task import BackgroundTask, IntegrationWorkerState
+        from logsqueak.models.background_task import BackgroundTask
         self.background_tasks: Dict[str, BackgroundTask] = {}
-
-        # Integration decision worker state (prevents duplicate workers)
-        self.integration_worker_state: IntegrationWorkerState = IntegrationWorkerState.NOT_STARTED
 
         # LLM request queue (serializes concurrent LLM requests)
         # Requests are processed sequentially with priority order:

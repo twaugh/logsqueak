@@ -14,14 +14,6 @@ class BackgroundTaskState(str, Enum):
     FAILED = "failed"
 
 
-class IntegrationWorkerState(str, Enum):
-    """Enum for integration decision worker lifecycle state."""
-
-    NOT_STARTED = "not_started"
-    RUNNING = "running"
-    COMPLETED = "completed"
-
-
 class BackgroundTask(BaseModel):
     """Background task state for async operations."""
 

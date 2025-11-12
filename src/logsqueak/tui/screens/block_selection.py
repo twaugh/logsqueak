@@ -566,8 +566,11 @@ class Phase1Screen(Screen):
             # Clean up background task
             if "llm_classification" in self._background_tasks:
                 del self._background_tasks["llm_classification"]
-                status_panel = self.query_one(StatusPanel)
-                status_panel.update_status()
+                try:
+                    status_panel = self.query_one(StatusPanel)
+                    status_panel.update_status()
+                except Exception:
+                    pass  # Widget not mounted (screen already transitioned)
             raise  # Re-raise to properly cancel the task
 
         except Exception as e:
