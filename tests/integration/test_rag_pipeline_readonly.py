@@ -130,7 +130,8 @@ async def test_end_to_end_rag_pipeline(rag_pipeline):
     # Should find Python page as most relevant
     assert "block-1" in results
     candidates = results["block-1"]
-    assert "Python" in candidates
+    page_names = [page_name for page_name, _, _ in candidates]
+    assert "Python" in page_names
     assert len(candidates) > 0
 
 
@@ -164,9 +165,10 @@ async def test_explicit_links_boost_rankings(rag_pipeline):
     candidates = results["block-1"]
 
     # Web Development should be highly ranked due to explicit link
-    assert "Web Development" in candidates
+    page_names = [page_name for page_name, _, _ in candidates]
+    assert "Web Development" in page_names
     # Should be in top 2 positions
-    assert candidates.index("Web Development") <= 1
+    assert page_names.index("Web Development") <= 1
 
 
 @pytest.mark.asyncio
@@ -199,7 +201,8 @@ async def test_semantic_search_finds_related_pages(rag_pipeline):
     candidates = results["block-1"]
 
     # Machine Learning page should be found (mentions data preprocessing)
-    assert "Machine Learning" in candidates
+    page_names = [page_name for page_name, _, _ in candidates]
+    assert "Machine Learning" in page_names
 
 
 @pytest.mark.asyncio
@@ -232,7 +235,8 @@ async def test_hierarchical_pages_in_search_results(rag_pipeline):
     candidates = results["block-1"]
 
     # Should find the hierarchical Projects/Backend API page
-    assert "Projects/Backend API" in candidates
+    page_names = [page_name for page_name, _, _ in candidates]
+    assert "Projects/Backend API" in page_names
 
 
 @pytest.mark.asyncio
@@ -283,9 +287,12 @@ async def test_multiple_knowledge_blocks_parallel_search(rag_pipeline):
     assert "block-3" in results
 
     # Each block should find relevant pages
-    assert "Machine Learning" in results["block-1"] or "Python" in results["block-1"]
-    assert "Web Development" in results["block-2"] or "Python" in results["block-2"]
-    assert "Web Development" in results["block-3"]  # Mentions Docker deployment
+    page_names_1 = [page_name for page_name, _, _ in results["block-1"]]
+    page_names_2 = [page_name for page_name, _, _ in results["block-2"]]
+    page_names_3 = [page_name for page_name, _, _ in results["block-3"]]
+    assert "Machine Learning" in page_names_1 or "Python" in page_names_1
+    assert "Web Development" in page_names_2 or "Python" in page_names_2
+    assert "Web Development" in page_names_3  # Mentions Docker deployment
 
 
 @pytest.mark.asyncio

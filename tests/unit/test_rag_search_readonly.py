@@ -100,7 +100,9 @@ async def test_find_candidates_returns_relevant_pages(indexed_db, temp_graph):
     assert "block-1" in results
     candidates = results["block-1"]
     assert len(candidates) > 0
-    assert "Python Programming" in candidates
+    # candidates is list of (page_name, block_id, hierarchical_context) tuples
+    page_names = [page_name for page_name, _, _ in candidates]
+    assert "Python Programming" in page_names
 
     await search.close()
 
@@ -135,7 +137,8 @@ async def test_find_candidates_ranks_pages_by_relevance(indexed_db, temp_graph):
     candidates = results["block-1"]
 
     # Machine Learning page should be highly ranked (mentions both ML and Python)
-    assert "Machine Learning" in candidates
+    page_names = [page_name for page_name, _, _ in candidates]
+    assert "Machine Learning" in page_names
 
     await search.close()
 
@@ -249,10 +252,11 @@ async def test_explicit_link_boosting(indexed_db, temp_graph):
     candidates = results["block-1"]
 
     # Python Programming should be in results (boosted by explicit link)
-    assert "Python Programming" in candidates
+    page_names = [page_name for page_name, _, _ in candidates]
+    assert "Python Programming" in page_names
 
     # Should be ranked high due to explicit link boost
-    assert candidates.index("Python Programming") <= 1  # In top 2
+    assert page_names.index("Python Programming") <= 1  # In top 2
 
     await search.close()
 
@@ -332,7 +336,8 @@ async def test_load_page_contents_loads_all_candidate_pages(indexed_db, temp_gra
     search = RAGSearch(indexed_db)
     graph_paths = GraphPaths(temp_graph)
 
-    # Mock candidate pages for multiple blocks
+    # Mock candidate pages for multiple blocks (list of tuples format)
+    # load_page_contents expects dict[str, list[str]] (page names only)
     candidate_pages = {
         "block-1": ["Python Programming", "Machine Learning"],
         "block-2": ["JavaScript", "Python Programming"]  # Python Programming appears twice

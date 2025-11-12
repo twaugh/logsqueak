@@ -98,6 +98,7 @@ async def test_find_candidates_handles_hierarchical_page_links(indexed_db, temp_
     candidates = results["block-1"]
 
     # Should find the hierarchical page
-    assert "Projects/Backend" in candidates
+    page_names = [page_name for page_name, _, _ in candidates]
+    assert "Projects/Backend" in page_names
 
     await search.close()

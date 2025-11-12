@@ -140,6 +140,7 @@ async def test_incremental_index_update_affects_search(test_graph, tmp_path, sha
     )
 
     # Should now find the Quantum Computing page
-    assert "Quantum Computing" in updated_results["block-1"]
+    page_names = [page_name for page_name, _, _ in updated_results["block-1"]]
+    assert "Quantum Computing" in page_names
 
     await search.close()

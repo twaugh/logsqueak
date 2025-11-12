@@ -113,6 +113,13 @@ async def test_worker_dependency_order_model_preload_then_indexing(
     # Manually trigger model preload and page indexing
     # (normally triggered by app.on_mount, but we're testing workers in isolation)
 
+    # Create background task entry before starting worker
+    app.background_tasks["model_preload"] = BackgroundTask(
+        task_type="page_indexing",
+        status="running",
+        progress_percentage=0.0,
+    )
+
     # Start model preload worker
     model_preload_task = asyncio.create_task(app._preload_embedding_model())
 
