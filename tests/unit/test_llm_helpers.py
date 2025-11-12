@@ -6,7 +6,9 @@ from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.services.llm_helpers import (
     batch_decisions_by_block,
     filter_skip_exists_blocks,
+    format_chunks_for_llm,
 )
+from logseq_outline.parser import LogseqOutline, LogseqBlock
 
 
 @pytest_asyncio.fixture
@@ -355,3 +357,193 @@ class TestFilterSkipExistsBlocks:
 
         assert len(filtered) == 0
         assert filtered_stream.skipped_count == 0
+
+
+# ============================================================================
+# T108k: Tests for format_chunks_for_llm()
+# ============================================================================
+
+
+class TestFormatChunksForLLM:
+    """Test format_chunks_for_llm() helper function."""
+
+    def test_groups_chunks_by_page(self):
+        """Should group chunks by page correctly."""
+        # Create test blocks
+        block1 = LogseqBlock(content=["Content 1"], indent_level=0, block_id="block-1")
+        block2 = LogseqBlock(content=["Content 2"], indent_level=0, block_id="block-2")
+        block3 = LogseqBlock(content=["Content 3"], indent_level=0, block_id="block-3")
+
+        # Chunks from different pages
+        chunks = [
+            ("Page1", block1, []),
+            ("Page2", block2, []),
+            ("Page1", block3, []),
+        ]
+
+        page_contents = {
+            "Page1": LogseqOutline(blocks=[], source_text="", frontmatter=[]),
+            "Page2": LogseqOutline(blocks=[], source_text="", frontmatter=[]),
+        }
+
+        xml = format_chunks_for_llm(chunks, page_contents)
+
+        # Should have both pages
+        assert '<page name="Page1">' in xml
+        assert '<page name="Page2">' in xml
+
+        # Page1 should have 2 blocks
+        assert xml.count('<block id="block-1">') == 1
+        assert xml.count('<block id="block-3">') == 1
+
+        # Page2 should have 1 block
+        assert xml.count('<block id="block-2">') == 1
+
+    def test_strips_id_properties_from_content(self):
+        """Should strip id:: properties from block content."""
+        # Create block with id:: property in content
+        block = LogseqBlock(
+            content=["Content line", "id:: 12345", "Another line"],
+            indent_level=0,
+            block_id="block-1"
+        )
+
+        chunks = [("Page1", block, [])]
+        page_contents = {"Page1": LogseqOutline(blocks=[], source_text="", frontmatter=[])}
+
+        xml = format_chunks_for_llm(chunks, page_contents)
+
+        # id:: should be in XML id attribute
+        assert 'id="block-1"' in xml
+
+        # id:: should NOT be in block content
+        assert "id:: 12345" not in xml
+
+        # Other content should remain
+        assert "Content line" in xml
+        assert "Another line" in xml
+
+    def test_includes_page_properties_if_present(self):
+        """Should include page properties in <properties> section."""
+        block = LogseqBlock(content=["Content"], indent_level=0, block_id="block-1")
+
+        chunks = [("Page1", block, [])]
+        page_contents = {
+            "Page1": LogseqOutline(
+                blocks=[],
+                source_text="",
+                frontmatter=["area:: [[Ideas]]", "type:: Best Practice"]
+            )
+        }
+
+        xml = format_chunks_for_llm(chunks, page_contents)
+
+        # Should have properties section
+        assert "<properties>" in xml
+        assert "area:: [[Ideas]]" in xml
+        assert "type:: Best Practice" in xml
+        assert "</properties>" in xml
+
+    def test_uses_block_hash_if_no_id(self):
+        """Should use block hash if no explicit id:: property."""
+        # Block without explicit id
+        block = LogseqBlock(content=["Content"], indent_level=0, block_id=None)
+
+        chunks = [("Page1", block, [])]
+        page_contents = {"Page1": LogseqOutline(blocks=[], source_text="", frontmatter=[])}
+
+        xml = format_chunks_for_llm(chunks, page_contents)
+
+        # Should have id attribute (hash-based)
+        assert 'id="hash-' in xml
+
+    def test_hierarchical_context_with_parents(self):
+        """Should include hierarchical context with parent blocks."""
+        # Create parent and child blocks
+        parent = LogseqBlock(content=["Parent content"], indent_level=0, block_id="parent-1")
+        child = LogseqBlock(content=["Child content"], indent_level=1, block_id="child-1")
+
+        chunks = [("Page1", child, [parent])]
+        page_contents = {"Page1": LogseqOutline(blocks=[], source_text="", frontmatter=[])}
+
+        xml = format_chunks_for_llm(chunks, page_contents)
+
+        # Should contain hierarchical context
+        assert "Parent content" in xml
+        assert "Child content" in xml
+
+        # Should have proper bullet formatting (from generate_full_context)
+        assert "- Parent content" in xml
+        assert "- Child content" in xml
+
+    def test_xml_escaping_in_page_names(self):
+        """Should escape XML special characters in page names."""
+        block = LogseqBlock(content=["Content"], indent_level=0, block_id="block-1")
+
+        chunks = [("Page<>&\"'", block, [])]
+        page_contents = {"Page<>&\"'": LogseqOutline(blocks=[], source_text="", frontmatter=[])}
+
+        xml = format_chunks_for_llm(chunks, page_contents)
+
+        # Should escape special characters
+        assert "Page&lt;&gt;&amp;&quot;&apos;" in xml
+        assert "Page<>&\"'" not in xml  # Original should not appear
+
+    def test_xml_escaping_in_block_ids(self):
+        """Should escape XML special characters in block IDs."""
+        block = LogseqBlock(content=["Content"], indent_level=0, block_id="block<>&\"'")
+
+        chunks = [("Page1", block, [])]
+        page_contents = {"Page1": LogseqOutline(blocks=[], source_text="", frontmatter=[])}
+
+        xml = format_chunks_for_llm(chunks, page_contents)
+
+        # Should escape special characters in id attribute
+        assert 'id="block&lt;&gt;&amp;&quot;&apos;"' in xml
+
+    def test_empty_chunks(self):
+        """Should handle empty chunk list without errors."""
+        chunks = []
+        page_contents = {}
+
+        xml = format_chunks_for_llm(chunks, page_contents)
+
+        # Should produce minimal XML
+        assert "<pages>" in xml
+        assert "</pages>" in xml
+        # Check that there are no individual page tags (not counting the "s" in pages)
+        assert '<page name=' not in xml  # No individual page tags
+
+    def test_page_without_properties(self):
+        """Should omit <properties> section if page has no frontmatter."""
+        block = LogseqBlock(content=["Content"], indent_level=0, block_id="block-1")
+
+        chunks = [("Page1", block, [])]
+        page_contents = {"Page1": LogseqOutline(blocks=[], source_text="", frontmatter=[])}
+
+        xml = format_chunks_for_llm(chunks, page_contents)
+
+        # Should NOT have properties section
+        assert "<properties>" not in xml
+        assert "</properties>" not in xml
+
+    def test_multiple_blocks_same_page(self):
+        """Should handle multiple blocks from same page."""
+        block1 = LogseqBlock(content=["Content 1"], indent_level=0, block_id="block-1")
+        block2 = LogseqBlock(content=["Content 2"], indent_level=0, block_id="block-2")
+        block3 = LogseqBlock(content=["Content 3"], indent_level=0, block_id="block-3")
+
+        chunks = [
+            ("Page1", block1, []),
+            ("Page1", block2, []),
+            ("Page1", block3, []),
+        ]
+        page_contents = {"Page1": LogseqOutline(blocks=[], source_text="", frontmatter=[])}
+
+        xml = format_chunks_for_llm(chunks, page_contents)
+
+        # Should have all blocks
+        assert xml.count("<block") == 3
+        assert 'id="block-1"' in xml
+        assert 'id="block-2"' in xml
+        assert 'id="block-3"' in xml

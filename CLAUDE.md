@@ -631,6 +631,14 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
 
 ## Recent Changes
 
+- 2025-11-12: **Integration Decisions Prompt Refinement (Partial)** - Implemented hierarchical chunk formatting (T108i-k)
+  - Created `format_chunks_for_llm()` helper in `src/logsqueak/services/llm_helpers.py`
+  - Formats RAG search results as XML with hierarchical block context
+  - Groups chunks by page, includes page properties, strips id:: from content
+  - 10 unit tests passing for chunk formatting functionality
+  - T108i SKIPPED: Removed duplicate `source_knowledge_block_id` field (same as `knowledge_block_id`)
+  - **NOT YET INTEGRATED**: Still using full page contents in `plan_integrations()` (62KB prompt)
+  - Next: Implement T108l-m to use per-block processing with formatted chunks
 - 2025-11-12: **LLM Request Queue** - Implemented request serialization with priority and cancellation (T108r, T108s)
   - Added priority queue to serialize LLM requests (prevents concurrent prompts)
   - Priority order: Classification (1) > Rewording (2) > Integration (3)

@@ -558,14 +558,13 @@ User should manually test:
 
 ### Integration Decisions Data Model
 
-- [ ] T108i Update IntegrationDecision model to include source_knowledge_block_id field
-  - Add source_knowledge_block_id: str field to IntegrationDecision in src/logsqueak/models/integration_decision.py
-  - This tracks which knowledge block each decision belongs to (for batching in UI)
-  - Update all tests that construct IntegrationDecision objects
+- [x] T108i Update IntegrationDecision model to include source_knowledge_block_id field
+  - SKIPPED: Removed as duplicate of knowledge_block_id (they're always the same)
+  - batch_decisions_by_block() uses knowledge_block_id directly
 
 ### RAG Chunk Format for LLM
 
-- [ ] T108j Create format_chunks_for_llm() helper function in src/logsqueak/services/llm_helpers.py
+- [x] T108j Create format_chunks_for_llm() helper function in src/logsqueak/services/llm_helpers.py
   - Input: List of RAG search results (each with page_path, block, parents, score)
   - Output: XML string in format:
     ```xml
@@ -588,7 +587,7 @@ User should manually test:
   - Use generate_full_context() to build hierarchical block content
   - Group chunks by page_path
 
-- [ ] T108k Write unit tests for format_chunks_for_llm() in tests/unit/test_llm_helpers.py
+- [x] T108k Write unit tests for format_chunks_for_llm() in tests/unit/test_llm_helpers.py
   - Test: Groups chunks by page correctly
   - Test: Strips id:: properties from block content
   - Test: Includes page properties if present
