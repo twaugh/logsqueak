@@ -70,9 +70,10 @@ async def test_rag_search_initialization(indexed_db):
 
 
 @pytest.mark.asyncio
-async def test_find_candidates_returns_relevant_pages(indexed_db):
+async def test_find_candidates_returns_relevant_pages(indexed_db, temp_graph):
     """Test that find_candidates returns relevant pages for knowledge blocks."""
     search = RAGSearch(indexed_db)
+    graph_paths = GraphPaths(temp_graph)
 
     # Knowledge block about Python
     edited_content = [
@@ -91,6 +92,7 @@ async def test_find_candidates_returns_relevant_pages(indexed_db):
     results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=3
     )
 
@@ -104,9 +106,10 @@ async def test_find_candidates_returns_relevant_pages(indexed_db):
 
 
 @pytest.mark.asyncio
-async def test_find_candidates_ranks_pages_by_relevance(indexed_db):
+async def test_find_candidates_ranks_pages_by_relevance(indexed_db, temp_graph):
     """Test that candidates are ranked by relevance."""
     search = RAGSearch(indexed_db)
+    graph_paths = GraphPaths(temp_graph)
 
     # Knowledge block about Python in ML context
     edited_content = [
@@ -125,6 +128,7 @@ async def test_find_candidates_ranks_pages_by_relevance(indexed_db):
     results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=3
     )
 
@@ -137,9 +141,10 @@ async def test_find_candidates_ranks_pages_by_relevance(indexed_db):
 
 
 @pytest.mark.asyncio
-async def test_find_candidates_handles_multiple_blocks(indexed_db):
+async def test_find_candidates_handles_multiple_blocks(indexed_db, temp_graph):
     """Test that find_candidates handles multiple knowledge blocks."""
     search = RAGSearch(indexed_db)
+    graph_paths = GraphPaths(temp_graph)
 
     edited_content = [
         EditedContent(
@@ -164,6 +169,7 @@ async def test_find_candidates_handles_multiple_blocks(indexed_db):
     results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=2
     )
 
@@ -179,9 +185,10 @@ async def test_find_candidates_handles_multiple_blocks(indexed_db):
 
 
 @pytest.mark.asyncio
-async def test_find_candidates_respects_top_k_limit(indexed_db):
+async def test_find_candidates_respects_top_k_limit(indexed_db, temp_graph):
     """Test that find_candidates respects the top_k parameter."""
     search = RAGSearch(indexed_db)
+    graph_paths = GraphPaths(temp_graph)
 
     edited_content = [
         EditedContent(
@@ -200,6 +207,7 @@ async def test_find_candidates_respects_top_k_limit(indexed_db):
     results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=2
     )
 
@@ -212,9 +220,10 @@ async def test_find_candidates_respects_top_k_limit(indexed_db):
 
 
 @pytest.mark.asyncio
-async def test_explicit_link_boosting(indexed_db):
+async def test_explicit_link_boosting(indexed_db, temp_graph):
     """Test that pages mentioned in explicit links get boosted."""
     search = RAGSearch(indexed_db)
+    graph_paths = GraphPaths(temp_graph)
 
     # Knowledge block with explicit link to Python Programming
     edited_content = [
@@ -233,6 +242,7 @@ async def test_explicit_link_boosting(indexed_db):
     results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=3
     )
 
@@ -248,9 +258,10 @@ async def test_explicit_link_boosting(indexed_db):
 
 
 @pytest.mark.asyncio
-async def test_find_candidates_uses_original_context(indexed_db):
+async def test_find_candidates_uses_original_context(indexed_db, temp_graph):
     """Test that original context is used for search, not edited content."""
     search = RAGSearch(indexed_db)
+    graph_paths = GraphPaths(temp_graph)
 
     edited_content = [
         EditedContent(
@@ -269,6 +280,7 @@ async def test_find_candidates_uses_original_context(indexed_db):
     results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=3
     )
 
@@ -281,9 +293,10 @@ async def test_find_candidates_uses_original_context(indexed_db):
 
 
 @pytest.mark.asyncio
-async def test_empty_results_when_no_matches(indexed_db):
+async def test_empty_results_when_no_matches(indexed_db, temp_graph):
     """Test that empty results are handled when there are no good matches."""
     search = RAGSearch(indexed_db)
+    graph_paths = GraphPaths(temp_graph)
 
     # Knowledge block about completely unrelated topic
     edited_content = [
@@ -302,6 +315,7 @@ async def test_empty_results_when_no_matches(indexed_db):
     results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=3
     )
 

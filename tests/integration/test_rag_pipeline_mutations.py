@@ -108,6 +108,7 @@ async def test_incremental_index_update_affects_search(test_graph, tmp_path, sha
     initial_results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=3
     )
 
@@ -134,6 +135,7 @@ async def test_incremental_index_update_affects_search(test_graph, tmp_path, sha
     updated_results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=3
     )
 

@@ -103,6 +103,7 @@ async def rag_pipeline(test_graph, tmp_path_factory, shared_sentence_transformer
 async def test_end_to_end_rag_pipeline(rag_pipeline):
     """Test complete RAG pipeline from indexing to search."""
     search, test_graph = rag_pipeline
+    graph_paths = GraphPaths(test_graph)
 
     # Simulate knowledge blocks from journal
     edited_content = [
@@ -122,6 +123,7 @@ async def test_end_to_end_rag_pipeline(rag_pipeline):
     results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=5
     )
 
@@ -136,6 +138,7 @@ async def test_end_to_end_rag_pipeline(rag_pipeline):
 async def test_explicit_links_boost_rankings(rag_pipeline):
     """Test that explicit page links boost ranking in search results."""
     search, test_graph = rag_pipeline
+    graph_paths = GraphPaths(test_graph)
 
     # Knowledge block with explicit link to Web Development
     edited_content = [
@@ -154,6 +157,7 @@ async def test_explicit_links_boost_rankings(rag_pipeline):
     results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=5
     )
 
@@ -169,6 +173,7 @@ async def test_explicit_links_boost_rankings(rag_pipeline):
 async def test_semantic_search_finds_related_pages(rag_pipeline):
     """Test that semantic search finds semantically related pages."""
     search, test_graph = rag_pipeline
+    graph_paths = GraphPaths(test_graph)
 
     # Knowledge block about ML workflow
     edited_content = [
@@ -187,6 +192,7 @@ async def test_semantic_search_finds_related_pages(rag_pipeline):
     results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=5
     )
 
@@ -200,6 +206,7 @@ async def test_semantic_search_finds_related_pages(rag_pipeline):
 async def test_hierarchical_pages_in_search_results(rag_pipeline):
     """Test that hierarchical pages are properly indexed and searchable."""
     search, test_graph = rag_pipeline
+    graph_paths = GraphPaths(test_graph)
 
     # Knowledge block about backend API development
     edited_content = [
@@ -218,6 +225,7 @@ async def test_hierarchical_pages_in_search_results(rag_pipeline):
     results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=5
     )
 
@@ -231,6 +239,7 @@ async def test_hierarchical_pages_in_search_results(rag_pipeline):
 async def test_multiple_knowledge_blocks_parallel_search(rag_pipeline):
     """Test searching for multiple knowledge blocks in parallel."""
     search, test_graph = rag_pipeline
+    graph_paths = GraphPaths(test_graph)
 
     # Multiple knowledge blocks on different topics
     edited_content = [
@@ -263,6 +272,7 @@ async def test_multiple_knowledge_blocks_parallel_search(rag_pipeline):
     results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=3
     )
 
@@ -282,6 +292,7 @@ async def test_multiple_knowledge_blocks_parallel_search(rag_pipeline):
 async def test_context_provides_better_results_than_content_alone(rag_pipeline):
     """Test that using full hierarchical context improves search results."""
     search, test_graph = rag_pipeline
+    graph_paths = GraphPaths(test_graph)
 
     # Same content, but with context vs without
     edited_content_without_context = [
@@ -306,6 +317,7 @@ async def test_context_provides_better_results_than_content_alone(rag_pipeline):
     results_no_context = await search.find_candidates(
         edited_content_without_context,
         {"block-1": "- Flask framework"},
+        graph_paths,
         top_k=5
     )
 
@@ -315,6 +327,7 @@ async def test_context_provides_better_results_than_content_alone(rag_pipeline):
         {
             "block-2": "- Projects - Backend Development\n  - Technology Stack\n    - Flask framework for REST API"
         },
+        graph_paths,
         top_k=5
     )
 

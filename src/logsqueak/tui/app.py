@@ -420,14 +420,16 @@ class LogsqueakApp(App):
                 self.rag_search._encoder = encoder
                 self.page_indexer._encoder = encoder
 
-            # Mark complete and remove from background tasks
-            del self.background_tasks["model_preload"]
+            # Mark complete
+            self.background_tasks["model_preload"].status = "completed"
+            self.background_tasks["model_preload"].progress_percentage = 100.0
 
             logger.info("embedding_model_preloaded", phase="phase1")
         except Exception as e:
-            # Mark failed
-            self.background_tasks["model_preload"].status = "failed"
-            self.background_tasks["model_preload"].error_message = str(e)
+            # Mark failed (if task still exists)
+            if "model_preload" in self.background_tasks:
+                self.background_tasks["model_preload"].status = "failed"
+                self.background_tasks["model_preload"].error_message = str(e)
 
             # Non-fatal - model will load on-demand in Phase 2 if preload fails
             logger.warning(

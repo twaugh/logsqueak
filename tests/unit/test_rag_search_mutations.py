@@ -91,6 +91,7 @@ async def test_find_candidates_handles_hierarchical_page_links(indexed_db, temp_
     results = await search.find_candidates(
         edited_content,
         original_contexts,
+        graph_paths,
         top_k=3
     )
 

@@ -168,6 +168,12 @@ async def test_plan_integrations_calls_llm_client_correctly():
         "Programming Notes": LogseqOutline.parse("- Python section\n  id:: section1")
     }
 
+    candidate_chunks = {
+        "abc": [
+            ("Programming Notes", "section1", "- Python section")
+        ]
+    }
+
     # Mock the stream_ndjson method
     async def mock_stream(*args, **kwargs):
         yield IntegrationDecisionChunk(
@@ -184,7 +190,7 @@ async def test_plan_integrations_calls_llm_client_correctly():
 
     # Act
     results = []
-    async for chunk in plan_integrations(mock_client, edited_contents, page_contents):
+    async for chunk in plan_integrations(mock_client, edited_contents, page_contents, candidate_chunks):
         results.append(chunk)
 
     # Assert
@@ -211,6 +217,12 @@ async def test_plan_integrations_returns_raw_stream():
 
     page_contents = {"Page1": LogseqOutline.parse("- Section\n  id:: s1")}
 
+    candidate_chunks = {
+        "abc": [
+            ("Page1", "s1", "- Section")
+        ]
+    }
+
     # Mock stream with skip_exists action
     async def mock_stream(*args, **kwargs):
         yield IntegrationDecisionChunk(
@@ -234,7 +246,7 @@ async def test_plan_integrations_returns_raw_stream():
 
     # Act
     results = []
-    async for chunk in plan_integrations(mock_client, edited_contents, page_contents):
+    async for chunk in plan_integrations(mock_client, edited_contents, page_contents, candidate_chunks):
         results.append(chunk)
 
     # Assert - should return ALL decisions including skip_exists (raw stream)
@@ -260,6 +272,7 @@ async def test_plan_integrations_handles_empty_candidates():
 
     # Empty candidates
     page_contents = {}
+    candidate_chunks = {}
 
     # Mock empty stream
     async def mock_stream(*args, **kwargs):
@@ -270,7 +283,7 @@ async def test_plan_integrations_handles_empty_candidates():
 
     # Act
     results = []
-    async for chunk in plan_integrations(mock_client, edited_contents, page_contents):
+    async for chunk in plan_integrations(mock_client, edited_contents, page_contents, candidate_chunks):
         results.append(chunk)
 
     # Assert
