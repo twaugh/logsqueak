@@ -6,15 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Logsqueak** is a TUI (Text User Interface) application for extracting lasting knowledge from Logseq journal entries using LLM-powered analysis. Users interactively review, refine, and integrate knowledge blocks into their Logseq knowledge base.
 
-**Current Status**: Phase 5 complete - All core user stories implemented
+**Current Status**: Phase 6.5 complete - End-to-end workflow functional with optimized LLM prompts
 - ✅ **Implemented**: `logseq-outline-parser` library (robust Logseq markdown parsing)
 - ✅ **Implemented**: Foundational infrastructure (models, services, CLI, config)
 - ✅ **Implemented**: Phase 1/US1 Block Selection TUI (tree navigation, LLM streaming, manual selection)
 - ✅ **Implemented**: Phase 4/US2 Content Editing TUI (three-panel layout, LLM rewording, manual editing)
 - ✅ **Implemented**: Phase 5/US3 Integration Review TUI (decision batching, target preview, atomic writes)
-- ✅ **Implemented**: RAG semantic search (PageIndexer, RAGSearch with lazy loading)
+- ✅ **Implemented**: Phase 6 Application Integration (end-to-end workflow, background workers, CLI)
+- ✅ **Implemented**: Phase 6.5 Prompt Optimization (90% reduction: 62KB → 2-4KB per block)
+- ✅ **Implemented**: RAG semantic search (PageIndexer, RAGSearch with hierarchical chunks)
 - ✅ **Implemented**: File operations (atomic two-phase writes with provenance markers)
-- ⏳ **Remaining**: Phase 6 (wire up all phases), Phase 7 (edge cases), Phase 8 (polish)
+- ✅ **Implemented**: LLM request queue (priority-based serialization with cancellation)
+- ⏳ **Remaining**: Phase 7 (edge cases), Phase 8 (polish)
 
 ## Project Structure
 
@@ -41,7 +44,7 @@ logsqueak/
 │   ├── 001-logsqueak/             # Original knowledge extraction spec
 │   └── 002-logsqueak-spec/        # Interactive TUI feature spec (CURRENT)
 │       ├── spec.md                # Complete feature specification
-│       ├── tasks.md               # Phase 1-4 complete (T001-T070 ✅)
+│       ├── tasks.md               # Phase 1-6.5 complete (T001-T108s ✅)
 │       └── contracts/             # Service interfaces, data models
 ├── pyproject.toml                 # Project dependencies and config
 └── CLAUDE.md                      # This file
@@ -209,17 +212,46 @@ All models in `src/logsqueak/models/`:
 ### Services Layer
 
 Implemented services in `src/logsqueak/services/`:
-- **llm_client.py**: LLMClient with async NDJSON streaming, retry logic, structured logging
+- **llm_client.py**: LLMClient with async NDJSON streaming, retry logic, request queue with priority
+- **llm_wrappers.py**: LLM-specific prompt wrappers for knowledge classification, content rewording, and integration decisions
+- **llm_helpers.py**: Decision batching, filtering, and hierarchical chunk formatting for RAG results
 - **file_monitor.py**: FileMonitor with mtime tracking using `!=` comparison (git-friendly)
-- **journal_loader.py**: Load and parse journal entries with date range support
 - **page_indexer.py**: ChromaDB vector indexing with lazy-loaded SentenceTransformer, uses `generate_chunks()`
-- **rag_search.py**: Semantic search with explicit link boosting and page-level ranking
-- **file_operations.py**: Atomic two-phase writes with provenance markers (implemented, uses strict mode for write operations)
+- **rag_search.py**: Semantic search returning hierarchical chunks with explicit link boosting
+- **file_operations.py**: Atomic two-phase writes with provenance markers (uses strict mode for write operations)
+
+### RAG Pipeline & Hierarchical Chunks
+
+The RAG (Retrieval-Augmented Generation) pipeline uses semantic search to find relevant existing knowledge:
+
+**Indexing (Phase 1):**
+- PageIndexer loads all non-journal pages from the Logseq graph
+- Uses `generate_chunks()` to create semantic chunks (blocks with hierarchical context)
+- Embeds chunks using lazy-loaded SentenceTransformer model
+- Stores embeddings in ChromaDB with full hierarchical context as document text
+
+**Search (Phase 2):**
+- RAGSearch finds similar blocks for each knowledge block being integrated
+- Returns hierarchical chunks: `(page_name, block_id, hierarchical_context)` tuples
+- Hierarchical context includes parent blocks for full understanding
+- Applies explicit link boosting (blocks that link to target pages rank higher)
+
+**LLM Integration (Phase 2 → Phase 3):**
+- `format_chunks_for_llm()` formats chunks as XML with page grouping
+- Only sends relevant block hierarchies (not full pages) to LLM
+- Strips duplicate page properties and id:: properties from content
+- **Result**: 90%+ prompt reduction (62KB → 2-4KB per knowledge block)
+
+**Why this matters:**
+- Enables smaller/faster models (Mistral-7B works without context window errors)
+- Reduces LLM latency and cost
+- Focuses LLM attention on semantically relevant content only
 
 ### Configuration & CLI
 
-- **cli.py**: Click-based CLI with `extract` command launching Phase 1 TUI
+- **cli.py**: Click-based CLI with `extract` command, date/range parsing, journal loading, TUI app launcher
 - **config.py**: ConfigManager with lazy validation, helpful error messages, permission checks (mode 600)
+- **app.py**: Main TUI application with screen management, phase transitions, worker coordination
 - Config file: `~/.config/logsqueak/config.yaml` (user must create before first run)
 
 ### Utilities
@@ -227,22 +259,37 @@ Implemented services in `src/logsqueak/services/`:
 - **logging.py**: Structured logging (structlog) to `~/.cache/logsqueak/logs/logsqueak.log`
 - **ids.py**: Deterministic UUID v5 generation with Logsqueak-specific namespace (`32e497fc-abf0-4d71-8cff-e302eb3e2bb0`)
 
+### TUI Components
+
+Screens in `src/logsqueak/tui/screens/`:
+- **block_selection.py**: Phase 1 - Tree navigation, LLM classification worker, block selection
+- **content_editing.py**: Phase 2 - Three-panel layout, LLM rewording, RAG search, manual editing
+- **integration_review.py**: Phase 3 - Decision review, target preview, acceptance workflow
+
+Widgets in `src/logsqueak/tui/widgets/`:
+- **block_tree.py**: Hierarchical tree view for journal blocks with selection state
+- **status_panel.py**: Real-time background task status display
+- **block_detail_panel.py**: Markdown rendering of selected block with context
+- **content_editor.py**: Three-panel editor (original, reworded, edited) with auto-save
+- **decision_list.py**: Batched integration decisions with filtering and navigation
+- **target_page_preview.py**: Live preview of target page with insertion point indicator
+
 ### Test Coverage
 
 Comprehensive test suite covering:
-- **Unit tests** (`tests/unit/`): Models, config, LLM client, file monitor, utilities, RAG services
-- **Integration tests** (`tests/integration/`): Config loading, LLM NDJSON streaming, RAG pipeline
-- **UI tests** (`tests/ui/`): Phase 1 and Phase 2 TUI with snapshot testing
+- **Unit tests** (`tests/unit/`): Models, config, LLM client/helpers/wrappers, file monitor, utilities, RAG services, request queue
+- **Integration tests** (`tests/integration/`): Config loading, LLM NDJSON streaming, RAG pipeline, phase transitions, end-to-end workflow
+- **UI tests** (`tests/ui/`): All three phases (block selection, content editing, integration review) with snapshot testing
 
 All async fixtures use `@pytest_asyncio.fixture`. FileMonitor uses `!=` for mtime comparison to handle git reverts.
 
-## Interactive TUI Application (IN PROGRESS)
+## Interactive TUI Application (IMPLEMENTED)
 
 See `specs/002-logsqueak-spec/spec.md` for the complete feature specification.
 
 ### High-Level Architecture
 
-The TUI application will have **3 interactive phases**:
+The TUI application has **3 interactive phases**:
 
 **Phase 1: Block Selection**
 - Display journal blocks in hierarchical tree view
@@ -399,6 +446,10 @@ Phase 3:
 3. **Integration decisions cannot start** until RAG search completes
 4. **Phase 2 → 3 transition is blocked** until RAG search completes
 5. **Integration Decision Worker is opportunistic** (starts whenever RAG completes)
+6. **LLM requests are serialized** via priority queue (prevents concurrent prompts):
+   - Priority order: Classification (1) > Rewording (2) > Integration (3)
+   - Workers use `acquire_llm_slot()` / `release_llm_slot()` for coordination
+   - Prevents resource contention with high-latency reasoning models
 
 #### Background Task Lifecycle
 
@@ -599,25 +650,34 @@ Logseq uses indented bullets (2 spaces per level) with special features:
 - ✅ **Phase 3: User Story 1** (T032-T049) - Block Selection TUI complete (38 tests passing)
 - ✅ **Phase 4: User Story 2** (T050-T070) - Content Editing TUI complete (44 tests passing)
 - ✅ **Phase 5: User Story 3** (T071-T096) - Integration Review TUI complete (38 tests passing)
-- ⏳ **Phase 6: Application Integration** (T097-T106) - Wire up all phases end-to-end
+- ✅ **Phase 6: Application Integration** (T097-T106) - All phases wired end-to-end
+- ✅ **Phase 6.5: Integration Prompt Refinement** (T108i-T108n, T108r-T108s) - 90% prompt reduction
 - ⏳ **Phase 7: Edge Cases** (T107-T117) - Error handling polish
 - ⏳ **Phase 8: Polish & Documentation** (T118-T130) - Final validation
 
-**Phase 5 Achievements** (Integration Review - US3):
-- ✅ File operations service with atomic two-phase writes (37 tests passing)
-- ✅ Provenance markers (`processed::` property in journal entries)
-- ✅ TargetPagePreview widget with insertion point indicator (green bar)
-- ✅ DecisionList widget with batching by knowledge block
-- ✅ Phase3Screen with decision navigation and acceptance workflow
-- ✅ Integration actions: add_section, add_under, replace, skip_exists
-- ✅ Idempotent retry detection and concurrent modification handling
-- ✅ Comprehensive UI and integration test suite with snapshot testing
+**Phase 6 Achievements** (Application Integration):
+- ✅ End-to-end workflow: Phase 1 → Phase 2 → Phase 3 fully integrated
+- ✅ Background workers with dependency coordination:
+  - Phase 1: LLM classification, SentenceTransformer loading, page indexing
+  - Phase 2: LLM rewording, RAG search (waits for indexer), integration decisions (opportunistic)
+  - Phase 3: Decision polling or worker start (based on Phase 2 state)
+- ✅ CLI with date/range parsing (`logsqueak extract [date|range]`)
+- ✅ Screen transitions with proper state passing and worker cancellation
+- ✅ Configuration loading with helpful validation errors
+- ✅ Integration test coverage for full workflow (3 tests passing)
 
-**Next steps** (Phase 6 - Application Integration):
-- Wire up Phase 1 → Phase 2 → Phase 3 in end-to-end workflow
-- Implement background workers for LLM streaming and RAG search
-- Test complete workflow from journal entry to page integration
-- Verify all phases work together seamlessly
+**Phase 6.5 Achievements** (Integration Prompt Refinement):
+- ✅ Hierarchical chunk formatting for RAG results (reduces context to relevant blocks only)
+- ✅ Per-block integration planning (one knowledge block at a time)
+- ✅ ChromaDB document reuse (eliminates redundant page parsing)
+- ✅ LLM request queue with priority and cancellation (prevents concurrent prompts)
+- ✅ **Result**: 90%+ prompt size reduction (62KB → 2-4KB per block)
+- ✅ **Impact**: Fixes context window errors on smaller models (Mistral-7B), faster responses
+
+**Next steps** (Phase 7 - Edge Cases):
+- Error handling polish and robustness improvements
+- Validate edge cases (empty journals, missing pages, network failures)
+- Add graceful degradation for LLM/RAG failures
 
 **Development guidelines**:
 - Follow TDD: Write failing tests → Implement → Tests pass → Manual verify
@@ -631,14 +691,25 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
 
 ## Recent Changes
 
-- 2025-11-12: **Integration Decisions Prompt Refinement (Partial)** - Implemented hierarchical chunk formatting (T108i-k)
-  - Created `format_chunks_for_llm()` helper in `src/logsqueak/services/llm_helpers.py`
-  - Formats RAG search results as XML with hierarchical block context
-  - Groups chunks by page, includes page properties, strips id:: from content
-  - 10 unit tests passing for chunk formatting functionality
-  - T108i SKIPPED: Removed duplicate `source_knowledge_block_id` field (same as `knowledge_block_id`)
-  - **NOT YET INTEGRATED**: Still using full page contents in `plan_integrations()` (62KB prompt)
-  - Next: Implement T108l-m to use per-block processing with formatted chunks
+- 2025-11-12: **Integration Decisions Prompt Optimization (COMPLETE)** - Reduced prompt size from 62KB to 2-4KB per block (T108i-m)
+  - **Phase 1**: Created `format_chunks_for_llm()` helper in `src/logsqueak/services/llm_helpers.py`
+    - Formats RAG search results as XML with hierarchical block context
+    - Groups chunks by page, includes page properties, strips id:: from content
+  - **Phase 2**: Implemented per-block integration decision planning (T108l, T108m, T108n)
+    - Refactored `plan_integrations()` to process one knowledge block at a time
+    - Added `plan_integration_for_block()` to handle single block with its candidate pages
+    - Reduced initial prompt size from 62KB to ~6-12KB per block
+  - **Phase 3**: Wired up hierarchical chunks in RAG pipeline
+    - Updated `RAGSearch.find_candidates()` to return hierarchical chunks from ChromaDB
+    - Used `generate_chunks()` to find blocks and build parent paths
+    - Further reduced prompt size to ~2-4KB per block
+  - **Phase 4**: Simplified to use ChromaDB documents directly (final refactor)
+    - RAG now returns `(page_name, block_id, hierarchical_context)` tuples
+    - Uses pre-computed context from ChromaDB instead of reconstructing from pages
+    - Removed redundant page loading and tree traversal
+    - Added `strip_page_properties()` to prevent duplicate frontmatter
+  - **Impact**: Fixes 400 Bad Request errors from Mistral-7B context window limits
+  - **Result**: 90%+ prompt size reduction enables faster responses and more reliable LLM calls
 - 2025-11-12: **LLM Request Queue** - Implemented request serialization with priority and cancellation (T108r, T108s)
   - Added priority queue to serialize LLM requests (prevents concurrent prompts)
   - Priority order: Classification (1) > Rewording (2) > Integration (3)

@@ -2,7 +2,7 @@
 
 Turn your Logseq journal chaos into organized knowledge. Interactive TUI (Text User Interface) for extracting lasting insights from journal entries using LLM-powered analysis.
 
-**Status**: 🚧 **Phase 4 Complete** - Content Editing TUI working, Integration Review next (Phase 5)
+**Status**: ✅ **Phase 6.5 Complete** - End-to-end workflow functional with 90% LLM prompt reduction
 
 ## Overview
 
@@ -30,30 +30,26 @@ All operations are **keyboard-driven** with vim-style navigation and **streaming
 
 ## Features
 
-### ✅ Implemented
+### ✅ Implemented (Phase 1-6.5)
 - **Logseq Parser**: Production-ready markdown parser with property order preservation
 - **Data Models**: Pydantic models for config, block state, LLM chunks, integration decisions
-- **LLM Client**: Async NDJSON streaming with retry logic and structured logging
+- **LLM Client**: Async NDJSON streaming with retry logic, request queue with priority
+- **LLM Prompt Optimization**: Hierarchical chunks reduce prompts from 62KB to 2-4KB per block
 - **File Monitor**: Git-friendly mtime tracking for concurrent modification detection
+- **File Operations**: Atomic two-phase writes with provenance markers
 - **Configuration**: Lazy validation with helpful error messages (mode 600 permission check)
 - **Utilities**: Structured logging (structlog), deterministic UUID generation
 - **Phase 1 TUI**: Block selection with tree navigation, LLM streaming, manual selection
 - **Phase 2 TUI**: Content editing with three-panel layout, LLM rewording, manual editing
-- **RAG Services**: PageIndexer and RAGSearch with lazy SentenceTransformer loading
-- **Journal Loader**: Load and parse journal entries with date/range support
-- **CLI Integration**: Working `logsqueak extract` command
+- **Phase 3 TUI**: Integration review with target page preview, decision batching, atomic writes
+- **RAG Services**: PageIndexer and RAGSearch returning hierarchical chunks with link boosting
+- **Background Workers**: Full dependency coordination across all three phases
+- **CLI Integration**: Complete `logsqueak extract` command with date/range parsing
+- **End-to-End Workflow**: All three phases wired together with proper state passing
 
-### 🚧 In Progress
-- **Background Workers**: LLM rewording and RAG search workers for Phase 2
-
-### ⏳ Planned
-- **Phase 3 Screen**: Integration review with target page preview
-- **File Operations**: Atomic two-phase writes with provenance markers
-
-### ⏳ Planned (After Phase 2-3 Complete)
-- **Application Integration**: Wire up all 3 phases in TUI app
-- **Edge Cases**: Error handling, concurrent modification detection
-- **Polish**: Comprehensive logging, documentation, manual validation
+### ⏳ Remaining
+- **Phase 7**: Edge case handling and error recovery polish
+- **Phase 8**: Final documentation and validation
 
 ### Key Design Principles
 - **Non-Destructive**: All integrations traceable via `processed::` markers
@@ -151,9 +147,9 @@ chmod 600 ~/.config/logsqueak/config.yaml
 
 ## Usage
 
-### Current Status: Phase 1 TUI Working
+### End-to-End Workflow (All Phases Working)
 
-Launch the interactive block selection TUI:
+Launch the interactive knowledge extraction workflow:
 
 ```bash
 # Extract from today's journal
@@ -166,7 +162,7 @@ logsqueak extract 2025-01-15
 logsqueak extract 2025-01-10..2025-01-15
 ```
 
-**Phase 1 - Block Selection** (Currently Working):
+**Phase 1 - Block Selection**:
 - Navigate blocks with `j`/`k` (vim-style) or arrow keys
 - Watch LLM classification stream in real-time (knowledge vs. activity)
 - Select/deselect blocks with `Space`
@@ -174,18 +170,29 @@ logsqueak extract 2025-01-10..2025-01-15
 - Clear all selections with `c`, reset to LLM suggestions with `r`
 - Jump to next/prev knowledge block with `Shift+j`/`Shift+k`
 - View block content with full context in bottom panel
-- Press `n` to proceed (Phase 2-3 not yet implemented)
-- Press `q` to quit
+- Background: Page indexing for semantic search
+- Press `n` to proceed to Phase 2, `q` to quit
 
-**Future workflow** (when Phase 2-3 complete):
-1. **Phase 1**: Select knowledge blocks (WORKING NOW)
-2. Press `n` to proceed to Phase 2
-3. **Phase 2**: Review/edit content, accept LLM rewording with `a` (not yet implemented)
-4. Press `n` to proceed to Phase 3
-5. **Phase 3**: Review integration decisions, accept with `y` (not yet implemented)
-6. Writes complete - journal marked with `processed::` markers
+**Phase 2 - Content Editing**:
+- Navigate blocks with `j`/`k` (auto-saves on navigation)
+- Three panels: Original, LLM Reworded, Current (editable)
+- Accept LLM reworded version with `a`
+- Revert to original with `r`
+- Tab to focus/unfocus editor for manual editing
+- Background: RAG search finds candidate pages, LLM plans integrations
+- Press `n` to proceed to Phase 3 (waits for RAG), `q` to go back
 
-All keyboard-driven, no mouse required.
+**Phase 3 - Integration Review**:
+- Navigate decisions with `j`/`k`
+- Preview target page with green bar showing insertion point
+- Accept decision with `y` (writes immediately)
+- Skip decision with `s`
+- Accept all decisions for current block with `a`
+- Press `n` to move to next knowledge block
+- Press `q` to go back to Phase 2
+- Journal marked with `processed::` markers after successful writes
+
+All keyboard-driven, no mouse required. LLM results stream in real-time across all phases.
 
 ## Project Structure
 
@@ -194,21 +201,21 @@ logsqueak/
 ├── src/
 │   ├── logsqueak/                 # Main application
 │   │   ├── models/                # Pydantic data models ✅
-│   │   ├── services/              # LLMClient, FileMonitor, PageIndexer, RAGSearch ✅
-│   │   ├── tui/                   # TUI screens & widgets (Phase 1-2 ✅, Phase 3 pending)
+│   │   ├── services/              # LLMClient, LLM helpers/wrappers, FileOps, RAG ✅
+│   │   ├── tui/                   # TUI screens & widgets (All 3 phases ✅)
 │   │   ├── utils/                 # Logging, UUID generation ✅
 │   │   ├── cli.py                 # CLI entry point ✅
 │   │   └── config.py              # ConfigManager ✅
 │   └── logseq-outline-parser/     # Parser library ✅
 ├── tests/                         # Test suite
-│   ├── unit/                      # Unit tests ✅
-│   ├── integration/               # Integration tests ✅
-│   └── ui/                        # UI tests for Phase 1 and Phase 2 ✅
+│   ├── unit/                      # Unit tests (all services, models, utils) ✅
+│   ├── integration/               # Integration tests (workflow, transitions) ✅
+│   └── ui/                        # UI tests (all 3 phases with snapshots) ✅
 ├── specs/
 │   ├── 001-logsqueak/             # Original 5-phase pipeline spec
 │   └── 002-logsqueak-spec/        # Interactive TUI spec (CURRENT)
 │       ├── spec.md                # Feature specification
-│       ├── tasks.md               # Phase 1-4 complete ✅ (T001-T070)
+│       ├── tasks.md               # Phase 1-6.5 complete ✅ (T001-T108s)
 │       └── contracts/             # Service interfaces, data models
 └── pyproject.toml                 # Dependencies and config
 ```
@@ -259,9 +266,9 @@ mypy src/
 
 ## Implementation Status
 
-**✅ Phase 1-4 Complete (Tasks T001-T070)**
+**✅ Phase 1-6.5 Complete (Tasks T001-T108s)**
 
-Foundation, Block Selection, and Content Editing TUI ready:
+All three phases working end-to-end with optimized LLM prompts:
 
 - ✅ **Logseq Outline Parser** (Production-ready library)
   - Non-destructive parsing & rendering with property order preservation
@@ -276,26 +283,30 @@ Foundation, Block Selection, and Content Editing TUI ready:
   - Background task state enum
 
 - ✅ **Services Layer**
-  - LLMClient: Async NDJSON streaming, retry logic, structured logging
+  - LLMClient: Async NDJSON streaming, retry logic, request queue with priority
+  - LLM Wrappers: Prompt templates for classification, rewording, integration
+  - LLM Helpers: Decision batching, filtering, hierarchical chunk formatting (90% prompt reduction)
   - FileMonitor: Mtime tracking with `!=` comparison (git-friendly)
+  - FileOperations: Atomic two-phase writes with provenance markers
   - PageIndexer: ChromaDB vector indexing with lazy-loaded SentenceTransformer
-  - RAGSearch: Semantic search with explicit link boosting and page-level ranking
+  - RAGSearch: Semantic search returning hierarchical chunks with link boosting
 
 - ✅ **Configuration & CLI**
   - ConfigManager with lazy validation
   - Mode 600 permission checking
   - Helpful error messages with example YAML
-  - Click-based CLI entry point (placeholder implementation)
+  - Click-based CLI with date/range parsing
+  - Main TUI app with screen management and worker coordination
 
 - ✅ **Utilities**
   - Structured logging (structlog) to `~/.cache/logsqueak/logs/logsqueak.log`
   - Deterministic UUID v5 with Logsqueak-specific namespace
 
 - ✅ **Test Coverage**
-  - Comprehensive test suite
-  - Unit tests: All models, services, utilities, RAG services
-  - Integration tests: Config loading, LLM NDJSON streaming, RAG pipeline
-  - UI tests: Phase 1 and Phase 2 TUI with snapshot testing
+  - Comprehensive test suite (all tests passing)
+  - Unit tests: All models, services, utilities, RAG, LLM helpers/wrappers, request queue
+  - Integration tests: Config loading, LLM NDJSON streaming, RAG pipeline, phase transitions, end-to-end workflow
+  - UI tests: All three phases with snapshot testing (Textual pilot)
   - Proper async fixtures with `@pytest_asyncio.fixture`
 
 - ✅ **Phase 1 Block Selection TUI**
@@ -312,32 +323,55 @@ Foundation, Block Selection, and Content Editing TUI ready:
   - Phase2Screen: Vertical three-panel layout (original, LLM reworded, current editable)
   - Keyboard controls: j/k navigation with auto-save, Tab focus, 'a' accept, 'r' revert
   - RAG search blocking on 'n' key (waits for completion)
-  - Background worker stubs ready for LLM/RAG integration
+  - Background workers: LLM rewording, RAG search, integration decision planning
 
-**🚧 Next Steps**
+- ✅ **Phase 3 Integration Review TUI**
+  - DecisionList widget: Batched decisions per knowledge block with filtering
+  - TargetPagePreview widget: Live preview with green insertion point bar
+  - Phase3Screen: Decision navigation and acceptance workflow
+  - File operations: Atomic two-phase writes with provenance markers
+  - Background worker: Decision polling or LLM decision generation
 
-Phase 5: User Story 3 (Integration Review TUI) using Test-Driven Development
+- ✅ **Phase 6 Application Integration**
+  - End-to-end workflow: All three phases wired together
+  - Screen transitions with proper state passing
+  - Background worker dependency coordination
+  - Worker cancellation during phase transitions
+
+- ✅ **Phase 6.5 LLM Prompt Optimization**
+  - Hierarchical chunk formatting for RAG results
+  - Per-block integration planning (one block at a time)
+  - ChromaDB document reuse (eliminates redundant parsing)
+  - LLM request queue with priority and cancellation
+  - **Result**: 90%+ prompt reduction (62KB → 2-4KB per block)
+  - **Impact**: Works with smaller models (Mistral-7B), faster responses
+
+**⏳ Next Steps**
+
+- Phase 7: Edge case handling and error recovery
+- Phase 8: Final documentation and validation
 
 ## Architecture
 
 ### Interactive 3-Phase TUI Workflow
 
-**Phase 1 - Block Selection Screen** (User Story 1, T032-T049):
+**Phase 1 - Block Selection Screen** (T032-T049):
 - BlockTree widget: Hierarchical display of journal blocks
 - LLM worker: Streams classification results (knowledge vs. activity)
 - StatusPanel widget: Shows background task progress (LLM classification, page indexing)
 - User actions: Navigate (j/k), select/deselect (Space), accept all (a), proceed (n)
 
-**Phase 2 - Content Editing Screen** (User Story 2, T050-T070):
+**Phase 2 - Content Editing Screen** (T050-T070):
 - ContentEditor widget: Three-panel view (original, LLM reworded, current editable)
-- LLM worker: Streams rewording suggestions
-- RAG worker: Finds candidate target pages in background
+- LLM rewording worker: Streams rewording suggestions
+- RAG search worker: Finds candidate target pages in background
+- Integration decision worker: Plans integrations (opportunistic - starts when RAG completes)
 - User actions: Navigate (j/k with auto-save), accept LLM (a), revert (r), Tab to focus editor, proceed (n) when RAG complete
 
-**Phase 3 - Integration Review Screen** (User Story 3, T071-T096):
-- DecisionList widget: Batched decisions per knowledge block
+**Phase 3 - Integration Review Screen** (T071-T096):
+- DecisionList widget: Batched decisions per knowledge block with skip_exists filtering
 - TargetPagePreview widget: Shows target page with green bar at insertion point
-- LLM worker: Streams integration decisions
+- Decision worker: Polls for new decisions OR starts worker if not already running
 - File operations: Atomic two-phase writes with provenance markers
 - User actions: Navigate decisions (j/k), accept (y), skip (s), next block (n), batch accept (a)
 
@@ -363,9 +397,9 @@ See [CLAUDE.md](CLAUDE.md) for developer documentation, architecture details, an
 
 Key resources:
 - **specs/002-logsqueak-spec/spec.md** - Complete interactive TUI feature specification
-- **specs/002-logsqueak-spec/tasks.md** - Implementation tasks (Phase 1-4 complete ✅)
+- **specs/002-logsqueak-spec/tasks.md** - Implementation tasks (Phase 1-6.5 complete ✅)
 - **specs/002-logsqueak-spec/contracts/** - Service interfaces and data models
-- **CLAUDE.md** - Developer guide with parser API, testing, and next steps
+- **CLAUDE.md** - Developer guide with parser API, RAG pipeline, testing, and architecture
 
 ## Development Workflow
 
@@ -376,26 +410,27 @@ Key resources:
 4. Run tests again - should NOW PASS
 5. Manual verification in TUI before proceeding
 
-**Current Status**: Phase 4 complete - Ready to begin Phase 5 (User Story 3 - Integration Review TUI)
+**Current Status**: Phase 6.5 complete - All three phases working end-to-end with optimized LLM prompts
 
 ## Roadmap
 
-**Completed** (Phase 1-4):
+**Completed** (Phase 1-6.5):
 - ✅ Project structure and dependencies
 - ✅ All data models with Pydantic validation
-- ✅ LLM client with NDJSON streaming
+- ✅ LLM client with NDJSON streaming and request queue
 - ✅ Configuration management with lazy validation
 - ✅ File monitoring for concurrent edits
 - ✅ Journal loading with date/range parsing
-- ✅ RAG services (PageIndexer, RAGSearch) with lazy SentenceTransformer loading
-- ✅ Comprehensive test suite
+- ✅ RAG services with hierarchical chunks (90% prompt reduction)
+- ✅ File operations with atomic two-phase writes
+- ✅ Comprehensive test suite (unit, integration, UI)
 - ✅ User Story 1: Block Selection TUI
 - ✅ User Story 2: Content Editing TUI
+- ✅ User Story 3: Integration Review TUI
+- ✅ Application Integration: All 3 phases wired together
+- ✅ Background worker coordination with dependency management
+- ✅ LLM prompt optimization (hierarchical chunks)
 
-**Next** (Phase 5):
-- 🚧 User Story 3: Integration Review TUI
-
-**Future** (Phase 6-8):
-- ⏳ Application integration (wire up all 3 phases)
-- ⏳ Background workers for LLM/RAG integration
-- ⏳ Edge case handling and polish
+**Next** (Phase 7-8):
+- ⏳ Edge case handling and error recovery
+- ⏳ Final documentation and validation
