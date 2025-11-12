@@ -537,9 +537,12 @@ async def test_atomic_write_skip_exists_adds_id_if_missing(
     page_path.write_text(page_content)
 
     # Get the content hash for the block (hybrid ID system)
-    # Hash is now stable regardless of parsing mode
+    # IMPORTANT: Generate hash the same way RAG indexing does (with page_name)
+    from logseq_outline.context import generate_chunks
     page_outline = LogseqOutline.parse(page_content)
-    content_hash = page_outline.blocks[0].get_hybrid_id()
+    # Use generate_chunks with page_name to match RAG indexing behavior
+    chunks = generate_chunks(page_outline, page_name="Python/Concurrency")
+    _, _, content_hash = chunks[0]  # Get hybrid_id from first chunk
 
     # LLM identified duplicate using content hash (implicit ID)
     decision = IntegrationDecision(

@@ -503,7 +503,10 @@ class TestApplyIntegration:
         outline = LogseqOutline.parse("- Existing content without id")
 
         # Get the block's hybrid ID (content hash since no explicit id::)
-        content_hash = outline.blocks[0].get_hybrid_id()
+        # IMPORTANT: Pass page_name to match how RAG indexing generates content hashes
+        from logseq_outline.context import generate_full_context, generate_content_hash
+        full_context = generate_full_context(outline.blocks[0], [])
+        content_hash = generate_content_hash(full_context, page_name="Python/Concurrency")
 
         decision = IntegrationDecision(
             knowledge_block_id="block-1",
