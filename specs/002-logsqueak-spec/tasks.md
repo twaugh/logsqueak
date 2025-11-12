@@ -637,6 +637,29 @@ User should manually test:
   - Verify: Decisions correctly batched by source_knowledge_block_id
   - Verify: RAG chunks don't exceed reasonable size (< 4000 tokens per block)
 
+### LLM Request Serialization
+
+- [ ] T108r Implement LLM request queue to ensure only one prompt/response in progress at a time
+  - Use app-level request queue with priority: classification > rewording > integration decisions
+  - Rationale: Reasoning models have high latency; concurrent requests can cause:
+    - Poor user experience (multiple slow responses competing)
+    - Increased resource usage on LLM backend
+    - Confusing UI state (which task is actually running?)
+  - Implementation approach:
+    - Add priority queue to TUI App class (asyncio.PriorityQueue or custom implementation)
+    - Priority order: 1=classification (Phase 1), 2=rewording (Phase 2), 3=integration (Phase 3)
+    - LLM wrappers (classify_blocks, reword_content, plan_integrations) submit requests to queue
+    - Single consumer worker processes requests sequentially with FIFO within same priority
+    - Background workers await queue slot before calling LLM, handle graceful waiting
+  - Update background workers to handle queuing gracefully (wait, don't fail)
+  - Add queue status to StatusPanel (e.g., "Waiting for LLM..." when queued)
+
+- [ ] T108s Write tests for LLM request serialization in tests/unit/test_llm_client.py
+  - Test: Concurrent calls to stream_ndjson() execute sequentially
+  - Test: Second request waits for first to complete
+  - Test: Errors in first request don't block second request
+  - Test: Multiple workers can queue requests without deadlock
+
 **Checkpoint 6.5**: Integration decisions use hierarchical chunks and per-block prompts
 
 ---
