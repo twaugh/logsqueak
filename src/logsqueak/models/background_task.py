@@ -19,6 +19,7 @@ class BackgroundTask(BaseModel):
 
     task_type: Literal[
         "llm_classification",
+        "model_preload",
         "page_indexing",
         "rag_search",
         "llm_rewording",
