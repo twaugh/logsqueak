@@ -310,36 +310,31 @@ async def reword_content(
 async def plan_integration_for_block(
     llm_client: LLMClient,
     edited_content: EditedContent,
-    candidate_pages: list[str],
+    candidate_chunks: list[tuple[str, LogseqBlock, list[LogseqBlock]]],
     page_contents: dict[str, LogseqOutline]
 ) -> AsyncIterator[IntegrationDecisionChunk]:
     """
-    Generate integration decisions for a SINGLE knowledge block (T108l).
+    Generate integration decisions for a SINGLE knowledge block.
 
-    Processes one knowledge block at a time with its specific RAG-retrieved
-    candidate pages. Reduces prompt size by only including relevant pages.
+    Uses hierarchical chunks (block + parents) instead of full pages to
+    drastically reduce prompt size.
 
     Args:
         llm_client: LLM client instance
         edited_content: Single knowledge block with refined content
-        candidate_pages: List of candidate page names for this block (from RAG)
-        page_contents: Dict mapping page names to full page outlines
+        candidate_chunks: List of (page_name, block, parents) tuples from RAG
+        page_contents: Dict mapping page names to LogseqOutline (for frontmatter/properties)
 
     Yields:
         IntegrationDecisionChunk for each integration decision
 
     Example:
         >>> async for chunk in plan_integration_for_block(
-        ...     client, block, ["Page1", "Page2"], page_contents
+        ...     client, block, rag_chunks, page_contents
         ... ):
         ...     print(f"Decision: {chunk.target_page}")
     """
-    # Filter page_contents to only candidate pages for this block
-    filtered_pages = {
-        page_name: outline
-        for page_name, outline in page_contents.items()
-        if page_name in candidate_pages
-    }
+    from logsqueak.services.llm_helpers import format_chunks_for_llm
 
     # Generate XML for single block
     knowledge_block_xml = (
@@ -351,8 +346,8 @@ async def plan_integration_for_block(
         f"  </block>\n"
     )
 
-    # Generate XML for candidate pages (full pages for now)
-    pages_xml = _generate_pages_xml(filtered_pages)
+    # Format hierarchical chunks using helper function
+    pages_xml = format_chunks_for_llm(candidate_chunks, page_contents)
 
     xml_formatted_content = (
         f"<knowledge_blocks>\n"
@@ -414,20 +409,19 @@ async def plan_integrations(
     llm_client: LLMClient,
     edited_contents: list[EditedContent],
     page_contents: dict[str, LogseqOutline],
-    candidate_pages: Optional[dict[str, list[str]]] = None
+    candidate_chunks: dict[str, list[tuple[str, LogseqBlock, list[LogseqBlock]]]]
 ) -> AsyncIterator[IntegrationDecisionChunk]:
     """
     Plan integration decisions for knowledge blocks using LLM.
 
     Wrapper that iterates over blocks and calls plan_integration_for_block()
-    for each one (T108m). Reduces prompt size by processing blocks individually.
+    for each one. Uses hierarchical chunks instead of full pages.
 
     Args:
         llm_client: LLM client instance
         edited_contents: Knowledge blocks with refined content
-        page_contents: Dict mapping page names to full page outlines
-        candidate_pages: Optional dict mapping block_id to candidate page names
-            If None, uses all pages for all blocks (legacy behavior)
+        page_contents: Dict mapping page names to LogseqOutline (for frontmatter/properties)
+        candidate_chunks: Dict mapping block_id to list of (page_name, block, parents) tuples
 
     Yields:
         IntegrationDecisionChunk for each integration decision (raw stream)
@@ -438,26 +432,21 @@ async def plan_integrations(
         to process the stream before displaying to user.
 
     Example:
-        >>> async for chunk in plan_integrations(client, edited_contents, pages, candidates):
+        >>> async for chunk in plan_integrations(client, edited_contents, pages, chunks):
         ...     print(f"Decision: {chunk.knowledge_block_id} → {chunk.target_page}")
     """
-    # Legacy behavior: use all pages for all blocks if candidate_pages not provided
-    if candidate_pages is None:
-        all_page_names = list(page_contents.keys())
-        candidate_pages = {ec.block_id: all_page_names for ec in edited_contents}
-
     # Process each block individually
     for edited_content in edited_contents:
-        block_candidates = candidate_pages.get(edited_content.block_id, [])
+        block_chunks = candidate_chunks.get(edited_content.block_id, [])
 
         # Skip if no candidates
-        if not block_candidates:
+        if not block_chunks:
             continue
 
         async for chunk in plan_integration_for_block(
             llm_client,
             edited_content,
-            block_candidates,
+            block_chunks,
             page_contents
         ):
             yield chunk

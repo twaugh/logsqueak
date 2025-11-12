@@ -5,7 +5,8 @@ from unittest.mock import AsyncMock, Mock
 from logsqueak.services.llm_wrappers import (
     classify_blocks,
     reword_content,
-    plan_integrations
+    plan_integrations,
+    plan_integration_for_block
 )
 from logsqueak.services.llm_client import LLMClient
 from logsqueak.models.llm_chunks import (

@@ -799,11 +799,11 @@ Confidence: {decision.confidence:.0%}
                 # Step 1: Stream raw decisions from LLM
                 logger.info("llm_decisions_starting", num_blocks=len(self.edited_content))
 
-                raw_decision_stream = plan_integrations(
-                    self.llm_client,
-                    self.edited_content,
-                    self.page_contents,
-                    self.candidate_pages  # Pass per-block candidates (T108n)
+                # Note: This code path is no longer used in production.
+                # Decisions are now generated in Phase 2 and passed via shared list.
+                # This is only for testing with mocked LLM client.
+                raise NotImplementedError(
+                    "Phase 3 LLM worker is deprecated - decisions should come from Phase 2"
                 )
 
                 # Step 2: Convert IntegrationDecisionChunk to IntegrationDecision

@@ -10,7 +10,7 @@ import re
 from collections import defaultdict
 import chromadb
 from logsqueak.models.edited_content import EditedContent
-from logseq_outline.parser import LogseqOutline
+from logseq_outline.parser import LogseqOutline, LogseqBlock
 from logseq_outline.graph import GraphPaths
 import structlog
 
@@ -74,19 +74,23 @@ class RAGSearch:
     async def find_candidates(
         self,
         edited_content: list[EditedContent],
-        original_contexts: dict[str, str],  # block_id -> hierarchical context
+        original_contexts: dict[str, str],
+        graph_paths: GraphPaths,
         top_k: int = 10
-    ) -> dict[str, list[str]]:
+    ) -> dict[str, list[tuple[str, LogseqBlock, list[LogseqBlock]]]]:
         """
-        Find candidate pages for each knowledge block.
+        Find candidate chunks (block + parents) for each knowledge block.
+
+        Returns hierarchical chunks ready for format_chunks_for_llm().
 
         Args:
             edited_content: List of EditedContent to find candidates for
             original_contexts: Mapping of block_id to original hierarchical context
-            top_k: Number of candidate pages per block
+            graph_paths: GraphPaths instance for resolving page paths
+            top_k: Number of candidate chunks per block
 
         Returns:
-            dict mapping block_id to list of candidate page names (ranked by relevance)
+            dict mapping block_id to list of (page_name, block, parents) tuples
             Empty lists if no indexed data exists
 
         Raises:
@@ -119,23 +123,24 @@ class RAGSearch:
             # Query ChromaDB
             query_results = self.collection.query(
                 query_embeddings=[embedding.tolist()],
-                n_results=top_k * 3  # Over-fetch to group by page
+                n_results=top_k * 3  # Over-fetch for diversity
             )
 
-            # Extract and rank pages
-            candidate_pages = self._rank_pages(
+            # Extract chunks with hierarchy
+            chunks = await self._extract_chunks_from_results(
                 query_results,
                 context,
+                graph_paths,
                 top_k
             )
 
-            results[ec.block_id] = candidate_pages
+            results[ec.block_id] = chunks
 
             logger.info(
-                "rag_search_results",
+                "rag_search_chunks_found",
                 block_id=ec.block_id,
-                num_candidates=len(candidate_pages),
-                candidates=candidate_pages  # Show all candidates
+                num_chunks=len(chunks),
+                unique_pages=len(set(page_name for page_name, _, _ in chunks))
             )
 
         return results
@@ -198,6 +203,124 @@ class RAGSearch:
             )
 
         return [page for page, score in top_results]
+
+    async def _extract_chunks_from_results(
+        self,
+        query_results: dict,
+        context: str,
+        graph_paths: GraphPaths,
+        top_k: int
+    ) -> list[tuple[str, LogseqBlock, list[LogseqBlock]]]:
+        """
+        Extract hierarchical chunks (block + parents) from ChromaDB results.
+
+        Args:
+            query_results: Raw results from ChromaDB query
+            context: Original search context (for explicit link boosting)
+            graph_paths: GraphPaths for resolving page paths
+            top_k: Number of chunks to return
+
+        Returns:
+            List of (page_name, block, parents) tuples
+        """
+        from logseq_outline.parser import LogseqBlock
+
+        # Extract explicit page links for boosting
+        explicit_links = set(re.findall(r'\[\[([^\]]+)\]\]', context))
+
+        # Score each chunk
+        chunk_scores = []
+        for metadata, distance in zip(
+            query_results["metadatas"][0],
+            query_results["distances"][0]
+        ):
+            page_name = metadata["page_name"]
+            block_id = metadata["block_id"]
+            similarity = 1.0 - distance
+
+            # Boost chunks from explicitly linked pages
+            if page_name in explicit_links or page_name.replace("/", "___") in explicit_links:
+                similarity *= 1.5
+
+            chunk_scores.append((page_name, block_id, similarity))
+
+        # Sort by score
+        chunk_scores.sort(key=lambda x: x[2], reverse=True)
+
+        # Load blocks and build chunks
+        chunks = []
+        loaded_pages = {}  # Cache loaded pages
+
+        for page_name, block_id, score in chunk_scores[:top_k]:
+            # Load page if not cached
+            if page_name not in loaded_pages:
+                page_path = graph_paths.get_page_path(page_name)
+                if not page_path.exists():
+                    logger.warning(
+                        "chunk_page_not_found",
+                        page_name=page_name,
+                        block_id=block_id
+                    )
+                    continue
+
+                try:
+                    page_text = page_path.read_text()
+                    outline = LogseqOutline.parse(page_text)
+                    loaded_pages[page_name] = outline
+                except Exception as e:
+                    logger.error(
+                        "chunk_page_parse_failed",
+                        page_name=page_name,
+                        error=str(e)
+                    )
+                    continue
+
+            outline = loaded_pages[page_name]
+
+            # Find block by hybrid ID using generate_chunks
+            from logseq_outline.context import generate_chunks
+            found_block = None
+            found_parents = []
+
+            for chunk_block, full_context, chunk_id in generate_chunks(outline, page_name):
+                if chunk_id == block_id:
+                    # Found the target block, now need to build parents list
+                    # We can find parents by walking up from this block
+                    found_block = chunk_block
+
+                    # Build parents list by traversing from root to this block
+                    def find_path_to_block(blocks, target, current_path=[]):
+                        for block in blocks:
+                            if block == target:
+                                return current_path
+                            result = find_path_to_block(block.children, target, current_path + [block])
+                            if result is not None:
+                                return result
+                        return None
+
+                    parents_path = find_path_to_block(outline.blocks, chunk_block)
+                    if parents_path:
+                        found_parents = parents_path
+                    break
+
+            if not found_block:
+                logger.warning(
+                    "chunk_block_not_found",
+                    page_name=page_name,
+                    block_id=block_id
+                )
+                continue
+
+            chunks.append((page_name, found_block, found_parents))
+
+        logger.debug(
+            "chunks_extracted",
+            total_results=len(chunk_scores),
+            chunks_loaded=len(chunks),
+            unique_pages=len(loaded_pages)
+        )
+
+        return chunks
 
     async def load_page_contents(
         self,
