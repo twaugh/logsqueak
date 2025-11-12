@@ -58,7 +58,7 @@ class TestLLMRequestQueue:
         return PageIndexer(
             graph_paths=graph_paths,
             db_path=tmp_path / "chroma",
-            embedding_model="all-MiniLM-L6-v2"
+            embedding_model="all-mpnet-base-v2"
         )
 
     @pytest.fixture
@@ -66,7 +66,7 @@ class TestLLMRequestQueue:
         """Create mock RAG search."""
         return RAGSearch(
             db_path=tmp_path / "chroma",
-            embedding_model="all-MiniLM-L6-v2"
+            embedding_model="all-mpnet-base-v2"
         )
 
     @pytest.fixture

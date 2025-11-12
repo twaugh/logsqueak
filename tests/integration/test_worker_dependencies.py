@@ -77,7 +77,7 @@ async def test_worker_dependency_order_model_preload_then_indexing(
 
     # Mock RAGSearch with controlled encoder property
     rag_search = MagicMock(spec=RAGSearch)
-    rag_search.embedding_model = "all-MiniLM-L6-v2"  # Set model name
+    rag_search.embedding_model = "all-mpnet-base-v2"  # Set model name
 
     # Pre-populate _encoder with mock to avoid real model loading
     mock_encoder = MagicMock()

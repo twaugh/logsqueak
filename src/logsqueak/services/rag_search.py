@@ -27,7 +27,7 @@ class RAGSearch:
     def __init__(
         self,
         db_path: Path,
-        embedding_model: str = "all-MiniLM-L6-v2"
+        embedding_model: str = "all-mpnet-base-v2"
     ):
         """
         Initialize RAG search.

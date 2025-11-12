@@ -26,7 +26,7 @@ class PageIndexer:
         self,
         graph_paths: GraphPaths,
         db_path: Path,
-        embedding_model: str = "all-MiniLM-L6-v2",
+        embedding_model: str = "all-mpnet-base-v2",
         encoder: Optional[Any] = None
     ):
         """

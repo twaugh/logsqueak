@@ -17,5 +17,5 @@ def shared_sentence_transformer():
     from sentence_transformers import SentenceTransformer
 
     # Load the same model used by PageIndexer
-    model = SentenceTransformer("all-MiniLM-L6-v2")
+    model = SentenceTransformer("all-mpnet-base-v2")
     return model
