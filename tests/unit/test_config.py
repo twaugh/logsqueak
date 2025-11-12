@@ -81,13 +81,13 @@ class TestRAGConfig:
         """Test RAG config with default values."""
         config = RAGConfig()
 
-        assert config.top_k == 10
+        assert config.top_k == 20
 
     def test_rag_config_custom_top_k(self):
         """Test RAG config with custom top_k."""
-        config = RAGConfig(top_k=20)
+        config = RAGConfig(top_k=30)
 
-        assert config.top_k == 20
+        assert config.top_k == 30
 
     def test_rag_config_validates_top_k_range(self):
         """Test RAG config validates top_k is in valid range."""
@@ -154,7 +154,7 @@ logseq:
         config = Config.load(config_file)
 
         # Should use RAG defaults
-        assert config.rag.top_k == 10
+        assert config.rag.top_k == 20
 
     def test_config_load_file_not_found(self, tmp_path):
         """Test loading config fails when file doesn't exist."""

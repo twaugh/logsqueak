@@ -147,7 +147,7 @@ logseq:
         config_mgr = ConfigManager.load_from_path(config_file)
 
         # RAG should use defaults
-        assert config_mgr.rag.top_k == 10
+        assert config_mgr.rag.top_k == 20
 
     def test_permission_check_integration(self, tmp_path):
         """Test that permission check works in full loading workflow."""

@@ -67,10 +67,10 @@ class RAGConfig(BaseModel):
     """Configuration for RAG semantic search."""
 
     top_k: int = Field(
-        default=10,
+        default=20,
         ge=1,
         le=100,
-        description="Number of candidate pages to retrieve from vector search"
+        description="Number of candidate chunks to retrieve from vector search"
     )
 
     model_config = {"frozen": True}
@@ -114,7 +114,7 @@ class Config(BaseModel):
                 f"logseq:\n"
                 f"  graph_path: ~/Documents/logseq-graph\n\n"
                 f"rag:\n"
-                f"  top_k: 10\n"
+                f"  top_k: 20\n"
             )
 
         # Check file permissions (must be 600)
