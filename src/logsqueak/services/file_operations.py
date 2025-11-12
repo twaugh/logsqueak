@@ -123,7 +123,8 @@ def write_add_under(
     )
 
     # Find target block
-    target_block = page_outline.find_block_by_id(target_block_id)
+    # IMPORTANT: Pass page_name for content hash matching
+    target_block = page_outline.find_block_by_id(target_block_id, page_name=target_page)
     if target_block is None:
         raise ValueError(f"Target block not found: {target_block_id}")
 
@@ -160,7 +161,8 @@ def write_replace(
         ValueError: If target block not found
     """
     # Find target block
-    target_block = page_outline.find_block_by_id(target_block_id)
+    # IMPORTANT: Pass page_name for content hash matching
+    target_block = page_outline.find_block_by_id(target_block_id, page_name=target_page)
     if target_block is None:
         raise ValueError(f"Target block not found: {target_block_id}")
 
@@ -243,7 +245,9 @@ def validate_decision(
                 f"Action {decision.action} requires target_block_id, but it is None"
             )
 
-        block = page_outline.find_block_by_id(decision.target_block_id)
+        # IMPORTANT: Pass page_name for content hash matching
+        # Page blocks indexed by RAG have content hashes that include page_name
+        block = page_outline.find_block_by_id(decision.target_block_id, page_name=decision.target_page)
         if block is None:
             raise ValueError(
                 f"Target block not found: {decision.target_block_id}\n"
@@ -301,7 +305,8 @@ def apply_integration(
     elif decision.action == "skip_exists":
         # Block already exists - ensure it has id:: property for provenance linking
         # Find the existing block
-        target_block = page_outline.find_block_by_id(decision.target_block_id)
+        # IMPORTANT: Pass page_name for content hash matching
+        target_block = page_outline.find_block_by_id(decision.target_block_id, page_name=decision.target_page)
         if target_block is None:
             raise ValueError(f"Target block not found: {decision.target_block_id}")
 
@@ -378,7 +383,8 @@ async def write_integration_atomic(
         target_block_id=decision.target_block_id
     )
 
-    existing_block = page_outline.find_block_by_id(expected_block_id)
+    # Pass page_name for consistency (though expected_block_id is usually an explicit UUID)
+    existing_block = page_outline.find_block_by_id(expected_block_id, page_name=decision.target_page)
     if existing_block is not None:
         logger.info(
             "block_already_exists",
@@ -432,6 +438,9 @@ async def write_integration_atomic(
         journal_outline = LogseqOutline.parse(journal_path.read_text(), strict_indent_preservation=True)
 
     # Step 6: Add provenance to journal
+    # NOTE: Do NOT pass page_name here - journal blocks are indexed without page_name
+    # The decision.knowledge_block_id was generated using content hashes WITHOUT page_name
+    # find_block_by_id() will match both explicit id:: properties and content hashes
     journal_block = journal_outline.find_block_by_id(decision.knowledge_block_id)
     if journal_block is None:
         raise ValueError(
