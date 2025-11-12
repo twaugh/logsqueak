@@ -1,7 +1,7 @@
 """Unit tests for main TUI App class."""
 
 import pytest
-from unittest.mock import Mock
+from unittest.mock import Mock, AsyncMock
 from pathlib import Path
 import tempfile
 import shutil
@@ -45,6 +45,8 @@ def mock_services(mock_config):
     llm_client = Mock(spec=LLMClient)
     page_indexer = Mock(spec=PageIndexer)
     rag_search = Mock(spec=RAGSearch)
+    # Configure rag_search.find_candidates to return an empty dict (not an AsyncMock)
+    rag_search.find_candidates = AsyncMock(return_value={})
     file_monitor = Mock(spec=FileMonitor)
 
     return {

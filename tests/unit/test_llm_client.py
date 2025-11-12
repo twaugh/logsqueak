@@ -2,12 +2,39 @@
 
 import pytest
 import httpx
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, MagicMock, patch
 import json
 
 from logsqueak.services.llm_client import LLMClient
 from logsqueak.models.config import LLMConfig
 from logsqueak.models.llm_chunks import KnowledgeClassificationChunk
+
+
+def create_mock_response(lines, status_code=200, headers=None):
+    """Create a properly configured mock HTTP response.
+
+    Uses MagicMock instead of AsyncMock to avoid triggering AsyncMockMixin
+    warnings when accessing attributes like headers.
+    """
+    # Use a regular object with __aenter__ and __aexit__ instead of MagicMock
+    # to avoid any async mock issues
+    class MockResponse:
+        def __init__(self):
+            self.status_code = status_code
+            self.headers = headers or {}
+            self.raise_for_status = Mock()
+
+        async def aiter_lines(self):
+            for line in lines:
+                yield line
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            return None
+
+    return MockResponse()
 
 
 class TestLLMClient:
@@ -43,16 +70,7 @@ class TestLLMClient:
         ]
 
         # Mock httpx response
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = Mock()
-
-        async def mock_aiter_lines():
-            for line in mock_lines:
-                yield line
-
-        mock_response.aiter_lines = mock_aiter_lines
-        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_response.__aexit__ = AsyncMock(return_value=None)
+        mock_response = create_mock_response(mock_lines)
 
         # Mock httpx client
         mock_client = AsyncMock()
@@ -83,16 +101,7 @@ class TestLLMClient:
         ]
 
         # Mock httpx response
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = Mock()
-
-        async def mock_aiter_lines():
-            for line in mock_lines:
-                yield line
-
-        mock_response.aiter_lines = mock_aiter_lines
-        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_response.__aexit__ = AsyncMock(return_value=None)
+        mock_response = create_mock_response(mock_lines)
 
         # Mock httpx client
         mock_client = AsyncMock()
@@ -125,16 +134,9 @@ class TestLLMClient:
         ]
 
         # Mock httpx response
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = Mock()
 
-        async def mock_aiter_lines():
-            for line in mock_lines:
-                yield line
 
-        mock_response.aiter_lines = mock_aiter_lines
-        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_response.__aexit__ = AsyncMock(return_value=None)
+        mock_response = create_mock_response(mock_lines)
 
         # Mock httpx client
         mock_client = AsyncMock()
@@ -169,17 +171,7 @@ class TestLLMClient:
             if attempts[0] == 1:
                 raise httpx.ReadTimeout("Timeout")
             else:
-                mock_response = AsyncMock()
-                mock_response.raise_for_status = Mock()
-
-                async def mock_aiter_lines():
-                    for line in mock_lines:
-                        yield line
-
-                mock_response.aiter_lines = mock_aiter_lines
-                mock_response.__aenter__ = AsyncMock(return_value=mock_response)
-                mock_response.__aexit__ = AsyncMock(return_value=None)
-                return mock_response
+                return create_mock_response(mock_lines)
 
         mock_client = AsyncMock()
         mock_client.stream = mock_stream_factory
@@ -258,16 +250,9 @@ class TestLLMClient:
         ]
 
         # Mock httpx response
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = Mock()
 
-        async def mock_aiter_lines():
-            for line in mock_lines:
-                yield line
 
-        mock_response.aiter_lines = mock_aiter_lines
-        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_response.__aexit__ = AsyncMock(return_value=None)
+        mock_response = create_mock_response(mock_lines)
 
         # Mock httpx client
         mock_client = AsyncMock()
@@ -305,19 +290,11 @@ class TestLLMClient:
             'data: [DONE]',
         ]
 
-        # Mock httpx response
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = Mock()
-        mock_response.status_code = 200
-        mock_response.headers = {"content-type": "text/event-stream"}
-
-        async def mock_aiter_lines():
-            for line in mock_lines:
-                yield line
-
-        mock_response.aiter_lines = mock_aiter_lines
-        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_response.__aexit__ = AsyncMock(return_value=None)
+        # Mock httpx response with SSE headers
+        mock_response = create_mock_response(
+            mock_lines,
+            headers={"content-type": "text/event-stream"}
+        )
 
         # Mock httpx client
         mock_client = AsyncMock()

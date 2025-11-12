@@ -2,7 +2,7 @@
 
 import pytest
 import json
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, MagicMock, patch
 
 from logsqueak.services.llm_client import LLMClient
 from logsqueak.models.config import LLMConfig
@@ -14,10 +14,15 @@ from logsqueak.models.llm_chunks import (
 
 
 def create_mock_streaming_client(mock_lines):
-    """Helper to create properly mocked httpx.AsyncClient for streaming."""
-    # Mock httpx response
-    mock_response = AsyncMock()
+    """Helper to create properly mocked httpx.AsyncClient for streaming.
+
+    Uses MagicMock for response to avoid AsyncMockMixin warnings when
+    accessing attributes like headers.
+    """
+    # Mock httpx response - use MagicMock to avoid AsyncMock attribute access warnings
+    mock_response = MagicMock()
     mock_response.raise_for_status = Mock()
+    mock_response.headers = {}
 
     async def mock_aiter_lines():
         for line in mock_lines:
@@ -177,8 +182,9 @@ class TestLLMStreamingIntegration:
                 raise httpx.ReadTimeout("Connection timeout")
             else:
                 # Second attempt: success
-                mock_response = AsyncMock()
+                mock_response = MagicMock()
                 mock_response.raise_for_status = Mock()
+                mock_response.headers = {}
 
                 async def mock_aiter_lines():
                     for line in mock_lines:
