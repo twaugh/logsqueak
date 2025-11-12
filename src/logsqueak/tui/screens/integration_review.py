@@ -90,6 +90,10 @@ class Phase3Screen(Screen):
         height: 1fr;
     }
 
+    #decision-list {
+        height: 1fr;
+    }
+
     TargetPagePreview {
         height: 1fr;
     }
