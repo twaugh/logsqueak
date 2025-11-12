@@ -5,6 +5,7 @@ results, and allows users to select knowledge blocks for extraction.
 """
 
 from typing import Dict, Optional, Callable, Any
+import asyncio
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.containers import Container, Vertical, Horizontal
@@ -435,6 +436,12 @@ class Phase1Screen(Screen):
         else:
             logger.warning("No LLM client or mock function provided, skipping classification")
 
+        # Register worker for cancellation
+        if self._llm_worker:
+            from logsqueak.tui.app import LogsqueakApp
+            if isinstance(self.app, LogsqueakApp):
+                self.app.register_llm_worker("llm_classification", self._llm_worker)
+
     async def _llm_classification_worker_mock(self) -> None:
         """Mock LLM classification worker (for testing)."""
         # Create background task
@@ -494,54 +501,74 @@ class Phase1Screen(Screen):
         status_panel.update_status()
 
         try:
-            # Stream results from LLM (only returns knowledge blocks)
-            count = 0
-            async for chunk in classify_blocks(self.llm_client, self.journal_outline):
-                block_id = chunk.block_id
-                if block_id in self.block_states:
-                    state = self.block_states[block_id]
+            # Acquire LLM slot (blocks until request can proceed)
+            from logsqueak.tui.app import LLMRequestPriority
+            request_id = "llm_classification"
+            await self.app.acquire_llm_slot(request_id, LLMRequestPriority.CLASSIFICATION)
 
-                    # All chunks are knowledge blocks (LLM filters out activity blocks)
-                    state.llm_classification = "knowledge"
-                    state.llm_confidence = chunk.confidence
-                    state.reason = chunk.reason
+            try:
+                # Stream results from LLM (only returns knowledge blocks)
+                count = 0
+                async for chunk in classify_blocks(self.llm_client, self.journal_outline):
+                    block_id = chunk.block_id
+                    if block_id in self.block_states:
+                        state = self.block_states[block_id]
 
-                    # Update visual (shows robot emoji but block not selected yet)
-                    tree = self.query_one(BlockTree)
-                    tree.update_block_label(block_id)
+                        # All chunks are knowledge blocks (LLM filters out activity blocks)
+                        state.llm_classification = "knowledge"
+                        state.llm_confidence = chunk.confidence
+                        state.reason = chunk.reason
 
-                    # Update bottom panel if this is the currently selected block
-                    if block_id == self.current_block_id:
-                        self._update_current_block()
+                        # Update visual (shows robot emoji but block not selected yet)
+                        tree = self.query_one(BlockTree)
+                        tree.update_block_label(block_id)
 
-                    logger.info(
-                        "llm_classification_chunk",
-                        block_id=block_id,
-                        confidence=chunk.confidence,
-                        reason=chunk.reason[:100] if chunk.reason else None
-                    )
-                else:
-                    logger.warning(
-                        "llm_classification_unknown_block",
-                        block_id=block_id
-                    )
+                        # Update bottom panel if this is the currently selected block
+                        if block_id == self.current_block_id:
+                            self._update_current_block()
 
-                count += 1
+                        logger.info(
+                            "llm_classification_chunk",
+                            block_id=block_id,
+                            confidence=chunk.confidence,
+                            reason=chunk.reason[:100] if chunk.reason else None
+                        )
+                    else:
+                        logger.warning(
+                            "llm_classification_unknown_block",
+                            block_id=block_id
+                        )
 
-                # Update progress
-                self._background_tasks["llm_classification"].progress_current = count
+                    count += 1
+
+                    # Update progress
+                    self._background_tasks["llm_classification"].progress_current = count
+                    status_panel.update_status()
+
+                # Mark complete and remove from background tasks
+                del self._background_tasks["llm_classification"]
                 status_panel.update_status()
 
-            # Mark complete and remove from background tasks
-            del self._background_tasks["llm_classification"]
-            status_panel.update_status()
+                self._update_selected_count()
 
-            self._update_selected_count()
+                logger.info(
+                    "llm_classification_complete",
+                    total_knowledge_blocks=count
+                )
 
-            logger.info(
-                "llm_classification_complete",
-                total_knowledge_blocks=count
-            )
+            finally:
+                # Release LLM slot
+                self.app.release_llm_slot(request_id)
+
+        except asyncio.CancelledError:
+            # Worker was cancelled (e.g., during screen transition)
+            logger.info("llm_classification_cancelled")
+            # Clean up background task
+            if "llm_classification" in self._background_tasks:
+                del self._background_tasks["llm_classification"]
+                status_panel = self.query_one(StatusPanel)
+                status_panel.update_status()
+            raise  # Re-raise to properly cancel the task
 
         except Exception as e:
             # Mark failed

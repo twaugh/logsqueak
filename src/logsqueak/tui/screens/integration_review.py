@@ -790,82 +790,92 @@ Confidence: {decision.confidence:.0%}
             status_panel.update_status()
 
         try:
-            # Step 1: Stream raw decisions from LLM
-            logger.info("llm_decisions_starting", num_blocks=len(self.edited_content))
+            # Acquire LLM slot (blocks until request can proceed)
+            from logsqueak.tui.app import LLMRequestPriority
+            request_id = "llm_decisions_phase3"
+            await self.app.acquire_llm_slot(request_id, LLMRequestPriority.INTEGRATION)
 
-            raw_decision_stream = plan_integrations(
-                self.llm_client,
-                self.edited_content,
-                self.page_contents
-            )
+            try:
+                # Step 1: Stream raw decisions from LLM
+                logger.info("llm_decisions_starting", num_blocks=len(self.edited_content))
 
-            # Step 2: Convert IntegrationDecisionChunk to IntegrationDecision
-            # (add refined_text from edited_content)
-            converted_stream = self._convert_chunks_to_decisions(raw_decision_stream)
+                raw_decision_stream = plan_integrations(
+                    self.llm_client,
+                    self.edited_content,
+                    self.page_contents
+                )
 
-            # Step 3: Filter out skip_exists blocks and track count
-            filtered_stream = filter_skip_exists_blocks(converted_stream)
+                # Step 2: Convert IntegrationDecisionChunk to IntegrationDecision
+                # (add refined_text from edited_content)
+                converted_stream = self._convert_chunks_to_decisions(raw_decision_stream)
 
-            # Step 4: Batch decisions by block
-            batched_stream = batch_decisions_by_block(filtered_stream)
+                # Step 3: Filter out skip_exists blocks and track count
+                filtered_stream = filter_skip_exists_blocks(converted_stream)
 
-            # Step 4: Process filtered batches
-            block_count = 0
-            async for decision_batch in batched_stream:
-                if not decision_batch:
-                    continue
+                # Step 4: Batch decisions by block
+                batched_stream = batch_decisions_by_block(filtered_stream)
 
-                # All decisions in batch have same block_id
-                block_id = decision_batch[0].knowledge_block_id
+                # Step 4: Process filtered batches
+                block_count = 0
+                async for decision_batch in batched_stream:
+                    if not decision_batch:
+                        continue
 
-                # Add decisions to our lists
-                self.decisions.extend(decision_batch)
-                self.decisions_by_block[block_id] = decision_batch
+                    # All decisions in batch have same block_id
+                    block_id = decision_batch[0].knowledge_block_id
 
-                # Mark block as ready for navigation
-                self.decisions_ready[block_id] = True
+                    # Add decisions to our lists
+                    self.decisions.extend(decision_batch)
+                    self.decisions_by_block[block_id] = decision_batch
 
-                # Update display if this is the current block
-                current_block_id = self.journal_blocks[self.current_block_index].block_id
-                if block_id == current_block_id:
-                    self.call_later(self._display_current_block)
+                    # Mark block as ready for navigation
+                    self.decisions_ready[block_id] = True
 
-                block_count += 1
+                    # Update display if this is the current block
+                    current_block_id = self.journal_blocks[self.current_block_index].block_id
+                    if block_id == current_block_id:
+                        self.call_later(self._display_current_block)
 
-                # Update progress
+                    block_count += 1
+
+                    # Update progress
+                    from logsqueak.tui.app import LogsqueakApp
+                    if isinstance(self.app, LogsqueakApp):
+                        self.app.background_tasks["llm_decisions"].progress_current = block_count
+                        status_panel = self.query_one(StatusPanel)
+                        status_panel.update_status()
+
+                    logger.info(
+                        "llm_decisions_batch_complete",
+                        block_id=block_id,
+                        num_decisions=len(decision_batch)
+                    )
+
+                # Get skipped count from filter
+                self.skipped_block_count = filtered_stream.skipped_count
+
+                # Mark complete and remove from background tasks
+                self.llm_decisions_state = BackgroundTaskState.COMPLETED
                 from logsqueak.tui.app import LogsqueakApp
+                from logsqueak.models.background_task import IntegrationWorkerState
                 if isinstance(self.app, LogsqueakApp):
-                    self.app.background_tasks["llm_decisions"].progress_current = block_count
+                    del self.app.background_tasks["llm_decisions"]
+                    self.app.integration_worker_state = IntegrationWorkerState.COMPLETED
                     status_panel = self.query_one(StatusPanel)
                     status_panel.update_status()
 
+                # Update block counter to show skipped count
+                self._update_block_counter_with_skip_count()
+
                 logger.info(
-                    "llm_decisions_batch_complete",
-                    block_id=block_id,
-                    num_decisions=len(decision_batch)
+                    "llm_decisions_complete",
+                    total_blocks=block_count,
+                    skipped_blocks=self.skipped_block_count
                 )
 
-            # Get skipped count from filter
-            self.skipped_block_count = filtered_stream.skipped_count
-
-            # Mark complete and remove from background tasks
-            self.llm_decisions_state = BackgroundTaskState.COMPLETED
-            from logsqueak.tui.app import LogsqueakApp
-            from logsqueak.models.background_task import IntegrationWorkerState
-            if isinstance(self.app, LogsqueakApp):
-                del self.app.background_tasks["llm_decisions"]
-                self.app.integration_worker_state = IntegrationWorkerState.COMPLETED
-                status_panel = self.query_one(StatusPanel)
-                status_panel.update_status()
-
-            # Update block counter to show skipped count
-            self._update_block_counter_with_skip_count()
-
-            logger.info(
-                "llm_decisions_complete",
-                total_blocks=block_count,
-                skipped_blocks=self.skipped_block_count
-            )
+            finally:
+                # Release LLM slot
+                self.app.release_llm_slot(request_id)
 
         except Exception as e:
             # Mark failed

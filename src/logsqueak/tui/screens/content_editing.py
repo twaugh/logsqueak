@@ -5,6 +5,7 @@ Users can see LLM-suggested rewordings, manually edit content, and review RAG se
 """
 
 from typing import Optional, Dict
+import asyncio
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.containers import Container, Horizontal, Vertical
@@ -226,8 +227,13 @@ class Phase2Screen(Screen):
         """Start background workers for LLM rewording and RAG search."""
         if self.llm_client:
             # Start LLM rewording worker
-            self.run_worker(self._llm_rewording_worker(), name="llm_rewording")
+            llm_worker = self.run_worker(self._llm_rewording_worker(), name="llm_rewording")
             logger.info("llm_rewording_worker_started")
+
+            # Register worker for cancellation
+            from logsqueak.tui.app import LogsqueakApp
+            if isinstance(self.app, LogsqueakApp):
+                self.app.register_llm_worker("llm_rewording", llm_worker)
 
         if self.rag_search:
             # Start RAG search worker (will be implemented in T097a)
@@ -498,58 +504,78 @@ class Phase2Screen(Screen):
         status_panel.update_status()
 
         try:
-            # Stream reworded content from LLM
-            count = 0
-            async for chunk in reword_content(
-                self.llm_client,
-                self.edited_content,
-                self.journal_outline
-            ):
-                block_id = chunk.block_id
-                if block_id in self.edited_content_map:
-                    ec = self.edited_content_map[block_id]
+            # Acquire LLM slot (blocks until request can proceed)
+            from logsqueak.tui.app import LLMRequestPriority
+            request_id = "llm_rewording"
+            await self.app.acquire_llm_slot(request_id, LLMRequestPriority.REWORDING)
 
-                    # Update reworded content
-                    ec.reworded_content = chunk.reworded_content
-                    ec.rewording_complete = True
+            try:
+                # Stream reworded content from LLM
+                count = 0
+                async for chunk in reword_content(
+                    self.llm_client,
+                    self.edited_content,
+                    self.journal_outline
+                ):
+                    block_id = chunk.block_id
+                    if block_id in self.edited_content_map:
+                        ec = self.edited_content_map[block_id]
 
-                    # Update display if this is the current block
-                    current_ec = self.edited_content[self.current_block_index]
-                    if block_id == current_ec.block_id:
-                        # Update LLM panel
-                        llm_reworded = self.query_one("#llm-reworded", TargetPagePreview)
-                        content_as_block = f"- {chunk.reworded_content}"
-                        await llm_reworded.load_preview(content_as_block)
+                        # Update reworded content
+                        ec.reworded_content = chunk.reworded_content
+                        ec.rewording_complete = True
 
-                    logger.info(
-                        "llm_rewording_chunk",
-                        block_id=block_id,
-                        reworded_length=len(chunk.reworded_content)
-                    )
-                else:
-                    logger.warning(
-                        "llm_rewording_unknown_block",
-                        block_id=block_id
-                    )
+                        # Update display if this is the current block
+                        current_ec = self.edited_content[self.current_block_index]
+                        if block_id == current_ec.block_id:
+                            # Update LLM panel
+                            llm_reworded = self.query_one("#llm-reworded", TargetPagePreview)
+                            content_as_block = f"- {chunk.reworded_content}"
+                            await llm_reworded.load_preview(content_as_block)
 
-                count += 1
+                        logger.info(
+                            "llm_rewording_chunk",
+                            block_id=block_id,
+                            reworded_length=len(chunk.reworded_content)
+                        )
+                    else:
+                        logger.warning(
+                            "llm_rewording_unknown_block",
+                            block_id=block_id
+                        )
 
-                # Update progress
-                self._background_tasks["llm_rewording"].progress_current = count
+                    count += 1
+
+                    # Update progress
+                    self._background_tasks["llm_rewording"].progress_current = count
+                    status_panel.update_status()
+
+                # Mark complete and remove from background tasks
+                del self._background_tasks["llm_rewording"]
                 status_panel.update_status()
 
-            # Mark complete and remove from background tasks
-            del self._background_tasks["llm_rewording"]
-            status_panel.update_status()
+                logger.info(
+                    "llm_rewording_complete",
+                    total_blocks=count
+                )
 
-            logger.info(
-                "llm_rewording_complete",
-                total_blocks=count
-            )
+                # NOTE: LLM decisions worker is NOT started here.
+                # It will start after RAG search completes (in _rag_search_worker),
+                # because it requires page_contents to be populated first.
 
-            # NOTE: LLM decisions worker is NOT started here.
-            # It will start after RAG search completes (in _rag_search_worker),
-            # because it requires page_contents to be populated first.
+            finally:
+                # Release LLM slot
+                self.app.release_llm_slot(request_id)
+
+        except asyncio.CancelledError:
+            # Worker was cancelled (e.g., during screen transition)
+            logger.info("llm_rewording_cancelled")
+            # Clean up background task
+            if "llm_rewording" in self._background_tasks:
+                del self._background_tasks["llm_rewording"]
+                status_panel = self.query_one(StatusPanel)
+                status_panel.update_status()
+            raise  # Re-raise to properly cancel the task
 
         except Exception as e:
             # Mark failed
@@ -588,104 +614,114 @@ class Phase2Screen(Screen):
             status_panel.update_status()
 
         try:
-            # Stream raw decisions from LLM
-            logger.info("llm_decisions_starting_phase2", num_blocks=len(self.edited_content))
+            # Acquire LLM slot (blocks until request can proceed)
+            from logsqueak.tui.app import LLMRequestPriority
+            request_id = "llm_decisions"
+            await self.app.acquire_llm_slot(request_id, LLMRequestPriority.INTEGRATION)
 
-            raw_decision_stream = plan_integrations(
-                self.llm_client,
-                self.edited_content,
-                self.page_contents
-            )
+            try:
+                # Stream raw decisions from LLM
+                logger.info("llm_decisions_starting_phase2", num_blocks=len(self.edited_content))
 
-            # Convert chunks to full decisions (add refined_text)
-            async def convert_chunks():
-                async for chunk in raw_decision_stream:
-                    edited_content = self.edited_content_map.get(chunk.knowledge_block_id)
-                    if not edited_content:
-                        logger.warning(
-                            "chunk_missing_edited_content_phase2",
-                            block_id=chunk.knowledge_block_id
-                        )
-                        continue
-
-                    decision = IntegrationDecision(
-                        knowledge_block_id=chunk.knowledge_block_id,
-                        target_page=chunk.target_page,
-                        action=chunk.action,
-                        target_block_id=chunk.target_block_id,
-                        target_block_title=chunk.target_block_title,
-                        confidence=chunk.confidence,
-                        refined_text=edited_content.current_content,
-                        reasoning=chunk.reasoning,
-                        write_status="pending",
-                    )
-                    yield decision
-
-            converted_stream = convert_chunks()
-
-            # Filter out skip_exists blocks
-            filtered_stream = filter_skip_exists_blocks(converted_stream)
-
-            # Batch decisions by block
-            batched_stream = batch_decisions_by_block(filtered_stream)
-
-            # Collect all decisions
-            block_count = 0
-            async for decision_batch in batched_stream:
-                if not decision_batch:
-                    continue
-
-                # Store decisions in app's shared list for Phase 3
-                from logsqueak.tui.app import LogsqueakApp
-                if isinstance(self.app, LogsqueakApp):
-                    before_count = len(self.app.integration_decisions)
-                    self.app.integration_decisions.extend(decision_batch)
-                    after_count = len(self.app.integration_decisions)
-                    logger.info(
-                        "decisions_added_to_shared_list",
-                        before=before_count,
-                        after=after_count,
-                        batch_size=len(decision_batch)
-                    )
-
-                block_count += 1
-
-                # Update progress
-                from logsqueak.tui.app import LogsqueakApp
-                if isinstance(self.app, LogsqueakApp):
-                    self.app.background_tasks["llm_decisions"].progress_current = block_count
-                    status_panel = self.query_one(StatusPanel)
-                    status_panel.update_status()
-
-                logger.info(
-                    "llm_decisions_batch_complete_phase2",
-                    block_id=decision_batch[0].knowledge_block_id,
-                    num_decisions=len(decision_batch)
+                raw_decision_stream = plan_integrations(
+                    self.llm_client,
+                    self.edited_content,
+                    self.page_contents
                 )
 
-            # Mark complete and remove from background tasks
-            from logsqueak.tui.app import LogsqueakApp
-            from logsqueak.models.background_task import IntegrationWorkerState
-            if isinstance(self.app, LogsqueakApp):
-                logger.info("phase2_removing_llm_decisions_task")
-                del self.app.background_tasks["llm_decisions"]
-                self.app.integration_worker_state = IntegrationWorkerState.COMPLETED
-                logger.info("phase2_task_removed", remaining_tasks=list(self.app.background_tasks.keys()))
-                status_panel = self.query_one(StatusPanel)
-                status_panel.update_status()
-                logger.info("phase2_status_panel_updated")
+                # Convert chunks to full decisions (add refined_text)
+                async def convert_chunks():
+                    async for chunk in raw_decision_stream:
+                        edited_content = self.edited_content_map.get(chunk.knowledge_block_id)
+                        if not edited_content:
+                            logger.warning(
+                                "chunk_missing_edited_content_phase2",
+                                block_id=chunk.knowledge_block_id
+                            )
+                            continue
 
-            # Get total count from app's shared list
-            total_decisions = 0
-            from logsqueak.tui.app import LogsqueakApp
-            if isinstance(self.app, LogsqueakApp):
-                total_decisions = len(self.app.integration_decisions)
+                        decision = IntegrationDecision(
+                            knowledge_block_id=chunk.knowledge_block_id,
+                            target_page=chunk.target_page,
+                            action=chunk.action,
+                            target_block_id=chunk.target_block_id,
+                            target_block_title=chunk.target_block_title,
+                            confidence=chunk.confidence,
+                            refined_text=edited_content.current_content,
+                            reasoning=chunk.reasoning,
+                            write_status="pending",
+                        )
+                        yield decision
 
-            logger.info(
-                "llm_decisions_complete_phase2",
-                total_blocks=block_count,
-                total_decisions=total_decisions
-            )
+                converted_stream = convert_chunks()
+
+                # Filter out skip_exists blocks
+                filtered_stream = filter_skip_exists_blocks(converted_stream)
+
+                # Batch decisions by block
+                batched_stream = batch_decisions_by_block(filtered_stream)
+
+                # Collect all decisions
+                block_count = 0
+                async for decision_batch in batched_stream:
+                    if not decision_batch:
+                        continue
+
+                    # Store decisions in app's shared list for Phase 3
+                    from logsqueak.tui.app import LogsqueakApp
+                    if isinstance(self.app, LogsqueakApp):
+                        before_count = len(self.app.integration_decisions)
+                        self.app.integration_decisions.extend(decision_batch)
+                        after_count = len(self.app.integration_decisions)
+                        logger.info(
+                            "decisions_added_to_shared_list",
+                            before=before_count,
+                            after=after_count,
+                            batch_size=len(decision_batch)
+                        )
+
+                    block_count += 1
+
+                    # Update progress
+                    from logsqueak.tui.app import LogsqueakApp
+                    if isinstance(self.app, LogsqueakApp):
+                        self.app.background_tasks["llm_decisions"].progress_current = block_count
+                        status_panel = self.query_one(StatusPanel)
+                        status_panel.update_status()
+
+                    logger.info(
+                        "llm_decisions_batch_complete_phase2",
+                        block_id=decision_batch[0].knowledge_block_id,
+                        num_decisions=len(decision_batch)
+                    )
+
+                # Mark complete and remove from background tasks
+                from logsqueak.tui.app import LogsqueakApp
+                from logsqueak.models.background_task import IntegrationWorkerState
+                if isinstance(self.app, LogsqueakApp):
+                    logger.info("phase2_removing_llm_decisions_task")
+                    del self.app.background_tasks["llm_decisions"]
+                    self.app.integration_worker_state = IntegrationWorkerState.COMPLETED
+                    logger.info("phase2_task_removed", remaining_tasks=list(self.app.background_tasks.keys()))
+                    status_panel = self.query_one(StatusPanel)
+                    status_panel.update_status()
+                    logger.info("phase2_status_panel_updated")
+
+                # Get total count from app's shared list
+                total_decisions = 0
+                from logsqueak.tui.app import LogsqueakApp
+                if isinstance(self.app, LogsqueakApp):
+                    total_decisions = len(self.app.integration_decisions)
+
+                logger.info(
+                    "llm_decisions_complete_phase2",
+                    total_blocks=block_count,
+                    total_decisions=total_decisions
+                )
+
+            finally:
+                # Release LLM slot
+                self.app.release_llm_slot(request_id)
 
         except Exception as e:
             # Mark failed

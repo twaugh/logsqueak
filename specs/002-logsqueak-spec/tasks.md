@@ -639,7 +639,7 @@ User should manually test:
 
 ### LLM Request Serialization
 
-- [ ] T108r Implement LLM request queue to ensure only one prompt/response in progress at a time
+- [X] T108r Implement LLM request queue to ensure only one prompt/response in progress at a time
   - Use app-level request queue with priority: classification > rewording > integration decisions
   - Rationale: Reasoning models have high latency; concurrent requests can cause:
     - Poor user experience (multiple slow responses competing)
@@ -654,7 +654,7 @@ User should manually test:
   - Update background workers to handle queuing gracefully (wait, don't fail)
   - Add queue status to StatusPanel (e.g., "Waiting for LLM..." when queued)
 
-- [ ] T108s Write tests for LLM request serialization in tests/unit/test_llm_client.py
+- [X] T108s Write tests for LLM request serialization in tests/unit/test_llm_request_queue.py
   - Test: Concurrent calls to stream_ndjson() execute sequentially
   - Test: Second request waits for first to complete
   - Test: Errors in first request don't block second request

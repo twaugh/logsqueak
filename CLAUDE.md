@@ -631,6 +631,16 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
 
 ## Recent Changes
 
+- 2025-11-12: **LLM Request Queue** - Implemented request serialization with priority and cancellation (T108r, T108s)
+  - Added priority queue to serialize LLM requests (prevents concurrent prompts)
+  - Priority order: Classification (1) > Rewording (2) > Integration (3)
+  - Workers use `acquire_llm_slot()` / `release_llm_slot()` for coordination
+  - Cancellation support: workers cancelled during screen transitions
+    - Phase 1→2: Cancel classification worker
+    - Phase 2→3: Cancel rewording worker
+  - Graceful handling of `asyncio.CancelledError` in all workers
+  - Test suite with 5 tests for sequential execution, priority ordering, error handling
+  - Rationale: Prevents resource contention with high-latency reasoning models
 - 2025-11-11: **Parser Refactoring** - Added strict_indent_preservation parameter
   - Parser now defaults to normalized indentation (no outdent markers)
   - Added strict_indent_preservation parameter for write operations only

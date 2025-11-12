@@ -41,12 +41,16 @@ Phase 3:
 See tests/integration/test_worker_dependencies.py for dependency ordering tests.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from pathlib import Path
+import asyncio
+from dataclasses import dataclass
+from enum import IntEnum
 
 from textual.app import App
 from textual.binding import Binding
 from textual.widgets import Footer, Header
+from textual.worker import Worker
 import structlog
 
 from logseq_outline.parser import LogseqOutline, LogseqBlock
@@ -62,6 +66,21 @@ from logsqueak.services.llm_wrappers import _augment_outline_with_ids
 from logsqueak.tui.screens import Phase1Screen, Phase2Screen, Phase3Screen
 
 logger = structlog.get_logger()
+
+
+class LLMRequestPriority(IntEnum):
+    """Priority levels for LLM requests (lower number = higher priority)."""
+    CLASSIFICATION = 1  # Phase 1: Block classification
+    REWORDING = 2  # Phase 2: Content rewording
+    INTEGRATION = 3  # Phase 3: Integration decisions
+
+
+@dataclass
+class LLMRequest:
+    """Represents a queued LLM request."""
+    priority: LLMRequestPriority
+    request_id: str
+    ready_event: asyncio.Event  # Set when request can proceed
 
 
 class LogsqueakApp(App):
@@ -132,6 +151,17 @@ class LogsqueakApp(App):
         # Integration decision worker state (prevents duplicate workers)
         self.integration_worker_state: IntegrationWorkerState = IntegrationWorkerState.NOT_STARTED
 
+        # LLM request queue (serializes concurrent LLM requests)
+        # Requests are processed sequentially with priority order:
+        # 1. Classification (Phase 1) - highest priority
+        # 2. Rewording (Phase 2) - medium priority
+        # 3. Integration (Phase 3) - lowest priority
+        # Within same priority, FIFO order is maintained.
+        self.llm_request_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
+        self._llm_queue_consumer_started = False
+        self._current_llm_request: Optional[str] = None  # Current request ID being processed
+        self._active_llm_workers: Dict[str, Worker] = {}  # Track active Textual Worker instances for cancellation
+
         logger.info(
             "app_initialized",
             journal_date=journal_date,
@@ -141,6 +171,9 @@ class LogsqueakApp(App):
     def on_mount(self) -> None:
         """Called when app is mounted. Start with Phase 1."""
         logger.info("app_on_mount_started")
+
+        # Start LLM request queue consumer worker
+        self._start_llm_queue_consumer()
 
         # Create and push Phase 1 screen FIRST (so it shows immediately)
         logger.info("creating_phase1_screen")
@@ -169,6 +202,182 @@ class LogsqueakApp(App):
         # The task exists now, so workers can poll it
         self.set_timer(0.1, self._start_model_preload)
         logger.info("app_on_mount_finished")
+
+    def _start_llm_queue_consumer(self) -> None:
+        """Start the LLM request queue consumer worker."""
+        if not self._llm_queue_consumer_started:
+            self._llm_queue_consumer_started = True
+            self.run_worker(self._consume_llm_queue(), name="llm_queue_consumer", exclusive=True)
+            logger.info("llm_queue_consumer_started")
+
+    async def _consume_llm_queue(self) -> None:
+        """Consumer worker that processes LLM requests sequentially.
+
+        This worker runs for the lifetime of the app and processes requests from
+        the priority queue. Only one LLM request executes at a time.
+
+        Requests are processed in priority order:
+        1. Classification (Phase 1)
+        2. Rewording (Phase 2)
+        3. Integration (Phase 3)
+
+        Within the same priority level, FIFO order is maintained.
+        """
+        logger.info("llm_queue_consumer_running")
+
+        try:
+            while True:
+                # Get next request from queue (blocks if queue is empty)
+                priority, request_id, ready_event = await self.llm_request_queue.get()
+
+                logger.info(
+                    "llm_queue_processing_request",
+                    request_id=request_id,
+                    priority=priority,
+                )
+
+                # Track current request
+                self._current_llm_request = request_id
+
+                # Signal that this request can proceed
+                ready_event.set()
+
+                # Wait for the request to clear (worker will call release_llm_slot)
+                # We poll instead of using another event to keep the implementation simple
+                while self._current_llm_request == request_id:
+                    await asyncio.sleep(0.1)
+
+                logger.info(
+                    "llm_queue_request_completed",
+                    request_id=request_id,
+                )
+
+        except asyncio.CancelledError:
+            logger.info("llm_queue_consumer_cancelled")
+            raise
+        except Exception as e:
+            logger.error("llm_queue_consumer_error", error=str(e))
+            raise
+
+    async def acquire_llm_slot(
+        self,
+        request_id: str,
+        priority: LLMRequestPriority,
+    ) -> None:
+        """Acquire a slot in the LLM request queue.
+
+        This method blocks until the request can proceed. Workers should call
+        this before making LLM API calls, and call release_llm_slot() when done.
+
+        Args:
+            request_id: Unique identifier for this request (for logging)
+            priority: Priority level for this request
+
+        Example:
+            await app.acquire_llm_slot("classification_worker", LLMRequestPriority.CLASSIFICATION)
+            try:
+                async for chunk in llm_client.stream_ndjson(...):
+                    # Process chunks
+            finally:
+                app.release_llm_slot("classification_worker")
+        """
+        ready_event = asyncio.Event()
+        request = LLMRequest(
+            priority=priority,
+            request_id=request_id,
+            ready_event=ready_event,
+        )
+
+        logger.info(
+            "llm_queue_request_submitted",
+            request_id=request_id,
+            priority=priority.name,
+        )
+
+        # Submit to queue (priority queue uses tuple: (priority, secondary_key, payload))
+        # We use request_id as secondary key to maintain FIFO within same priority
+        await self.llm_request_queue.put((priority, request_id, ready_event))
+
+        # Wait for our turn
+        logger.debug(
+            "llm_queue_request_waiting",
+            request_id=request_id,
+        )
+        await ready_event.wait()
+
+        logger.info(
+            "llm_queue_request_ready",
+            request_id=request_id,
+        )
+
+    def release_llm_slot(self, request_id: str) -> None:
+        """Release the LLM request slot.
+
+        Workers must call this when their LLM request is complete (or failed).
+
+        Args:
+            request_id: Same identifier used in acquire_llm_slot()
+        """
+        if self._current_llm_request == request_id:
+            logger.info(
+                "llm_queue_slot_released",
+                request_id=request_id,
+            )
+            self._current_llm_request = None
+        else:
+            logger.warning(
+                "llm_queue_slot_release_mismatch",
+                request_id=request_id,
+                current_request=self._current_llm_request,
+            )
+
+    def register_llm_worker(self, worker_name: str, worker: Worker) -> None:
+        """Register an LLM worker for potential cancellation.
+
+        Args:
+            worker_name: Name of the worker (e.g., "llm_classification", "llm_rewording")
+            worker: The Textual Worker instance running the worker coroutine
+        """
+        self._active_llm_workers[worker_name] = worker
+        logger.debug(
+            "llm_worker_registered",
+            worker_name=worker_name,
+            worker_state=worker.state.name if hasattr(worker, 'state') else None
+        )
+
+    def cancel_llm_worker(self, worker_name: str) -> None:
+        """Cancel an active LLM worker.
+
+        This is called during screen transitions to stop workers that are no longer needed.
+
+        Args:
+            worker_name: Name of the worker to cancel (e.g., "llm_classification")
+        """
+        worker = self._active_llm_workers.get(worker_name)
+        if worker:
+            # Check if worker is still running (Textual Worker has is_running property)
+            if hasattr(worker, 'is_running') and worker.is_running:
+                logger.info(
+                    "llm_worker_cancelling",
+                    worker_name=worker_name
+                )
+                worker.cancel()
+            # Remove from active workers
+            del self._active_llm_workers[worker_name]
+        else:
+            logger.debug(
+                "llm_worker_cancel_skipped",
+                worker_name=worker_name,
+                reason="not found"
+            )
+
+    def cancel_all_llm_workers(self) -> None:
+        """Cancel all active LLM workers.
+
+        This is useful for cleanup or during app shutdown.
+        """
+        for worker_name in list(self._active_llm_workers.keys()):
+            self.cancel_llm_worker(worker_name)
 
     def _start_model_preload(self) -> None:
         """Start the model preload worker (called after screen is visible)."""
@@ -240,6 +449,9 @@ class LogsqueakApp(App):
             "transitioning_to_phase2",
             num_selected=len(selected_blocks),
         )
+
+        # Cancel Phase 1 workers (classification)
+        self.cancel_llm_worker("llm_classification")
 
         # Store selected blocks
         self.selected_blocks = selected_blocks
@@ -320,6 +532,11 @@ class LogsqueakApp(App):
             num_blocks=len(edited_content),
             num_candidates=len(candidate_pages),
         )
+
+        # Cancel Phase 2 workers (rewording)
+        self.cancel_llm_worker("llm_rewording")
+        # Note: llm_decisions worker may still be running and that's okay
+        # It populates the shared decisions list that Phase 3 uses
 
         # Store Phase 2 outputs
         self.edited_content = edited_content
