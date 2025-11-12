@@ -40,6 +40,10 @@ def _augment_outline_with_ids(outline: LogseqOutline) -> LogseqOutline:
     # Deep copy to avoid modifying the original
     augmented = copy.deepcopy(outline)
 
+    # Get frontmatter and indent_str to match generate_chunks() behavior
+    frontmatter = augmented.frontmatter if augmented.frontmatter else None
+    indent_str = augmented.indent_str
+
     def augment_block(block: LogseqBlock, parents: list[LogseqBlock]) -> LogseqBlock:
         """Recursively augment a block and its children with IDs."""
         # If block already has an explicit ID, keep it
@@ -47,18 +51,22 @@ def _augment_outline_with_ids(outline: LogseqOutline) -> LogseqOutline:
             block_id = block.block_id
         else:
             # Generate content hash as temporary ID
-            # Use generate_full_context to get hierarchical context, then hash it
-            full_context = generate_full_context(block, parents)
+            # IMPORTANT: Must match generate_chunks() behavior exactly:
+            # - Include frontmatter (for journals with properties)
+            # - Include indent_str (for correct formatting)
+            # - Do NOT include page_name (journals don't use page_name in hashes)
+            full_context = generate_full_context(block, parents, indent_str, frontmatter)
             block_id = generate_content_hash(full_context)
 
-        # Ensure block has id:: property
-        if block.get_property("id") is None:
-            block.set_property("id", block_id)
-
-        # Recursively augment children
+        # CRITICAL: Recursively augment children BEFORE adding id:: property to this block
+        # This ensures child hashes don't include parent's augmented id:: property
         new_parents = parents + [block]
         for child in block.children:
             augment_block(child, new_parents)
+
+        # NOW set the id:: property (after children are processed)
+        if block.get_property("id") is None:
+            block.set_property("id", block_id)
 
         return block
 
