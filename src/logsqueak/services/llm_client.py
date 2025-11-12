@@ -108,7 +108,7 @@ class LLMClient:
             return self._is_ollama
 
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(5.0), verify=False) as client:
                 # Probe Ollama-specific version endpoint
                 base_url = str(self.config.endpoint).rstrip("/")
                 # Remove /v1 suffix if present (OpenAI-compatible path)
@@ -239,7 +239,7 @@ class LLMClient:
 
         while attempt <= max_retries:
             try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                async with httpx.AsyncClient(timeout=self.timeout, verify=False) as client:
                     headers = {"Authorization": f"Bearer {self.config.api_key}"}
 
                     # Choose endpoint based on provider
