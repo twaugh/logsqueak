@@ -528,12 +528,116 @@ User should manually test:
 7. Verify target pages have new blocks with id:: properties
 
 **Success Criteria**:
-- [ ] All tasks T058a-T108g complete (including worker dependency fixes)
+- [x] All tasks T058a-T108g complete (including worker dependency fixes)
 - [ ] All unit tests pass (pytest tests/unit/ -v)
 - [ ] All integration tests pass (pytest tests/integration/ -v)
 - [ ] Manual end-to-end test completes without errors
 - [ ] Files written have correct structure and provenance
-- [ ] Worker dependencies execute in correct order (SentenceTransformer → PageIndexer → RAG → Decisions)
+- [x] Worker dependencies execute in correct order (SentenceTransformer → PageIndexer → RAG → Decisions)
+
+---
+
+## Phase 6.5: Integration Decisions Prompt Refinement
+
+**Purpose**: Improve LLM integration decisions by using hierarchical chunks instead of full pages and sending per-block prompts
+
+**Context**: During testing, we discovered:
+1. Full page contents are too large for the LLM context window
+2. Batching all knowledge blocks in one prompt reduces decision quality
+3. RAG already provides hierarchical chunks - we should use those instead
+
+**Required Changes**:
+
+### LLM Prompt Format Updates
+
+- [ ] T108h Add `format=json` parameter to all LLMClient.stream_ndjson() calls
+  - Update classify_blocks() wrapper in src/logsqueak/services/llm_wrappers.py
+  - Update reword_content() wrapper in src/logsqueak/services/llm_wrappers.py
+  - Update plan_integrations() wrapper in src/logsqueak/services/llm_wrappers.py
+  - Verify LLMClient._prepare_request() passes format parameter to API
+
+### Integration Decisions Data Model
+
+- [ ] T108i Update IntegrationDecision model to include source_knowledge_block_id field
+  - Add source_knowledge_block_id: str field to IntegrationDecision in src/logsqueak/models/integration_decision.py
+  - This tracks which knowledge block each decision belongs to (for batching in UI)
+  - Update all tests that construct IntegrationDecision objects
+
+### RAG Chunk Format for LLM
+
+- [ ] T108j Create format_chunks_for_llm() helper function in src/logsqueak/services/llm_helpers.py
+  - Input: List of RAG search results (each with page_path, block, parents, score)
+  - Output: XML string in format:
+    ```xml
+    <pages>
+    <page name="foo/bar">
+    <properties>
+    area:: [[Ideas]]
+    type:: Best Practice
+    </properties>
+    <block id="block-hash-or-id">
+    - full hierarchical context
+      - goes here
+        - and this is the deepest block (id stripped from content)
+    </block>
+    ...
+    </page>
+    </pages>
+    ```
+  - Strip `id::` properties from block content (keep in XML id attribute only)
+  - Use generate_full_context() to build hierarchical block content
+  - Group chunks by page_path
+
+- [ ] T108k Write unit tests for format_chunks_for_llm() in tests/unit/test_llm_helpers.py
+  - Test: Groups chunks by page correctly
+  - Test: Strips id:: properties from block content
+  - Test: Includes page properties if present
+  - Test: Uses block hash/id in XML id attribute
+
+### Per-Block Integration Planning
+
+- [ ] T108l Refactor plan_integrations() to plan_integration_for_block() (singular)
+  - New signature: `plan_integration_for_block(llm_client, knowledge_block, rag_chunks, config)`
+  - Input: Single EditedContent object + its RAG search results
+  - Format RAG chunks using format_chunks_for_llm()
+  - Generate prompt for ONE knowledge block only
+  - Stream IntegrationDecision objects with source_knowledge_block_id set
+  - Old plan_integrations() becomes wrapper that calls this per block
+
+- [ ] T108m Update plan_integrations() wrapper to iterate over blocks
+  - For each EditedContent in edited_blocks:
+    - Get RAG results for that block from candidate_pages dict
+    - Call plan_integration_for_block()
+    - Yield decisions with source_knowledge_block_id
+  - This maintains same async generator interface for Phase 3 worker
+
+- [ ] T108n Update Phase 3 worker to pass per-block RAG results
+  - Currently passes all candidate_pages - keep this
+  - Worker should group candidate_pages by knowledge_block_id before calling plan_integrations()
+  - Ensure decision batching still works (batch_decisions_by_block already uses source field)
+
+- [ ] T108q Review and update batch_decisions_by_block() for new per-block streaming
+  - Current implementation assumes decisions arrive in arbitrary order and batches by consecutive source_knowledge_block_id
+  - With new approach, decisions for each block arrive sequentially (one LLM call per block)
+  - Consider: Is batching logic still needed, or can we simplify?
+  - Option A: Keep current batching (works regardless of order, more robust)
+  - Option B: Simplify to assume consecutive ordering (since we now control call order)
+  - Decision: Document chosen approach and update implementation if needed
+  - Update tests in tests/unit/test_llm_helpers.py to match new behavior
+
+### Testing
+
+- [ ] T108o Update unit tests for plan_integration_for_block() in tests/unit/test_llm_wrappers.py
+  - Test: Single block produces decisions with correct source_knowledge_block_id
+  - Test: RAG chunks formatted correctly (hierarchical, id stripped)
+  - Test: Empty RAG results produce no decisions (or appropriate message)
+
+- [ ] T108p Update integration tests for full workflow in tests/integration/test_workflow.py
+  - Verify: Multiple blocks each get their own LLM call
+  - Verify: Decisions correctly batched by source_knowledge_block_id
+  - Verify: RAG chunks don't exceed reasonable size (< 4000 tokens per block)
+
+**Checkpoint 6.5**: Integration decisions use hierarchical chunks and per-block prompts
 
 ---
 
