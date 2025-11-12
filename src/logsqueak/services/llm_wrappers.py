@@ -161,7 +161,8 @@ async def classify_blocks(
         prompt=prompt,
         system_prompt=system_prompt,
         chunk_model=KnowledgeClassificationChunk,
-        temperature=0.3  # Low temperature for deterministic classification
+        temperature=0.3,  # Low temperature for deterministic classification
+        request_id="classify_blocks",
     ):
         yield chunk
 
@@ -226,7 +227,8 @@ async def reword_content(
         prompt=prompt,
         system_prompt=system_prompt,
         chunk_model=ContentRewordingChunk,
-        temperature=0.5  # Moderate temperature for creative rewording
+        temperature=0.5,  # Moderate temperature for creative rewording
+        request_id="reword_content",
     ):
         yield chunk
 
@@ -317,11 +319,15 @@ async def plan_integration_for_block(
         f"{xml_formatted_content}"
     )
 
+    # Create unique request ID using truncated block ID (first 8 chars)
+    block_id_short = edited_content.block_id[:8] if len(edited_content.block_id) >= 8 else edited_content.block_id
+
     async for chunk in llm_client.stream_ndjson(
         prompt=prompt,
         system_prompt=system_prompt,
         chunk_model=IntegrationDecisionChunk,
-        temperature=0.2
+        temperature=0.2,
+        request_id=f"plan_integration_{block_id_short}",
     ):
         yield chunk
 

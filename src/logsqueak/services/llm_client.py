@@ -2,7 +2,7 @@
 
 import httpx
 import json
-from typing import AsyncIterator, Dict, Any, TypeVar, Type
+from typing import AsyncIterator, Dict, Any, TypeVar, Type, Optional
 from pydantic import BaseModel
 import asyncio
 
@@ -157,7 +157,8 @@ class LLMClient:
         max_retries: int = 1,
         retry_delay: float = 2.0,
         temperature: float = 0.7,
-        json_mode: bool = False
+        json_mode: bool = False,
+        request_id: Optional[str] = None
     ) -> AsyncIterator[T]:
         """
         Stream responses from LLM API.
@@ -176,6 +177,7 @@ class LLMClient:
             retry_delay: Delay in seconds between retries (default: 2.0)
             temperature: Sampling temperature 0.0-1.0 (default: 0.7)
             json_mode: Enable JSON mode (forces JSON output, OpenAI only, default: False)
+            request_id: Optional identifier for this request (for logging/tracing)
 
         Yields:
             Parsed chunk_model instances
@@ -191,7 +193,15 @@ class LLMClient:
             ... ):
             ...     print(f"Block {chunk.block_id}: confidence {chunk.confidence}")
         """
-        request_id = str(asyncio.current_task().get_name() if asyncio.current_task() else "unknown")
+        # Use provided request_id, or fall back to asyncio task name
+        if not request_id:
+            current_task = asyncio.current_task()
+            task_name = current_task.get_name() if current_task else None
+            # Check for None, empty string, or the literal string "None"
+            if task_name and task_name != "None":
+                request_id = task_name
+            else:
+                request_id = "unknown"
 
         # Detect provider (cached after first call)
         is_ollama = await self._detect_ollama()
