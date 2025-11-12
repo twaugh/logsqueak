@@ -622,8 +622,8 @@ class Phase1Screen(Screen):
         while True:
             if isinstance(self.app, LogsqueakApp):
                 model_task = self.app.background_tasks.get("model_preload")
-                if model_task is None:
-                    # Task deleted - it completed successfully
+                if model_task is None or model_task.status == "completed":
+                    # Task deleted or completed - model is ready
                     logger.info("page_indexing_model_ready", phase="phase1")
                     break
                 elif model_task.status == "failed":

@@ -64,6 +64,7 @@ class StatusPanel(Static):
         # Map task types to human-readable labels
         labels = {
             "llm_classification": "Analyzing knowledge blocks",
+            "model_preload": "Loading embedding model",
             "page_indexing": "Building page index",
             "rag_search": "Finding relevant pages",
             "llm_rewording": "Refining content",
@@ -91,6 +92,7 @@ class StatusPanel(Static):
         """
         labels = {
             "llm_classification": "Classification failed",
+            "model_preload": "Model loading failed",
             "page_indexing": "Indexing failed",
             "rag_search": "Search failed",
             "llm_rewording": "Rewording failed",

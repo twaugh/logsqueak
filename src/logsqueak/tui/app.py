@@ -187,9 +187,8 @@ class LogsqueakApp(App):
         # This prevents race condition where page_indexing worker starts before preload task exists
         from logsqueak.models.background_task import BackgroundTask
         self.background_tasks["model_preload"] = BackgroundTask(
-            task_type="page_indexing",  # Reuse task_type since it's related
+            task_type="model_preload",
             status="running",
-            progress_percentage=0.0,
         )
 
         self.push_screen(phase1_screen)
@@ -420,9 +419,9 @@ class LogsqueakApp(App):
                 self.rag_search._encoder = encoder
                 self.page_indexer._encoder = encoder
 
-            # Mark complete
+            # Mark complete (other workers poll for this status)
+            # Don't set progress_percentage - model loading is not granularly measurable
             self.background_tasks["model_preload"].status = "completed"
-            self.background_tasks["model_preload"].progress_percentage = 100.0
 
             logger.info("embedding_model_preloaded", phase="phase1")
         except Exception as e:
