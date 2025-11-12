@@ -403,10 +403,25 @@ class Phase3Screen(Screen):
         target_block_id = decision.target_block_id
 
         if action == "add_under" and target_block_id:
-            # Find the target block and add as child
-            target_found = self._add_block_under(outline, target_block_id, new_block_content, new_block_id)
+            # Find the target block and add as child (pass page name for hash matching)
+            target_found = self._add_block_under(
+                outline, target_block_id, new_block_content, new_block_id, decision.target_page
+            )
             if not target_found:
-                logger.warning("target_block_not_found", target_id=target_block_id)
+                logger.warning(
+                    "target_block_not_found_fallback_to_section",
+                    target_id=target_block_id,
+                    target_page=decision.target_page,
+                    knowledge_block_id=decision.knowledge_block_id,
+                    reason="Block may have been modified/deleted since RAG indexing, adding as section instead"
+                )
+                # Fallback: add as new root-level section if target not found
+                new_root = LogseqBlock(
+                    content=[new_block_content],
+                    indent_level=0,
+                    block_id=new_block_id
+                )
+                outline.blocks.append(new_root)
         elif action == "add_section":
             # Add as new root-level block
             new_root = LogseqBlock(
@@ -428,7 +443,7 @@ class Phase3Screen(Screen):
         return preview_content, highlight_block_id
 
     def _add_block_under(
-        self, outline: LogseqOutline, target_id: str, content: str, block_id: str
+        self, outline: LogseqOutline, target_id: str, content: str, block_id: str, page_name: str
     ) -> bool:
         """Add a new block under the target block.
 
@@ -437,6 +452,7 @@ class Phase3Screen(Screen):
             target_id: ID of target block to add under
             content: Content for new block
             block_id: ID for new block
+            page_name: Page name (for content hash matching)
 
         Returns:
             True if target was found and block added
@@ -448,9 +464,9 @@ class Phase3Screen(Screen):
                 if parent_block.block_id == target_id:
                     block_matches = True
                 else:
-                    # Try content hash
+                    # Try content hash (MUST include page_name to match RAG indexing)
                     full_context = generate_full_context(parent_block, parents)
-                    content_hash = generate_content_hash(full_context)
+                    content_hash = generate_content_hash(full_context, page_name)
                     if content_hash == target_id:
                         block_matches = True
 
