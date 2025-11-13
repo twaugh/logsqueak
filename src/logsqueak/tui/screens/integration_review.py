@@ -320,6 +320,7 @@ class Phase3Screen(Screen):
 
         # Display journal context with highlighted block
         journal_preview = self.query_one("#journal-preview", TargetPagePreview)
+        journal_preview.border_title = f"Journal Context: {self.journal_date}"
         await journal_preview.load_preview(self.journal_content, block_id)
 
         # Get decisions for this block
@@ -337,17 +338,21 @@ class Phase3Screen(Screen):
         block_id = self.journal_blocks[self.current_block_index].block_id
         block_decisions = self.decisions_by_block.get(block_id, [])
 
+        preview = self.query_one("#target-page-preview", TargetPagePreview)
+
         if not block_decisions or self.current_decision_index >= len(block_decisions):
-            preview = self.query_one("#target-page-preview", TargetPagePreview)
+            preview.border_title = "Target Page Preview"
             preview.clear()
             return
 
         decision = block_decisions[self.current_decision_index]
 
+        # Update border title with target page name
+        preview.border_title = f"Target Page Preview: {decision.target_page}"
+
         # Generate preview content with integrated block
         preview_text, highlight_block_id = self._generate_preview_with_integration(decision)
 
-        preview = self.query_one("#target-page-preview", TargetPagePreview)
         await preview.load_preview(preview_text, highlight_block_id)
 
     def _generate_preview_with_integration(
