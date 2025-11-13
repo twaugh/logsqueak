@@ -198,35 +198,72 @@ def create_demo_data():
     """Create demo data for Phase3Screen.
 
     Returns:
-        tuple: (journal_blocks, edited_content, decisions, graph_paths)
+        tuple: (journal_blocks, edited_content, decisions, graph_paths, page_contents, journal_content)
     """
-    # Create journal blocks (mock LogseqBlock objects)
-    journal_blocks = []
+    # Create a realistic journal structure with context
+    journal_markdown = """- Morning standup at 9am
+  id:: standup-1
+  - Discussed sprint progress
+  - Blocked on API integration
+- Morning session
+  id:: morning-1
+  - Python learning
+    - **List comprehensions** are a concise way to create lists in Python. They combine map() and filter() operations into a single expression: `[x*2 for x in range(10) if x % 2 == 0]`
+      id:: kb1
+- Lunch break
+  id:: lunch-1
+- Afternoon session
+  id:: afternoon-1
+  - Docker setup
+    - Docker **multi-stage builds** reduce image size by using multiple FROM statements. Build artifacts from earlier stages can be copied to later stages with `COPY --from=builder`, eliminating build dependencies from the final image.
+      id:: kb2
+- Reading notes
+  id:: reading-1
+  - CI/CD article
+    - **Continuous deployment** differs from continuous delivery in that code changes automatically deploy to production after passing tests, without human approval. This requires high confidence in automated testing and monitoring.
+      id:: kb3
+"""
+
+    # Parse the full journal to get the complete structure
+    full_journal_outline = LogseqOutline.parse(journal_markdown)
+
+    # Find the knowledge blocks (kb1, kb2, kb3) within the journal structure
+    def find_blocks_by_ids(blocks, target_ids, parents=None):
+        """Recursively find blocks by their IDs."""
+        if parents is None:
+            parents = []
+        found = []
+        for block in blocks:
+            if block.block_id in target_ids:
+                found.append(block)
+            # Search children
+            found.extend(find_blocks_by_ids(block.children, target_ids, parents + [block]))
+        return found
+
+    target_ids = ["kb1", "kb2", "kb3"]
+    journal_blocks = find_blocks_by_ids(full_journal_outline.blocks, target_ids)
+
+    # Create EditedContent and decisions for each knowledge block
     edited_content_list = []
     all_decisions = []
 
-    for kb in KNOWLEDGE_BLOCKS:
-        # Create a mock LogseqBlock
-        block = LogseqBlock(
-            content=[kb["content"]],
-            indent_level=0,
-            block_id=kb["id"]
-        )
-        journal_blocks.append(block)
+    for kb_data in KNOWLEDGE_BLOCKS:
+        # Find the corresponding block
+        kb_id = kb_data["id"]
 
         # Create EditedContent for this block
         ec = EditedContent(
-            block_id=kb["id"],
-            original_content=kb["content"],
-            hierarchical_context=kb["context"],
-            reworded_content=kb["content"],  # Same as original for demo
-            current_content=kb["content"],
+            block_id=kb_id,
+            original_content=kb_data["content"],
+            hierarchical_context=kb_data["context"],
+            reworded_content=kb_data["content"],  # Same as original for demo
+            current_content=kb_data["content"],
             rewording_complete=True
         )
         edited_content_list.append(ec)
 
         # Add the decisions for this block
-        all_decisions.extend(kb["decisions"])
+        all_decisions.extend(kb_data["decisions"])
 
     # Create mock GraphPaths
     graph_paths = MockGraphPaths()
@@ -237,7 +274,10 @@ def create_demo_data():
         outline = LogseqOutline.parse(page_text)
         page_contents[page_name] = outline
 
-    return journal_blocks, edited_content_list, all_decisions, graph_paths, page_contents
+    # Use the full journal content for preview
+    journal_content = journal_markdown
+
+    return journal_blocks, edited_content_list, all_decisions, graph_paths, page_contents, journal_content
 
 
 class Phase3Demo(App):
@@ -250,7 +290,7 @@ class Phase3Demo(App):
     async def on_mount(self) -> None:
         """Push the Phase3Screen when app mounts."""
         # Create demo data
-        journal_blocks, edited_content, decisions, graph_paths, page_contents = create_demo_data()
+        journal_blocks, edited_content, decisions, graph_paths, page_contents, journal_content = create_demo_data()
 
         # Create and push Phase3Screen
         screen = Phase3Screen(
@@ -259,6 +299,7 @@ class Phase3Demo(App):
             page_contents=page_contents,
             decisions=decisions,
             journal_date="2025-01-15",
+            journal_content=journal_content,
             graph_paths=graph_paths,
             file_monitor=None,
             auto_start_workers=False  # Don't start background workers in demo
