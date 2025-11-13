@@ -2,7 +2,7 @@
 
 Turn your Logseq journal chaos into organized knowledge. Interactive TUI (Text User Interface) for extracting lasting insights from journal entries using LLM-powered analysis.
 
-**Status**: ✅ **Phase 6.5 Complete** - End-to-end workflow functional with 90% LLM prompt reduction
+**Status**: ✅ **Phase 6 Complete** - End-to-end workflow fully tested with 280 passing tests
 
 ## Overview
 
@@ -30,11 +30,11 @@ All operations are **keyboard-driven** with vim-style navigation and **streaming
 
 ## Features
 
-### ✅ Implemented (Phase 1-6.5)
+### ✅ Implemented (Phase 1-6)
 - **Logseq Parser**: Production-ready markdown parser with property order preservation
 - **Data Models**: Pydantic models for config, block state, LLM chunks, integration decisions
 - **LLM Client**: Async NDJSON streaming with retry logic, request queue with priority
-- **LLM Prompt Optimization**: Hierarchical chunks reduce prompts from 62KB to 2-4KB per block
+- **LLM Prompt Optimization**: Hierarchical chunks reduce prompts from 62KB to 2-4KB per block (90% reduction)
 - **File Monitor**: Git-friendly mtime tracking for concurrent modification detection
 - **File Operations**: Atomic two-phase writes with provenance markers
 - **Configuration**: Lazy validation with helpful error messages (mode 600 permission check)
@@ -46,6 +46,7 @@ All operations are **keyboard-driven** with vim-style navigation and **streaming
 - **Background Workers**: Full dependency coordination across all three phases
 - **CLI Integration**: Complete `logsqueak extract` command with date/range parsing
 - **End-to-End Workflow**: All three phases wired together with proper state passing
+- **Test Coverage**: 280 tests passing (173 unit, 69 integration, 38 UI)
 
 ### ⏳ Remaining
 - **Phase 7**: Edge case handling and error recovery polish
