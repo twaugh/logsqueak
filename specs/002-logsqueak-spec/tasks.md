@@ -629,12 +629,12 @@ User should manually test:
 
 ### Testing
 
-- [ ] T108o Update unit tests for plan_integration_for_block() in tests/unit/test_llm_wrappers.py
+- [X] T108o Update unit tests for plan_integration_for_block() in tests/unit/test_llm_wrappers.py
   - Test: Single block produces decisions with correct source_knowledge_block_id
   - Test: RAG chunks formatted correctly (hierarchical, id stripped)
   - Test: Empty RAG results produce no decisions (or appropriate message)
 
-- [ ] T108p Update integration tests for full workflow in tests/integration/test_workflow.py
+- [X] T108p Update integration tests for full workflow in tests/integration/test_workflow.py
   - Verify: Multiple blocks each get their own LLM call
   - Verify: Decisions correctly batched by source_knowledge_block_id
   - Verify: RAG chunks don't exceed reasonable size (< 4000 tokens per block)

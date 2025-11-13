@@ -291,3 +291,307 @@ async def test_app_can_initialize_without_crashing(
         assert app is not None
     except Exception as e:
         pytest.fail(f"App initialization failed with error: {e}")
+
+
+@pytest.mark.asyncio
+async def test_plan_integrations_multiple_blocks_separate_llm_calls():
+    """Test that plan_integrations() calls LLM separately for each knowledge block.
+
+    Verifies: Multiple blocks each get their own LLM call (T108p requirement).
+    """
+    from logsqueak.services.llm_wrappers import plan_integrations
+    from logsqueak.models.edited_content import EditedContent
+    from logsqueak.models.llm_chunks import IntegrationDecisionChunk
+    from unittest.mock import Mock
+
+    # Arrange
+    mock_client = Mock(spec=LLMClient)
+    llm_call_count = 0
+
+    # Track which blocks were processed
+    processed_blocks = []
+
+    async def mock_stream(*args, **kwargs):
+        nonlocal llm_call_count
+        llm_call_count += 1
+
+        # Extract knowledge_block_id from prompt
+        prompt = kwargs.get('prompt', '')
+        # Simple extraction - look for block id in XML
+        if 'block_1' in prompt:
+            processed_blocks.append('block_1')
+            yield IntegrationDecisionChunk(
+                knowledge_block_id="block_1",
+                target_page="Page1",
+                action="add_under",
+                target_block_id="section1",
+                target_block_title="Section 1",
+                confidence=0.85,
+                reasoning="Fits well"
+            )
+        elif 'block_2' in prompt:
+            processed_blocks.append('block_2')
+            yield IntegrationDecisionChunk(
+                knowledge_block_id="block_2",
+                target_page="Page2",
+                action="add_section",
+                confidence=0.75,
+                reasoning="New section needed"
+            )
+        elif 'block_3' in prompt:
+            processed_blocks.append('block_3')
+            yield IntegrationDecisionChunk(
+                knowledge_block_id="block_3",
+                target_page="Page1",
+                action="add_under",
+                target_block_id="section2",
+                target_block_title="Section 2",
+                confidence=0.90,
+                reasoning="Related content"
+            )
+
+    mock_client.stream_ndjson = mock_stream
+
+    # Multiple knowledge blocks
+    edited_contents = [
+        EditedContent(
+            block_id="block_1",
+            original_content="First knowledge",
+            hierarchical_context="- Context 1\n  - First knowledge",
+            current_content="First knowledge refined"
+        ),
+        EditedContent(
+            block_id="block_2",
+            original_content="Second knowledge",
+            hierarchical_context="- Context 2\n  - Second knowledge",
+            current_content="Second knowledge refined"
+        ),
+        EditedContent(
+            block_id="block_3",
+            original_content="Third knowledge",
+            hierarchical_context="- Context 3\n  - Third knowledge",
+            current_content="Third knowledge refined"
+        )
+    ]
+
+    page_contents = {
+        "Page1": LogseqOutline.parse("- Section 1\n  id:: section1\n- Section 2\n  id:: section2"),
+        "Page2": LogseqOutline.parse("- Overview\n  id:: overview")
+    }
+
+    candidate_chunks = {
+        "block_1": [("Page1", "section1", "- Section 1\n  - Related content")],
+        "block_2": [("Page2", "overview", "- Overview\n  - Context")],
+        "block_3": [("Page1", "section2", "- Section 2\n  - More content")]
+    }
+
+    # Act
+    results = []
+    async for chunk in plan_integrations(mock_client, edited_contents, page_contents, candidate_chunks):
+        results.append(chunk)
+
+    # Assert
+    assert llm_call_count == 3, f"Expected 3 LLM calls (one per block), got {llm_call_count}"
+    assert len(results) == 3, f"Expected 3 decisions, got {len(results)}"
+    assert processed_blocks == ['block_1', 'block_2', 'block_3'], "Blocks processed in wrong order"
+
+    # Verify each decision has correct knowledge_block_id
+    assert results[0].knowledge_block_id == "block_1"
+    assert results[1].knowledge_block_id == "block_2"
+    assert results[2].knowledge_block_id == "block_3"
+
+
+@pytest.mark.asyncio
+async def test_integration_decisions_batched_by_knowledge_block():
+    """Test that integration decisions are correctly batched by source knowledge_block_id.
+
+    Verifies: Decisions correctly batched by source_knowledge_block_id (T108p requirement).
+    """
+    from logsqueak.services.llm_wrappers import plan_integrations
+    from logsqueak.models.edited_content import EditedContent
+    from logsqueak.models.llm_chunks import IntegrationDecisionChunk
+    from unittest.mock import Mock
+
+    # Arrange
+    mock_client = Mock(spec=LLMClient)
+
+    async def mock_stream(*args, **kwargs):
+        prompt = kwargs.get('prompt', '')
+
+        # Each block can have multiple decisions (different target pages)
+        if 'block_alpha' in prompt:
+            yield IntegrationDecisionChunk(
+                knowledge_block_id="block_alpha",
+                target_page="PageA",
+                action="add_under",
+                target_block_id="sectionA",
+                target_block_title="Section A",
+                confidence=0.85,
+                reasoning="Primary location"
+            )
+            yield IntegrationDecisionChunk(
+                knowledge_block_id="block_alpha",
+                target_page="PageB",
+                action="add_section",
+                confidence=0.65,
+                reasoning="Alternative location"
+            )
+        elif 'block_beta' in prompt:
+            yield IntegrationDecisionChunk(
+                knowledge_block_id="block_beta",
+                target_page="PageC",
+                action="add_under",
+                target_block_id="sectionC",
+                target_block_title="Section C",
+                confidence=0.90,
+                reasoning="Best fit"
+            )
+
+    mock_client.stream_ndjson = mock_stream
+
+    edited_contents = [
+        EditedContent(
+            block_id="block_alpha",
+            original_content="Alpha knowledge",
+            hierarchical_context="- Alpha context",
+            current_content="Alpha refined"
+        ),
+        EditedContent(
+            block_id="block_beta",
+            original_content="Beta knowledge",
+            hierarchical_context="- Beta context",
+            current_content="Beta refined"
+        )
+    ]
+
+    page_contents = {
+        "PageA": LogseqOutline.parse("- Section A\n  id:: sectionA"),
+        "PageB": LogseqOutline.parse("- Content"),
+        "PageC": LogseqOutline.parse("- Section C\n  id:: sectionC")
+    }
+
+    candidate_chunks = {
+        "block_alpha": [
+            ("PageA", "sectionA", "- Section A"),
+            ("PageB", "root", "- Content")
+        ],
+        "block_beta": [
+            ("PageC", "sectionC", "- Section C")
+        ]
+    }
+
+    # Act - collect results and group by knowledge_block_id
+    results_by_block = {}
+    async for chunk in plan_integrations(mock_client, edited_contents, page_contents, candidate_chunks):
+        if chunk.knowledge_block_id not in results_by_block:
+            results_by_block[chunk.knowledge_block_id] = []
+        results_by_block[chunk.knowledge_block_id].append(chunk)
+
+    # Assert - verify batching
+    assert "block_alpha" in results_by_block
+    assert "block_beta" in results_by_block
+
+    # Verify block_alpha has 2 decisions (different target pages)
+    assert len(results_by_block["block_alpha"]) == 2
+    assert results_by_block["block_alpha"][0].target_page == "PageA"
+    assert results_by_block["block_alpha"][1].target_page == "PageB"
+
+    # Verify block_beta has 1 decision
+    assert len(results_by_block["block_beta"]) == 1
+    assert results_by_block["block_beta"][0].target_page == "PageC"
+
+
+@pytest.mark.asyncio
+async def test_rag_chunks_reasonable_size():
+    """Test that RAG chunks don't exceed reasonable size (< 4000 tokens per block).
+
+    Verifies: RAG chunks don't exceed reasonable size (T108p requirement).
+    Note: 4000 tokens ≈ 16000 characters (rough estimate at 4 chars/token)
+    """
+    from logsqueak.services.llm_wrappers import plan_integration_for_block
+    from logsqueak.models.edited_content import EditedContent
+    from logsqueak.models.llm_chunks import IntegrationDecisionChunk
+    from unittest.mock import Mock
+
+    # Arrange
+    mock_client = Mock(spec=LLMClient)
+
+    # Track the prompt size
+    captured_prompt = None
+
+    async def mock_stream(*args, **kwargs):
+        nonlocal captured_prompt
+        captured_prompt = kwargs.get('prompt', '')
+        yield IntegrationDecisionChunk(
+            knowledge_block_id="test_block",
+            target_page="TestPage",
+            action="add_section",
+            confidence=0.80,
+            reasoning="Test"
+        )
+
+    mock_client.stream_ndjson = mock_stream
+
+    edited_content = EditedContent(
+        block_id="test_block",
+        original_content="Test content",
+        hierarchical_context="- Parent\n  - Test content",
+        current_content="Test content refined"
+    )
+
+    # Create candidate chunks with substantial hierarchical context
+    # Simulate realistic page structure with nested content
+    candidate_chunks = [
+        ("TestPage", "block1",
+         "- Main section\n" +
+         "  - Subsection A\n" +
+         "    - Detail 1\n" +
+         "    - Detail 2\n" +
+         "  - Subsection B\n" +
+         "    - Detail 3"),
+        ("TestPage", "block2",
+         "- Another section\n" +
+         "  - More content\n" +
+         "    - Nested detail\n" +
+         "      - Deep nesting"),
+        ("TestPage", "block3",
+         "- Third section\n" +
+         "  - Content here")
+    ]
+
+    page_contents = {
+        "TestPage": LogseqOutline.parse(
+            "title:: Test Page\n"
+            "tags:: #test\n"
+            "- Main section\n"
+            "  id:: block1\n"
+            "- Another section\n"
+            "  id:: block2\n"
+            "- Third section\n"
+            "  id:: block3"
+        )
+    }
+
+    # Act
+    results = []
+    async for chunk in plan_integration_for_block(mock_client, edited_content, candidate_chunks, page_contents):
+        results.append(chunk)
+
+    # Assert - verify prompt size is reasonable
+    assert captured_prompt is not None
+    prompt_length = len(captured_prompt)
+
+    # Rough token estimate: 4 chars per token
+    # Target: < 4000 tokens = < 16000 characters
+    max_chars = 16000
+
+    assert prompt_length < max_chars, (
+        f"Prompt too large: {prompt_length} chars "
+        f"(~{prompt_length // 4} tokens) exceeds {max_chars} chars "
+        f"(~{max_chars // 4} tokens)"
+    )
+
+    # Verify the prompt contains the essential parts but isn't bloated
+    assert "<knowledge_blocks>" in captured_prompt
+    assert "<page name=\"TestPage\">" in captured_prompt
+    assert "Main section" in captured_prompt
