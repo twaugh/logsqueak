@@ -30,7 +30,7 @@ class DecisionList(Static):
             Rich Text object with formatted decision list
         """
         if not self.decisions:
-            return Text("No decisions available", style="dim")
+            return Text("None available", style="dim")
 
         result = Text()
 
