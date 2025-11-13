@@ -59,43 +59,26 @@ class Phase3Screen(Screen):
         layout: vertical;
     }
 
-    #journal-context-panel {
-        height: 1fr;
-        layout: vertical;
-    }
-
     #bottom-row {
         height: 2fr;
         layout: horizontal;
     }
 
-    #decision-list-panel {
-        width: 1fr;
-        min-width: 30;
-        layout: vertical;
-    }
-
-    #preview-panel {
-        width: 2fr;
-        layout: vertical;
-    }
-
-    .panel-header {
-        height: auto;
-        padding: 0 1;
-        text-style: bold;
-    }
-
-    #journal-context {
+    #journal-preview {
         height: 1fr;
+        border: solid white;
     }
 
     #decision-list {
         height: 1fr;
+        width: 1fr;
+        min-width: 30;
+        border: solid white;
     }
 
-    TargetPagePreview {
+    #target-page-preview {
         height: 1fr;
+        width: 2fr;
     }
     """
 
@@ -123,6 +106,7 @@ class Phase3Screen(Screen):
         edited_content: list[EditedContent],
         page_contents: Dict[str, LogseqOutline],
         journal_date: str,
+        journal_content: str,
         llm_client: Optional[LLMClient] = None,
         graph_paths: Optional[GraphPaths] = None,
         file_monitor: Optional[FileMonitor] = None,
@@ -137,6 +121,7 @@ class Phase3Screen(Screen):
             edited_content: Refined content from Phase 2
             page_contents: Dict mapping page names to LogseqOutline (from Phase 2 RAG)
             journal_date: Journal date (YYYY-MM-DD)
+            journal_content: Full journal content (markdown text for preview)
             llm_client: LLM client instance (None for testing with pre-generated decisions)
             graph_paths: GraphPaths instance for file operations
             file_monitor: FileMonitor for concurrent modification detection
@@ -148,6 +133,7 @@ class Phase3Screen(Screen):
         self.edited_content = edited_content
         self.page_contents = page_contents
         self.journal_date = journal_date
+        self.journal_content = journal_content
         self.llm_client = llm_client
         self.graph_paths = graph_paths
         self.file_monitor = file_monitor or FileMonitor()
@@ -206,22 +192,21 @@ class Phase3Screen(Screen):
             # Three-panel layout: journal context on top, decisions and preview below
             with Vertical(id="content-panels"):
                 # Top: Journal context (full width)
-                with Container(id="journal-context-panel"):
-                    yield Label("Journal Context", classes="panel-header")
-                    with VerticalScroll():
-                        yield Static("", id="journal-context")
+                journal_preview = TargetPagePreview(id="journal-preview")
+                journal_preview.border_title = "Journal Context"
+                yield journal_preview
 
                 # Bottom row: Decision list and target page preview
                 with Container(id="bottom-row"):
                     # Bottom-left: Decision list
-                    with Container(id="decision-list-panel"):
-                        yield Label("Integration Decisions", classes="panel-header")
-                        yield DecisionList()
+                    decision_list = DecisionList()
+                    decision_list.border_title = "Integration Points"
+                    yield decision_list
 
                     # Bottom-right: Target page preview
-                    with Container(id="preview-panel"):
-                        yield Label("Target Page Preview", classes="panel-header")
-                        yield TargetPagePreview()
+                    target_preview = TargetPagePreview()
+                    target_preview.border_title = "Target Page Preview"
+                    yield target_preview
 
             # Status panel for background tasks (uses app-level shared dict or test dict)
             from logsqueak.tui.app import LogsqueakApp
@@ -333,12 +318,9 @@ class Phase3Screen(Screen):
             f"Block {self.current_block_index + 1} of {len(self.journal_blocks)}"
         )
 
-        # Display journal context (hierarchical)
-        from logseq_outline.context import generate_full_context
-        # For journal context, we need parent blocks
-        # For simplicity, just show the block itself
-        context_widget = self.query_one("#journal-context", Static)
-        context_widget.update(current_block.get_full_content())
+        # Display journal context with highlighted block
+        journal_preview = self.query_one("#journal-preview", TargetPagePreview)
+        await journal_preview.load_preview(self.journal_content, block_id)
 
         # Get decisions for this block
         block_decisions = self.decisions_by_block.get(block_id, [])
@@ -356,7 +338,7 @@ class Phase3Screen(Screen):
         block_decisions = self.decisions_by_block.get(block_id, [])
 
         if not block_decisions or self.current_decision_index >= len(block_decisions):
-            preview = self.query_one(TargetPagePreview)
+            preview = self.query_one("#target-page-preview", TargetPagePreview)
             preview.clear()
             return
 
@@ -365,7 +347,7 @@ class Phase3Screen(Screen):
         # Generate preview content with integrated block
         preview_text, highlight_block_id = self._generate_preview_with_integration(decision)
 
-        preview = self.query_one(TargetPagePreview)
+        preview = self.query_one("#target-page-preview", TargetPagePreview)
         await preview.load_preview(preview_text, highlight_block_id)
 
     def _generate_preview_with_integration(
@@ -665,7 +647,7 @@ Confidence: {decision.confidence:.0%}
 
     def action_focus_preview(self) -> None:
         """Focus the target page preview widget."""
-        preview = self.query_one(TargetPagePreview)
+        preview = self.query_one("#target-page-preview", TargetPagePreview)
         preview.focus()
 
     def action_back(self) -> None:

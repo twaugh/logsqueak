@@ -119,6 +119,14 @@ def sample_decisions():
 
 
 @pytest.fixture
+def sample_journal_content(sample_journal_blocks):
+    """Create sample journal content (markdown) for preview."""
+    from logseq_outline.parser import LogseqOutline
+    outline = LogseqOutline(blocks=sample_journal_blocks, source_text="", frontmatter=[])
+    return outline.render()
+
+
+@pytest.fixture
 def sample_page_contents():
     """Create sample page contents for testing."""
     return {
@@ -175,7 +183,7 @@ def sample_page_contents():
 
 @pytest.mark.asyncio
 async def test_n_key_advances_to_next_block(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test n key advances to next knowledge block."""
     screen = Phase3Screen(
@@ -184,6 +192,7 @@ async def test_n_key_advances_to_next_block(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -206,7 +215,7 @@ async def test_n_key_advances_to_next_block(
 
 @pytest.mark.asyncio
 async def test_n_key_skips_remaining_pending_decisions(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test n key skips any remaining pending decisions for current block."""
     screen = Phase3Screen(
@@ -215,6 +224,7 @@ async def test_n_key_skips_remaining_pending_decisions(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -247,7 +257,7 @@ async def test_n_key_skips_remaining_pending_decisions(
 @pytest.mark.skip(reason="decisions_ready tracking not yet implemented - requires background worker integration")
 @pytest.mark.asyncio
 async def test_n_key_shows_processing_status_if_next_block_not_ready(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test n key shows 'Processing knowledge blocks...' if next block decisions not ready."""
     screen = Phase3Screen(
@@ -256,6 +266,7 @@ async def test_n_key_shows_processing_status_if_next_block_not_ready(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -277,7 +288,7 @@ async def test_n_key_shows_processing_status_if_next_block_not_ready(
 
 @pytest.mark.asyncio
 async def test_n_key_at_last_block_does_nothing(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test n key at last block does nothing (or shows completion)."""
     screen = Phase3Screen(
@@ -286,6 +297,7 @@ async def test_n_key_at_last_block_does_nothing(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -309,7 +321,7 @@ async def test_n_key_at_last_block_does_nothing(
 
 @pytest.mark.asyncio
 async def test_block_counter_updates_on_next_block(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test that block counter updates when advancing to next block."""
     screen = Phase3Screen(
@@ -318,6 +330,7 @@ async def test_block_counter_updates_on_next_block(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)

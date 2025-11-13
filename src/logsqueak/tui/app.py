@@ -561,6 +561,7 @@ class LogsqueakApp(App):
             edited_content=edited_content,
             page_contents=page_contents,
             journal_date=self.journal_date,
+            journal_content=self.journal_outline.render(),  # Full journal content for preview
             llm_client=None,  # Decisions are generated in Phase 2
             graph_paths=GraphPaths(Path(self.config.logseq.graph_path)),
             file_monitor=self.file_monitor,

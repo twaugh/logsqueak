@@ -118,6 +118,14 @@ def sample_decisions():
 
 
 @pytest.fixture
+def sample_journal_content(sample_journal_blocks):
+    """Create sample journal content (markdown) for preview."""
+    from logseq_outline.parser import LogseqOutline
+    outline = LogseqOutline(blocks=sample_journal_blocks, source_text="", frontmatter=[])
+    return outline.render()
+
+
+@pytest.fixture
 def sample_page_contents():
     """Create sample page contents for testing."""
     return {
@@ -174,7 +182,7 @@ def sample_page_contents():
 
 @pytest.mark.asyncio
 async def test_navigate_between_decisions_with_j_key(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test j key navigates to next decision for current block."""
     screen = Phase3Screen(
@@ -183,6 +191,7 @@ async def test_navigate_between_decisions_with_j_key(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -205,7 +214,7 @@ async def test_navigate_between_decisions_with_j_key(
 
 @pytest.mark.asyncio
 async def test_navigate_between_decisions_with_k_key(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test k key navigates to previous decision for current block."""
     screen = Phase3Screen(
@@ -214,6 +223,7 @@ async def test_navigate_between_decisions_with_k_key(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -237,7 +247,7 @@ async def test_navigate_between_decisions_with_k_key(
 
 @pytest.mark.asyncio
 async def test_navigate_with_arrow_keys(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test arrow keys also work for decision navigation."""
     screen = Phase3Screen(
@@ -246,6 +256,7 @@ async def test_navigate_with_arrow_keys(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -271,7 +282,7 @@ async def test_navigate_with_arrow_keys(
 
 @pytest.mark.asyncio
 async def test_navigation_wraps_at_decision_boundaries(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test that navigation stops at first and last decisions for current block."""
     screen = Phase3Screen(
@@ -280,6 +291,7 @@ async def test_navigation_wraps_at_decision_boundaries(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -306,7 +318,7 @@ async def test_navigation_wraps_at_decision_boundaries(
 
 @pytest.mark.asyncio
 async def test_target_page_preview_updates_on_navigation(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test that target page preview updates when navigating between decisions."""
     screen = Phase3Screen(
@@ -315,6 +327,7 @@ async def test_target_page_preview_updates_on_navigation(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -338,7 +351,7 @@ async def test_target_page_preview_updates_on_navigation(
 
 @pytest.mark.asyncio
 async def test_decision_list_highlights_current_selection(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test that decision list highlights the currently selected decision."""
     screen = Phase3Screen(
@@ -347,6 +360,7 @@ async def test_decision_list_highlights_current_selection(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)

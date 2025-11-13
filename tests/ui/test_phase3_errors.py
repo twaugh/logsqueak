@@ -69,6 +69,14 @@ def sample_decisions():
 
 
 @pytest.fixture
+def sample_journal_content(sample_journal_blocks):
+    """Create sample journal content (markdown) for preview."""
+    from logseq_outline.parser import LogseqOutline
+    outline = LogseqOutline(blocks=sample_journal_blocks, source_text="", frontmatter=[])
+    return outline.render()
+
+
+@pytest.fixture
 def sample_page_contents():
     """Create sample page contents for testing."""
     return {
@@ -101,7 +109,7 @@ def sample_page_contents():
 
 @pytest.mark.asyncio
 async def test_target_block_not_found_error(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test error handling when target block doesn't exist."""
     screen = Phase3Screen(
@@ -110,6 +118,7 @@ async def test_target_block_not_found_error(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -136,7 +145,7 @@ async def test_target_block_not_found_error(
 
 @pytest.mark.asyncio
 async def test_file_modified_externally_error(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test error handling when file is modified externally during operation."""
     screen = Phase3Screen(
@@ -145,6 +154,7 @@ async def test_file_modified_externally_error(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -169,7 +179,7 @@ async def test_file_modified_externally_error(
 
 @pytest.mark.asyncio
 async def test_permission_error_during_write(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test error handling for file permission errors."""
     screen = Phase3Screen(
@@ -178,6 +188,7 @@ async def test_permission_error_during_write(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -202,7 +213,7 @@ async def test_permission_error_during_write(
 
 @pytest.mark.asyncio
 async def test_page_file_not_found_error(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test error handling when target page file doesn't exist."""
     screen = Phase3Screen(
@@ -211,6 +222,7 @@ async def test_page_file_not_found_error(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -234,7 +246,7 @@ async def test_page_file_not_found_error(
 
 @pytest.mark.asyncio
 async def test_error_message_displayed_in_ui(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test that error messages are displayed in the UI."""
     screen = Phase3Screen(
@@ -243,6 +255,7 @@ async def test_error_message_displayed_in_ui(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -268,7 +281,7 @@ async def test_error_message_displayed_in_ui(
 
 @pytest.mark.asyncio
 async def test_failed_decision_can_be_retried(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test that user can retry a failed decision."""
     screen = Phase3Screen(
@@ -277,6 +290,7 @@ async def test_failed_decision_can_be_retried(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -308,7 +322,7 @@ async def test_failed_decision_can_be_retried(
 
 @pytest.mark.asyncio
 async def test_error_details_suggest_remediation(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
     """Test that error messages suggest remediation actions."""
     screen = Phase3Screen(
@@ -317,6 +331,7 @@ async def test_error_details_suggest_remediation(
         page_contents=sample_page_contents,
         decisions=sample_decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)
@@ -346,7 +361,7 @@ async def test_error_details_suggest_remediation(
 
 @pytest.mark.asyncio
 async def test_multiple_errors_handled_independently(
-    sample_journal_blocks, sample_edited_content, sample_page_contents
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_journal_content
 ):
     """Test that multiple failed decisions are tracked independently."""
     decisions = [
@@ -375,6 +390,7 @@ async def test_multiple_errors_handled_independently(
         page_contents=sample_page_contents,
         decisions=decisions,
         journal_date="2025-11-06",
+        journal_content=sample_journal_content,
         auto_start_workers=False
     )
     app = Phase3TestApp(screen)

@@ -424,6 +424,7 @@ class TargetPagePreview(Widget):
         self._highlight_block_id: Optional[str] = None
         self._gutter: Optional[_LineGutter] = None
         self._content_widget: Optional[Static] = None
+        self._block_map: dict[str, list[int]] = {}  # Track block ID -> line numbers for scrolling
 
     def compose(self) -> ComposeResult:
         """Compose the gutter and content widget."""
@@ -465,6 +466,10 @@ class TargetPagePreview(Widget):
             return
 
         await self._render_preview()
+
+        # Auto-scroll to highlighted block
+        if highlight_block_id:
+            self._scroll_to_highlighted_block()
 
     async def _render_preview(self) -> None:
         """Internal method to render the current content."""
@@ -522,13 +527,45 @@ class TargetPagePreview(Widget):
         else:
             self._gutter.marked_lines = set()
 
+        # Store block map for scrolling
+        self._block_map = block_map
+
         # Force a refresh to ensure the update is displayed
         self.refresh()
+
+    def _scroll_to_highlighted_block(self) -> None:
+        """Scroll the preview to make the highlighted block visible with context.
+
+        Scrolls to show at least 3 lines of context above the highlighted block
+        if possible, so users can see surrounding content.
+        """
+        if not self._highlight_block_id or self._highlight_block_id not in self._block_map:
+            return
+
+        # Get the line numbers for the highlighted block
+        highlighted_lines = self._block_map[self._highlight_block_id]
+        if not highlighted_lines:
+            return
+
+        # Scroll to the first line of the highlighted block
+        # We need to find the ScrollableContainer and scroll it
+        scroll_container = self.query_one(ScrollableContainer)
+        if scroll_container:
+            # Calculate the vertical position (each line is 1 unit tall)
+            target_line = highlighted_lines[0]
+
+            # Try to show 3 lines of context above the highlighted block
+            context_lines = 3
+            scroll_position = max(0, target_line - context_lines)
+
+            # Scroll to the calculated position
+            scroll_container.scroll_to(y=scroll_position, animate=False)
 
     def clear(self) -> None:
         """Clear preview content."""
         self._content = ""
         self._highlight_block_id = None
+        self._block_map = {}
         if self._content_widget:
             self._content_widget.update("*No preview available*")
         if self._gutter:
