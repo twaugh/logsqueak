@@ -301,9 +301,11 @@ async def plan_integration_for_block(
         "- Output ONLY raw NDJSON (newline-delimited JSON objects)\n"
         "- Start output immediately with first JSON object\n\n"
         "TASK: Find where knowledge belongs in existing pages.\n\n"
-        "INPUT:\n"
+        "INPUT FORMAT:\n"
         "- <knowledge_blocks>: Content to integrate (block ID in XML attribute)\n"
-        "- <pages>: Hierarchical page structure (block IDs in XML attributes)\n\n"
+        "- <pages>: Existing page structure\n"
+        "  Each <page name=\"PageName\"> contains blocks with id attributes\n"
+        "  CRITICAL: Use the page NAME (e.g. \"TDD\") NOT the block id (e.g. \"abc123\")\n\n"
         "HOW TO FIND THE BEST LOCATION:\n"
         "Pages show hierarchical structure (parent → child → grandchild).\n"
         "Look for semantic relationships in the hierarchy.\n"
@@ -318,10 +320,17 @@ async def plan_integration_for_block(
         "- add_section: Add as new top-level section if no good parent exists\n"
         "- replace: Replace existing block with updated knowledge\n"
         "- skip_exists: Duplicate already exists\n\n"
+        "FIELD DEFINITIONS:\n"
+        "- knowledge_block_id: The block id from <knowledge_blocks>\n"
+        "- target_page: The PAGE NAME from <page name=\"...\"> (example: \"TDD\" not \"abc123\")\n"
+        "- target_block_id: The block id from <block id=\"...\"> within the page\n\n"
         "REQUIRED JSON SCHEMA (one object per line):\n"
         '{"knowledge_block_id": "string", "target_page": "string", "action": "add_section|add_under|replace|skip_exists", '
         '"target_block_id": "string|null", "target_block_title": "string|null", '
         '"confidence": 0.0-1.0, "reasoning": "string"}\n\n'
+        'EXAMPLE: {"knowledge_block_id": "xyz789", "target_page": "TDD", "action": "add_under", '
+        '"target_block_id": "abc123", "target_block_title": "Core concepts", "confidence": 0.85, '
+        '"reasoning": "Fits under existing section"}\n\n'
         "START OUTPUT NOW (first character must be '{'):"
     )
 
