@@ -681,7 +681,7 @@ User should manually test:
 - [ ] T117b [P] Replace direct Path.write_text() calls with atomic_write() in write_integration_atomic() function in src/logsqueak/services/file_operations.py
 - [ ] T118 [P] Implement external file modification handling (reload, revalidate) in src/logsqueak/services/file_monitor.py
 - [ ] T118a Write unit tests for atomic_write() with concurrent modification detection in tests/unit/test_atomic_write.py and run with pytest
-- [ ] T119 [P] Implement Ctrl+C cancellation warning in Phase 3 (partial journal state) in src/logsqueak/tui/screens/integration_review.py
+- [~] T119 [P] Implement Ctrl+C cancellation warning in Phase 3 (partial journal state) in src/logsqueak/tui/screens/integration_review.py
 - [ ] T120 Write integration tests for all edge cases in tests/integration/test_edge_cases.py and run with pytest
 
 ---
@@ -693,7 +693,7 @@ User should manually test:
 ### Optional Enhancements
 
 - [ ] T121 [P] Add completion summary screen with statistics and journal link in src/logsqueak/tui/screens/integration_review.py
-- [ ] T122 [P] Implement Enter key as alternative to 'n' key for advancing to next block in src/logsqueak/tui/screens/integration_review.py
+- [~] T122 [P] Implement Enter key as alternative to 'n' key for advancing to next block in src/logsqueak/tui/screens/integration_review.py
 
 ### Logging & Polish
 
@@ -717,9 +717,34 @@ User should manually test:
 - [ ] T130a Generate and review HTML coverage report: `open htmlcov/index.html`
 - [ ] T131 Manual validation of quickstart.md walkthrough (Phase 1, Phase 2, Phase 3)
 - [ ] T132 Test with Ollama local model (verify num_ctx config, connection, streaming)
-- [ ] T133 Test with OpenAI API (verify API key handling, rate limits, errors)
+- [~] T133 Test with OpenAI API (verify API key handling, rate limits, errors)
 - [ ] T134 Test edge case: very large journal entry (>100 blocks, verify UI responsiveness)
-- [ ] T135 Test edge case: concurrent file modification (edit journal in Logseq while TUI running)
+- [~] T135 Test edge case: concurrent file modification (edit journal in Logseq while TUI running)
+
+### New Features
+
+- [ ] T136 Fix Phase 1 (block_selection.py) to handle multiple journal days correctly
+  - Update journal loading to preserve date grouping in tree view
+  - Verify navigation works across date boundaries
+  - Add date headers in BlockTree widget for clarity
+- [ ] T137 Implement per-graph page index using '(basename)-(16-digit pathname hash)' pattern
+  - Update PageIndexer to generate unique collection names per graph
+  - Use graph path basename + 16-digit hash of full path for collection naming
+  - Add graph_path parameter to PageIndexer initialization
+  - Ensure ChromaDB collections are isolated per graph (prevents cross-graph contamination)
+  - Write unit tests for collection name generation in tests/unit/test_page_indexer.py
+- [ ] T138 Implement 'logsqueak search <query>' CLI command
+  - Add 'search' command to src/logsqueak/cli.py with query argument
+  - Load config and initialize PageIndexer/RAGSearch services
+  - Load SentenceTransformer model if not cached
+  - Reindex pages if index is missing or stale
+  - Execute semantic search with provided query
+  - Display results with:
+    - Confidence score (0-100%)
+    - Page name as clickable terminal link using OSC 8 escape codes (logseq://graph/page/PageName)
+    - Content snippet (hierarchical context, max 2 lines)
+  - Format output for terminal readability (aligned columns, color coding)
+  - Write integration tests for search command in tests/integration/test_cli_search.py
 
 ---
 
