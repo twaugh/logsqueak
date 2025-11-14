@@ -734,18 +734,19 @@ User should manually test:
   - Enables force-reindexing by removing a specific graph's directory
   - Ensure ChromaDB databases are isolated per graph (prevents cross-graph contamination)
   - Write unit tests for directory name generation in tests/unit/test_page_indexer.py
-- [ ] T138 Implement 'logsqueak search <query>' CLI command
+- [x] T138 Implement 'logsqueak search <query>' CLI command
   - Add 'search' command to src/logsqueak/cli.py with query argument
   - Load config and initialize PageIndexer/RAGSearch services
   - Load SentenceTransformer model if not cached
   - Reindex pages if index is missing or stale
   - Execute semantic search with provided query
   - Display results with:
-    - Confidence score (0-100%)
+    - Relevance score (0-100%) - semantic similarity percentage
     - Page name as clickable terminal link using OSC 8 escape codes (logseq://graph/page/PageName)
-    - Content snippet (hierarchical context, max 2 lines)
-  - Format output for terminal readability (aligned columns, color coding)
+    - Content snippet (hierarchical context, max 2 lines, whitespace normalized)
+  - Format output for terminal readability (clean indentation, clickable links)
   - Write integration tests for search command in tests/integration/test_cli_search.py
+  - All 7 integration tests passing ✅
 
 ---
 

@@ -148,7 +148,7 @@ chmod 600 ~/.config/logsqueak/config.yaml
 
 ## Usage
 
-### End-to-End Workflow (All Phases Working)
+### Interactive Knowledge Extraction
 
 Launch the interactive knowledge extraction workflow:
 
@@ -162,6 +162,25 @@ logsqueak extract 2025-01-15
 # Extract from date range
 logsqueak extract 2025-01-10..2025-01-15
 ```
+
+### Semantic Search
+
+Search your Logseq knowledge base from the terminal:
+
+```bash
+# Search for content
+logsqueak search "machine learning best practices"
+
+# Force rebuild search index
+logsqueak search "python tips" --reindex
+```
+
+**Search features:**
+- Semantic similarity search using same RAG infrastructure as main app
+- Automatic index building on first run (incremental updates)
+- Results show relevance percentage and hierarchical context
+- Clickable `logseq://` links (modern terminals)
+- Respects `rag.top_k` from config (default: 10 results)
 
 **Phase 1 - Block Selection**:
 - Navigate blocks with `j`/`k` (vim-style) or arrow keys

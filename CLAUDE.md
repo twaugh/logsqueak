@@ -250,7 +250,9 @@ The RAG (Retrieval-Augmented Generation) pipeline uses semantic search to find r
 
 ### Configuration & CLI
 
-- **cli.py**: Click-based CLI with `extract` command, date/range parsing, journal loading, TUI app launcher
+- **cli.py**: Click-based CLI with commands:
+  - `extract` - Interactive knowledge extraction workflow (date/range parsing, journal loading, TUI launcher)
+  - `search` - Semantic search of knowledge base (uses RAG infrastructure, clickable logseq:// links)
 - **config.py**: ConfigManager with lazy validation, helpful error messages, permission checks (mode 600)
 - **app.py**: Main TUI application with screen management, phase transitions, worker coordination
 - Config file: `~/.config/logsqueak/config.yaml` (user must create before first run)
@@ -543,6 +545,10 @@ logsqueak extract 2025-01-10..2025-01-15  # Date range
 # Phase 2: Edit/refine content (Tab to focus editor, 'a' accept LLM version, 'r' revert)
 # Phase 3: Review integrations (j/k through decisions, 'y' accept, 'a' batch accept)
 # All phases complete - writes to pages with provenance markers in journal
+
+# Search your knowledge base
+logsqueak search "machine learning best practices"
+logsqueak search "python debugging tips" --reindex  # Force rebuild index
 ```
 
 ## Python Version & Dependencies

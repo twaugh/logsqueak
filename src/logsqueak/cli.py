@@ -249,6 +249,185 @@ def extract(date_or_range: str = None):
     logger.info("extract_command_completed")
 
 
+@cli.command()
+@click.argument("query")
+@click.option("--reindex", is_flag=True, help="Force rebuild of the search index")
+def search(query: str, reindex: bool):
+    """
+    Search your Logseq knowledge base using semantic search.
+
+    Examples:
+        logsqueak search "machine learning best practices"
+        logsqueak search "how to debug async code" --reindex
+    """
+    import asyncio
+    from logsqueak.services.llm_client import LLMClient
+    from logsqueak.services.page_indexer import PageIndexer
+    from logsqueak.services.rag_search import RAGSearch
+
+    logger.info("search_command_started", query=query, reindex=reindex)
+
+    # Load configuration
+    config = load_config()
+    graph_path = Path(config.logseq.graph_path).expanduser()
+
+    # Initialize services
+    logger.info("initializing_search_services")
+    graph_paths = GraphPaths(graph_path)
+
+    # Create page indexer
+    page_indexer = PageIndexer(graph_paths=graph_paths)
+    logger.info("page_indexer_initialized", db_path=str(page_indexer.db_path))
+
+    # Create RAG search service
+    rag_search = RAGSearch(db_path=page_indexer.db_path)
+    logger.info("rag_search_initialized")
+
+    # Check if we need to build/rebuild the index
+    needs_indexing = reindex or not rag_search.has_indexed_data()
+
+    if needs_indexing:
+        if reindex:
+            click.echo("Rebuilding search index...")
+        else:
+            click.echo("Building search index (first run)...")
+
+        # Build index with progress indicator
+        async def build_index_with_progress():
+            total_pages = 0
+            current_page = 0
+
+            def progress_callback(current, total):
+                nonlocal total_pages, current_page
+                total_pages = total
+                current_page = current
+                # Simple progress indicator
+                percent = int((current / total) * 100) if total > 0 else 0
+                click.echo(f"\rIndexing pages: {current}/{total} ({percent}%)", nl=False)
+
+            try:
+                await page_indexer.build_index(progress_callback=progress_callback)
+                click.echo()  # Newline after progress
+                click.echo(f"Index built successfully ({total_pages} pages)")
+            except Exception as e:
+                click.echo()  # Newline after progress
+                logger.error("index_build_failed", error=str(e))
+                raise click.ClickException(f"Failed to build search index: {e}")
+
+        asyncio.run(build_index_with_progress())
+    else:
+        logger.info("search_index_exists", skipping_build=True)
+
+    # Execute search
+    click.echo(f"\nSearching for: {query}\n")
+
+    async def execute_search():
+        try:
+            # Generate embedding for query
+            embedding = rag_search.encoder.encode(query, convert_to_numpy=True)
+
+            # Query ChromaDB
+            top_k = config.rag.top_k
+            query_results = rag_search.collection.query(
+                query_embeddings=[embedding.tolist()],
+                n_results=top_k
+            )
+
+            # Extract results
+            if not query_results["ids"][0]:
+                click.echo("No results found.")
+                return
+
+            results = []
+            for metadata, distance, document in zip(
+                query_results["metadatas"][0],
+                query_results["distances"][0],
+                query_results["documents"][0]
+            ):
+                page_name = metadata["page_name"]
+                block_id = metadata["block_id"]
+                similarity = 1.0 - distance  # Convert distance to similarity
+                confidence = int(similarity * 100)
+
+                results.append({
+                    "page_name": page_name,
+                    "block_id": block_id,
+                    "confidence": confidence,
+                    "snippet": document
+                })
+
+            # Sort by confidence
+            results.sort(key=lambda x: x["confidence"], reverse=True)
+
+            # Display results
+            _display_search_results(results, graph_path)
+
+        except Exception as e:
+            logger.error("search_execution_failed", error=str(e))
+            raise click.ClickException(f"Search failed: {e}")
+
+    asyncio.run(execute_search())
+    logger.info("search_command_completed")
+
+
+def _display_search_results(results: list[dict], graph_path: Path):
+    """
+    Display search results in terminal-friendly format.
+
+    Uses OSC 8 escape codes for clickable links and color coding for readability.
+    """
+    graph_name = graph_path.name
+
+    for idx, result in enumerate(results, 1):
+        page_name = result["page_name"]
+        confidence = result["confidence"]
+        snippet = result["snippet"]
+
+        # Format confidence with color coding
+        if confidence >= 80:
+            confidence_color = "green"
+        elif confidence >= 60:
+            confidence_color = "yellow"
+        else:
+            confidence_color = "red"
+
+        # Create clickable logseq:// link using OSC 8 escape codes
+        # Format: \033]8;;URI\033\\TEXT\033]8;;\033\\
+        # URL format: logseq://graph/(encoded-graph-name)?page=(encoded-page-name)
+        from urllib.parse import quote
+        encoded_graph = quote(graph_name, safe='')
+        encoded_page = quote(page_name, safe='')
+        logseq_uri = f"logseq://graph/{encoded_graph}?page={encoded_page}"
+        clickable_link = f"\033]8;;{logseq_uri}\033\\{page_name}\033]8;;\033\\"
+
+        # Format snippet (exclude frontmatter properties, preserve original indentation)
+        snippet_lines = snippet.split('\n')
+
+        # Filter out frontmatter (property lines like "status:: value")
+        # Keep only bullet lines, preserving their original indentation
+        content_lines = []
+        for line in snippet_lines:
+            stripped = line.lstrip()
+            # Skip empty lines and property lines (contain :: but don't start with -)
+            if stripped and stripped.startswith('-'):
+                # Convert tabs to 2 spaces and keep original line with indentation intact
+                line_with_spaces = line.replace('\t', '  ')
+                content_lines.append(line_with_spaces)
+
+        # Show all content lines (full hierarchical context with original formatting)
+        if content_lines:
+            snippet_display = '\n   '.join(content_lines)  # Indent to align under "Relevance:"
+        else:
+            # Fallback if no bullet content (shouldn't happen)
+            snippet_display = "(no content preview)"
+
+        # Display result
+        click.echo(f"{idx}. {clickable_link}")
+        click.echo(f"   Relevance: {confidence}%")
+        click.echo(f"   {snippet_display}")
+        click.echo()  # Blank line between results
+
+
 def main():
     """Main entry point for setuptools console script."""
     cli()
