@@ -669,11 +669,11 @@ User should manually test:
 
 **Purpose**: Handle edge cases and provide helpful error messages
 
-- [ ] T110 [P] Implement missing config file error with example YAML in src/logsqueak/config.py
-- [ ] T111 [P] Implement config validation error messages with clear remediation in src/logsqueak/config.py
-- [ ] T112 [P] Implement file permission check (mode 600) for config file in src/logsqueak/config.py
-- [ ] T113 [P] Implement network error handling (connection refused, timeout, invalid API key) in src/logsqueak/services/llm_client.py
-- [ ] T114 [P] Implement malformed JSON handling in NDJSON streaming in src/logsqueak/services/llm_client.py
+- [x] T110 [P] Implement missing config file error with example YAML in src/logsqueak/config.py
+- [x] T111 [P] Implement config validation error messages with clear remediation in src/logsqueak/config.py
+- [x] T112 [P] Implement file permission check (mode 600) for config file in src/logsqueak/config.py
+- [x] T113 [P] Implement network error handling (connection refused, timeout, invalid API key) in src/logsqueak/services/llm_client.py
+- [x] T114 [P] Implement malformed JSON handling in NDJSON streaming in src/logsqueak/services/llm_client.py
 - [ ] T115 [P] Implement "No knowledge blocks identified" message in Phase 1 in src/logsqueak/tui/screens/block_selection.py
 - [ ] T116 [P] Implement "No relevant pages found" message in Phase 3 in src/logsqueak/tui/screens/integration_review.py
 - [ ] T117 [P] Implement atomic_write() function with temp-file-rename pattern (early+late modification checks, fsync, atomic rename) in src/logsqueak/services/file_operations.py
