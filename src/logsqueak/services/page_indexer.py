@@ -7,6 +7,7 @@ The encoder is initialized on first use (build_index), not at __init__.
 from pathlib import Path
 from typing import Optional, Callable, Any
 import hashlib
+import sqlite3
 import chromadb
 from logseq_outline.parser import LogseqOutline, LogseqBlock
 from logseq_outline.context import generate_chunks
@@ -215,6 +216,11 @@ class PageIndexer:
                 ids=chunk_ids,
                 metadatas=metadatas
             )
+
+            # Phase 6: Compact database to reclaim fragmented space
+            # Bulk upserts can leave ~70% wasted space due to SQLite fragmentation
+            self._vacuum_database()
+
             logger.info("page_indexing_completed", total_pages=len(page_files), chunks_indexed=len(all_chunks))
         else:
             logger.info("page_indexing_completed", total_pages=len(page_files), chunks_indexed=0, reason="all_up_to_date")
@@ -349,6 +355,31 @@ class PageIndexer:
             parts.append("\n".join(outline.frontmatter))
 
         return "\n".join(parts)
+
+    def _vacuum_database(self) -> None:
+        """Compact the SQLite database to reclaim fragmented space.
+
+        Bulk upsert operations can create significant SQLite fragmentation
+        (up to 70% wasted space). Running VACUUM after bulk operations
+        reclaims this space and reduces database file size.
+
+        This is a blocking operation but typically completes in <1 second
+        for typical graph sizes.
+        """
+        sqlite_path = self.db_path / "chroma.sqlite3"
+        if not sqlite_path.exists():
+            logger.warning("vacuum_skipped", reason="sqlite_not_found", path=str(sqlite_path))
+            return
+
+        try:
+            logger.debug("vacuum_started", db_path=str(sqlite_path))
+            conn = sqlite3.connect(str(sqlite_path))
+            conn.execute("VACUUM")
+            conn.close()
+            logger.debug("vacuum_completed", db_path=str(sqlite_path))
+        except Exception as e:
+            # VACUUM is an optimization - don't fail if it errors
+            logger.warning("vacuum_failed", error=str(e), db_path=str(sqlite_path))
 
     async def close(self) -> None:
         """Close ChromaDB client."""
