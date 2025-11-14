@@ -723,7 +723,7 @@ User should manually test:
 
 ### New Features
 
-- [ ] T136 Fix Phase 1 (block_selection.py) to handle multiple journal days correctly
+- [x] T136 Fix Phase 1 (block_selection.py) to handle multiple journal days correctly
   - Update journal loading to preserve date grouping in tree view
   - Verify navigation works across date boundaries
   - Add date headers in BlockTree widget for clarity

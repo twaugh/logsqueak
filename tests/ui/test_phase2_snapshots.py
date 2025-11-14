@@ -85,6 +85,12 @@ def journal_outline(sample_blocks_for_snapshot):
 
 
 @pytest.fixture
+def journals(journal_outline):
+    """Create journals dict for Phase2Screen."""
+    return {"2025-01-15": journal_outline}
+
+
+@pytest.fixture
 def graph_paths(tmp_path):
     """Create a temporary GraphPaths instance."""
     graph_dir = tmp_path / "test-graph"
@@ -105,7 +111,7 @@ def test_phase2_initial_render_snapshot(
     screen = Phase2Screen(
         blocks=sample_blocks_for_snapshot,
         edited_content=sample_edited_content_for_snapshot,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -126,7 +132,7 @@ def test_phase2_with_llm_rewording_complete(
     screen = Phase2Screen(
         blocks=sample_blocks_for_snapshot,
         edited_content=sample_edited_content_for_snapshot,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -147,7 +153,7 @@ def test_phase2_second_block_snapshot(
     screen = Phase2Screen(
         blocks=sample_blocks_for_snapshot,
         edited_content=sample_edited_content_for_snapshot,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -172,7 +178,7 @@ def test_phase2_three_panel_layout_snapshot(
     screen = Phase2Screen(
         blocks=sample_blocks_for_snapshot,
         edited_content=sample_edited_content_for_snapshot,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -196,7 +202,7 @@ def test_phase2_status_panel_snapshot(
     screen = Phase2Screen(
         blocks=sample_blocks_for_snapshot,
         edited_content=sample_edited_content_for_snapshot,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -222,7 +228,7 @@ def test_phase2_footer_snapshot(
     screen = Phase2Screen(
         blocks=sample_blocks_for_snapshot,
         edited_content=sample_edited_content_for_snapshot,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )

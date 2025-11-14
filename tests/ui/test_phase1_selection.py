@@ -55,10 +55,16 @@ def journal_outline(sample_blocks):
     return LogseqOutline(blocks=sample_blocks, source_text="", frontmatter=[])
 
 
+@pytest.fixture
+def journals(journal_outline):
+    """Create journals dict for Phase1Screen."""
+    return {"2025-01-15": journal_outline}
+
+
 @pytest.mark.asyncio
-async def test_space_toggles_selection_non_llm_block(sample_blocks, journal_outline):
+async def test_space_toggles_selection_non_llm_block(journals):
     """Test Space key toggles selection on non-LLM blocks (no suggestion)."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", journal_outline=journal_outline, auto_start_workers=False)
+    screen = Phase1Screen(journals=journals, auto_start_workers=False)
     app = Phase1TestApp(screen)
 
     async with app.run_test() as pilot:
@@ -90,7 +96,7 @@ async def test_space_toggles_selection_non_llm_block(sample_blocks, journal_outl
 
 
 @pytest.mark.asyncio
-async def test_space_toggles_llm_suggested_block(sample_blocks, journal_outline):
+async def test_space_toggles_llm_suggested_block(sample_blocks, journals):
     """Test Space key toggles LLM-suggested blocks between blue and green."""
     # Set up block with LLM suggestion (but NOT selected)
     block_states = {
@@ -107,10 +113,11 @@ async def test_space_toggles_llm_suggested_block(sample_blocks, journal_outline)
     # Create outline with just first block
     single_block_outline = LogseqOutline(blocks=[sample_blocks[0]], source_text="", frontmatter=[])
 
+    # Create journals dict
+    single_journals = {"2025-01-15": single_block_outline}
+
     screen = Phase1Screen(
-        blocks=[sample_blocks[0]],
-        journal_date="2025-01-15",
-        journal_outline=single_block_outline,
+        journals=single_journals,
         initial_block_states=block_states,
         auto_start_workers=False
     )
@@ -151,9 +158,9 @@ async def test_space_toggles_llm_suggested_block(sample_blocks, journal_outline)
 
 
 @pytest.mark.asyncio
-async def test_selection_updates_visual_indicator(sample_blocks, journal_outline):
+async def test_selection_updates_visual_indicator(journals):
     """Test that selection adds visual indicator (green highlight)."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", journal_outline=journal_outline, auto_start_workers=False)
+    screen = Phase1Screen(journals=journals, auto_start_workers=False)
     app = Phase1TestApp(screen)
 
     async with app.run_test() as pilot:
@@ -176,7 +183,7 @@ async def test_selection_updates_visual_indicator(sample_blocks, journal_outline
 
 
 @pytest.mark.asyncio
-async def test_accept_all_llm_suggestions(sample_blocks, journal_outline):
+async def test_accept_all_llm_suggestions(sample_blocks, journal_outline, journals):
     """Test 'a' key accepts all LLM suggestions."""
     # Set up block states with some LLM suggestions
     block_states = {
@@ -203,10 +210,11 @@ async def test_accept_all_llm_suggestions(sample_blocks, journal_outline):
         ),
     }
 
+    # Create journals dict
+    test_journals = {"2025-01-15": journal_outline}
+
     screen = Phase1Screen(
-        blocks=sample_blocks,
-        journal_date="2025-01-15",
-        journal_outline=journal_outline,
+        journals=test_journals,
         initial_block_states=block_states,
         auto_start_workers=False
     )
@@ -232,7 +240,7 @@ async def test_accept_all_llm_suggestions(sample_blocks, journal_outline):
 
 
 @pytest.mark.asyncio
-async def test_clear_all_selections(sample_blocks, journal_outline):
+async def test_clear_all_selections(sample_blocks, journal_outline, journals):
     """Test 'c' key clears all selections."""
     # Set up block states with some selected
     block_states = {
@@ -258,10 +266,11 @@ async def test_clear_all_selections(sample_blocks, journal_outline):
         ),
     }
 
+    # Create journals dict
+    test_journals = {"2025-01-15": journal_outline}
+
     screen = Phase1Screen(
-        blocks=sample_blocks,
-        journal_date="2025-01-15",
-        journal_outline=journal_outline,
+        journals=test_journals,
         initial_block_states=block_states,
         auto_start_workers=False
     )
@@ -285,7 +294,7 @@ async def test_clear_all_selections(sample_blocks, journal_outline):
 
 
 @pytest.mark.asyncio
-async def test_reset_to_llm_suggestion(sample_blocks, journal_outline):
+async def test_reset_to_llm_suggestion(sample_blocks, journals):
     """Test 'r' key resets current block to LLM suggestion."""
     # Set up a block with LLM suggestion but user override
     block_states = {
@@ -307,10 +316,11 @@ async def test_reset_to_llm_suggestion(sample_blocks, journal_outline):
     # Create outline with first two blocks
     two_block_outline = LogseqOutline(blocks=sample_blocks[:2], source_text="", frontmatter=[])
 
+    # Create journals dict
+    two_journals = {"2025-01-15": two_block_outline}
+
     screen = Phase1Screen(
-        blocks=sample_blocks[:2],
-        journal_date="2025-01-15",
-        journal_outline=two_block_outline,
+        journals=two_journals,
         initial_block_states=block_states
     )
     app = Phase1TestApp(screen)
@@ -332,9 +342,9 @@ async def test_reset_to_llm_suggestion(sample_blocks, journal_outline):
 
 
 @pytest.mark.asyncio
-async def test_next_button_enabled_when_blocks_selected(sample_blocks, journal_outline):
+async def test_next_button_enabled_when_blocks_selected(journals):
     """Test 'n' key is only enabled when at least one block is selected."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", journal_outline=journal_outline, auto_start_workers=False)
+    screen = Phase1Screen(journals=journals, auto_start_workers=False)
     app = Phase1TestApp(screen)
 
     async with app.run_test() as pilot:

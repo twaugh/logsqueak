@@ -138,7 +138,7 @@ def sample_page_contents():
 
 @pytest.mark.asyncio
 async def test_phase3_initial_render_snapshot(
-    snapshot, sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    snapshot, sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Snapshot test for initial Phase 3 screen render."""
     screen = Phase3Screen(
@@ -146,7 +146,7 @@ async def test_phase3_initial_render_snapshot(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -161,7 +161,7 @@ async def test_phase3_initial_render_snapshot(
 
 @pytest.mark.asyncio
 async def test_phase3_decision_list_snapshot(
-    snapshot, sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    snapshot, sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Snapshot test for decision list display."""
     screen = Phase3Screen(
@@ -169,7 +169,7 @@ async def test_phase3_decision_list_snapshot(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -187,7 +187,7 @@ async def test_phase3_decision_list_snapshot(
 
 @pytest.mark.asyncio
 async def test_phase3_with_completed_decision_snapshot(
-    snapshot, sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    snapshot, sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Snapshot test for screen with a completed decision (checkmark indicator)."""
     from unittest.mock import AsyncMock
@@ -197,7 +197,7 @@ async def test_phase3_with_completed_decision_snapshot(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -218,7 +218,7 @@ async def test_phase3_with_completed_decision_snapshot(
 
 @pytest.mark.asyncio
 async def test_phase3_with_failed_decision_snapshot(
-    snapshot, sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    snapshot, sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Snapshot test for screen with a failed decision (warning indicator)."""
     from unittest.mock import AsyncMock
@@ -228,7 +228,7 @@ async def test_phase3_with_failed_decision_snapshot(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -251,7 +251,7 @@ async def test_phase3_with_failed_decision_snapshot(
 
 @pytest.mark.asyncio
 async def test_phase3_target_preview_snapshot(
-    snapshot, sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    snapshot, sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Snapshot test for target page preview display."""
     screen = Phase3Screen(
@@ -259,7 +259,7 @@ async def test_phase3_target_preview_snapshot(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -277,7 +277,7 @@ async def test_phase3_target_preview_snapshot(
 
 @pytest.mark.asyncio
 async def test_phase3_footer_snapshot(
-    snapshot, sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    snapshot, sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Snapshot test for Phase 3 footer with keyboard shortcuts."""
     screen = Phase3Screen(
@@ -285,7 +285,7 @@ async def test_phase3_footer_snapshot(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )

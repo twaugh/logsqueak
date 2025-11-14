@@ -109,7 +109,7 @@ def sample_page_contents():
 
 @pytest.mark.asyncio
 async def test_target_block_not_found_error(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Test error handling when target block doesn't exist."""
     screen = Phase3Screen(
@@ -117,7 +117,7 @@ async def test_target_block_not_found_error(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -145,7 +145,7 @@ async def test_target_block_not_found_error(
 
 @pytest.mark.asyncio
 async def test_file_modified_externally_error(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Test error handling when file is modified externally during operation."""
     screen = Phase3Screen(
@@ -153,7 +153,7 @@ async def test_file_modified_externally_error(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -179,7 +179,7 @@ async def test_file_modified_externally_error(
 
 @pytest.mark.asyncio
 async def test_permission_error_during_write(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Test error handling for file permission errors."""
     screen = Phase3Screen(
@@ -187,7 +187,7 @@ async def test_permission_error_during_write(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -213,7 +213,7 @@ async def test_permission_error_during_write(
 
 @pytest.mark.asyncio
 async def test_page_file_not_found_error(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Test error handling when target page file doesn't exist."""
     screen = Phase3Screen(
@@ -221,7 +221,7 @@ async def test_page_file_not_found_error(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -246,7 +246,7 @@ async def test_page_file_not_found_error(
 
 @pytest.mark.asyncio
 async def test_error_message_displayed_in_ui(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Test that error messages are displayed in the UI."""
     screen = Phase3Screen(
@@ -254,7 +254,7 @@ async def test_error_message_displayed_in_ui(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -281,7 +281,7 @@ async def test_error_message_displayed_in_ui(
 
 @pytest.mark.asyncio
 async def test_failed_decision_can_be_retried(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Test that user can retry a failed decision."""
     screen = Phase3Screen(
@@ -289,7 +289,7 @@ async def test_failed_decision_can_be_retried(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -322,7 +322,7 @@ async def test_failed_decision_can_be_retried(
 
 @pytest.mark.asyncio
 async def test_error_details_suggest_remediation(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Test that error messages suggest remediation actions."""
     screen = Phase3Screen(
@@ -330,7 +330,7 @@ async def test_error_details_suggest_remediation(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -361,7 +361,7 @@ async def test_error_details_suggest_remediation(
 
 @pytest.mark.asyncio
 async def test_multiple_errors_handled_independently(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_journal_content
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_journal_content, sample_journals
 ):
     """Test that multiple failed decisions are tracked independently."""
     decisions = [
@@ -389,7 +389,7 @@ async def test_multiple_errors_handled_independently(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )

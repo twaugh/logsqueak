@@ -69,9 +69,15 @@ def journal_outline(sample_blocks):
     return LogseqOutline(blocks=sample_blocks, source_text="", frontmatter=[])
 
 
-def test_phase1_initial_render(snap_compare, sample_blocks, journal_outline):
+@pytest.fixture
+def journals(journal_outline):
+    """Create journals dict for Phase1Screen."""
+    return {"2025-01-15": journal_outline}
+
+
+def test_phase1_initial_render(snap_compare, journals):
     """Test Phase 1 screen initial appearance matches snapshot."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", journal_outline=journal_outline)
+    screen = Phase1Screen(journals=journals)
     app = Phase1TestApp(screen)
 
     assert snap_compare(
@@ -80,7 +86,7 @@ def test_phase1_initial_render(snap_compare, sample_blocks, journal_outline):
     )
 
 
-def test_phase1_with_llm_suggestions(snap_compare, sample_blocks, journal_outline):
+def test_phase1_with_llm_suggestions(snap_compare, journals):
     """Test Phase 1 screen with LLM suggestions displayed."""
     # Set up block states with LLM suggestions
     block_states = {
@@ -115,9 +121,7 @@ def test_phase1_with_llm_suggestions(snap_compare, sample_blocks, journal_outlin
     }
 
     screen = Phase1Screen(
-        blocks=sample_blocks,
-        journal_date="2025-01-15",
-        journal_outline=journal_outline,
+        journals=journals,
         initial_block_states=block_states
     )
     app = Phase1TestApp(screen)
@@ -128,7 +132,7 @@ def test_phase1_with_llm_suggestions(snap_compare, sample_blocks, journal_outlin
     )
 
 
-def test_phase1_with_user_selections(snap_compare, sample_blocks, journal_outline):
+def test_phase1_with_user_selections(snap_compare, journals):
     """Test Phase 1 screen with user selections (green highlights)."""
     # Set up block states with user selections
     block_states = {
@@ -161,9 +165,7 @@ def test_phase1_with_user_selections(snap_compare, sample_blocks, journal_outlin
     }
 
     screen = Phase1Screen(
-        blocks=sample_blocks,
-        journal_date="2025-01-15",
-        journal_outline=journal_outline,
+        journals=journals,
         initial_block_states=block_states
     )
     app = Phase1TestApp(screen)
@@ -174,15 +176,11 @@ def test_phase1_with_user_selections(snap_compare, sample_blocks, journal_outlin
     )
 
 
-def test_phase1_with_background_tasks(snap_compare, sample_blocks, journal_outline):
+def test_phase1_with_background_tasks(snap_compare, journals):
     """Test Phase 1 screen with background tasks in progress."""
     from logsqueak.models.background_task import BackgroundTask
 
-    test_screen = Phase1Screen(
-        blocks=sample_blocks,
-        journal_date="2025-01-15",
-        journal_outline=journal_outline
-    )
+    test_screen = Phase1Screen(journals=journals)
 
     # Set up background tasks
     test_screen.background_tasks = {
@@ -207,7 +205,7 @@ def test_phase1_with_background_tasks(snap_compare, sample_blocks, journal_outli
     )
 
 
-def test_phase1_with_processed_blocks(snap_compare, journal_outline):
+def test_phase1_with_processed_blocks(snap_compare, sample_blocks, journals):
     """Test Phase 1 screen with previously processed blocks."""
     # Create blocks with processed:: property
     blocks = [
@@ -269,10 +267,12 @@ def test_phase1_with_processed_blocks(snap_compare, journal_outline):
         ),
     }
 
+    # Create journal outline from blocks
+    test_outline = LogseqOutline(blocks=blocks, source_text="", frontmatter=[])
+    test_journals = {"2025-01-15": test_outline}
+
     screen = Phase1Screen(
-        blocks=blocks,
-        journal_date="2025-01-15",
-        journal_outline=journal_outline,
+        journals=test_journals,
         initial_block_states=block_states
     )
     app = Phase1TestApp(screen)

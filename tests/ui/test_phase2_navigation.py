@@ -83,6 +83,12 @@ def journal_outline(sample_blocks):
 
 
 @pytest.fixture
+def journals(journal_outline):
+    """Create journals dict for Phase2Screen."""
+    return {"2025-01-15": journal_outline}
+
+
+@pytest.fixture
 def graph_paths(tmp_path):
     """Create a temporary GraphPaths instance."""
     graph_dir = tmp_path / "test-graph"
@@ -98,7 +104,7 @@ async def test_navigate_with_j_key(sample_blocks, sample_edited_content, journal
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -124,7 +130,7 @@ async def test_navigate_with_k_key(sample_blocks, sample_edited_content, journal
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -153,7 +159,7 @@ async def test_navigate_with_arrow_keys(sample_blocks, sample_edited_content, jo
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -184,7 +190,7 @@ async def test_auto_save_on_navigation(sample_blocks, sample_edited_content, jou
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -214,7 +220,7 @@ async def test_navigation_only_works_when_editor_unfocused(sample_blocks, sample
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -256,7 +262,7 @@ async def test_navigation_wraps_at_boundaries(sample_blocks, sample_edited_conte
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -288,7 +294,7 @@ async def test_block_indicator_updates_on_navigation(sample_blocks, sample_edite
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )

@@ -59,6 +59,12 @@ def journal_outline(sample_blocks):
 
 
 @pytest.fixture
+def journals(journal_outline):
+    """Create journals dict for Phase2Screen."""
+    return {"2025-01-15": journal_outline}
+
+
+@pytest.fixture
 def graph_paths(tmp_path):
     """Create a temporary GraphPaths instance."""
     graph_dir = tmp_path / "test-graph"
@@ -74,7 +80,7 @@ async def test_tab_focuses_editor(sample_blocks, sample_edited_content, journal_
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -102,7 +108,7 @@ async def test_tab_unfocuses_editor(sample_blocks, sample_edited_content, journa
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -132,7 +138,7 @@ async def test_editor_border_highlights_when_focused(sample_blocks, sample_edite
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -158,7 +164,7 @@ async def test_can_type_in_focused_editor(sample_blocks, sample_edited_content, 
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -193,7 +199,7 @@ async def test_keyboard_shortcuts_disabled_when_focused(sample_blocks, sample_ed
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -235,7 +241,7 @@ async def test_cursor_appears_in_focused_editor(sample_blocks, sample_edited_con
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -274,7 +280,7 @@ async def test_editor_loads_current_content_on_display(sample_blocks, sample_edi
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )

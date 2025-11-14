@@ -78,9 +78,9 @@ async def test_phase1_to_phase2_transition(
     sample_journal_outline, mock_config, mock_services
 ):
     """Test that pressing 'n' in Phase 1 transitions to Phase 2 with selected blocks."""
+    journals = {"2025-01-15": sample_journal_outline}
     app = LogsqueakApp(
-        journal_outline=sample_journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         config=mock_config,
         **mock_services,
     )
@@ -140,9 +140,9 @@ async def test_phase2_to_phase3_transition(
     ml_page = graph_dir / "pages" / "Machine Learning.md"
     ml_page.write_text("- # Machine Learning\n  - Introduction to ML")
 
+    journals = {"2025-01-15": sample_journal_outline}
     app = LogsqueakApp(
-        journal_outline=sample_journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         config=mock_config,
         **mock_services,
     )
@@ -203,9 +203,9 @@ async def test_state_preservation_across_phases(
     from logsqueak.models.block_state import BlockState
     from logsqueak.models.edited_content import EditedContent
 
+    journals = {"2025-01-15": sample_journal_outline}
     app = LogsqueakApp(
-        journal_outline=sample_journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         config=mock_config,
         **mock_services,
     )
@@ -270,9 +270,9 @@ async def test_phase1_no_selection_blocks_phase2(
     sample_journal_outline, mock_config, mock_services
 ):
     """Test that Phase 1 doesn't transition to Phase 2 if no blocks selected."""
+    journals = {"2025-01-15": sample_journal_outline}
     app = LogsqueakApp(
-        journal_outline=sample_journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         config=mock_config,
         **mock_services,
     )

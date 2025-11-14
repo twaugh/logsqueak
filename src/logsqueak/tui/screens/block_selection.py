@@ -65,9 +65,7 @@ class Phase1Screen(Screen):
 
     def __init__(
         self,
-        blocks: list[LogseqBlock],
-        journal_date: str,
-        journal_outline: LogseqOutline,
+        journals: Dict[str, LogseqOutline],
         llm_client: Optional[LLMClient] = None,
         initial_block_states: Optional[Dict[str, BlockState]] = None,
         llm_stream_fn: Optional[Callable] = None,
@@ -78,18 +76,14 @@ class Phase1Screen(Screen):
         """Initialize Phase1Screen.
 
         Args:
-            blocks: List of LogseqBlock objects from journal
-            journal_date: Date string for journal (e.g., "2025-01-15")
-            journal_outline: Full journal outline (for LLM classification)
+            journals: Dictionary mapping date string (YYYY-MM-DD) to LogseqOutline
             llm_client: LLM client instance (None for testing with mock)
             initial_block_states: Optional pre-populated block states
             llm_stream_fn: Optional mock LLM streaming function (for testing)
             auto_start_workers: Whether to auto-start background workers on mount
         """
         super().__init__(*args, **kwargs)
-        self.blocks = blocks
-        self.journal_date = journal_date
-        self.journal_outline = journal_outline
+        self.journals = journals
         self.llm_client = llm_client
         self.llm_stream_fn = llm_stream_fn
         self.auto_start_workers = auto_start_workers
@@ -98,7 +92,7 @@ class Phase1Screen(Screen):
         if initial_block_states:
             self.block_states = initial_block_states
         else:
-            self.block_states = self._initialize_block_states(blocks)
+            self.block_states = self._initialize_block_states_from_journals(journals)
 
         # Background tasks tracking - use app.background_tasks in production, local dict in tests
         self._test_background_tasks: Dict[str, BackgroundTask] = {}
@@ -106,6 +100,24 @@ class Phase1Screen(Screen):
         # Workers
         self._llm_worker: Optional[Worker] = None
         self._indexing_worker: Optional[Worker] = None
+
+    def _initialize_block_states_from_journals(
+        self,
+        journals: Dict[str, LogseqOutline]
+    ) -> Dict[str, BlockState]:
+        """Initialize BlockState for all blocks across all journals.
+
+        Args:
+            journals: Dictionary mapping date to LogseqOutline
+
+        Returns:
+            Dictionary mapping block_id to BlockState
+        """
+        states = {}
+        for outline in journals.values():
+            block_states = self._initialize_block_states(outline.blocks)
+            states.update(block_states)
+        return states
 
     def _initialize_block_states(
         self,
@@ -151,9 +163,16 @@ class Phase1Screen(Screen):
         with Container(id="main-container"):
             with Vertical():
                 # Block tree (top panel)
+                # Generate tree label
+                dates = sorted(self.journals.keys())
+                if len(dates) == 1:
+                    tree_label = f"Journal Blocks ({dates[0]})"
+                else:
+                    tree_label = f"Journal Blocks ({len(dates)} days: {dates[0]} to {dates[-1]})"
+
                 yield BlockTree(
-                    f"Journal Blocks ({self.journal_date})",
-                    blocks=self.blocks,
+                    label=tree_label,
+                    journals=self.journals,
                     block_states=self.block_states,
                 )
 
@@ -365,8 +384,8 @@ class Phase1Screen(Screen):
             if block_id and block_id in self.block_states:
                 self.current_block_id = block_id
 
-                # Find the block
-                block = self._find_block_by_id(self.blocks, block_id)
+                # Find the block across all journals
+                block = self._find_block_in_journals(block_id)
                 if block:
                     state = self.block_states[block_id]
 
@@ -380,7 +399,7 @@ class Phase1Screen(Screen):
                     node = tree.get_node_at_line(tree.cursor_line)
                     if node and node.data:
                         block_id = node.data
-                        block = self._find_block_by_id(self.blocks, block_id)
+                        block = self._find_block_in_journals(block_id)
                         if block and block_id in self.block_states:
                             state = self.block_states[block_id]
                             panel = self.query_one(BlockDetailPanel)
@@ -390,6 +409,21 @@ class Phase1Screen(Screen):
         except:
             # Widget not ready yet
             pass
+
+    def _find_block_in_journals(self, block_id: str) -> Optional[LogseqBlock]:
+        """Find a LogseqBlock across all journals by id.
+
+        Args:
+            block_id: Block identifier to find
+
+        Returns:
+            LogseqBlock if found, None otherwise
+        """
+        for outline in self.journals.values():
+            result = self._find_block_by_id(outline.blocks, block_id)
+            if result:
+                return result
+        return None
 
     def _find_block_by_id(
         self,
@@ -512,43 +546,44 @@ class Phase1Screen(Screen):
             await self.app.acquire_llm_slot(request_id, LLMRequestPriority.CLASSIFICATION)
 
             try:
-                # Stream results from LLM (only returns knowledge blocks)
+                # Stream results from LLM for all journals (only returns knowledge blocks)
                 count = 0
-                async for chunk in classify_blocks(self.llm_client, self.journal_outline):
-                    block_id = chunk.block_id
-                    if block_id in self.block_states:
-                        state = self.block_states[block_id]
+                for journal_date, journal_outline in sorted(self.journals.items()):
+                    async for chunk in classify_blocks(self.llm_client, journal_outline):
+                        block_id = chunk.block_id
+                        if block_id in self.block_states:
+                            state = self.block_states[block_id]
 
-                        # All chunks are knowledge blocks (LLM filters out activity blocks)
-                        state.llm_classification = "knowledge"
-                        state.llm_confidence = chunk.confidence
-                        state.reason = chunk.reason
+                            # All chunks are knowledge blocks (LLM filters out activity blocks)
+                            state.llm_classification = "knowledge"
+                            state.llm_confidence = chunk.confidence
+                            state.reason = chunk.reason
 
-                        # Update visual (shows robot emoji but block not selected yet)
-                        tree = self.query_one(BlockTree)
-                        tree.update_block_label(block_id)
+                            # Update visual (shows robot emoji but block not selected yet)
+                            tree = self.query_one(BlockTree)
+                            tree.update_block_label(block_id)
 
-                        # Update bottom panel if this is the currently selected block
-                        if block_id == self.current_block_id:
-                            self._update_current_block()
+                            # Update bottom panel if this is the currently selected block
+                            if block_id == self.current_block_id:
+                                self._update_current_block()
 
-                        logger.info(
-                            "llm_classification_chunk",
-                            block_id=block_id,
-                            confidence=chunk.confidence,
-                            reason=chunk.reason[:100] if chunk.reason else None
-                        )
-                    else:
-                        logger.warning(
-                            "llm_classification_unknown_block",
-                            block_id=block_id
-                        )
+                            logger.info(
+                                "llm_classification_chunk",
+                                block_id=block_id,
+                                confidence=chunk.confidence,
+                                reason=chunk.reason[:100] if chunk.reason else None
+                            )
+                        else:
+                            logger.warning(
+                                "llm_classification_unknown_block",
+                                block_id=block_id
+                            )
 
-                    count += 1
+                        count += 1
 
-                    # Update progress
-                    self._background_tasks["llm_classification"].progress_current = count
-                    status_panel.update_status()
+                        # Update progress
+                        self._background_tasks["llm_classification"].progress_current = count
+                        status_panel.update_status()
 
                 # Mark complete and remove from background tasks
                 del self._background_tasks["llm_classification"]

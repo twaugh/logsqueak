@@ -58,6 +58,12 @@ def journal_outline(sample_blocks):
 
 
 @pytest.fixture
+def journals(journal_outline):
+    """Create journals dict for Phase1Screen."""
+    return {"2025-01-15": journal_outline}
+
+
+@pytest.fixture
 def mock_llm_classification_stream():
     """Mock LLM classification streaming results (only returns knowledge blocks)."""
     async def stream():
@@ -81,12 +87,10 @@ def mock_llm_classification_stream():
 
 
 @pytest.mark.asyncio
-async def test_llm_results_appear_incrementally(sample_blocks, journal_outline, mock_llm_classification_stream):
+async def test_llm_results_appear_incrementally(journals, mock_llm_classification_stream):
     """Test UI updates as LLM results stream in."""
     screen = Phase1Screen(
-        blocks=sample_blocks,
-        journal_date="2025-01-15",
-        journal_outline=journal_outline,
+        journals=journals,
         llm_stream_fn=mock_llm_classification_stream,
         auto_start_workers=False
     )
@@ -133,12 +137,10 @@ async def test_llm_results_appear_incrementally(sample_blocks, journal_outline, 
 
 
 @pytest.mark.asyncio
-async def test_robot_emoji_appears_on_llm_suggestion(sample_blocks, journal_outline, mock_llm_classification_stream):
+async def test_robot_emoji_appears_on_llm_suggestion(journals, mock_llm_classification_stream):
     """Test robot emoji appears when LLM suggests a block as knowledge."""
     screen = Phase1Screen(
-        blocks=sample_blocks,
-        journal_date="2025-01-15",
-        journal_outline=journal_outline,
+        journals=journals,
         llm_stream_fn=mock_llm_classification_stream,
         auto_start_workers=False
     )
@@ -168,12 +170,10 @@ async def test_robot_emoji_appears_on_llm_suggestion(sample_blocks, journal_outl
 
 
 @pytest.mark.asyncio
-async def test_bottom_panel_shows_llm_reasoning(sample_blocks, journal_outline, mock_llm_classification_stream):
+async def test_bottom_panel_shows_llm_reasoning(journals, mock_llm_classification_stream):
     """Test bottom panel displays LLM reasoning when block is selected."""
     screen = Phase1Screen(
-        blocks=sample_blocks,
-        journal_date="2025-01-15",
-        journal_outline=journal_outline,
+        journals=journals,
         llm_stream_fn=mock_llm_classification_stream,
         auto_start_workers=False
     )
@@ -205,12 +205,10 @@ async def test_bottom_panel_shows_llm_reasoning(sample_blocks, journal_outline, 
 
 
 @pytest.mark.asyncio
-async def test_classification_can_continue_during_user_interaction(sample_blocks, journal_outline, mock_llm_classification_stream):
+async def test_classification_can_continue_during_user_interaction(journals, mock_llm_classification_stream):
     """Test user can interact with UI while LLM classification is running."""
     screen = Phase1Screen(
-        blocks=sample_blocks,
-        journal_date="2025-01-15",
-        journal_outline=journal_outline,
+        journals=journals,
         llm_stream_fn=mock_llm_classification_stream,
         auto_start_workers=False
     )

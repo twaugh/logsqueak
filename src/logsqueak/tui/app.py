@@ -102,8 +102,7 @@ class LogsqueakApp(App):
 
     def __init__(
         self,
-        journal_outline: LogseqOutline,
-        journal_date: str,
+        journals: Dict[str, LogseqOutline],
         config: Config,
         llm_client: LLMClient,
         page_indexer: PageIndexer,
@@ -113,8 +112,7 @@ class LogsqueakApp(App):
         """Initialize the Logsqueak app.
 
         Args:
-            journal_outline: Parsed journal entry
-            journal_date: Date of journal entry (YYYY-MM-DD format)
+            journals: Dictionary mapping date string (YYYY-MM-DD) to LogseqOutline
             config: Application configuration
             llm_client: LLM client for streaming responses
             page_indexer: Page indexing service for RAG
@@ -123,10 +121,12 @@ class LogsqueakApp(App):
         """
         super().__init__()
 
-        # Augment journal outline with temporary IDs for blocks without explicit id:: properties
+        # Augment all journal outlines with temporary IDs for blocks without explicit id:: properties
         # This ensures all blocks have stable IDs for LLM classification and tracking
-        self.journal_outline = _augment_outline_with_ids(journal_outline)
-        self.journal_date = journal_date
+        self.journals = {
+            date: _augment_outline_with_ids(outline)
+            for date, outline in journals.items()
+        }
 
         # Store services
         self.config = config
@@ -159,10 +159,14 @@ class LogsqueakApp(App):
         self._current_llm_request: Optional[str] = None  # Current request ID being processed
         self._active_llm_workers: Dict[str, Worker] = {}  # Track active Textual Worker instances for cancellation
 
+        # Calculate total blocks across all journals
+        total_blocks = sum(len(outline.blocks) for outline in self.journals.values())
+
         logger.info(
             "app_initialized",
-            journal_date=journal_date,
-            num_blocks=len(journal_outline.blocks),
+            num_journals=len(self.journals),
+            journal_dates=list(self.journals.keys()),
+            total_blocks=total_blocks,
         )
 
     def on_mount(self) -> None:
@@ -175,9 +179,7 @@ class LogsqueakApp(App):
         # Create and push Phase 1 screen FIRST (so it shows immediately)
         logger.info("creating_phase1_screen")
         phase1_screen = Phase1Screen(
-            blocks=self.journal_outline.blocks,
-            journal_date=self.journal_date,
-            journal_outline=self.journal_outline,
+            journals=self.journals,
             llm_client=self.llm_client,
             auto_start_workers=True,  # Auto-start LLM classification
             name="phase1",
@@ -462,17 +464,22 @@ class LogsqueakApp(App):
 
             block = None
             hierarchical_context = ""
+            journal_outline = None
 
-            # First pass: Find the block using hybrid IDs (WITH frontmatter for matching)
-            for found_block, context, hybrid_id in generate_chunks(self.journal_outline):
-                if hybrid_id == block_state.block_id:
-                    block = found_block
-                    # Don't use context yet - it includes frontmatter
+            # First pass: Find the block across all journals using hybrid IDs
+            for date, outline in self.journals.items():
+                for found_block, context, hybrid_id in generate_chunks(outline):
+                    if hybrid_id == block_state.block_id:
+                        block = found_block
+                        journal_outline = outline
+                        # Don't use context yet - it includes frontmatter
+                        break
+                if block:
                     break
 
             # Second pass: Generate hierarchical context WITHOUT frontmatter
             # We need to rebuild the parent chain to generate clean context
-            if block:
+            if block and journal_outline:
                 # Find parent chain by walking the tree
                 def find_block_with_parents(target_block, blocks, parents=[]):
                     for b in blocks:
@@ -483,13 +490,13 @@ class LogsqueakApp(App):
                             return result
                     return None
 
-                parents = find_block_with_parents(block, self.journal_outline.blocks) or []
+                parents = find_block_with_parents(block, journal_outline.blocks) or []
 
                 # Generate context WITHOUT frontmatter
                 hierarchical_context = generate_full_context(
                     block,
                     parents,
-                    indent_str=self.journal_outline.indent_str,
+                    indent_str=journal_outline.indent_str,
                     frontmatter=None  # Exclude frontmatter
                 )
 
@@ -512,18 +519,23 @@ class LogsqueakApp(App):
 
         selected_logseq_blocks = []
         for block_state in selected_blocks:
-            block = self.journal_outline.find_block_by_id(block_state.block_id)
-            if block:
-                selected_logseq_blocks.append(block)
+            # Search across all journals
+            block = None
+            for outline in self.journals.values():
+                block = outline.find_block_by_id(block_state.block_id)
+                if block:
+                    selected_logseq_blocks.append(block)
+                    break
 
         # Create GraphPaths from config
         graph_paths = GraphPaths(Path(self.config.logseq.graph_path))
 
-        # Create and push Phase 2 screen
+        # For Phase 2, we pass journals dict instead of single outline
+        # Phase2Screen will need to handle multiple journals
         phase2_screen = Phase2Screen(
             blocks=selected_logseq_blocks,
             edited_content=self.edited_content,
-            journal_outline=self.journal_outline,
+            journals=self.journals,
             graph_paths=graph_paths,
             llm_client=self.llm_client,
             rag_search=self.rag_search,
@@ -571,11 +583,24 @@ class LogsqueakApp(App):
             self.original_contexts[content.block_id] = content.hierarchical_context
 
         # Filter journal blocks to only include edited ones (preserving order)
+        # Collect blocks from all journals
         edited_block_ids = {ec.block_id for ec in edited_content}
+        all_journal_blocks = []
+        for outline in self.journals.values():
+            all_journal_blocks.extend(outline.blocks)
+
         filtered_journal_blocks = self._filter_blocks_by_ids(
-            self.journal_outline.blocks,
+            all_journal_blocks,
             edited_block_ids
         )
+
+        # Combine all journal content for preview (concatenate all journals)
+        journal_contents = []
+        for date in sorted(self.journals.keys()):
+            journal_contents.append(f"# {date}\n\n")
+            journal_contents.append(self.journals[date].render())
+            journal_contents.append("\n\n")
+        combined_journal_content = "".join(journal_contents)
 
         # Create and push Phase 3 screen with shared decisions list
         # Phase 3 will use self.integration_decisions which is being populated
@@ -584,8 +609,8 @@ class LogsqueakApp(App):
             journal_blocks=filtered_journal_blocks,
             edited_content=edited_content,
             page_contents=page_contents,
-            journal_date=self.journal_date,
-            journal_content=self.journal_outline.render(),  # Full journal content for preview
+            journals=self.journals,
+            journal_content=combined_journal_content,  # Combined journal content for preview
             llm_client=None,  # Decisions are generated in Phase 2
             graph_paths=GraphPaths(Path(self.config.logseq.graph_path)),
             file_monitor=self.file_monitor,

@@ -89,9 +89,9 @@ def sample_journal_outline():
 
 def test_app_instantiates_without_errors(mock_services, sample_journal_outline):
     """Test that App instantiates without errors."""
+    journals = {"2025-01-15": sample_journal_outline}
     app = LogsqueakApp(
-        journal_outline=sample_journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         **mock_services,
     )
 
@@ -104,26 +104,27 @@ def test_app_instantiates_without_errors(mock_services, sample_journal_outline):
 
 
 def test_app_tracks_journal_outline(mock_services, sample_journal_outline):
-    """Test that App tracks journal outline and date."""
+    """Test that App tracks journal outlines dict."""
+    journals = {"2025-01-15": sample_journal_outline}
     app = LogsqueakApp(
-        journal_outline=sample_journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         **mock_services,
     )
 
-    # Note: app.journal_outline is augmented with IDs, so check structure instead of equality
-    assert len(app.journal_outline.blocks) == len(sample_journal_outline.blocks)
-    assert app.journal_date == "2025-01-15"
+    # Note: app.journals values are augmented with IDs, so check structure instead of equality
+    assert len(app.journals) == 1
+    assert "2025-01-15" in app.journals
+    assert len(app.journals["2025-01-15"].blocks) == len(sample_journal_outline.blocks)
     # All blocks should have IDs after augmentation
-    for block in app.journal_outline.blocks:
+    for block in app.journals["2025-01-15"].blocks:
         assert block.block_id is not None
 
 
 def test_app_tracks_current_phase_state(mock_services, sample_journal_outline):
     """Test that App tracks current phase state."""
+    journals = {"2025-01-15": sample_journal_outline}
     app = LogsqueakApp(
-        journal_outline=sample_journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         **mock_services,
     )
 
@@ -145,25 +146,25 @@ def test_app_tracks_current_phase_state(mock_services, sample_journal_outline):
 @pytest.mark.asyncio
 async def test_app_can_install_phase1_screen(mock_services, sample_journal_outline):
     """Test that App can install Phase1Screen."""
+    journals = {"2025-01-15": sample_journal_outline}
     app = LogsqueakApp(
-        journal_outline=sample_journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         **mock_services,
     )
 
     # App should have on_mount method that installs screens
     assert hasattr(app, "on_mount")
     # App tracks journal data needed for screen creation
-    assert app.journal_outline is not None
-    assert app.journal_date == "2025-01-15"
+    assert app.journals is not None
+    assert "2025-01-15" in app.journals
 
 
 @pytest.mark.asyncio
 async def test_app_starts_with_phase1(mock_services, sample_journal_outline):
     """Test that App starts with Phase 1 screen."""
+    journals = {"2025-01-15": sample_journal_outline}
     app = LogsqueakApp(
-        journal_outline=sample_journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         **mock_services,
     )
 
@@ -175,9 +176,9 @@ async def test_app_starts_with_phase1(mock_services, sample_journal_outline):
 
 def test_app_augments_outline_with_ids(mock_services, sample_journal_outline):
     """Test that App augments journal outline with IDs for all blocks."""
+    journals = {"2025-01-15": sample_journal_outline}
     app = LogsqueakApp(
-        journal_outline=sample_journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         **mock_services,
     )
 
@@ -189,7 +190,7 @@ def test_app_augments_outline_with_ids(mock_services, sample_journal_outline):
             if block.children:
                 check_blocks_have_ids(block.children)
 
-    check_blocks_have_ids(app.journal_outline.blocks)
+    check_blocks_have_ids(app.journals["2025-01-15"].blocks)
 
 
 @pytest.mark.asyncio
@@ -197,9 +198,9 @@ async def test_transition_to_phase2_filters_id_property(mock_services, sample_jo
     """Test that transition_to_phase2 excludes id:: property from editable content."""
     from logsqueak.models.block_state import BlockState
 
+    journals = {"2025-01-15": sample_journal_outline}
     app = LogsqueakApp(
-        journal_outline=sample_journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         **mock_services,
     )
 
@@ -208,7 +209,7 @@ async def test_transition_to_phase2_filters_id_property(mock_services, sample_jo
 
         # Create a selected block (simulating Phase 1 completion)
         # The augmented outline will have id:: properties added
-        first_block = app.journal_outline.blocks[0]
+        first_block = app.journals["2025-01-15"].blocks[0]
 
         selected_blocks = [
             BlockState(

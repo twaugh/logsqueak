@@ -60,6 +60,12 @@ def journal_outline(sample_blocks):
 
 
 @pytest.fixture
+def journals(journal_outline):
+    """Create journals dict for Phase2Screen."""
+    return {"2025-01-15": journal_outline}
+
+
+@pytest.fixture
 def graph_paths(tmp_path):
     """Create a temporary GraphPaths instance."""
     graph_dir = tmp_path / "test-graph"
@@ -75,7 +81,7 @@ async def test_n_key_blocked_when_page_indexing_running(sample_blocks, sample_ed
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -101,7 +107,7 @@ async def test_n_key_blocked_when_rag_search_running(sample_blocks, sample_edite
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -128,7 +134,7 @@ async def test_n_key_enabled_when_all_tasks_complete(sample_blocks, sample_edite
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -153,7 +159,7 @@ async def test_status_message_when_waiting_for_page_index(sample_blocks, sample_
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -177,7 +183,7 @@ async def test_status_message_when_waiting_for_rag_search(sample_blocks, sample_
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -200,7 +206,7 @@ async def test_rag_search_starts_after_page_indexing_completes(sample_blocks, sa
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -229,7 +235,7 @@ async def test_footer_shows_n_disabled_while_waiting(sample_blocks, sample_edite
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -253,7 +259,7 @@ async def test_status_updates_with_rag_search_progress(sample_blocks, sample_edi
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -279,7 +285,7 @@ async def test_page_indexing_error_shows_message(sample_blocks, sample_edited_co
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -304,7 +310,7 @@ async def test_rag_search_error_shows_message(sample_blocks, sample_edited_conte
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )

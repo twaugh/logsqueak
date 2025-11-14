@@ -194,9 +194,9 @@ async def test_full_workflow_phase1_to_phase2_to_phase3(
     client, mock_classify, mock_reword, mock_decisions = mock_llm_client
 
     # Initialize app with mocked services
+    journals = {"2025-01-15": sample_journal_outline}
     app = LogsqueakApp(
-        journal_outline=sample_journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         config=mock_config,
         llm_client=client,
         page_indexer=mock_page_indexer,
@@ -205,9 +205,9 @@ async def test_full_workflow_phase1_to_phase2_to_phase3(
     )
 
     # Verify app initialized with correct state
-    assert app.journal_date == "2025-01-15"
-    # Note: app.journal_outline is augmented with IDs, so it won't equal the original
-    assert len(app.journal_outline.blocks) == len(sample_journal_outline.blocks)
+    assert "2025-01-15" in app.journals
+    # Note: app.journals values are augmented with IDs, so won't equal the original
+    assert len(app.journals["2025-01-15"].blocks) == len(sample_journal_outline.blocks)
     assert app.config == mock_config
     assert app.llm_client == client
     assert app.page_indexer == mock_page_indexer
@@ -237,9 +237,9 @@ async def test_app_initialization_with_services(
     """Test that app initializes correctly with all services wired up."""
     client, _, _, _ = mock_llm_client
 
+    journals = {"2025-01-15": sample_journal_outline}
     app = LogsqueakApp(
-        journal_outline=sample_journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         config=mock_config,
         llm_client=client,
         page_indexer=mock_page_indexer,
@@ -255,11 +255,11 @@ async def test_app_initialization_with_services(
     assert app.config is not None
 
     # Verify journal data is stored (outline is augmented with IDs)
-    assert app.journal_outline is not None
-    assert app.journal_date == "2025-01-15"
-    assert len(app.journal_outline.blocks) == 3
+    assert app.journals is not None
+    assert "2025-01-15" in app.journals
+    assert len(app.journals["2025-01-15"].blocks) == 3
     # All blocks should have IDs after augmentation
-    for block in app.journal_outline.blocks:
+    for block in app.journals["2025-01-15"].blocks:
         assert block.block_id is not None
 
 
@@ -279,9 +279,9 @@ async def test_app_can_initialize_without_crashing(
     client, _, _, _ = mock_llm_client
 
     try:
+        journals = {"2025-01-15": sample_journal_outline}
         app = LogsqueakApp(
-            journal_outline=sample_journal_outline,
-            journal_date="2025-01-15",
+            journals=journals,
             config=mock_config,
             llm_client=client,
             page_indexer=mock_page_indexer,

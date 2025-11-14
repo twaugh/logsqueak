@@ -224,21 +224,16 @@ def extract(date_or_range: str = None):
     file_monitor = FileMonitor()
     logger.info("file_monitor_initialized")
 
-    # For single-journal case, use the only journal
-    # For multi-journal case, use the first one (or could show picker in future)
-    journal_date = list(journals.keys())[0]
-    journal_outline = journals[journal_date]
-
-    # Record initial journal file
-    journal_path = graph_paths.get_journal_path(journal_date)
-    file_monitor.record(journal_path)
-    logger.info("journal_recorded_in_file_monitor", date=journal_date, path=str(journal_path))
+    # Record all journal files in file monitor
+    for journal_date in journals.keys():
+        journal_path = graph_paths.get_journal_path(journal_date)
+        file_monitor.record(journal_path)
+        logger.info("journal_recorded_in_file_monitor", date=journal_date, path=str(journal_path))
 
     # Initialize and launch TUI app
-    logger.info("launching_tui", journal_date=journal_date)
+    logger.info("launching_tui", journal_count=len(journals))
     app = LogsqueakApp(
-        journal_outline=journal_outline,
-        journal_date=journal_date,
+        journals=journals,
         config=config,
         llm_client=llm_client,
         page_indexer=page_indexer,

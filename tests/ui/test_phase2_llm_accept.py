@@ -90,6 +90,12 @@ def journal_outline(sample_blocks):
 
 
 @pytest.fixture
+def journals(journal_outline):
+    """Create journals dict for Phase2Screen."""
+    return {"2025-01-15": journal_outline}
+
+
+@pytest.fixture
 def graph_paths(tmp_path):
     """Create a temporary GraphPaths instance."""
     graph_dir = tmp_path / "test-graph"
@@ -105,7 +111,7 @@ async def test_accept_llm_version_when_available(sample_blocks, sample_edited_co
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_with_rewording,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -136,7 +142,7 @@ async def test_accept_llm_disabled_when_not_available(sample_blocks, sample_edit
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_pending_rewording,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -165,7 +171,7 @@ async def test_accept_llm_only_works_when_unfocused(sample_blocks, sample_edited
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_with_rewording,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -212,7 +218,7 @@ async def test_accept_llm_updates_indicator(sample_blocks, sample_edited_content
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_with_rewording,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -237,7 +243,7 @@ async def test_accept_llm_after_manual_edit(sample_blocks, sample_edited_content
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_with_rewording,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -273,7 +279,7 @@ async def test_llm_version_display_when_available(sample_blocks, sample_edited_c
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_with_rewording,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -295,7 +301,7 @@ async def test_llm_version_shows_loading_when_pending(sample_blocks, sample_edit
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_pending_rewording,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )

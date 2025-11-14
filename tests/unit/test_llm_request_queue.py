@@ -85,9 +85,9 @@ class TestLLMRequestQueue:
         mock_file_monitor
     ):
         """Create test app instance."""
+        journals = {"2025-01-15": mock_journal_outline}
         app = LogsqueakApp(
-            journal_outline=mock_journal_outline,
-            journal_date="2025-01-15",
+            journals=journals,
             config=mock_config,
             llm_client=mock_llm_client,
             page_indexer=mock_page_indexer,

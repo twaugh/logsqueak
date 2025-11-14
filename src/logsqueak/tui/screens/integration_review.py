@@ -105,7 +105,7 @@ class Phase3Screen(Screen):
         journal_blocks: list[LogseqBlock],
         edited_content: list[EditedContent],
         page_contents: Dict[str, LogseqOutline],
-        journal_date: str,
+        journals: Dict[str, LogseqOutline],
         journal_content: str,
         llm_client: Optional[LLMClient] = None,
         graph_paths: Optional[GraphPaths] = None,
@@ -120,7 +120,7 @@ class Phase3Screen(Screen):
             journal_blocks: Original journal blocks (for context)
             edited_content: Refined content from Phase 2
             page_contents: Dict mapping page names to LogseqOutline (from Phase 2 RAG)
-            journal_date: Journal date (YYYY-MM-DD)
+            journals: Dictionary mapping date string (YYYY-MM-DD) to LogseqOutline
             journal_content: Full journal content (markdown text for preview)
             llm_client: LLM client instance (None for testing with pre-generated decisions)
             graph_paths: GraphPaths instance for file operations
@@ -132,12 +132,19 @@ class Phase3Screen(Screen):
         self.journal_blocks = journal_blocks
         self.edited_content = edited_content
         self.page_contents = page_contents
-        self.journal_date = journal_date
+        self.journals = journals
         self.journal_content = journal_content
         self.llm_client = llm_client
         self.graph_paths = graph_paths
         self.file_monitor = file_monitor or FileMonitor()
         self.auto_start_workers = auto_start_workers
+
+        # Build mapping from block_id to journal date
+        from logseq_outline.context import generate_chunks
+        self.block_to_date = {}
+        for date, outline in journals.items():
+            for block, _, hybrid_id in generate_chunks(outline):
+                self.block_to_date[hybrid_id] = date
 
         # Map block_id to EditedContent for quick lookup
         self.edited_content_map = {ec.block_id: ec for ec in edited_content}
@@ -321,7 +328,17 @@ class Phase3Screen(Screen):
 
         # Display journal context with highlighted block
         journal_preview = self.query_one("#journal-preview", TargetPagePreview)
-        journal_preview.border_title = f"Journal Context: {self.journal_date}"
+        # Get the date for this block
+        block_date = self.block_to_date.get(block_id)
+        if block_date:
+            journal_preview.border_title = f"Journal Context: {block_date}"
+        else:
+            # Fallback for multi-journal case
+            dates = sorted(self.journals.keys())
+            if len(dates) == 1:
+                journal_preview.border_title = f"Journal Context: {dates[0]}"
+            else:
+                journal_preview.border_title = f"Journal Context: {dates[0]} to {dates[-1]}"
         await journal_preview.load_preview(self.journal_content, block_id)
 
         # Get decisions for this block
@@ -609,9 +626,15 @@ Confidence: {decision.confidence:.0%}
         # Full implementation would call write_integration_atomic
         # For now, this is a placeholder that tests can mock
         if self.graph_paths:
+            # Get the journal date for this block
+            journal_date = self.block_to_date.get(decision.knowledge_block_id)
+            if not journal_date:
+                # Fallback: use first date if we can't determine which journal
+                journal_date = sorted(self.journals.keys())[0]
+
             await write_integration_atomic(
                 decision=decision,
-                journal_date=self.journal_date,
+                journal_date=journal_date,
                 graph_paths=self.graph_paths,
                 file_monitor=self.file_monitor
             )
@@ -962,15 +985,26 @@ Confidence: {decision.confidence:.0%}
         if failed_count > 0:
             summary_lines.append(f"    - **Failed:** {failed_count} ⚠")
 
-        # Add journal link
+        # Add journal link(s)
         if self.graph_paths:
-            journal_path = self.graph_paths.get_journal_path(self.journal_date)
-            summary_lines.extend([
-                "  - ## Journal Entry",
-                "    - Journal entry updated with provenance markers:",
-                f"      `{journal_path}`",
-                "    - You can view the processed blocks in your Logseq graph with the `processed::` property.",
-            ])
+            dates = sorted(self.journals.keys())
+            if len(dates) == 1:
+                journal_path = self.graph_paths.get_journal_path(dates[0])
+                summary_lines.extend([
+                    "  - ## Journal Entry",
+                    "    - Journal entry updated with provenance markers:",
+                    f"      `{journal_path}`",
+                    "    - You can view the processed blocks in your Logseq graph with the `processed::` property.",
+                ])
+            else:
+                summary_lines.extend([
+                    "  - ## Journal Entries",
+                    "    - Journal entries updated with provenance markers:",
+                ])
+                for date in dates:
+                    journal_path = self.graph_paths.get_journal_path(date)
+                    summary_lines.append(f"      - `{journal_path}`")
+                summary_lines.append("    - You can view the processed blocks in your Logseq graph with the `processed::` property.")
 
         summary_lines.extend([
             "  - ---",

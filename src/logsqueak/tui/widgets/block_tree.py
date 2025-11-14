@@ -9,7 +9,7 @@ from typing import Dict, Optional
 from textual.widgets import Tree
 from textual.widgets.tree import TreeNode
 from rich.text import Text
-from logseq_outline.parser import LogseqBlock
+from logseq_outline.parser import LogseqBlock, LogseqOutline
 from logsqueak.models.block_state import BlockState
 
 
@@ -19,7 +19,7 @@ class BlockTree(Tree):
     def __init__(
         self,
         label: str,
-        blocks: list[LogseqBlock],
+        journals: Dict[str, 'LogseqOutline'],
         block_states: Dict[str, BlockState],
         *args,
         **kwargs
@@ -28,18 +28,36 @@ class BlockTree(Tree):
 
         Args:
             label: Root label for the tree
-            blocks: List of LogseqBlock objects to display
+            journals: Dictionary mapping date string (YYYY-MM-DD) to LogseqOutline
             block_states: Dictionary mapping block_id to BlockState
         """
         super().__init__(label, *args, id="block-tree", **kwargs)
-        self.blocks = blocks
+        self.journals = journals
         self.block_states = block_states
 
     def on_mount(self) -> None:
         """Build tree structure when widget is mounted."""
         self.root.expand()
-        for block in self.blocks:
-            self._add_block_to_tree(block, self.root)
+
+        # Sort journals by date and add date headers if multiple journals
+        sorted_dates = sorted(self.journals.keys())
+
+        if len(sorted_dates) == 1:
+            # Single journal - add blocks directly without date header
+            date = sorted_dates[0]
+            for block in self.journals[date].blocks:
+                self._add_block_to_tree(block, self.root)
+        else:
+            # Multiple journals - add date headers
+            for date in sorted_dates:
+                # Create date header node
+                from rich.text import Text
+                date_header = Text(f"📅 {date}", style="bold cyan")
+                date_node = self.root.add(date_header, data=None, expand=True)
+
+                # Add blocks under date header
+                for block in self.journals[date].blocks:
+                    self._add_block_to_tree(block, date_node)
 
         # Set cursor to first actual block (line 1, since line 0 is root)
         if self.root.children:
@@ -102,7 +120,7 @@ class BlockTree(Tree):
         state = self.block_states.get(block_id)
 
         # Find the actual LogseqBlock to check for processed:: property
-        block = self._find_block_by_id(self.blocks, block_id)
+        block = self._find_block_in_journals(block_id)
         is_processed = block and block.get_property("processed") is not None
 
         label = Text()
@@ -143,8 +161,8 @@ class BlockTree(Tree):
         # Find the node with this block_id
         node = self._find_node_by_block_id(self.root, block_id)
         if node:
-            # Get block content from original blocks list
-            block = self._find_block_by_id(self.blocks, block_id)
+            # Get block content from journals
+            block = self._find_block_in_journals(block_id)
             if block:
                 content = block.get_full_content(normalize_whitespace=True)
                 first_line = content.split('\n')[0] if content else ""
@@ -172,6 +190,21 @@ class BlockTree(Tree):
             if result:
                 return result
 
+        return None
+
+    def _find_block_in_journals(self, block_id: str) -> Optional[LogseqBlock]:
+        """Find a LogseqBlock across all journals by id.
+
+        Args:
+            block_id: Block identifier to find
+
+        Returns:
+            LogseqBlock if found, None otherwise
+        """
+        for outline in self.journals.values():
+            result = self._find_block_by_id(outline.blocks, block_id)
+            if result:
+                return result
         return None
 
     def _find_block_by_id(

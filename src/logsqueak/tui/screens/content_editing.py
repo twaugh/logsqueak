@@ -117,7 +117,7 @@ class Phase2Screen(Screen):
         self,
         blocks: list[LogseqBlock],
         edited_content: list[EditedContent],
-        journal_outline: LogseqOutline,
+        journals: Dict[str, LogseqOutline],
         graph_paths: GraphPaths,
         llm_client: Optional[LLMClient] = None,
         rag_search: Optional[RAGSearch] = None,
@@ -129,7 +129,7 @@ class Phase2Screen(Screen):
         Args:
             blocks: List of selected knowledge blocks
             edited_content: List of EditedContent for each block
-            journal_outline: Full journal outline (for LLM rewording)
+            journals: Dictionary mapping date string (YYYY-MM-DD) to LogseqOutline
             graph_paths: GraphPaths instance for loading page contents
             llm_client: LLM client instance (None for testing)
             rag_search: RAG search service instance (None for testing)
@@ -138,7 +138,7 @@ class Phase2Screen(Screen):
         super().__init__(**kwargs)
         self.blocks = blocks
         self.edited_content = edited_content
-        self.journal_outline = journal_outline
+        self.journals = journals
         self.graph_paths = graph_paths
         self.llm_client = llm_client
         self.rag_search = rag_search
@@ -547,10 +547,12 @@ class Phase2Screen(Screen):
             try:
                 # Stream reworded content from LLM
                 count = 0
+                # Get first journal for indent detection (all should have same indent)
+                first_journal = next(iter(self.journals.values()))
                 async for chunk in reword_content(
                     self.llm_client,
                     self.edited_content,
-                    self.journal_outline
+                    first_journal
                 ):
                     block_id = chunk.block_id
                     if block_id in self.edited_content_map:

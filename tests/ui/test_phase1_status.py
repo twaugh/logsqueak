@@ -51,10 +51,16 @@ def journal_outline(sample_blocks):
     return LogseqOutline(blocks=sample_blocks, source_text="", frontmatter=[])
 
 
+@pytest.fixture
+def journals(journal_outline):
+    """Create journals dict for Phase1Screen."""
+    return {"2025-01-15": journal_outline}
+
+
 @pytest.mark.asyncio
-async def test_status_shows_llm_classification_progress(sample_blocks, journal_outline):
+async def test_status_shows_llm_classification_progress(journals):
     """Test status widget shows LLM classification progress."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", journal_outline=journal_outline)
+    screen = Phase1Screen(journals=journals)
 
     app = Phase1TestApp(screen)
 
@@ -85,9 +91,9 @@ async def test_status_shows_llm_classification_progress(sample_blocks, journal_o
 
 
 @pytest.mark.asyncio
-async def test_status_shows_page_indexing_progress(sample_blocks, journal_outline):
+async def test_status_shows_page_indexing_progress(journals):
     """Test status widget shows page indexing progress with percentage."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", journal_outline=journal_outline)
+    screen = Phase1Screen(journals=journals)
 
     app = Phase1TestApp(screen)
 
@@ -113,9 +119,9 @@ async def test_status_shows_page_indexing_progress(sample_blocks, journal_outlin
 
 
 @pytest.mark.asyncio
-async def test_status_shows_multiple_tasks(sample_blocks, journal_outline):
+async def test_status_shows_multiple_tasks(journals):
     """Test status widget shows multiple background tasks at once."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", journal_outline=journal_outline)
+    screen = Phase1Screen(journals=journals)
 
     app = Phase1TestApp(screen)
 
@@ -148,9 +154,9 @@ async def test_status_shows_multiple_tasks(sample_blocks, journal_outline):
 
 
 @pytest.mark.asyncio
-async def test_status_task_completion(sample_blocks, journal_outline):
+async def test_status_task_completion(journals):
     """Test status widget updates when tasks complete."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", journal_outline=journal_outline)
+    screen = Phase1Screen(journals=journals)
 
     app = Phase1TestApp(screen)
 
@@ -183,9 +189,9 @@ async def test_status_task_completion(sample_blocks, journal_outline):
 
 
 @pytest.mark.asyncio
-async def test_status_task_failure(sample_blocks, journal_outline):
+async def test_status_task_failure(journals):
     """Test status widget shows error when task fails."""
-    screen = Phase1Screen(blocks=sample_blocks, journal_date="2025-01-15", journal_outline=journal_outline)
+    screen = Phase1Screen(journals=journals)
 
     app = Phase1TestApp(screen)
 

@@ -183,7 +183,7 @@ def sample_page_contents():
 
 @pytest.mark.asyncio
 async def test_n_key_advances_to_next_block(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Test n key advances to next knowledge block."""
     screen = Phase3Screen(
@@ -191,7 +191,7 @@ async def test_n_key_advances_to_next_block(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -215,7 +215,7 @@ async def test_n_key_advances_to_next_block(
 
 @pytest.mark.asyncio
 async def test_n_key_skips_remaining_pending_decisions(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Test n key skips any remaining pending decisions for current block."""
     screen = Phase3Screen(
@@ -223,7 +223,7 @@ async def test_n_key_skips_remaining_pending_decisions(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -257,7 +257,7 @@ async def test_n_key_skips_remaining_pending_decisions(
 @pytest.mark.skip(reason="decisions_ready tracking not yet implemented - requires background worker integration")
 @pytest.mark.asyncio
 async def test_n_key_shows_processing_status_if_next_block_not_ready(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Test n key shows 'Processing knowledge blocks...' if next block decisions not ready."""
     screen = Phase3Screen(
@@ -265,7 +265,7 @@ async def test_n_key_shows_processing_status_if_next_block_not_ready(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -288,7 +288,7 @@ async def test_n_key_shows_processing_status_if_next_block_not_ready(
 
 @pytest.mark.asyncio
 async def test_n_key_at_last_block_shows_completion_summary(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Test n key at last block shows completion summary."""
     screen = Phase3Screen(
@@ -296,7 +296,7 @@ async def test_n_key_at_last_block_shows_completion_summary(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -341,7 +341,7 @@ async def test_n_key_at_last_block_shows_completion_summary(
 
 @pytest.mark.asyncio
 async def test_completion_summary_statistics_with_mixed_statuses(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Test completion summary shows correct statistics with completed, pending, and failed decisions."""
     screen = Phase3Screen(
@@ -349,7 +349,7 @@ async def test_completion_summary_statistics_with_mixed_statuses(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )
@@ -406,7 +406,7 @@ async def test_completion_summary_statistics_with_mixed_statuses(
 
 @pytest.mark.asyncio
 async def test_block_counter_updates_on_next_block(
-    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
     """Test that block counter updates when advancing to next block."""
     screen = Phase3Screen(
@@ -414,7 +414,7 @@ async def test_block_counter_updates_on_next_block(
         edited_content=sample_edited_content,
         page_contents=sample_page_contents,
         decisions=sample_decisions,
-        journal_date="2025-11-06",
+        journals=sample_journals,
         journal_content=sample_journal_content,
         auto_start_workers=False
     )

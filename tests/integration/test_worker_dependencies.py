@@ -98,11 +98,11 @@ async def test_worker_dependency_order_model_preload_then_indexing(
 
     # Create test journal outline
     journal_outline = LogseqOutline.parse("- Test block\n  id:: abc123")
+    journals = {"2025-01-15": journal_outline}
 
     # Create app
     app = LogsqueakApp(
-        journal_outline=journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         config=mock_config,
         llm_client=llm_client,
         page_indexer=page_indexer,
@@ -196,11 +196,11 @@ async def test_worker_dependency_order_indexing_then_rag(temp_graph_path, mock_c
 
     # Create test journal outline
     journal_outline = LogseqOutline.parse("- Test block\n  id:: abc123")
+    journals = {"2025-01-15": journal_outline}
 
     # Create app
     app = LogsqueakApp(
-        journal_outline=journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         config=mock_config,
         llm_client=llm_client,
         page_indexer=page_indexer,
@@ -285,11 +285,11 @@ async def test_worker_dependency_handles_failures(temp_graph_path, mock_config):
 
     # Create test journal outline
     journal_outline = LogseqOutline.parse("- Test block\n  id:: abc123")
+    journals = {"2025-01-15": journal_outline}
 
     # Create app
     app = LogsqueakApp(
-        journal_outline=journal_outline,
-        journal_date="2025-01-15",
+        journals=journals,
         config=mock_config,
         llm_client=llm_client,
         page_indexer=page_indexer,

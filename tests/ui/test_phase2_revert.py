@@ -76,6 +76,12 @@ def journal_outline(sample_blocks):
 
 
 @pytest.fixture
+def journals(journal_outline):
+    """Create journals dict for Phase2Screen."""
+    return {"2025-01-15": journal_outline}
+
+
+@pytest.fixture
 def graph_paths(tmp_path):
     """Create a temporary GraphPaths instance."""
     graph_dir = tmp_path / "test-graph"
@@ -91,7 +97,7 @@ async def test_revert_to_original_after_manual_edit(sample_blocks, sample_edited
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_modified,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -122,7 +128,7 @@ async def test_revert_to_original_after_accepting_llm(sample_blocks, sample_edit
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_with_llm,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -150,7 +156,7 @@ async def test_revert_only_works_when_unfocused(sample_blocks, sample_edited_con
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_modified,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -207,7 +213,7 @@ async def test_revert_when_already_original(sample_blocks, journal_outline, grap
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=edited_content,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -235,7 +241,7 @@ async def test_revert_updates_indicator(sample_blocks, sample_edited_content_mod
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_modified,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -260,7 +266,7 @@ async def test_can_revert_multiple_times(sample_blocks, sample_edited_content_mo
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_modified,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
@@ -303,7 +309,7 @@ async def test_revert_then_accept_llm(sample_blocks, sample_edited_content_modif
     screen = Phase2Screen(
         blocks=sample_blocks,
         edited_content=sample_edited_content_modified,
-        journal_outline=journal_outline,
+        journals=journals,
         graph_paths=graph_paths,
         auto_start_workers=False
     )
