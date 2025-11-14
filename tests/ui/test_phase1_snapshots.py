@@ -205,3 +205,79 @@ def test_phase1_with_background_tasks(snap_compare, sample_blocks, journal_outli
         app,
         terminal_size=(120, 40)
     )
+
+
+def test_phase1_with_processed_blocks(snap_compare, journal_outline):
+    """Test Phase 1 screen with previously processed blocks."""
+    # Create blocks with processed:: property
+    blocks = [
+        LogseqBlock(
+            content=["2025-01-15"],
+            indent_level=0,
+            block_id="root",
+            children=[
+                LogseqBlock(
+                    content=[
+                        "Learned about Python async patterns",
+                        "processed:: [Async Patterns](((uuid-123)))"
+                    ],
+                    indent_level=1,
+                    block_id="block-1",
+                    children=[]
+                ),
+                LogseqBlock(
+                    content=[
+                        "Found a bug in the authentication flow",
+                        "processed:: [Bug Fixes](((uuid-456)))"
+                    ],
+                    indent_level=1,
+                    block_id="block-2",
+                    children=[]
+                ),
+                LogseqBlock(
+                    content=["New idea: use Redis for caching"],
+                    indent_level=1,
+                    block_id="block-3",
+                    children=[]
+                ),
+            ]
+        ),
+    ]
+
+    # Set up block states - LLM suggests block-2 (processed) and block-3 (not processed)
+    block_states = {
+        "block-1": BlockState(
+            block_id="block-1",
+            classification="pending",
+            source="user",
+        ),
+        "block-2": BlockState(
+            block_id="block-2",
+            classification="pending",
+            source="user",
+            llm_classification="knowledge",
+            llm_confidence=0.85,
+            reason="Documents bug discovery"
+        ),
+        "block-3": BlockState(
+            block_id="block-3",
+            classification="pending",
+            source="user",
+            llm_classification="knowledge",
+            llm_confidence=0.90,
+            reason="New technical idea"
+        ),
+    }
+
+    screen = Phase1Screen(
+        blocks=blocks,
+        journal_date="2025-01-15",
+        journal_outline=journal_outline,
+        initial_block_states=block_states
+    )
+    app = Phase1TestApp(screen)
+
+    assert snap_compare(
+        app,
+        terminal_size=(120, 40)
+    )

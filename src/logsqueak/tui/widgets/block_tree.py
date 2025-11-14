@@ -81,10 +81,12 @@ class BlockTree(Tree):
     def _create_block_label(self, block_id: str, content: str) -> Text:
         """Create Rich Text label with visual indicators.
 
-        Uses emoji indicators to show selection source:
-        - 🤖 = LLM selected (blue background)
-        - ✅ = User selected (green background)
-        - Invisible padding = Not selected
+        Uses emoji indicators to show selection and processing state:
+        Priority order (first match wins):
+        1. ✓ = User selected this session (green background)
+        2. 📌 = Previously processed (blue if LLM suggested, default if not)
+        3. 🤖 = LLM suggested (blue background)
+        4. Invisible padding = Not selected
 
         Uses invisible Braille Pattern Blank characters (U+2800) to ensure
         consistent alignment when no emoji is shown.
@@ -99,24 +101,35 @@ class BlockTree(Tree):
         # Get block state
         state = self.block_states.get(block_id)
 
+        # Find the actual LogseqBlock to check for processed:: property
+        block = self._find_block_by_id(self.blocks, block_id)
+        is_processed = block and block.get_property("processed") is not None
+
         label = Text()
 
         # Strategy: Emoji OR invisible characters, then content
         # Using Braille Pattern Blank (U+2800) - an invisible char that takes up space
         invisible_padding = "\u2800\u2800"  # 2 invisible characters = 2 cells
 
-        # Determine emoji and style based on state
+        # Determine emoji and style based on priority
         if state and state.classification == "knowledge":
-            # Block is selected (will be processed in Phase 2)
-            # Always use checkmark + green for selected blocks
-            label.append("✅", style="")
+            # Priority 1: User selected this session - checkmark + green
+            label.append("✓", style="")
             label.append(content, style="on dark_green")
+        elif is_processed:
+            # Priority 2: Previously processed - pushpin
+            # Blue background if LLM suggested, default if not
+            label.append("📌", style="")
+            if state and state.llm_classification == "knowledge":
+                label.append(content, style="on dark_blue")
+            else:
+                label.append(content, style="")
         elif state and state.llm_classification == "knowledge":
-            # LLM suggested but not selected yet - robot + blue background
+            # Priority 3: LLM suggested (not selected, not processed) - robot + blue
             label.append("🤖", style="")
             label.append(content, style="on dark_blue")
         else:
-            # Not selected, no LLM suggestion - invisible padding
+            # Priority 4: No special state - invisible padding
             label.append(invisible_padding + content, style="")
 
         return label
