@@ -251,12 +251,13 @@ def extract(date_or_range: str = None):
 
 @cli.command()
 @click.argument("query")
-@click.option("--reindex", is_flag=True, help="Force rebuild of the search index")
+@click.option("--reindex", is_flag=True, help="Force full rebuild of the search index (clears existing data)")
 def search(query: str, reindex: bool):
     """
     Search your Logseq knowledge base using semantic search.
 
     Uses the same RAG search service as the TUI application.
+    Automatically updates the index with modified pages (incremental indexing).
 
     Examples:
         logsqueak search "machine learning best practices"
@@ -285,40 +286,54 @@ def search(query: str, reindex: bool):
     rag_search = RAGSearch(db_path=page_indexer.db_path)
     logger.info("rag_search_initialized")
 
-    # Check if we need to build/rebuild the index
-    needs_indexing = reindex or not rag_search.has_indexed_data()
+    # Handle --reindex flag (force full rebuild by clearing collection)
+    if reindex:
+        click.echo("Clearing existing index for full rebuild...")
+        # Delete collection and recreate it (ChromaDB doesn't support delete all)
+        page_indexer.chroma_client.delete_collection("logsqueak_blocks")
+        page_indexer.collection = page_indexer.chroma_client.create_collection(
+            "logsqueak_blocks",
+            metadata={"hnsw:space": "cosine"}
+        )
+        logger.info("index_cleared_for_rebuild")
 
-    if needs_indexing:
-        if reindex:
-            click.echo("Rebuilding search index...")
-        else:
-            click.echo("Building search index (first run)...")
-
-        # Build index with progress indicator
-        async def build_index_with_progress():
-            total_pages = 0
-            current_page = 0
-
-            def progress_callback(current, total):
-                nonlocal total_pages, current_page
-                total_pages = total
-                current_page = current
-                # Simple progress indicator
-                percent = int((current / total) * 100) if total > 0 else 0
-                click.echo(f"\rIndexing pages: {current}/{total} ({percent}%)", nl=False)
-
-            try:
-                await page_indexer.build_index(progress_callback=progress_callback)
-                click.echo()  # Newline after progress
-                click.echo(f"Index built successfully ({total_pages} pages)")
-            except Exception as e:
-                click.echo()  # Newline after progress
-                logger.error("index_build_failed", error=str(e))
-                raise click.ClickException(f"Failed to build search index: {e}")
-
-        asyncio.run(build_index_with_progress())
+    # Always update index (incremental indexing is fast - only modified pages)
+    has_data = rag_search.has_indexed_data()
+    if reindex:
+        click.echo("Rebuilding search index...")
+    elif not has_data:
+        click.echo("Building search index (first run)...")
     else:
-        logger.info("search_index_exists", skipping_build=True)
+        click.echo("Updating search index...")
+
+    # Build/update index with progress indicator
+    async def build_index_with_progress():
+        total_pages = 0
+        current_page = 0
+
+        def progress_callback(current, total):
+            nonlocal total_pages, current_page
+            total_pages = total
+            current_page = current
+            # Simple progress indicator
+            percent = int((current / total) * 100) if total > 0 else 0
+            click.echo(f"\rIndexing pages: {current}/{total} ({percent}%)", nl=False)
+
+        try:
+            await page_indexer.build_index(progress_callback=progress_callback)
+            click.echo()  # Newline after progress
+            if reindex:
+                click.echo(f"Index rebuilt successfully ({total_pages} pages)")
+            elif not has_data:
+                click.echo(f"Index built successfully ({total_pages} pages)")
+            else:
+                click.echo(f"Index updated successfully ({total_pages} pages checked)")
+        except Exception as e:
+            click.echo()  # Newline after progress
+            logger.error("index_build_failed", error=str(e))
+            raise click.ClickException(f"Failed to build search index: {e}")
+
+    asyncio.run(build_index_with_progress())
 
     # Execute search using RAG service
     click.echo(f"\nSearching for: {query}\n")
