@@ -294,10 +294,13 @@ def search(query: str, reindex: bool):
         click.echo("Clearing existing index for full rebuild...")
         # Delete collection and recreate it (ChromaDB doesn't support delete all)
         page_indexer.chroma_client.delete_collection("logsqueak_blocks")
-        page_indexer.collection = page_indexer.chroma_client.create_collection(
+        new_collection = page_indexer.chroma_client.create_collection(
             "logsqueak_blocks",
             metadata={"hnsw:space": "cosine"}
         )
+        # Update both page_indexer and rag_search to use new collection
+        page_indexer.collection = new_collection
+        rag_search.collection = new_collection
         logger.info("index_cleared_for_rebuild")
 
     # Always update index (incremental indexing is fast - only modified pages)
