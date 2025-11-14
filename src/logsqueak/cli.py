@@ -256,14 +256,16 @@ def search(query: str, reindex: bool):
     """
     Search your Logseq knowledge base using semantic search.
 
+    Uses the same RAG search service as the TUI application.
+
     Examples:
         logsqueak search "machine learning best practices"
         logsqueak search "how to debug async code" --reindex
     """
     import asyncio
-    from logsqueak.services.llm_client import LLMClient
     from logsqueak.services.page_indexer import PageIndexer
     from logsqueak.services.rag_search import RAGSearch
+    from logsqueak.models.edited_content import EditedContent
 
     logger.info("search_command_started", query=query, reindex=reindex)
 
@@ -318,46 +320,48 @@ def search(query: str, reindex: bool):
     else:
         logger.info("search_index_exists", skipping_build=True)
 
-    # Execute search
+    # Execute search using RAG service
     click.echo(f"\nSearching for: {query}\n")
 
     async def execute_search():
         try:
-            # Generate embedding for query
-            embedding = rag_search.encoder.encode(query, convert_to_numpy=True)
+            # Create a temporary EditedContent object for the search query
+            # (RAG service expects EditedContent for its interface)
+            query_content = EditedContent(
+                block_id="search_query",
+                original_content=query,
+                hierarchical_context="",  # Not used for search
+                current_content=query
+            )
 
-            # Query ChromaDB
+            # Use RAG search service (same as TUI)
             top_k = config.rag.top_k
-            query_results = rag_search.collection.query(
-                query_embeddings=[embedding.tolist()],
-                n_results=top_k
+            chunks_dict = await rag_search.find_candidates(
+                edited_content=[query_content],
+                original_contexts={"search_query": query},  # Use query as context
+                graph_paths=graph_paths,
+                top_k=top_k
             )
 
             # Extract results
-            if not query_results["ids"][0]:
+            chunks = chunks_dict.get("search_query", [])
+            if not chunks:
                 click.echo("No results found.")
                 return
 
+            # Format results for display
             results = []
-            for metadata, distance, document in zip(
-                query_results["metadatas"][0],
-                query_results["distances"][0],
-                query_results["documents"][0]
-            ):
-                page_name = metadata["page_name"]
-                block_id = metadata["block_id"]
-                similarity = 1.0 - distance  # Convert distance to similarity
-                confidence = int(similarity * 100)
+            for idx, (page_name, block_id, hierarchical_context) in enumerate(chunks):
+                # Calculate a pseudo-confidence based on rank (since RAG returns sorted results)
+                # First result = 100%, linearly decreasing
+                confidence = max(50, 100 - (idx * (50 // len(chunks))))
 
                 results.append({
                     "page_name": page_name,
                     "block_id": block_id,
                     "confidence": confidence,
-                    "snippet": document
+                    "snippet": hierarchical_context
                 })
-
-            # Sort by confidence
-            results.sort(key=lambda x: x["confidence"], reverse=True)
 
             # Display results
             _display_search_results(results, graph_path)
