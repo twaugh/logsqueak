@@ -130,21 +130,48 @@ class PageIndexer:
             total_pages=len(page_files)
         )
 
+        # OPTIMIZATION: Batch-load all page metadata and mtimes upfront
+        indexed_pages = self._get_all_indexed_pages()
+
+        # Batch-load all file mtimes to avoid repeated stat() calls
+        file_mtimes = {
+            page_file.stem.replace("___", "/"): page_file.stat().st_mtime
+            for page_file in page_files
+        }
+
         for idx, page_file in enumerate(page_files, 1):
             page_name = page_file.stem.replace("___", "/")
+            current_mtime = file_mtimes[page_name]
 
-            # Check if page needs re-indexing
-            if self._is_page_indexed(page_name, page_file):
-                logger.debug("page_index_skip", page_name=page_name, reason="not_modified")
-                if progress_callback:
-                    progress_callback(idx, len(page_files))
-                continue
+            # Check if page needs re-indexing using cached metadata
+            if page_name in indexed_pages:
+                stored_mtime = indexed_pages[page_name]
+                # Use tolerance-based comparison to handle floating point precision issues
+                # ChromaDB may store floats with slightly different precision than Python
+                mtime_tolerance = 1e-6  # 1 microsecond tolerance
+                if abs(stored_mtime - current_mtime) < mtime_tolerance:
+                    logger.debug("page_index_skip", page_name=page_name, reason="not_modified")
+                    if progress_callback:
+                        progress_callback(idx, len(page_files))
+                    continue
+                else:
+                    # Page modified - log mtime difference for debugging
+                    logger.debug(
+                        "page_mtime_changed",
+                        page_name=page_name,
+                        stored_mtime=stored_mtime,
+                        current_mtime=current_mtime,
+                        diff=current_mtime - stored_mtime
+                    )
+            else:
+                # Page not in index yet
+                logger.debug("page_not_indexed", page_name=page_name)
 
             # Parse page
             outline = LogseqOutline.parse(page_file.read_text())
 
             # Index all blocks
-            self._index_page_blocks(page_name, outline, page_file.stat().st_mtime)
+            self._index_page_blocks(page_name, outline, current_mtime)
 
             if progress_callback:
                 progress_callback(idx, len(page_files))
@@ -153,27 +180,29 @@ class PageIndexer:
 
         logger.info("page_indexing_completed", total_pages=len(page_files))
 
-    def _is_page_indexed(self, page_name: str, page_file: Path) -> bool:
+    def _get_all_indexed_pages(self) -> dict[str, float]:
         """
-        Check if page is already indexed and unmodified.
+        Get all indexed pages with their modification times.
 
-        Uses mtime equality check to detect changes. This handles
-        Logseq graphs in git where files may revert to earlier content.
+        Returns a dict mapping page_name -> mtime for all pages in the collection.
+        This enables efficient batch checking instead of querying per page.
+
+        Returns:
+            Dict of {page_name: mtime} for all indexed pages
         """
-        # Query collection for page metadata
-        results = self.collection.get(
-            where={"page_name": page_name},
-            limit=1
-        )
+        # Get all documents in collection
+        results = self.collection.get(include=["metadatas"])
 
-        if not results["ids"]:
-            return False
+        # Build dict of page_name -> mtime
+        # (Multiple blocks per page all have same mtime, so we can use any)
+        indexed_pages = {}
+        for metadata in results["metadatas"]:
+            page_name = metadata["page_name"]
+            mtime = metadata.get("mtime")
+            if mtime is not None:
+                indexed_pages[page_name] = mtime
 
-        # Check modification time (use == to check if unchanged)
-        stored_mtime = results["metadatas"][0].get("mtime")
-        current_mtime = page_file.stat().st_mtime
-
-        return stored_mtime is not None and current_mtime == stored_mtime
+        return indexed_pages
 
     def _index_page_blocks(
         self,
@@ -181,11 +210,34 @@ class PageIndexer:
         outline: LogseqOutline,
         mtime: float
     ) -> None:
-        """Index all blocks from a page using semantic chunks."""
+        """Index all blocks from a page using semantic chunks.
+
+        Also creates a page-level chunk for every page (even empty ones) to enable:
+        - Incremental indexing of empty pages
+        - Page name-based search
+        - Better integration decision matching
+        """
         # Use dict to deduplicate by ID (keeps last occurrence)
         chunks_by_id = {}
 
-        # Generate chunks with full context and hybrid IDs
+        # ALWAYS create page-level chunk (enables empty page indexing and name search)
+        page_title = self._extract_page_title(outline)
+        page_context = self._create_page_context(page_name, page_title, outline)
+        page_embedding = self.encoder.encode(page_context, convert_to_numpy=True)
+
+        page_chunk_id = f"{page_name}::__PAGE__"
+        chunks_by_id[page_chunk_id] = {
+            "document": page_context,
+            "embedding": page_embedding.tolist(),
+            "metadata": {
+                "page_name": page_name,
+                "block_id": "__PAGE__",
+                "mtime": mtime,
+                "page_title": page_title  # Store title:: for display
+            }
+        }
+
+        # Generate block-level chunks with full context and hybrid IDs
         chunks = generate_chunks(outline, page_name)
 
         for block, full_context, hybrid_id in chunks:
@@ -200,23 +252,75 @@ class PageIndexer:
                 "metadata": {
                     "page_name": page_name,
                     "block_id": hybrid_id,
-                    "mtime": mtime
+                    "mtime": mtime,
+                    "page_title": page_title  # Include in block metadata too
                 }
             }
 
-        # Convert to lists for ChromaDB
-        if chunks_by_id:
-            ids = list(chunks_by_id.keys())
-            documents = [chunk["document"] for chunk in chunks_by_id.values()]
-            embeddings = [chunk["embedding"] for chunk in chunks_by_id.values()]
-            metadatas = [chunk["metadata"] for chunk in chunks_by_id.values()]
+        # Convert to lists for ChromaDB (always has at least page-level chunk)
+        ids = list(chunks_by_id.keys())
+        documents = [chunk["document"] for chunk in chunks_by_id.values()]
+        embeddings = [chunk["embedding"] for chunk in chunks_by_id.values()]
+        metadatas = [chunk["metadata"] for chunk in chunks_by_id.values()]
 
-            self.collection.upsert(
-                documents=documents,
-                embeddings=embeddings,
-                ids=ids,
-                metadatas=metadatas
-            )
+        self.collection.upsert(
+            documents=documents,
+            embeddings=embeddings,
+            ids=ids,
+            metadatas=metadatas
+        )
+
+    def _extract_page_title(self, outline: LogseqOutline) -> Optional[str]:
+        """Extract title:: property from page frontmatter.
+
+        Returns:
+            Page title from title:: property, or None if not present
+        """
+        # Parse frontmatter for title:: property
+        if not outline.frontmatter:
+            return None
+
+        for line in outline.frontmatter:
+            line = line.strip()
+            if line.startswith('title::'):
+                # Extract value after 'title::'
+                title = line[7:].strip()  # Skip 'title::'
+                return title if title else None
+
+        return None
+
+    def _create_page_context(
+        self,
+        page_name: str,
+        page_title: Optional[str],
+        outline: LogseqOutline
+    ) -> str:
+        """Create searchable context for page-level chunk.
+
+        Includes page name, title:: property, and frontmatter for semantic matching.
+
+        Args:
+            page_name: Page name from filename (e.g., "Konflux/Java builds")
+            page_title: Value from title:: property if present
+            outline: Parsed LogseqOutline
+
+        Returns:
+            Context string for embedding
+        """
+        parts = []
+
+        # Always include page name
+        parts.append(f"Page: {page_name}")
+
+        # Include title:: if different from page_name
+        if page_title and page_title != page_name:
+            parts.append(f"Title: {page_title}")
+
+        # Include frontmatter properties for additional context
+        if outline.frontmatter:
+            parts.append("\n".join(outline.frontmatter))
+
+        return "\n".join(parts)
 
     async def close(self) -> None:
         """Close ChromaDB client."""
