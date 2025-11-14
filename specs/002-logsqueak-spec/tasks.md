@@ -676,11 +676,11 @@ User should manually test:
 - [x] T114 [P] Implement malformed JSON handling in NDJSON streaming in src/logsqueak/services/llm_client.py
 - [x] T115 [P] Implement "No knowledge blocks identified" message in Phase 1 in src/logsqueak/tui/screens/block_selection.py
 - [x] T116 [P] Implement "No relevant pages found" message in Phase 3 in src/logsqueak/tui/screens/integration_review.py
-- [ ] T117 [P] Implement atomic_write() function with temp-file-rename pattern (early+late modification checks, fsync, atomic rename) in src/logsqueak/services/file_operations.py
-- [ ] T117a [P] Add FileModifiedError exception class in src/logsqueak/services/exceptions.py
-- [ ] T117b [P] Replace direct Path.write_text() calls with atomic_write() in write_integration_atomic() function in src/logsqueak/services/file_operations.py
-- [ ] T118 [P] Implement external file modification handling (reload, revalidate) in src/logsqueak/services/file_monitor.py
-- [ ] T118a Write unit tests for atomic_write() with concurrent modification detection in tests/unit/test_atomic_write.py and run with pytest
+- [x] T117 [P] Implement atomic_write() function with temp-file-rename pattern (early+late modification checks, fsync, atomic rename) in src/logsqueak/services/file_operations.py
+- [x] T117a [P] Add FileModifiedError exception class in src/logsqueak/services/exceptions.py
+- [x] T117b [P] Replace direct Path.write_text() calls with atomic_write() in write_integration_atomic() function in src/logsqueak/services/file_operations.py
+- [x] T118 [P] Implement external file modification handling (reload, revalidate) in src/logsqueak/services/file_monitor.py
+- [x] T118a Write unit tests for atomic_write() with concurrent modification detection in tests/unit/test_atomic_write.py and run with pytest
 - [~] T119 [P] Implement Ctrl+C cancellation warning in Phase 3 (partial journal state) in src/logsqueak/tui/screens/integration_review.py
 - [ ] T120 Write integration tests for all edge cases in tests/integration/test_edge_cases.py and run with pytest
 

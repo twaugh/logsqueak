@@ -5,6 +5,7 @@ the file operations contract in specs/002-logsqueak-spec/contracts/file-operatio
 """
 
 import uuid
+import os
 import structlog
 from pathlib import Path
 from typing import Optional
@@ -12,8 +13,92 @@ from logseq_outline.parser import LogseqOutline, LogseqBlock
 from logseq_outline.graph import GraphPaths
 from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.services.file_monitor import FileMonitor
+from logsqueak.services.exceptions import FileModifiedError
 
 logger = structlog.get_logger()
+
+
+def atomic_write(
+    path: Path,
+    content: str,
+    file_monitor: Optional[FileMonitor] = None
+) -> None:
+    """
+    Atomically write content to file with temp-file-rename pattern.
+
+    This function implements safe file writing with:
+    1. Early modification check (before write)
+    2. Write to temporary file
+    3. fsync to ensure data is on disk
+    4. Late modification check (after write, before rename)
+    5. Atomic rename to replace original file
+
+    Args:
+        path: Target file path
+        content: Content to write
+        file_monitor: Optional FileMonitor for concurrent modification detection
+
+    Raises:
+        FileModifiedError: If file was modified during write operation
+        OSError: On file I/O errors
+        PermissionError: On permission errors
+    """
+    # Early modification check
+    if file_monitor and file_monitor.is_modified(path):
+        raise FileModifiedError(
+            str(path),
+            "File was modified before write (early check)"
+        )
+
+    # Create temporary file in same directory (ensures same filesystem for atomic rename)
+    temp_path = path.parent / f".{path.name}.tmp.{os.getpid()}"
+
+    try:
+        # Write content to temporary file
+        temp_path.write_text(content, encoding='utf-8')
+
+        # Ensure data is written to disk (fsync)
+        with open(temp_path, 'r+', encoding='utf-8') as f:
+            f.flush()
+            os.fsync(f.fileno())
+
+        # Late modification check (before rename)
+        if file_monitor and file_monitor.is_modified(path):
+            raise FileModifiedError(
+                str(path),
+                "File was modified during write (late check)"
+            )
+
+        # Atomic rename (replaces target file)
+        # On POSIX systems, this is atomic even if target exists
+        temp_path.replace(path)
+
+        # Update file monitor after successful write
+        if file_monitor:
+            file_monitor.refresh(path)
+
+        logger.debug(
+            "atomic_write_success",
+            path=str(path),
+            size=len(content)
+        )
+
+    except FileModifiedError:
+        # Clean up temp file and re-raise
+        if temp_path.exists():
+            temp_path.unlink()
+        raise
+
+    except Exception as e:
+        # Clean up temp file on any error
+        if temp_path.exists():
+            temp_path.unlink()
+        logger.error(
+            "atomic_write_failed",
+            path=str(path),
+            error=str(e)
+        )
+        raise
 
 
 def generate_integration_id(
@@ -406,14 +491,23 @@ async def write_integration_atomic(
         # For skip_exists without id::, write to add the id:: property
         if original_rendered != new_rendered:
             try:
-                page_path.write_text(new_rendered)
-                file_monitor.refresh(page_path)
+                atomic_write(page_path, new_rendered, file_monitor)
                 logger.info(
                     "page_write_success",
                     page=decision.target_page,
                     block_id=new_block_id,
                     action=decision.action
                 )
+            except FileModifiedError as e:
+                logger.error(
+                    "page_concurrent_modification",
+                    page=decision.target_page,
+                    error=str(e)
+                )
+                raise ValueError(
+                    f"Page was modified during write: {decision.target_page}\n"
+                    f"Please reload and try again."
+                ) from e
             except Exception as e:
                 logger.error(
                     "page_write_failed",
@@ -451,14 +545,23 @@ async def write_integration_atomic(
 
     # Step 7: Write journal (SECOND WRITE - only if page write succeeded)
     try:
-        journal_path.write_text(journal_outline.render())
-        file_monitor.refresh(journal_path)
+        atomic_write(journal_path, journal_outline.render(), file_monitor)
         logger.info(
             "journal_provenance_added",
             journal_date=journal_date,
             knowledge_block_id=decision.knowledge_block_id,
             target_page=decision.target_page
         )
+    except FileModifiedError as e:
+        logger.error(
+            "journal_concurrent_modification",
+            journal_date=journal_date,
+            error=str(e)
+        )
+        raise ValueError(
+            f"Journal was modified during write: {journal_date}\n"
+            f"Please reload and try again."
+        ) from e
     except Exception as e:
         logger.error(
             "journal_write_failed",
