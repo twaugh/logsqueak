@@ -222,3 +222,14 @@ class BlockDetailPanel(Widget):
             self._preview.clear()
         if self._status:
             self._status.show_empty()
+
+    def show_no_knowledge_blocks(self) -> None:
+        """Display message when no knowledge blocks are identified by LLM."""
+        if self._preview:
+            self._preview.clear()
+        if self._status:
+            message = Text()
+            message.append("No knowledge blocks identified\n\n", style="bold yellow")
+            message.append("The AI did not find any blocks containing lasting knowledge in this journal entry.\n\n", style="italic")
+            message.append("You can still manually select blocks using Space if needed.", style="dim")
+            self._status.update(message)

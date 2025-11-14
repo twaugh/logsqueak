@@ -343,7 +343,17 @@ class Phase3Screen(Screen):
 
         if not block_decisions or self.current_decision_index >= len(block_decisions):
             preview.border_title = "Target Page Preview"
-            preview.clear()
+            if not block_decisions:
+                # Show helpful message when no relevant pages found
+                message = "No relevant pages found\n\n"
+                message += "The AI did not find any suitable pages to integrate this knowledge block.\n\n"
+                message += "This could mean:\n"
+                message += "- The knowledge is new and doesn't fit existing pages\n"
+                message += "- You may want to create a new page for this topic\n"
+                message += "- The content might be too specific to this journal entry"
+                await preview.load_preview(message, None)
+            else:
+                preview.clear()
             return
 
         decision = block_decisions[self.current_decision_index]

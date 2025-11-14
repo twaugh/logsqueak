@@ -674,8 +674,8 @@ User should manually test:
 - [x] T112 [P] Implement file permission check (mode 600) for config file in src/logsqueak/config.py
 - [x] T113 [P] Implement network error handling (connection refused, timeout, invalid API key) in src/logsqueak/services/llm_client.py
 - [x] T114 [P] Implement malformed JSON handling in NDJSON streaming in src/logsqueak/services/llm_client.py
-- [ ] T115 [P] Implement "No knowledge blocks identified" message in Phase 1 in src/logsqueak/tui/screens/block_selection.py
-- [ ] T116 [P] Implement "No relevant pages found" message in Phase 3 in src/logsqueak/tui/screens/integration_review.py
+- [x] T115 [P] Implement "No knowledge blocks identified" message in Phase 1 in src/logsqueak/tui/screens/block_selection.py
+- [x] T116 [P] Implement "No relevant pages found" message in Phase 3 in src/logsqueak/tui/screens/integration_review.py
 - [ ] T117 [P] Implement atomic_write() function with temp-file-rename pattern (early+late modification checks, fsync, atomic rename) in src/logsqueak/services/file_operations.py
 - [ ] T117a [P] Add FileModifiedError exception class in src/logsqueak/services/exceptions.py
 - [ ] T117b [P] Replace direct Path.write_text() calls with atomic_write() in write_integration_atomic() function in src/logsqueak/services/file_operations.py

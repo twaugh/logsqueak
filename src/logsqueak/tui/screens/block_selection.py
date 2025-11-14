@@ -487,6 +487,11 @@ class Phase1Screen(Screen):
 
         self._update_selected_count()
 
+        # Show message if no knowledge blocks were identified
+        if count == 0:
+            detail_panel = self.query_one(BlockDetailPanel)
+            detail_panel.show_no_knowledge_blocks()
+
     async def _llm_classification_worker(self) -> None:
         """Real LLM classification worker using classify_blocks wrapper."""
         # Create background task
@@ -550,6 +555,11 @@ class Phase1Screen(Screen):
                 status_panel.update_status()
 
                 self._update_selected_count()
+
+                # Show message if no knowledge blocks were identified
+                if count == 0:
+                    detail_panel = self.query_one(BlockDetailPanel)
+                    detail_panel.show_no_knowledge_blocks()
 
                 logger.info(
                     "llm_classification_complete",
