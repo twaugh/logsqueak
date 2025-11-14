@@ -692,7 +692,7 @@ User should manually test:
 
 ### Optional Enhancements
 
-- [ ] T121 [P] Add completion summary screen with statistics and journal link in src/logsqueak/tui/screens/integration_review.py
+- [x] T121 [P] Add completion summary screen with statistics and journal link in src/logsqueak/tui/screens/integration_review.py
 - [~] T122 [P] Implement Enter key as alternative to 'n' key for advancing to next block in src/logsqueak/tui/screens/integration_review.py
 
 ### Logging & Polish

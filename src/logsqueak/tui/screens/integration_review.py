@@ -620,9 +620,12 @@ Confidence: {decision.confidence:.0%}
         """Advance to next knowledge block.
 
         Blocks navigation if next block's decisions aren't ready yet.
+        Shows completion summary if at last block.
         """
         if self.current_block_index >= len(self.journal_blocks) - 1:
-            return  # Already at last block
+            # At last block - show completion summary
+            self.run_worker(self._show_completion_summary(), exclusive=True)
+            return
 
         # Check if next block's decisions are ready
         next_block_id = self.journal_blocks[self.current_block_index + 1].block_id
@@ -931,3 +934,74 @@ Confidence: {decision.confidence:.0%}
             )
         except Exception:
             pass  # Widget not mounted yet
+
+    async def _show_completion_summary(self) -> None:
+        """Show completion summary screen with statistics and journal link."""
+        # Calculate statistics
+        total_decisions = len(self.decisions)
+        completed_count = sum(1 for d in self.decisions if d.write_status == "completed")
+        failed_count = sum(1 for d in self.decisions if d.write_status == "failed")
+        pending_count = sum(1 for d in self.decisions if d.write_status == "pending")
+
+        total_blocks = len(self.edited_content)
+        new_integrations = total_blocks - self.skipped_block_count
+
+        # Build summary text in Logseq bullet format
+        summary_lines = [
+            "- # Knowledge Extraction Complete",
+            "  - ## Summary Statistics",
+            f"    - **Total knowledge blocks processed:** {total_blocks}",
+            f"    - **New integrations:** {new_integrations}",
+            f"    - **Already recorded:** {self.skipped_block_count}",
+            "  - ## Write Operations",
+            f"    - **Total integration points:** {total_decisions}",
+            f"    - **Completed:** {completed_count} ✓",
+            f"    - **Pending:** {pending_count} ⊙",
+        ]
+
+        if failed_count > 0:
+            summary_lines.append(f"    - **Failed:** {failed_count} ⚠")
+
+        # Add journal link
+        if self.graph_paths:
+            journal_path = self.graph_paths.get_journal_path(self.journal_date)
+            summary_lines.extend([
+                "  - ## Journal Entry",
+                "    - Journal entry updated with provenance markers:",
+                f"      `{journal_path}`",
+                "    - You can view the processed blocks in your Logseq graph with the `processed::` property.",
+            ])
+
+        summary_lines.extend([
+            "  - ---",
+            "  - Press 'q' to return to content editing or Ctrl+Q to exit the application.",
+        ])
+
+        summary_text = "\n".join(summary_lines)
+
+        # Update counter first (synchronous)
+        counter = self.query_one("#block-counter", Label)
+        counter.update("✓ Processing Complete")
+
+        # Clear decision list and target preview (synchronous)
+        decision_list = self.query_one(DecisionList)
+        decision_list.clear()
+
+        target_preview = self.query_one("#target-page-preview", TargetPagePreview)
+        target_preview.border_title = ""
+        target_preview.clear()
+
+        # Load summary into journal preview (async)
+        journal_preview = self.query_one("#journal-preview", TargetPagePreview)
+        journal_preview.border_title = "Extraction Complete"
+        await journal_preview.load_preview(summary_text, None)
+
+        logger.info(
+            "completion_summary_displayed",
+            total_blocks=total_blocks,
+            new_integrations=new_integrations,
+            skipped=self.skipped_block_count,
+            completed=completed_count,
+            failed=failed_count,
+            pending=pending_count
+        )

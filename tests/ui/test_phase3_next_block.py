@@ -287,10 +287,10 @@ async def test_n_key_shows_processing_status_if_next_block_not_ready(
 
 
 @pytest.mark.asyncio
-async def test_n_key_at_last_block_does_nothing(
+async def test_n_key_at_last_block_shows_completion_summary(
     sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
 ):
-    """Test n key at last block does nothing (or shows completion)."""
+    """Test n key at last block shows completion summary."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
@@ -302,7 +302,14 @@ async def test_n_key_at_last_block_does_nothing(
     )
     app = Phase3TestApp(screen)
 
+    # Mock write_integration to mark some decisions as completed
+    screen.write_integration = AsyncMock(return_value=True)
+
     async with app.run_test() as pilot:
+        await pilot.pause()
+
+        # Accept first decision for block 1
+        await pilot.press("y")
         await pilot.pause()
 
         # Navigate to second (last) block
@@ -311,12 +318,90 @@ async def test_n_key_at_last_block_does_nothing(
 
         assert screen.current_block_index == 1
 
-        # Press n at last block
+        # Accept first decision for block 2
+        await pilot.press("y")
+        await pilot.pause()
+
+        # Press n at last block - should show completion summary
         await pilot.press("n")
         await pilot.pause()
 
-        # Should show completion summary or stay at last block
-        # (Implementation may vary - could show completion screen)
+        # Verify completion summary is displayed
+        # Check that the counter shows "Processing Complete"
+        from textual.widgets import Label
+        counter = screen.query_one("#block-counter", Label)
+        # Use str() to get the text content from the Label
+        assert "Processing Complete" in str(counter.render())
+
+        # Verify the journal preview shows the summary
+        from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
+        journal_preview = screen.query_one("#journal-preview", TargetPagePreview)
+        assert journal_preview.border_title == "Extraction Complete"
+
+
+@pytest.mark.asyncio
+async def test_completion_summary_statistics_with_mixed_statuses(
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content
+):
+    """Test completion summary shows correct statistics with completed, pending, and failed decisions."""
+    screen = Phase3Screen(
+        journal_blocks=sample_journal_blocks,
+        edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
+        decisions=sample_decisions,
+        journal_date="2025-11-06",
+        journal_content=sample_journal_content,
+        auto_start_workers=False
+    )
+    app = Phase3TestApp(screen)
+
+    # Mock write_integration to mark some as completed, some as failed
+    async def mock_write(decision):
+        # Fail the second decision, succeed others
+        if decision == sample_decisions[1]:
+            decision.write_status = "failed"
+            decision.error_message = "Test error"
+            raise ValueError("Test error")
+        else:
+            decision.write_status = "completed"
+
+    screen.write_integration = mock_write
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        # Accept first decision (should succeed)
+        await pilot.press("y")
+        await pilot.pause()
+
+        # Navigate to second decision
+        await pilot.press("j")
+        await pilot.pause()
+
+        # Try to accept second decision (should fail)
+        await pilot.press("y")
+        await pilot.pause()
+
+        # Skip to next block (leaving third decision pending)
+        await pilot.press("n")
+        await pilot.pause()
+
+        # Accept first decision for block 2
+        await pilot.press("y")
+        await pilot.pause()
+
+        # Press n at last block - should show completion summary
+        await pilot.press("n")
+        await pilot.pause()
+
+        # Verify we have the expected statistics:
+        # - 5 total decisions
+        # - 2 completed (first from block 1, first from block 2)
+        # - 1 failed (second from block 1)
+        # - 2 pending (third from block 1, second from block 2)
+        assert sum(1 for d in sample_decisions if d.write_status == "completed") == 2
+        assert sum(1 for d in sample_decisions if d.write_status == "failed") == 1
+        assert sum(1 for d in sample_decisions if d.write_status == "pending") == 2
 
 
 @pytest.mark.asyncio
