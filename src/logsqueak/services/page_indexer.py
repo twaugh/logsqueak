@@ -199,11 +199,21 @@ class PageIndexer:
             # Batch encode all documents at once
             # Note: SentenceTransformer's show_progress_bar doesn't integrate with our progress_callback,
             # but we can at least signal that encoding is happening
+
+            # Signal model loading phase (before first encoder access)
             if progress_callback:
-                # Signal start of encoding phase (use total_pages + 1 to show we're in a new phase)
+                # Use negative progress to signal model loading phase
+                progress_callback(-1, len(page_files))
+
+            # Access encoder (triggers lazy loading on first use)
+            encoder = self.encoder
+
+            # Signal encoding phase after model is loaded
+            if progress_callback:
+                # Use total_pages as both current and total to signal encoding phase
                 progress_callback(len(page_files), len(page_files))
 
-            embeddings = self.encoder.encode(documents, convert_to_numpy=True, show_progress_bar=False)
+            embeddings = encoder.encode(documents, convert_to_numpy=True, show_progress_bar=False)
 
             # Phase 4: Prepare data for bulk upsert
             metadatas = [chunk["metadata"] for chunk in all_chunks.values()]

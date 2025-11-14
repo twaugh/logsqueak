@@ -319,16 +319,24 @@ def search(query: str, reindex: bool):
             nonlocal total_pages, current_page, status_context
             total_pages = total
             current_page = current
-            # When current == total, we're moving to the embedding phase
-            if current == total and status_context is None:  # Only start spinner once
+
+            # Negative current signals model loading phase
+            if current < 0:
                 # Clear the progress line completely
                 sys.stdout.write(f"\r{' ' * 50}\r")
                 sys.stdout.flush()
-                # Start spinner for embedding phase (Rich handles terminal detection)
+                # Start spinner for model loading
+                status_context = console.status("[bold green]Loading embedding model...")
+                status_context.__enter__()
+            # When current == total, we're in the embedding generation phase
+            elif current == total and status_context is not None:
+                # Stop model loading spinner
+                status_context.__exit__(None, None, None)
+                # Start embedding generation spinner
                 status_context = console.status("[bold green]Generating embeddings...")
                 status_context.__enter__()
             elif current < total:
-                # Simple progress indicator
+                # Simple progress indicator for page indexing
                 percent = int((current / total) * 100) if total > 0 else 0
                 click.echo(f"\rIndexing pages: {current}/{total} ({percent}%)", nl=False)
 
