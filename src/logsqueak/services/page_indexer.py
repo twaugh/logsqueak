@@ -182,10 +182,8 @@ class PageIndexer:
         mtime: float
     ) -> None:
         """Index all blocks from a page using semantic chunks."""
-        documents = []
-        embeddings = []
-        ids = []
-        metadatas = []
+        # Use dict to deduplicate by ID (keeps last occurrence)
+        chunks_by_id = {}
 
         # Generate chunks with full context and hybrid IDs
         chunks = generate_chunks(outline, page_name)
@@ -194,18 +192,25 @@ class PageIndexer:
             # Generate embedding
             embedding = self.encoder.encode(full_context, convert_to_numpy=True)
 
-            # Store chunk
-            documents.append(full_context)
-            embeddings.append(embedding.tolist())
-            ids.append(f"{page_name}::{hybrid_id}")
-            metadatas.append({
-                "page_name": page_name,
-                "block_id": hybrid_id,
-                "mtime": mtime
-            })
+            # Store chunk (overwrites if duplicate ID)
+            full_id = f"{page_name}::{hybrid_id}"
+            chunks_by_id[full_id] = {
+                "document": full_context,
+                "embedding": embedding.tolist(),
+                "metadata": {
+                    "page_name": page_name,
+                    "block_id": hybrid_id,
+                    "mtime": mtime
+                }
+            }
 
-        # Add to collection (upsert)
-        if documents:
+        # Convert to lists for ChromaDB
+        if chunks_by_id:
+            ids = list(chunks_by_id.keys())
+            documents = [chunk["document"] for chunk in chunks_by_id.values()]
+            embeddings = [chunk["embedding"] for chunk in chunks_by_id.values()]
+            metadatas = [chunk["metadata"] for chunk in chunks_by_id.values()]
+
             self.collection.upsert(
                 documents=documents,
                 embeddings=embeddings,
