@@ -64,3 +64,7 @@ logs/
 
 # Ruff
 .ruff_cache/
+
+# Logseq-generated files in test graph
+test-graph/logseq/
+test-graph/pages/contents.md
