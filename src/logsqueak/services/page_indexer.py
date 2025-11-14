@@ -107,9 +107,13 @@ class PageIndexer:
         Build or update vector index for all pages in graph.
 
         Uses incremental indexing: only re-indexes modified pages.
+        Uses batch embedding for performance: all chunks are collected and embedded together.
 
         Args:
-            progress_callback: Optional callback(current, total) for progress updates
+            progress_callback: Optional callback(current, total) for progress updates.
+                Called during Phase 1 (page scanning/parsing) with (current_page, total_pages).
+                Called at start of Phase 3 (batch encoding) with (total_pages, total_pages) to signal 100%.
+                Note: Batch encoding itself doesn't provide incremental updates since it's a single operation.
 
         Raises:
             ValueError: If graph pages directory doesn't exist or contains no pages
@@ -138,6 +142,10 @@ class PageIndexer:
             page_file.stem.replace("___", "/"): page_file.stat().st_mtime
             for page_file in page_files
         }
+
+        # Phase 1: Collect all chunks that need indexing
+        all_chunks = {}  # dict[chunk_id] -> chunk_data (for deduplication)
+        pages_to_index = []  # List of (page_name, outline, mtime) tuples
 
         for idx, page_file in enumerate(page_files, 1):
             page_name = page_file.stem.replace("___", "/")
@@ -169,16 +177,47 @@ class PageIndexer:
 
             # Parse page
             outline = LogseqOutline.parse(page_file.read_text())
-
-            # Index all blocks
-            self._index_page_blocks(page_name, outline, current_mtime)
+            pages_to_index.append((page_name, outline, current_mtime))
 
             if progress_callback:
                 progress_callback(idx, len(page_files))
 
-            logger.debug("page_indexed", page_name=page_name, block_count=len(outline.blocks))
+        # Phase 2: Generate chunks for all pages to index
+        if pages_to_index:
+            logger.info("generating_chunks", pages_to_index=len(pages_to_index))
+            for page_name, outline, mtime in pages_to_index:
+                page_chunks = self._prepare_page_chunks(page_name, outline, mtime)
+                all_chunks.update(page_chunks)  # Merge with deduplication
+                logger.debug("page_chunks_prepared", page_name=page_name, chunk_count=len(page_chunks))
 
-        logger.info("page_indexing_completed", total_pages=len(page_files))
+            # Phase 3: Batch encode all chunks
+            logger.info("batch_encoding", total_chunks=len(all_chunks))
+            chunk_ids = list(all_chunks.keys())
+            documents = [chunk["document"] for chunk in all_chunks.values()]
+
+            # Batch encode all documents at once
+            # Note: SentenceTransformer's show_progress_bar doesn't integrate with our progress_callback,
+            # but we can at least signal that encoding is happening
+            if progress_callback:
+                # Signal start of encoding phase (use total_pages + 1 to show we're in a new phase)
+                progress_callback(len(page_files), len(page_files))
+
+            embeddings = self.encoder.encode(documents, convert_to_numpy=True, show_progress_bar=False)
+
+            # Phase 4: Prepare data for bulk upsert
+            metadatas = [chunk["metadata"] for chunk in all_chunks.values()]
+
+            # Phase 5: Bulk upsert to ChromaDB
+            logger.info("bulk_upserting", total_chunks=len(chunk_ids))
+            self.collection.upsert(
+                documents=documents,
+                embeddings=embeddings.tolist(),
+                ids=chunk_ids,
+                metadatas=metadatas
+            )
+            logger.info("page_indexing_completed", total_pages=len(page_files), chunks_indexed=len(all_chunks))
+        else:
+            logger.info("page_indexing_completed", total_pages=len(page_files), chunks_indexed=0, reason="all_up_to_date")
 
     def _get_all_indexed_pages(self) -> dict[str, float]:
         """
@@ -204,18 +243,24 @@ class PageIndexer:
 
         return indexed_pages
 
-    def _index_page_blocks(
+    def _prepare_page_chunks(
         self,
         page_name: str,
         outline: LogseqOutline,
         mtime: float
-    ) -> None:
-        """Index all blocks from a page using semantic chunks.
+    ) -> dict[str, dict]:
+        """Prepare chunks for a page without embedding or upserting.
 
-        Also creates a page-level chunk for every page (even empty ones) to enable:
-        - Incremental indexing of empty pages
-        - Page name-based search
-        - Better integration decision matching
+        Creates a page-level chunk and block-level chunks for every page.
+        Returns a dict mapping chunk_id -> chunk_data (without embeddings).
+
+        Args:
+            page_name: Name of the page (e.g., "Konflux/Java builds")
+            outline: Parsed LogseqOutline
+            mtime: File modification time
+
+        Returns:
+            Dict of {chunk_id: {"document": str, "metadata": dict}}
         """
         # Use dict to deduplicate by ID (keeps last occurrence)
         chunks_by_id = {}
@@ -223,12 +268,10 @@ class PageIndexer:
         # ALWAYS create page-level chunk (enables empty page indexing and name search)
         page_title = self._extract_page_title(outline)
         page_context = self._create_page_context(page_name, page_title, outline)
-        page_embedding = self.encoder.encode(page_context, convert_to_numpy=True)
 
         page_chunk_id = f"{page_name}::__PAGE__"
         chunks_by_id[page_chunk_id] = {
             "document": page_context,
-            "embedding": page_embedding.tolist(),
             "metadata": {
                 "page_name": page_name,
                 "block_id": "__PAGE__",
@@ -241,14 +284,10 @@ class PageIndexer:
         chunks = generate_chunks(outline, page_name)
 
         for block, full_context, hybrid_id in chunks:
-            # Generate embedding
-            embedding = self.encoder.encode(full_context, convert_to_numpy=True)
-
             # Store chunk (overwrites if duplicate ID)
             full_id = f"{page_name}::{hybrid_id}"
             chunks_by_id[full_id] = {
                 "document": full_context,
-                "embedding": embedding.tolist(),
                 "metadata": {
                     "page_name": page_name,
                     "block_id": hybrid_id,
@@ -257,18 +296,7 @@ class PageIndexer:
                 }
             }
 
-        # Convert to lists for ChromaDB (always has at least page-level chunk)
-        ids = list(chunks_by_id.keys())
-        documents = [chunk["document"] for chunk in chunks_by_id.values()]
-        embeddings = [chunk["embedding"] for chunk in chunks_by_id.values()]
-        metadatas = [chunk["metadata"] for chunk in chunks_by_id.values()]
-
-        self.collection.upsert(
-            documents=documents,
-            embeddings=embeddings,
-            ids=ids,
-            metadatas=metadatas
-        )
+        return chunks_by_id
 
     def _extract_page_title(self, outline: LogseqOutline) -> Optional[str]:
         """Extract title:: property from page frontmatter.

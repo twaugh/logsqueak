@@ -3,6 +3,8 @@
 import click
 from pathlib import Path
 from datetime import date, timedelta
+import sys
+from rich.console import Console
 from logsqueak.utils.logging import configure_logging, get_logger
 from logsqueak.models.config import Config
 from logseq_outline.parser import LogseqOutline
@@ -10,6 +12,7 @@ from logseq_outline.graph import GraphPaths
 
 
 logger = get_logger(__name__)
+console = Console()
 
 
 def parse_date_or_range(date_or_range: str | None) -> list[date]:
@@ -310,17 +313,30 @@ def search(query: str, reindex: bool):
     async def build_index_with_progress():
         total_pages = 0
         current_page = 0
+        status_context = None
 
         def progress_callback(current, total):
-            nonlocal total_pages, current_page
+            nonlocal total_pages, current_page, status_context
             total_pages = total
             current_page = current
-            # Simple progress indicator
-            percent = int((current / total) * 100) if total > 0 else 0
-            click.echo(f"\rIndexing pages: {current}/{total} ({percent}%)", nl=False)
+            # When current == total, we're moving to the embedding phase
+            if current == total and status_context is None:  # Only start spinner once
+                # Clear the progress line completely
+                sys.stdout.write(f"\r{' ' * 50}\r")
+                sys.stdout.flush()
+                # Start spinner for embedding phase (Rich handles terminal detection)
+                status_context = console.status("[bold green]Generating embeddings...")
+                status_context.__enter__()
+            elif current < total:
+                # Simple progress indicator
+                percent = int((current / total) * 100) if total > 0 else 0
+                click.echo(f"\rIndexing pages: {current}/{total} ({percent}%)", nl=False)
 
         try:
             await page_indexer.build_index(progress_callback=progress_callback)
+            # Stop spinner if it was started
+            if status_context:
+                status_context.__exit__(None, None, None)
             click.echo()  # Newline after progress
             if reindex:
                 click.echo(f"Index rebuilt successfully ({total_pages} pages)")
@@ -329,6 +345,9 @@ def search(query: str, reindex: bool):
             else:
                 click.echo(f"Index updated successfully ({total_pages} pages checked)")
         except Exception as e:
+            # Stop spinner on error
+            if status_context:
+                status_context.__exit__(None, None, None)
             click.echo()  # Newline after progress
             logger.error("index_build_failed", error=str(e))
             raise click.ClickException(f"Failed to build search index: {e}")

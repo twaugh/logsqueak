@@ -652,10 +652,17 @@ class Phase1Screen(Screen):
             # Define progress callback to update status panel
             def on_progress(current: int, total: int):
                 """Update progress percentage as pages are indexed."""
-                percentage = (current / total) * 100.0
-                self._background_tasks["page_indexing"].progress_percentage = percentage
-                self._background_tasks["page_indexing"].progress_current = current
-                self._background_tasks["page_indexing"].progress_total = total
+                # When current == total, we're moving to the embedding phase
+                # Clear progress counts to show "Processing pages..." instead of "100/100"
+                if current == total:
+                    self._background_tasks["page_indexing"].progress_percentage = None
+                    self._background_tasks["page_indexing"].progress_current = None
+                    self._background_tasks["page_indexing"].progress_total = None
+                else:
+                    percentage = (current / total) * 100.0
+                    self._background_tasks["page_indexing"].progress_percentage = percentage
+                    self._background_tasks["page_indexing"].progress_current = current
+                    self._background_tasks["page_indexing"].progress_total = total
 
                 # Update status panel
                 try:
