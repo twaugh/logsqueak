@@ -381,3 +381,78 @@ async def test_embeddings_are_stored(temp_graph, temp_db, shared_sentence_transf
     assert len(first_embedding) > 0  # Non-empty vector
 
     await indexer.close()
+
+
+@pytest.mark.asyncio
+async def test_reindexing_deletes_old_chunks(temp_graph, temp_db, shared_sentence_transformer):
+    """Test that re-indexing a modified page deletes old chunks with stale block IDs.
+
+    This is a regression test for a bug where modified pages would have new chunks added
+    but old chunks (with old content hashes/block IDs) would remain in the index, causing
+    RAG search to return stale block IDs that no longer exist in the actual files.
+    """
+    graph_paths = GraphPaths(temp_graph)
+    indexer = PageIndexer(graph_paths, temp_db, encoder=shared_sentence_transformer)
+
+    # Initial index
+    await indexer.build_index()
+
+    # Get initial chunks for Test Page 1
+    initial_results = indexer.collection.get(
+        where={"page_name": "Test Page 1"},
+        include=["documents", "metadatas"]
+    )
+    initial_chunk_count = len(initial_results["ids"])
+    initial_chunk_ids = set(initial_results["ids"])
+
+    assert initial_chunk_count > 0, "Should have chunks after initial indexing"
+
+    # Modify the page (change content, which changes content hashes)
+    test_page = temp_graph / "pages" / "Test Page 1.md"
+    test_page.write_text("""- Modified content
+  - This is completely different
+  - New blocks with new content hashes
+- Another new section
+  - More new content
+""")
+
+    # Wait a bit to ensure mtime changes
+    import time
+    time.sleep(0.01)
+
+    # Re-index
+    await indexer.build_index()
+
+    # Get chunks after re-indexing
+    final_results = indexer.collection.get(
+        where={"page_name": "Test Page 1"},
+        include=["documents", "metadatas"]
+    )
+    final_chunk_count = len(final_results["ids"])
+    final_chunk_ids = set(final_results["ids"])
+
+    # Verify old chunks were deleted
+    # The old chunk IDs should NOT be present in the final results
+    # Exception: __PAGE__ chunk ID is stable (represents the page itself, not content)
+    overlap = (initial_chunk_ids & final_chunk_ids) - {f"Test Page 1::__PAGE__"}
+    assert len(overlap) == 0, f"Old chunks still present after re-indexing: {overlap}"
+
+    # Verify new chunks were added
+    assert final_chunk_count > 0, "Should have new chunks after re-indexing"
+
+    # Verify none of the documents contain the old content
+    old_content_patterns = ["Nested block", "Sub-block"]
+    new_content_patterns = ["Modified content", "completely different"]
+
+    for doc in final_results["documents"]:
+        for old_pattern in old_content_patterns:
+            assert old_pattern not in doc, f"Old content '{old_pattern}' still in index after re-indexing"
+
+    # At least some documents should have new content
+    has_new_content = any(
+        any(pattern in doc for pattern in new_content_patterns)
+        for doc in final_results["documents"]
+    )
+    assert has_new_content, "New content not found in index after re-indexing"
+
+    await indexer.close()

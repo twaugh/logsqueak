@@ -183,7 +183,23 @@ class PageIndexer:
             if progress_callback:
                 progress_callback(idx, len(page_files))
 
-        # Phase 2: Generate chunks for all pages to index
+        # Phase 2: Delete old chunks for modified pages
+        # When a page is re-indexed, its content may have changed, leading to new content hashes
+        # (new block IDs). We must delete the old chunks to prevent stale data in the index.
+        if pages_to_index:
+            pages_to_reindex = {page_name for page_name, _, _ in pages_to_index if page_name in indexed_pages}
+            if pages_to_reindex:
+                logger.info("deleting_old_chunks", pages_to_reindex=len(pages_to_reindex))
+                for page_name in pages_to_reindex:
+                    # Delete all chunks for this page
+                    # ChromaDB requires a where clause, so we filter by page_name metadata
+                    try:
+                        self.collection.delete(where={"page_name": page_name})
+                        logger.debug("deleted_old_chunks", page_name=page_name)
+                    except Exception as e:
+                        logger.warning("failed_to_delete_old_chunks", page_name=page_name, error=str(e))
+
+        # Phase 3: Generate chunks for all pages to index
         if pages_to_index:
             logger.info("generating_chunks", pages_to_index=len(pages_to_index))
             for page_name, outline, mtime in pages_to_index:
@@ -191,7 +207,7 @@ class PageIndexer:
                 all_chunks.update(page_chunks)  # Merge with deduplication
                 logger.debug("page_chunks_prepared", page_name=page_name, chunk_count=len(page_chunks))
 
-            # Phase 3: Batch encode all chunks
+            # Phase 4: Batch encode all chunks
             logger.info("batch_encoding", total_chunks=len(all_chunks))
             chunk_ids = list(all_chunks.keys())
             documents = [chunk["document"] for chunk in all_chunks.values()]
@@ -215,10 +231,10 @@ class PageIndexer:
 
             embeddings = encoder.encode(documents, convert_to_numpy=True, show_progress_bar=False)
 
-            # Phase 4: Prepare data for bulk upsert
+            # Phase 5: Prepare data for bulk upsert
             metadatas = [chunk["metadata"] for chunk in all_chunks.values()]
 
-            # Phase 5: Bulk upsert to ChromaDB
+            # Phase 6: Bulk upsert to ChromaDB
             logger.info("bulk_upserting", total_chunks=len(chunk_ids))
             self.collection.upsert(
                 documents=documents,
@@ -227,7 +243,7 @@ class PageIndexer:
                 metadatas=metadatas
             )
 
-            # Phase 6: Compact database to reclaim fragmented space
+            # Phase 7: Compact database to reclaim fragmented space
             # Bulk upserts can leave ~70% wasted space due to SQLite fragmentation
             self._vacuum_database()
 
