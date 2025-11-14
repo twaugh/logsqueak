@@ -448,10 +448,29 @@ class Phase2Screen(Screen):
             task_not_started = "llm_decisions" not in self.app.background_tasks
 
         if self.llm_client and task_not_started:
+            # Save all content before starting worker (in case there are unsaved edits)
+            self._save_all_content()
+            logger.info("saved_current_edits_before_integration_on_transition")
+
             logger.info("llm_decisions_worker_starting_on_transition")
             self.run_worker(self._llm_decisions_worker(), name="llm_decisions")
 
         logger.info("phase2_complete", blocks_edited=len(self.edited_content))
+
+        # Update refined_text in all existing decisions with latest edited content
+        # This ensures decisions use the user's final edits, even if they were
+        # created by the worker while user was still editing
+        from logsqueak.tui.app import LogsqueakApp
+        if isinstance(self.app, LogsqueakApp):
+            for decision in self.app.integration_decisions:
+                edited_content = self.edited_content_map.get(decision.knowledge_block_id)
+                if edited_content:
+                    decision.refined_text = edited_content.current_content
+                    logger.debug(
+                        "updated_decision_refined_text",
+                        block_id=decision.knowledge_block_id,
+                        refined_text_length=len(decision.refined_text)
+                    )
 
         # Call app transition method
         from logsqueak.tui.app import LogsqueakApp
@@ -486,6 +505,23 @@ class Phase2Screen(Screen):
 
         # Update current content from editor
         current_ec.current_content = editor.get_content()
+
+    def _save_all_content(self) -> None:
+        """Save current editor content before starting integration worker.
+
+        This ensures that any unsaved edits in the currently displayed block
+        are captured before the Integration Decision worker reads the content.
+        """
+        if not self.edited_content:
+            return
+
+        try:
+            editor = self.query_one(ContentEditor)
+            current_ec = self.edited_content[self.current_block_index]
+            current_ec.current_content = editor.get_content()
+        except Exception:
+            # Widget might not be mounted in test scenarios
+            pass
 
     # Background worker methods
 
@@ -861,6 +897,10 @@ class Phase2Screen(Screen):
                 task_exists = "llm_decisions" in self.app.background_tasks
 
             if self.llm_client and not task_exists:
+                # Save any unsaved edits before starting integration worker
+                self._save_all_content()
+                logger.info("saved_current_edits_before_integration")
+
                 self.run_worker(self._llm_decisions_worker(), name="llm_decisions")
                 logger.info("llm_decisions_worker_started_after_rag")
 
