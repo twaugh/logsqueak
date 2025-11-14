@@ -137,7 +137,12 @@ async def classify_blocks(
     indent_style = _detect_indent_style(journal_outline)
 
     # Render the outline (expecting it to already have IDs from _augment_outline_with_ids)
+    # IMPORTANT: Exclude frontmatter from LLM prompt (it's page-level metadata, not knowledge)
+    # Temporarily clear frontmatter, render, then restore it
+    original_frontmatter = journal_outline.frontmatter
+    journal_outline.frontmatter = []
     journal_content = journal_outline.render()
+    journal_outline.frontmatter = original_frontmatter
 
     system_prompt = (
         f"You are a JSON-only knowledge classifier. Output ONLY valid JSON lines (NDJSON format).\n"

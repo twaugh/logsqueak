@@ -76,6 +76,60 @@ async def test_classify_blocks_handles_empty_journal():
 
 
 @pytest.mark.asyncio
+async def test_classify_blocks_excludes_frontmatter():
+    """Test classify_blocks() excludes journal frontmatter from LLM prompt."""
+    # Arrange
+    mock_client = Mock(spec=LLMClient)
+
+    # Journal with frontmatter (date, properties)
+    journal_with_frontmatter = (
+        "date:: 2025-01-15\n"
+        "tags:: journal, daily\n"
+        "\n"
+        "- Morning standup meeting\n"
+        "  id:: 123\n"
+        "- Python asyncio.Queue is thread-safe\n"
+        "  id:: abc"
+    )
+    test_outline = LogseqOutline.parse(journal_with_frontmatter)
+
+    # Verify frontmatter was parsed
+    assert len(test_outline.frontmatter) > 0
+    assert test_outline.frontmatter[0] == "date:: 2025-01-15"
+
+    # Capture the prompt sent to LLM
+    captured_prompt = None
+    async def mock_stream(*args, **kwargs):
+        nonlocal captured_prompt
+        captured_prompt = kwargs.get('prompt', args[0] if args else None)
+        yield KnowledgeClassificationChunk(
+            block_id="abc",
+            confidence=0.85,
+            reason="Technical insight"
+        )
+
+    mock_client.stream_ndjson = mock_stream
+
+    # Act
+    results = []
+    async for chunk in classify_blocks(mock_client, test_outline):
+        results.append(chunk)
+
+    # Assert
+    assert captured_prompt is not None
+    # Frontmatter should NOT be in the prompt
+    assert "date:: 2025-01-15" not in captured_prompt
+    assert "tags:: journal, daily" not in captured_prompt
+    # Block content SHOULD be in the prompt
+    assert "Morning standup meeting" in captured_prompt
+    assert "Python asyncio.Queue is thread-safe" in captured_prompt
+
+    # Original outline should still have frontmatter preserved
+    assert len(test_outline.frontmatter) > 0
+    assert test_outline.frontmatter[0] == "date:: 2025-01-15"
+
+
+@pytest.mark.asyncio
 async def test_reword_content_calls_llm_client_correctly():
     """Test reword_content() wrapper calls LLMClient.stream_ndjson with correct parameters."""
     # Arrange

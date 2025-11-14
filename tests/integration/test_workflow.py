@@ -595,3 +595,71 @@ async def test_rag_chunks_reasonable_size():
     assert "<knowledge_blocks>" in captured_prompt
     assert "<page name=\"TestPage\">" in captured_prompt
     assert "Main section" in captured_prompt
+
+
+def test_journal_frontmatter_excluded_from_hierarchical_context():
+    """Test that journal frontmatter is excluded from hierarchical context.
+
+    Verifies that page-level metadata (frontmatter) from journal entries doesn't
+    leak into the hierarchical context used for knowledge block processing.
+    """
+    from logseq_outline.context import generate_full_context
+
+    # Arrange: Create journal with frontmatter
+    journal_with_frontmatter = """type:: journal
+tags:: daily-notes
+
+- Parent block
+  id:: parent-123
+  - Child block with knowledge
+    id:: child-456
+"""
+    journal_outline = LogseqOutline.parse(journal_with_frontmatter)
+
+    # Verify frontmatter was parsed
+    assert len(journal_outline.frontmatter) > 0
+    assert journal_outline.frontmatter[0] == "type:: journal"
+
+    # Find the child block and its parents
+    child_block = None
+    parent_block = None
+    for block in journal_outline.blocks:
+        parent_block = block
+        if block.block_id == "parent-123":
+            for child in block.children:
+                if child.block_id == "child-456":
+                    child_block = child
+                    break
+
+    assert parent_block is not None
+    assert child_block is not None
+
+    # Act: Generate hierarchical context WITHOUT frontmatter
+    hierarchical_context_clean = generate_full_context(
+        child_block,
+        [parent_block],
+        indent_str=journal_outline.indent_str,
+        frontmatter=None  # Exclude frontmatter
+    )
+
+    # Act: Generate hierarchical context WITH frontmatter (for comparison)
+    hierarchical_context_with_fm = generate_full_context(
+        child_block,
+        [parent_block],
+        indent_str=journal_outline.indent_str,
+        frontmatter=journal_outline.frontmatter
+    )
+
+    # Assert: Clean context should NOT have frontmatter
+    assert "type:: journal" not in hierarchical_context_clean
+    assert "tags:: daily-notes" not in hierarchical_context_clean
+    assert "Parent block" in hierarchical_context_clean
+    assert "Child block with knowledge" in hierarchical_context_clean
+
+    # Assert: Context with frontmatter SHOULD have frontmatter
+    assert "type:: journal" in hierarchical_context_with_fm
+    assert "tags:: daily-notes" in hierarchical_context_with_fm
+
+    # Original journal should still have frontmatter preserved
+    assert len(journal_outline.frontmatter) > 0
+    assert journal_outline.frontmatter[0] == "type:: journal"

@@ -458,16 +458,40 @@ class LogsqueakApp(App):
         self.edited_content = []
         for block_state in selected_blocks:
             # Find the actual block and its context using generate_chunks
-            from logseq_outline.context import generate_chunks
+            from logseq_outline.context import generate_chunks, generate_full_context
 
             block = None
             hierarchical_context = ""
 
+            # First pass: Find the block using hybrid IDs (WITH frontmatter for matching)
             for found_block, context, hybrid_id in generate_chunks(self.journal_outline):
                 if hybrid_id == block_state.block_id:
                     block = found_block
-                    hierarchical_context = context
+                    # Don't use context yet - it includes frontmatter
                     break
+
+            # Second pass: Generate hierarchical context WITHOUT frontmatter
+            # We need to rebuild the parent chain to generate clean context
+            if block:
+                # Find parent chain by walking the tree
+                def find_block_with_parents(target_block, blocks, parents=[]):
+                    for b in blocks:
+                        if b is target_block:
+                            return parents
+                        result = find_block_with_parents(target_block, b.children, parents + [b])
+                        if result is not None:
+                            return result
+                    return None
+
+                parents = find_block_with_parents(block, self.journal_outline.blocks) or []
+
+                # Generate context WITHOUT frontmatter
+                hierarchical_context = generate_full_context(
+                    block,
+                    parents,
+                    indent_str=self.journal_outline.indent_str,
+                    frontmatter=None  # Exclude frontmatter
+                )
 
             if block:
                 # Get user-facing content (excludes id:: property)
