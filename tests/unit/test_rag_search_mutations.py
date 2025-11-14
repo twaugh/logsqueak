@@ -51,6 +51,9 @@ async def indexed_db(temp_graph, tmp_path, shared_sentence_transformer):
 
     # Build index
     await indexer.build_index()
+
+    # Return base db_path for tests that need to rebuild index
+    # Tests should call PageIndexer to get per-graph path
     await indexer.close()
 
     return db_path
@@ -70,9 +73,12 @@ async def test_find_candidates_handles_hierarchical_page_links(indexed_db, temp_
     graph_paths = GraphPaths(temp_graph)
     indexer = PageIndexer(graph_paths, indexed_db, encoder=shared_sentence_transformer)
     await indexer.build_index()
+
+    # Use per-graph db_path for RAGSearch
+    per_graph_db_path = indexer.db_path
     await indexer.close()
 
-    search = RAGSearch(indexed_db)
+    search = RAGSearch(per_graph_db_path)
 
     # Knowledge block with hierarchical link
     edited_content = [

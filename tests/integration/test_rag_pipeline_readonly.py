@@ -89,10 +89,12 @@ async def rag_pipeline(test_graph, tmp_path_factory, shared_sentence_transformer
     graph_paths = GraphPaths(test_graph)
     indexer = PageIndexer(graph_paths, db_path, encoder=shared_sentence_transformer)
     await indexer.build_index()
-    await indexer.close()
 
-    # Create search instance
-    search = RAGSearch(db_path)
+    # Create search instance using the same per-graph db_path
+    # PageIndexer creates a per-graph subdirectory, so we must use indexer.db_path
+    search = RAGSearch(indexer.db_path)
+
+    await indexer.close()
 
     yield search, test_graph
 

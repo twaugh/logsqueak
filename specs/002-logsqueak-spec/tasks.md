@@ -727,12 +727,13 @@ User should manually test:
   - Update journal loading to preserve date grouping in tree view
   - Verify navigation works across date boundaries
   - Add date headers in BlockTree widget for clarity
-- [ ] T137 Implement per-graph page index using '(basename)-(16-digit pathname hash)' pattern
-  - Update PageIndexer to generate unique collection names per graph
-  - Use graph path basename + 16-digit hash of full path for collection naming
-  - Add graph_path parameter to PageIndexer initialization
-  - Ensure ChromaDB collections are isolated per graph (prevents cross-graph contamination)
-  - Write unit tests for collection name generation in tests/unit/test_page_indexer.py
+- [x] T137 Implement per-graph page index using '(basename)-(16-digit pathname hash)' pattern
+  - Update PageIndexer to create separate ChromaDB directories per graph
+  - Use graph path basename + 16-digit hash of full path for directory naming
+  - Directory pattern: ~/.cache/logsqueak/chromadb/(basename)-(16-digit-hash)
+  - Enables force-reindexing by removing a specific graph's directory
+  - Ensure ChromaDB databases are isolated per graph (prevents cross-graph contamination)
+  - Write unit tests for directory name generation in tests/unit/test_page_indexer.py
 - [ ] T138 Implement 'logsqueak search <query>' CLI command
   - Add 'search' command to src/logsqueak/cli.py with query argument
   - Load config and initialize PageIndexer/RAGSearch services

@@ -87,10 +87,10 @@ async def test_incremental_index_update_affects_search(test_graph, tmp_path, sha
     graph_paths = GraphPaths(test_graph)
     indexer = PageIndexer(graph_paths, db_path, encoder=shared_sentence_transformer)
     await indexer.build_index()
-    await indexer.close()
 
-    # Initial search
-    search = RAGSearch(db_path)
+    # Initial search (use indexer.db_path for per-graph directory)
+    search = RAGSearch(indexer.db_path)
+    await indexer.close()
 
     edited_content = [
         EditedContent(
@@ -128,10 +128,10 @@ async def test_incremental_index_update_affects_search(test_graph, tmp_path, sha
     # Rebuild index
     indexer = PageIndexer(graph_paths, db_path, encoder=shared_sentence_transformer)
     await indexer.build_index()
-    await indexer.close()
 
-    # Search again
-    search = RAGSearch(db_path)
+    # Search again (use indexer.db_path for per-graph directory)
+    search = RAGSearch(indexer.db_path)
+    await indexer.close()
     updated_results = await search.find_candidates(
         edited_content,
         original_contexts,

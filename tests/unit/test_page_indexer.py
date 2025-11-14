@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 import tempfile
 import shutil
-from logsqueak.services.page_indexer import PageIndexer
+from logsqueak.services.page_indexer import PageIndexer, generate_graph_db_name
 from logseq_outline.graph import GraphPaths
 from logseq_outline.parser import LogseqOutline
 
@@ -47,17 +47,155 @@ def temp_db(tmp_path):
     return tmp_path / "chromadb"
 
 
+def test_generate_graph_db_name_basic():
+    """Test basic database directory name generation."""
+    graph_path = Path("/home/user/Documents/my-graph")
+    db_name = generate_graph_db_name(graph_path)
+
+    # Should contain basename
+    assert "my-graph" in db_name or "my_graph" in db_name
+
+    # Should end with hyphen + 16-character hex hash
+    assert "-" in db_name
+    parts = db_name.rsplit("-", 1)
+    assert len(parts) == 2
+    assert len(parts[1]) == 16
+    assert all(c in "0123456789abcdef" for c in parts[1])
+
+
+def test_generate_graph_db_name_preserves_basename():
+    """Test that basename is preserved as-is (since Path already validates it)."""
+    graph_path = Path("/home/user/Documents/my_graph")
+    db_name = generate_graph_db_name(graph_path)
+
+    # Should contain the exact basename
+    assert "my_graph" in db_name
+
+    # Should have the expected format
+    assert db_name.startswith("my_graph-")
+    hash_part = db_name.split("-", 1)[1]
+    assert len(hash_part) == 16
+    assert all(c in "0123456789abcdef" for c in hash_part)
+
+
+def test_generate_graph_db_name_different_paths_different_hashes():
+    """Test that different graph paths produce different hashes."""
+    graph_path1 = Path("/home/user/Documents/graph1")
+    graph_path2 = Path("/home/user/Documents/graph2")
+
+    name1 = generate_graph_db_name(graph_path1)
+    name2 = generate_graph_db_name(graph_path2)
+
+    # Different paths should produce different directory names
+    assert name1 != name2
+
+    # Hashes (last part) should be different
+    hash1 = name1.rsplit("-", 1)[-1]
+    hash2 = name2.rsplit("-", 1)[-1]
+    assert hash1 != hash2
+
+
+def test_generate_graph_db_name_same_path_same_hash():
+    """Test that same path produces same hash consistently."""
+    graph_path = Path("/home/user/Documents/my-graph")
+
+    name1 = generate_graph_db_name(graph_path)
+    name2 = generate_graph_db_name(graph_path)
+
+    # Same path should produce identical directory names
+    assert name1 == name2
+
+
+def test_generate_graph_db_name_same_basename_different_paths():
+    """Test that graphs with same basename but different paths get different directories."""
+    graph_path1 = Path("/home/user/Documents/my-graph")
+    graph_path2 = Path("/home/other/Projects/my-graph")
+
+    name1 = generate_graph_db_name(graph_path1)
+    name2 = generate_graph_db_name(graph_path2)
+
+    # Should have different directory names due to different full paths
+    assert name1 != name2
+
+    # But both should contain the basename
+    assert "my-graph" in name1 or "my_graph" in name1
+    assert "my-graph" in name2 or "my_graph" in name2
+
+
 @pytest.mark.asyncio
 async def test_page_indexer_initialization(temp_graph, temp_db, shared_sentence_transformer):
     """Test PageIndexer initialization."""
     graph_paths = GraphPaths(temp_graph)
-    indexer = PageIndexer(graph_paths, temp_db, encoder=shared_sentence_transformer)
+    indexer = PageIndexer(graph_paths, db_path=temp_db, encoder=shared_sentence_transformer)
 
     assert indexer.graph_paths.graph_path == temp_graph
-    assert indexer.db_path == temp_db
+    # db_path should be a subdirectory under temp_db
+    assert indexer.db_path.parent == temp_db
     assert indexer.collection is not None
 
     await indexer.close()
+
+
+@pytest.mark.asyncio
+async def test_page_indexer_uses_per_graph_directory(temp_graph, temp_db, shared_sentence_transformer):
+    """Test that PageIndexer creates per-graph ChromaDB directories."""
+    graph_paths = GraphPaths(temp_graph)
+    indexer = PageIndexer(graph_paths, db_path=temp_db, encoder=shared_sentence_transformer)
+
+    # Database path should be under the base path with graph-specific subdirectory
+    assert indexer.db_path.parent == temp_db
+
+    # Directory name should be based on graph path
+    expected_db_name = generate_graph_db_name(temp_graph)
+    assert indexer.db_path.name == expected_db_name
+
+    # Directory should contain the graph basename
+    assert "test-graph" in indexer.db_path.name or "test_graph" in indexer.db_path.name
+
+    # Directory should exist
+    assert indexer.db_path.exists()
+    assert indexer.db_path.is_dir()
+
+    await indexer.close()
+
+
+@pytest.mark.asyncio
+async def test_page_indexer_different_graphs_different_directories(tmp_path, shared_sentence_transformer):
+    """Test that different graphs get different ChromaDB directories."""
+    # Create two different graphs
+    graph1 = tmp_path / "graph1"
+    graph1.mkdir()
+    (graph1 / "pages").mkdir()
+    (graph1 / "pages" / "test.md").write_text("- Test content")
+
+    graph2 = tmp_path / "graph2"
+    graph2.mkdir()
+    (graph2 / "pages").mkdir()
+    (graph2 / "pages" / "test.md").write_text("- Test content")
+
+    # Create shared db base path
+    db_base = tmp_path / "chromadb"
+
+    # Initialize indexers for both graphs
+    graph_paths1 = GraphPaths(graph1)
+    indexer1 = PageIndexer(graph_paths1, db_path=db_base, encoder=shared_sentence_transformer)
+
+    graph_paths2 = GraphPaths(graph2)
+    indexer2 = PageIndexer(graph_paths2, db_path=db_base, encoder=shared_sentence_transformer)
+
+    # Should have different directories
+    assert indexer1.db_path != indexer2.db_path
+
+    # Both should be under the base path
+    assert indexer1.db_path.parent == db_base
+    assert indexer2.db_path.parent == db_base
+
+    # Both directories should exist
+    assert indexer1.db_path.exists()
+    assert indexer2.db_path.exists()
+
+    await indexer1.close()
+    await indexer2.close()
 
 
 @pytest.mark.asyncio

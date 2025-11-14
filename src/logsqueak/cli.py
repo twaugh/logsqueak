@@ -205,18 +205,17 @@ def extract(date_or_range: str = None):
     llm_client = LLMClient(config=config.llm)
     logger.info("llm_client_initialized", endpoint=str(config.llm.endpoint), model=config.llm.model)
 
-    # Create GraphPaths and ChromaDB path
+    # Create GraphPaths
     graph_paths = GraphPaths(graph_path)
-    chroma_db_path = Path.home() / ".cache" / "logsqueak" / "chromadb"
-    chroma_db_path.mkdir(parents=True, exist_ok=True)
 
     # Create page indexer (will build index during Phase 1 background task)
-    page_indexer = PageIndexer(graph_paths=graph_paths, db_path=chroma_db_path)
-    logger.info("page_indexer_initialized", graph_path=str(graph_path), db_path=str(chroma_db_path))
+    # PageIndexer creates its own per-graph ChromaDB directory under ~/.cache/logsqueak/chromadb
+    page_indexer = PageIndexer(graph_paths=graph_paths)
+    logger.info("page_indexer_initialized", graph_path=str(graph_path), db_path=str(page_indexer.db_path))
 
-    # Create RAG search service (uses same db_path as page_indexer)
-    rag_search = RAGSearch(db_path=chroma_db_path)
-    logger.info("rag_search_initialized", db_path=str(chroma_db_path))
+    # Create RAG search service (uses same per-graph db_path as page_indexer)
+    rag_search = RAGSearch(db_path=page_indexer.db_path)
+    logger.info("rag_search_initialized", db_path=str(page_indexer.db_path))
 
     # Create file monitor
     file_monitor = FileMonitor()

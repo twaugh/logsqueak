@@ -53,9 +53,12 @@ async def indexed_db(temp_graph, tmp_path_factory, shared_sentence_transformer):
 
     # Build index
     await indexer.build_index()
+
+    # Return the per-graph db_path (PageIndexer creates subdirectory)
+    per_graph_db_path = indexer.db_path
     await indexer.close()
 
-    return db_path
+    return per_graph_db_path
 
 
 @pytest.mark.asyncio
