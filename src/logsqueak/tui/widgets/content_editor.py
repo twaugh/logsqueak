@@ -6,6 +6,7 @@ in Phase 2 of the workflow.
 
 from textual.widgets import TextArea
 from textual.reactive import reactive
+from typing import Any
 
 
 class ContentEditor(TextArea):
@@ -16,9 +17,9 @@ class ContentEditor(TextArea):
 
     def __init__(
         self,
-        *args,
-        **kwargs
-    ):
+        *args: Any,
+        **kwargs: Any
+    ) -> None:
         """Initialize ContentEditor with markdown language support."""
         super().__init__(
             "",

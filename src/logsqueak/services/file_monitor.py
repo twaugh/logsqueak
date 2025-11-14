@@ -21,7 +21,7 @@ class FileMonitor:
         ...     tracker.refresh(journal_path)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize empty file tracker."""
         self._mtimes: Dict[Path, float] = {}
 

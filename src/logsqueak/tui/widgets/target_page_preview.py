@@ -7,7 +7,7 @@ New design: Custom Rich Text rendering with block-level highlighting.
 """
 
 import re
-from typing import Optional
+from typing import Optional, Any
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, ScrollableContainer
@@ -413,7 +413,7 @@ class TargetPagePreview(Widget):
     }
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize TargetPagePreview with gutter and content."""
         # If id is not provided, use default
         if 'id' not in kwargs:
