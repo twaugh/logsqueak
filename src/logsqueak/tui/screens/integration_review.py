@@ -198,9 +198,10 @@ class Phase3Screen(Screen):
 
                 # Bottom row: Decision list and target page preview
                 with Container(id="bottom-row"):
-                    # Bottom-left: Decision list
-                    decision_list = DecisionList()
-                    decision_list.border_title = "Integration Points"
+                    # Bottom-left: Decision list (with graph_path for clickable links)
+                    graph_path = self.graph_paths.graph_path if self.graph_paths else None
+                    decision_list = DecisionList(graph_path=graph_path)
+                    decision_list.border_title = "Integration Points (Ctrl+Click)"
                     yield decision_list
 
                     # Bottom-right: Target page preview

@@ -370,14 +370,29 @@ def search(query: str, reindex: bool):
     logger.info("search_command_completed")
 
 
+def _create_clickable_link(page_name: str, graph_path: Path) -> str:
+    """Create a clickable logseq:// hyperlink using OSC 8 escape codes.
+
+    Args:
+        page_name: Name of the Logseq page
+        graph_path: Path to the Logseq graph directory
+
+    Returns:
+        Formatted hyperlink string with OSC 8 escape codes
+    """
+    from logsqueak.utils.logseq_urls import create_logseq_url
+
+    logseq_url = create_logseq_url(page_name, graph_path)
+    # OSC 8 format: \033]8;;URI\033\\TEXT\033]8;;\033\\
+    return f"\033]8;;{logseq_url}\033\\{page_name}\033]8;;\033\\"
+
+
 def _display_search_results(results: list[dict], graph_path: Path):
     """
     Display search results in terminal-friendly format.
 
     Uses OSC 8 escape codes for clickable links and color coding for readability.
     """
-    graph_name = graph_path.name
-
     for idx, result in enumerate(results, 1):
         page_name = result["page_name"]
         confidence = result["confidence"]
@@ -392,13 +407,7 @@ def _display_search_results(results: list[dict], graph_path: Path):
             confidence_color = "red"
 
         # Create clickable logseq:// link using OSC 8 escape codes
-        # Format: \033]8;;URI\033\\TEXT\033]8;;\033\\
-        # URL format: logseq://graph/(encoded-graph-name)?page=(encoded-page-name)
-        from urllib.parse import quote
-        encoded_graph = quote(graph_name, safe='')
-        encoded_page = quote(page_name, safe='')
-        logseq_uri = f"logseq://graph/{encoded_graph}?page={encoded_page}"
-        clickable_link = f"\033]8;;{logseq_uri}\033\\{page_name}\033]8;;\033\\"
+        clickable_link = _create_clickable_link(page_name, graph_path)
 
         # Format snippet (exclude frontmatter properties, preserve original indentation)
         snippet_lines = snippet.split('\n')

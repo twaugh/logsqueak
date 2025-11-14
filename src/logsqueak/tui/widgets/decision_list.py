@@ -4,11 +4,14 @@ This widget shows a list of integration decisions for the current knowledge bloc
 with visual indicators for status (pending, completed, failed).
 """
 
+from pathlib import Path
+from typing import List, Optional
 from textual.widgets import Static
 from textual.reactive import reactive
 from rich.text import Text
+from rich.style import Style
+from rich.color import Color
 from rich.console import RenderableType
-from typing import List
 from logsqueak.models.integration_decision import IntegrationDecision
 
 
@@ -19,9 +22,14 @@ class DecisionList(Static):
     decisions = reactive([], always_update=True)
     current_index = reactive(0)
 
-    def __init__(self, *args, **kwargs):
-        """Initialize DecisionList."""
+    def __init__(self, graph_path: Optional[Path] = None, *args, **kwargs):
+        """Initialize DecisionList.
+
+        Args:
+            graph_path: Path to Logseq graph (for creating clickable links)
+        """
         super().__init__("", *args, id="decision-list", **kwargs)
+        self.graph_path = graph_path
 
     def render(self) -> RenderableType:
         """Render the decision list with status indicators.
@@ -52,9 +60,25 @@ class DecisionList(Static):
             else:
                 result.append("  ")
 
-            # Status indicator and target page
+            # Status indicator
             result.append(f"{indicator} ", style=style)
-            result.append(f"{decision.target_page}", style="bold" if i == self.current_index else "")
+
+            # Target page (with clickable link if graph_path is available)
+            if self.graph_path:
+                # Create logseq:// URL using shared utility
+                from logsqueak.utils.logseq_urls import create_logseq_url
+                logseq_url = create_logseq_url(decision.target_page, self.graph_path)
+
+                # Use Rich Style with link parameter for proper clickable links
+                # Explicit RGB blue color to override terminal's default link styling
+                page_style = Style(
+                    bold=i == self.current_index,
+                    color=Color.from_rgb(100, 149, 237),  # Cornflower blue
+                    link=logseq_url
+                )
+                result.append(decision.target_page, style=page_style)
+            else:
+                result.append(f"{decision.target_page}", style="bold" if i == self.current_index else "")
 
             # Action type and confidence
             action_display = decision.action.replace("_", " ").title()
