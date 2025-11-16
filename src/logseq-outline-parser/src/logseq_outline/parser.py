@@ -367,8 +367,15 @@ class LogseqOutline:
             else:
                 lines.append(f"{indent}- {block.content[0]}")
 
-            # Render subsequent lines (continuation/properties) with "  " instead of "- "
-            for line in block.content[1:]:
+            # Render subsequent lines (continuation/properties), but skip trailing empty lines
+            # to avoid blank lines between blocks
+            continuation_lines = block.content[1:]
+
+            # Strip trailing empty continuation lines
+            while continuation_lines and continuation_lines[-1] == '':
+                continuation_lines = continuation_lines[:-1]
+
+            for line in continuation_lines:
                 # Check if line has indent reduction marker
                 if line.startswith('\x00'):
                     # Extract reduction amount and content
