@@ -244,13 +244,17 @@ class Phase1Screen(Screen):
     def action_cursor_down(self) -> None:
         """Move cursor down in tree."""
         tree = self.query_one(BlockTree)
+        current_block = tree.get_current_block_id()
         tree.action_cursor_down()
+        logger.info("user_action_cursor_down", from_block=current_block)
         # Note: _update_current_block() called by on_tree_node_highlighted event
 
     def action_cursor_up(self) -> None:
         """Move cursor up in tree."""
         tree = self.query_one(BlockTree)
+        current_block = tree.get_current_block_id()
         tree.action_cursor_up()
+        logger.info("user_action_cursor_up", from_block=current_block)
         # Note: _update_current_block() called by on_tree_node_highlighted event
 
     def action_jump_next_knowledge(self) -> None:
@@ -262,7 +266,10 @@ class Phase1Screen(Screen):
         if next_line is not None:
             tree.cursor_line = next_line
             tree.scroll_to_line(next_line)
+            logger.info("user_action_jump_next_knowledge", from_line=current_line, to_line=next_line)
             # Note: _update_current_block() called by on_tree_node_highlighted event
+        else:
+            logger.info("user_action_jump_next_knowledge_no_target", from_line=current_line)
 
     def action_jump_prev_knowledge(self) -> None:
         """Jump to previous LLM-suggested knowledge block."""
@@ -273,7 +280,10 @@ class Phase1Screen(Screen):
         if prev_line is not None:
             tree.cursor_line = prev_line
             tree.scroll_to_line(prev_line)
+            logger.info("user_action_jump_prev_knowledge", from_line=current_line, to_line=prev_line)
             # Note: _update_current_block() called by on_tree_node_highlighted event
+        else:
+            logger.info("user_action_jump_prev_knowledge_no_target", from_line=current_line)
 
     def action_toggle_selection(self) -> None:
         """Toggle selection on current block."""
@@ -288,11 +298,13 @@ class Phase1Screen(Screen):
                 state.classification = "pending"
                 state.source = "user"
                 state.confidence = None
+                logger.info("user_action_deselect_block", block_id=block_id)
             else:
                 # Not selected → Select as user choice (green checkmark)
                 state.classification = "knowledge"
                 state.source = "user"
                 state.confidence = 1.0
+                logger.info("user_action_select_block", block_id=block_id)
 
             # Update visual
             tree.update_block_label(block_id)
@@ -303,6 +315,7 @@ class Phase1Screen(Screen):
         """Accept all LLM suggestions (keeps existing user selections)."""
         tree = self.query_one(BlockTree)
 
+        accepted_count = 0
         for block_id, state in self.block_states.items():
             if state.llm_classification == "knowledge":
                 # Accept LLM suggestion (only if not already selected)
@@ -310,10 +323,12 @@ class Phase1Screen(Screen):
                     state.classification = "knowledge"
                     state.source = "llm"
                     state.confidence = state.llm_confidence or 0.0
+                    accepted_count += 1
 
                     # Update visual
                     tree.update_block_label(block_id)
 
+        logger.info("user_action_accept_all_suggestions", accepted_count=accepted_count)
         self._update_selected_count()
         self._update_current_block()
 
@@ -321,13 +336,17 @@ class Phase1Screen(Screen):
         """Clear all selections."""
         tree = self.query_one(BlockTree)
 
+        cleared_count = 0
         for block_id, state in self.block_states.items():
+            if state.classification == "knowledge":
+                cleared_count += 1
             state.classification = "pending"
             state.source = "user"
 
             # Update visual
             tree.update_block_label(block_id)
 
+        logger.info("user_action_clear_all_selections", cleared_count=cleared_count)
         self._update_selected_count()
         self._update_current_block()
 
@@ -344,11 +363,14 @@ class Phase1Screen(Screen):
                 state.classification = "knowledge"
                 state.source = "llm"
                 state.confidence = state.llm_confidence or 0.0
+                logger.info("user_action_reset_to_llm", block_id=block_id)
 
                 # Update visual
                 tree.update_block_label(block_id)
                 self._update_selected_count()
                 self._update_current_block()
+            else:
+                logger.info("user_action_reset_to_llm_no_suggestion", block_id=block_id)
 
     def action_next_phase(self) -> None:
         """Proceed to Phase 2 (only if blocks selected)."""
@@ -371,6 +393,7 @@ class Phase1Screen(Screen):
 
     def action_quit(self) -> None:
         """Quit application."""
+        logger.info("user_action_quit_phase1")
         self.app.exit()
 
     # Helper methods

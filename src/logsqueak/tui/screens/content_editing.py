@@ -356,7 +356,9 @@ class Phase2Screen(Screen):
 
         # Move to next block
         if self.current_block_index < len(self.edited_content) - 1:
+            old_index = self.current_block_index
             self.current_block_index += 1
+            logger.info("user_action_navigate_next", from_index=old_index, to_index=self.current_block_index)
             await self._update_display()
 
     async def action_navigate_previous(self) -> None:
@@ -371,7 +373,9 @@ class Phase2Screen(Screen):
 
         # Move to previous block
         if self.current_block_index > 0:
+            old_index = self.current_block_index
             self.current_block_index -= 1
+            logger.info("user_action_navigate_previous", from_index=old_index, to_index=self.current_block_index)
             await self._update_display()
 
     def action_toggle_focus(self) -> None:
@@ -381,9 +385,11 @@ class Phase2Screen(Screen):
         if editor.has_focus:
             # Unfocus the editor
             self.set_focus(None)
+            logger.info("user_action_toggle_focus", focused=False)
         else:
             # Focus the editor
             editor.focus()
+            logger.info("user_action_toggle_focus", focused=True)
 
     def action_accept_llm(self) -> None:
         """Accept LLM reworded version ('a' key)."""
@@ -493,6 +499,7 @@ class Phase2Screen(Screen):
         # Save current content
         self._save_current_content()
 
+        logger.info("user_action_back_to_phase1")
         # TODO: Transition back to Phase 1
         self.app.pop_screen()
 

@@ -699,7 +699,7 @@ User should manually test:
 
 - [x] T123 [P] Add logging for all LLM requests (request_id, model, endpoint) in src/logsqueak/services/llm_client.py
 - [x] T124 [P] Add logging for all LLM responses (chunk count, errors) in src/logsqueak/services/llm_client.py
-- [ ] T125 [P] Add logging for user actions (navigation, selection, acceptance) in all TUI screens
+- [x] T125 [P] Add logging for user actions (navigation, selection, acceptance) in all TUI screens
 - [x] T126 [P] Add logging for file operations (writes, validations, errors) in src/logsqueak/services/file_operations.py
 - [ ] T127 [P] Code cleanup and refactoring across all modules
 - [x] T128 [P] Add type hints and docstrings to all public functions

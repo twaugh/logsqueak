@@ -564,13 +564,18 @@ Confidence: {decision.confidence:.0%}
         block_decisions = self.decisions_by_block.get(block_id, [])
 
         if self.current_decision_index < len(block_decisions) - 1:
+            old_index = self.current_decision_index
             self.current_decision_index += 1
+            logger.info("user_action_navigate_next_decision", from_index=old_index, to_index=self.current_decision_index, block_id=block_id)
             # The watch_current_decision_index watcher will handle the update
 
     def action_navigate_previous_decision(self) -> None:
         """Navigate to previous decision for current block."""
         if self.current_decision_index > 0:
+            old_index = self.current_decision_index
             self.current_decision_index -= 1
+            block_id = self.journal_blocks[self.current_block_index].block_id
+            logger.info("user_action_navigate_previous_decision", from_index=old_index, to_index=self.current_decision_index, block_id=block_id)
             # The watch_current_decision_index watcher will handle the update
 
     async def _update_decision_display(self) -> None:
@@ -647,6 +652,7 @@ Confidence: {decision.confidence:.0%}
         """
         if self.current_block_index >= len(self.journal_blocks) - 1:
             # At last block - show completion summary
+            logger.info("user_action_next_block_at_end")
             self.run_worker(self._show_completion_summary(), exclusive=True)
             return
 
@@ -662,8 +668,10 @@ Confidence: {decision.confidence:.0%}
             return
 
         # Navigate to next block
+        old_index = self.current_block_index
         self.current_block_index += 1
         self.current_decision_index = 0
+        logger.info("user_action_next_block", from_index=old_index, to_index=self.current_block_index)
         self.call_later(self._display_current_block)
 
     async def action_accept_all(self) -> None:
@@ -671,14 +679,20 @@ Confidence: {decision.confidence:.0%}
         block_id = self.journal_blocks[self.current_block_index].block_id
         block_decisions = self.decisions_by_block.get(block_id, [])
 
+        accepted_count = 0
+        failed_count = 0
         for decision in block_decisions:
             if decision.write_status == "pending":
                 try:
                     await self.write_integration(decision)
                     decision.write_status = "completed"
+                    accepted_count += 1
                 except Exception as e:
                     decision.write_status = "failed"
                     decision.error_message = str(e)
+                    failed_count += 1
+
+        logger.info("user_action_accept_all", block_id=block_id, accepted_count=accepted_count, failed_count=failed_count)
 
         # Refresh decision list
         decision_list = self.query_one(DecisionList)
@@ -691,9 +705,11 @@ Confidence: {decision.confidence:.0%}
         """Focus the target page preview widget."""
         preview = self.query_one("#target-page-preview", TargetPagePreview)
         preview.focus()
+        logger.info("user_action_focus_preview")
 
     def action_back(self) -> None:
         """Return to previous screen."""
+        logger.info("user_action_back_to_phase2")
         self.dismiss()
 
     # Background worker methods
