@@ -284,9 +284,9 @@ def add_provenance(
     target_block_id: str
 ) -> None:
     """
-    Add processed:: property to journal block.
+    Add extracted-to:: property to journal block.
 
-    Format: processed:: [Page Name](((uuid))), [Other Page](((uuid2)))
+    Format: extracted-to:: [Page Name](((uuid))), [Other Page](((uuid2)))
 
     Args:
         journal_block: Journal block that was processed
@@ -297,8 +297,8 @@ def add_provenance(
     display_name = target_page.replace("___", "/")
     provenance_link = f"[{display_name}]((({target_block_id})))"
 
-    # Get existing processed:: value or empty string
-    existing = journal_block.get_property("processed") or ""
+    # Get existing extracted-to:: value or empty string
+    existing = journal_block.get_property("extracted-to") or ""
 
     # Append new link (comma-separated)
     if existing:
@@ -307,7 +307,7 @@ def add_provenance(
         new_value = provenance_link
 
     # Update property (preserves order)
-    journal_block.set_property("processed", new_value)
+    journal_block.set_property("extracted-to", new_value)
 
 
 def validate_decision(

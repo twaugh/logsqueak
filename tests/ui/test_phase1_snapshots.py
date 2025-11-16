@@ -207,7 +207,7 @@ def test_phase1_with_background_tasks(snap_compare, journals):
 
 def test_phase1_with_processed_blocks(snap_compare, sample_blocks, journals):
     """Test Phase 1 screen with previously processed blocks."""
-    # Create blocks with processed:: property
+    # Create blocks with extracted-to:: property
     blocks = [
         LogseqBlock(
             content=["2025-01-15"],
@@ -217,7 +217,7 @@ def test_phase1_with_processed_blocks(snap_compare, sample_blocks, journals):
                 LogseqBlock(
                     content=[
                         "Learned about Python async patterns",
-                        "processed:: [Async Patterns](((uuid-123)))"
+                        "extracted-to:: [Async Patterns](((uuid-123)))"
                     ],
                     indent_level=1,
                     block_id="block-1",
@@ -226,7 +226,7 @@ def test_phase1_with_processed_blocks(snap_compare, sample_blocks, journals):
                 LogseqBlock(
                     content=[
                         "Found a bug in the authentication flow",
-                        "processed:: [Bug Fixes](((uuid-456)))"
+                        "extracted-to:: [Bug Fixes](((uuid-456)))"
                     ],
                     indent_level=1,
                     block_id="block-2",

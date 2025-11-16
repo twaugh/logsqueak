@@ -113,7 +113,7 @@ The user wants to review integration suggestions for each knowledge block, see w
    - Action description, confidence score, and LLM reasoning for the selected decision
 
 6. **Given** a knowledge block has 3 relevant pages with decisions, **When** user presses 'j' or 'k', **Then** they navigate between the different page decisions for this knowledge block, and the preview panel updates to show the selected decision's target page context
-7. **Given** a decision shows "Add under 'Project Timeline'" with the target page preview visible, **When** user presses 'y' (accept), **Then** system immediately writes that knowledge block to the target page at the specified location and atomically adds to the `processed::` property on the journal block (creating it if it doesn't exist, or appending to the comma-separated list if it does), where each link uses markdown link format `[Page Name](((uuid)))` with the target page name as link text (with '___' converted to '/' for hierarchical pages) and Logseq block reference `((uuid))` as the link target
+7. **Given** a decision shows "Add under 'Project Timeline'" with the target page preview visible, **When** user presses 'y' (accept), **Then** system immediately writes that knowledge block to the target page at the specified location and atomically adds to the `extracted-to::` property on the journal block (creating it if it doesn't exist, or appending to the comma-separated list if it does), where each link uses markdown link format `[Page Name](((uuid)))` with the target page name as link text (with '___' converted to '/' for hierarchical pages) and Logseq block reference `((uuid))` as the link target
 8. **Given** a write operation succeeds, **When** the system updates the display, **Then** that decision is marked as completed with a checkmark (✓) and remains visible in the list
 9. **Given** user has accepted one decision for a knowledge block and other decisions remain, **When** they press 'y' on another decision for the same block, **Then** system writes to that additional page as well (the user can integrate the same knowledge block to multiple pages)
 10. **Given** a write operation fails, **When** the error occurs, **Then** system shows error details (e.g., "Target block not found"), marks that decision as failed (⚠), and allows user to continue with remaining decisions
@@ -147,7 +147,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 - What if the LLM response includes malformed JSON during streaming? (Logs error, shows user-friendly message, skips that item, continues with remaining items)
 - What happens if user edits journal or target page file externally (e.g., in Logseq app) while TUI session is active? (System detects file modification timestamp changes before write operations, automatically reloads modified files, re-validates that target blocks/structure still exist, and either proceeds with write or shows error if validation fails)
 - What happens if user accepts a decision ('y') but the write takes a long time? (UI shows "Writing..." status, blocks navigation until write completes or fails, then auto-advances to next decision)
-- What if user skips all knowledge blocks without accepting any decisions? (Completion summary shows "0 blocks integrated, 5 blocks skipped" with link to journal entry - no processed:: markers added since nothing was written)
+- What if user skips all knowledge blocks without accepting any decisions? (Completion summary shows "0 blocks integrated, 5 blocks skipped" with link to journal entry - no extracted-to:: markers added since nothing was written)
 - What happens if user advances to next knowledge block ('n' or 'a') while decisions are still streaming in for that next block? (System shows "Processing knowledge blocks..." status and blocks interaction until all decisions for that block arrive)
 
 ## Requirements *(mandatory)*
@@ -210,7 +210,7 @@ The user wants to review integration suggestions for each knowledge block, see w
 - **FR-040**: System MUST provide navigation controls (j/k/arrows) to move between decisions for the current knowledge block
 - **FR-041**: System MUST write the knowledge block to the target page immediately when user presses 'y' on a pending decision
 - **FR-042**: System MUST allow user to accept multiple decisions for the same knowledge block (integrating the same content to multiple pages)
-- **FR-043**: System MUST atomically add to the `processed::` property on the journal block after each successful page write (appending to comma-separated list)
+- **FR-043**: System MUST atomically add to the `extracted-to::` property on the journal block after each successful page write (appending to comma-separated list)
 - **FR-044**: System MUST mark completed integrations with checkmark (✓) and keep them visible in the decision list
 - **FR-045**: System MUST display error details if a write operation fails, mark decision as failed (⚠), and allow continuation with remaining decisions
 - **FR-046**: System MUST allow advancing to next knowledge block using 'n' key (skipping remaining decisions for current block)
@@ -463,7 +463,7 @@ Key principles:
 
 ### II. Non-Destructive Operations (NON-NEGOTIABLE)
 
-- All operations traceable via `processed::` markers in journal entries
+- All operations traceable via `extracted-to::` markers in journal entries
 - UPDATE operations replace content but preserve structure/IDs
 - APPEND operations add new blocks without modifying existing content
 - Every integrated block generates deterministic `id::` property (UUID v5 based on knowledge_block_id + target_page + action)

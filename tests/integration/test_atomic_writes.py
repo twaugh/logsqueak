@@ -107,7 +107,7 @@ async def test_atomic_write_add_section(
     knowledge_block = journal_outline.find_block_by_id("knowledge-block-1")
     assert knowledge_block is not None
 
-    processed = knowledge_block.get_property("processed")
+    processed = knowledge_block.get_property("extracted-to")
     assert processed is not None
     assert "Python/Concurrency" in processed
     assert "((" in processed  # Block reference format
@@ -149,7 +149,7 @@ async def test_atomic_write_add_under(
     # Verify journal provenance
     journal_outline = LogseqOutline.parse(sample_journal.read_text())
     knowledge_block = journal_outline.find_block_by_id("knowledge-block-1")
-    processed = knowledge_block.get_property("processed")
+    processed = knowledge_block.get_property("extracted-to")
     assert processed is not None
     assert "Python/Concurrency" in processed
 
@@ -188,7 +188,7 @@ async def test_atomic_write_replace(
     # Verify journal provenance
     journal_outline = LogseqOutline.parse(sample_journal.read_text())
     knowledge_block = journal_outline.find_block_by_id("knowledge-block-1")
-    processed = knowledge_block.get_property("processed")
+    processed = knowledge_block.get_property("extracted-to")
     assert processed is not None
 
 
@@ -238,7 +238,7 @@ async def test_atomic_write_multiple_integrations_same_block(
     # Verify journal has both provenance links
     journal_outline = LogseqOutline.parse(sample_journal.read_text())
     knowledge_block = journal_outline.find_block_by_id("knowledge-block-1")
-    processed = knowledge_block.get_property("processed")
+    processed = knowledge_block.get_property("extracted-to")
 
     # Should have two comma-separated links
     assert processed.count("Python/Concurrency") == 2
@@ -310,7 +310,7 @@ async def test_concurrent_journal_modification_detection(
     # Verify provenance was added
     journal_outline = LogseqOutline.parse(sample_journal.read_text())
     knowledge_block = journal_outline.find_block_by_id("knowledge-block-1")
-    assert knowledge_block.get_property("processed") is not None
+    assert knowledge_block.get_property("extracted-to") is not None
 
 
 @pytest.mark.asyncio
@@ -385,7 +385,7 @@ async def test_write_failure_target_not_found(
     # Verify journal was NOT modified (atomic guarantee)
     journal_outline = LogseqOutline.parse(sample_journal.read_text())
     knowledge_block = journal_outline.find_block_by_id("knowledge-block-1")
-    assert knowledge_block.get_property("processed") is None
+    assert knowledge_block.get_property("extracted-to") is None
 
 
 @pytest.mark.asyncio
@@ -416,7 +416,7 @@ async def test_write_failure_page_not_found(
     # Verify journal was NOT modified
     journal_outline = LogseqOutline.parse(sample_journal.read_text())
     knowledge_block = journal_outline.find_block_by_id("knowledge-block-1")
-    assert knowledge_block.get_property("processed") is None
+    assert knowledge_block.get_property("extracted-to") is None
 
 
 @pytest.mark.asyncio
@@ -514,7 +514,7 @@ async def test_atomic_write_skip_exists_with_id(
     knowledge_block = journal.find_block_by_id("knowledge-block-1")
 
     assert knowledge_block is not None
-    processed = knowledge_block.get_property("processed")
+    processed = knowledge_block.get_property("extracted-to")
     assert processed is not None
     assert "Python/Concurrency" in processed
     assert "existing-block-id" in processed
@@ -581,7 +581,7 @@ async def test_atomic_write_skip_exists_adds_id_if_missing(
     knowledge_block = journal.find_block_by_id("knowledge-block-1")
 
     assert knowledge_block is not None
-    processed = knowledge_block.get_property("processed")
+    processed = knowledge_block.get_property("extracted-to")
     assert processed is not None
     assert "Python/Concurrency" in processed
     assert added_id in processed  # Should link to the newly added ID

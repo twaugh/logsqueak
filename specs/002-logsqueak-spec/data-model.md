@@ -927,7 +927,7 @@ class TaskProgress(BaseModel):
 └─────────┘
     │
     ├─ User accepts ('y') ──────► write_status="completed" (if write succeeds)
-    │                             Journal marked with processed:: property
+    │                             Journal marked with extracted-to:: property
     │
     └─ Write fails ─────────────► write_status="failed"
                                   error_message="Target block not found"

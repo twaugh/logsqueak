@@ -88,7 +88,7 @@ The user wants to see where each refined knowledge block will be integrated in t
    - Target page preview showing existing page structure
    - New content shown with green bar (`┃`) in its target location
    - If replacing: old content shown with strikethrough, new content below it with green bar
-3. **Given** a decision shows "Add under 'Project Timeline'" with the target page preview visible, **When** user presses 'y' (accept), **Then** system immediately writes that knowledge block to the target page at the specified location and atomically adds to the `processed::` property on the journal block (creating it if it doesn't exist, or appending to the comma-separated list if it does), where each link uses the target page name as link text (with '___' converted to '/' for hierarchical pages) and block reference `((uuid))` as the link target (e.g., `processed:: [Plans/Project X](((abcde-1234-...)))` or `processed:: [Page A](((uuid1))), [Page B](((uuid2)))` for multiple integrations)
+3. **Given** a decision shows "Add under 'Project Timeline'" with the target page preview visible, **When** user presses 'y' (accept), **Then** system immediately writes that knowledge block to the target page at the specified location and atomically adds to the `extracted-to::` property on the journal block (creating it if it doesn't exist, or appending to the comma-separated list if it does), where each link uses the target page name as link text (with '___' converted to '/' for hierarchical pages) and block reference `((uuid))` as the link target (e.g., `extracted-to:: [Plans/Project X](((abcde-1234-...)))` or `extracted-to:: [Page A](((uuid1))), [Page B](((uuid2)))` for multiple integrations)
 4. **Given** a write operation succeeds, **When** the system updates the display, **Then** that decision is marked as completed with a checkmark and the next decision is shown
 5. **Given** a write operation fails, **When** the error occurs, **Then** system shows error details (e.g., "Target block not found"), marks that decision as failed, and allows user to continue with remaining decisions
 6. **Given** the status display shows "Decision 3 of 8 (✓ 2 completed, ⊙ 5 pending, ✗ 0 skipped)", **When** user views the screen, **Then** they can see progress at a glance and available actions are shown in the footer ("Press y to accept, n to skip, j/k to navigate")
@@ -119,7 +119,7 @@ The user wants to see where each refined knowledge block will be integrated in t
 - What happens when user tries to cancel (Ctrl+C) during a write operation in Phase 3? (Shows warning about potential partial journal state with some blocks already marked as processed, asks for confirmation)
 - What if the LLM response includes malformed JSON during streaming? (Logs error, shows user-friendly message, skips that item, continues with remaining items)
 - What happens if user accepts a decision ('y') but the write takes a long time? (UI shows "Writing..." status, blocks navigation until write completes or fails, then auto-advances to next decision)
-- What if all decisions are skipped or fail? (Completion summary shows "0 blocks integrated, X skipped, Y failed" with link to journal entry - no processed:: markers added since nothing was written)
+- What if all decisions are skipped or fail? (Completion summary shows "0 blocks integrated, X skipped, Y failed" with link to journal entry - no extracted-to:: markers added since nothing was written)
 
 ## Requirements *(mandatory)*
 
@@ -184,7 +184,7 @@ The user wants to see where each refined knowledge block will be integrated in t
 - **FR-040**: System MUST provide navigation controls to move between decisions without taking action (j/k/↓/↑)
 - **FR-041**: System MUST write the knowledge block to the target page immediately when user presses 'y' (accept) on a pending decision
 - **FR-042**: System MUST automatically advance to the next decision after accepting (y) or skipping (n) the current decision
-- **FR-043**: System MUST atomically add to the `processed::` property on the journal block only after successful page write, appending to the existing comma-separated list if the property already exists, where each link uses the target page name as link text (converting '___' to '/' for hierarchical pages) and block reference `((uuid))` as the target (e.g., `processed:: [Plans/Project X](((abcde-1234...))), [Daily Notes](((fghij-5678...)))`)
+- **FR-043**: System MUST atomically add to the `extracted-to::` property on the journal block only after successful page write, appending to the existing comma-separated list if the property already exists, where each link uses the target page name as link text (converting '___' to '/' for hierarchical pages) and block reference `((uuid))` as the target (e.g., `extracted-to:: [Plans/Project X](((abcde-1234...))), [Daily Notes](((fghij-5678...)))`)
 - **FR-044**: System MUST mark completed integrations with checkmark (✓) and update the status count display
 - **FR-045**: System MUST display error details if a write operation fails (e.g., "Target block not found"), mark decision as failed (⚠), and allow continuation with remaining decisions
 - **FR-046**: System MUST allow skipping a decision using 'n' key (git-style no/skip) without writing and advance to next decision, marking as skipped (✗)
@@ -227,7 +227,7 @@ The user wants to see where each refined knowledge block will be integrated in t
 - **FR-068**: System MUST preserve exact property order when reading and writing Logseq files (insertion order is sacred)
 - **FR-069**: System MUST use hybrid ID system (explicit `id::` properties OR content hashes) for block identification, using `generate_chunks()` from `logseq-outline-parser` which implements `generate_content_hash()` for content-based IDs
 - **FR-070**: System MUST generate unique UUIDs for all integrated blocks (via `id::` property)
-- **FR-071**: System MUST maintain provenance links from journal to integrated blocks via `processed::` property containing comma-separated markdown links with page names as link text (converting file name '___' to '/' for hierarchical pages) and block references `((uuid))` as targets (backward links from pages to journal are automatically provided by Logseq's backlinks feature)
+- **FR-071**: System MUST maintain provenance links from journal to integrated blocks via `extracted-to::` property containing comma-separated markdown links with page names as link text (converting file name '___' to '/' for hierarchical pages) and block references `((uuid))` as targets (backward links from pages to journal are automatically provided by Logseq's backlinks feature)
 
 ### Key Entities
 
@@ -658,7 +658,7 @@ Key principles:
 
 ### II. Non-Destructive Operations (NON-NEGOTIABLE)
 
-- All operations traceable via `processed::` markers in journal entries
+- All operations traceable via `extracted-to::` markers in journal entries
 - UPDATE operations replace content but preserve structure/IDs
 - APPEND operations add new blocks without modifying existing content
 - Every integrated block generates unique `id::` property (UUID)

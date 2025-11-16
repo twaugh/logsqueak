@@ -182,7 +182,7 @@
 
 **Goal**: Display integration decisions batched by knowledge block, show target page previews with insertion point, write on 'y' acceptance with immediate provenance markers
 
-**Independent Test**: Manually create refined knowledge blocks and candidate pages from Phase 2, verify decisions batched per knowledge block, navigate between decisions with j/k, see target page preview update with green bar indicator, accept decision with 'y', verify write succeeds and journal gets processed:: property, test multi-page integration (same block to multiple targets)
+**Independent Test**: Manually create refined knowledge blocks and candidate pages from Phase 2, verify decisions batched per knowledge block, navigate between decisions with j/k, see target page preview update with green bar indicator, accept decision with 'y', verify write succeeds and journal gets extracted-to:: property, test multi-page integration (same block to multiple targets)
 
 ### Tests for User Story 3 (TDD Approach)
 
@@ -465,7 +465,7 @@ These can be implemented in parallel after LLM wrappers complete:
   - Use pytest-textual pilot to simulate full session
   - Mock LLM responses with fixture data
   - Verify: Block selection → Content editing → Integration → Writes succeed
-  - Verify: Journal gets processed:: markers
+  - Verify: Journal gets extracted-to:: markers
   - Verify: Target pages get new blocks with id:: properties
 
 - [x] T108a Run pytest tests/integration/test_workflow.py -v and verify it PASSES (3/3 passing ✅)
@@ -524,7 +524,7 @@ User should manually test:
 3. `logsqueak extract 2025-01-10..2025-01-15` - Loads date range
 4. Navigate all 3 phases with real LLM (Ollama or OpenAI)
 5. Complete a full extraction session with writes
-6. Verify journal has processed:: markers
+6. Verify journal has extracted-to:: markers
 7. Verify target pages have new blocks with id:: properties
 
 **Success Criteria**:

@@ -325,7 +325,7 @@ The TUI application has **3 interactive phases**:
 - LLM suggests where to integrate each knowledge block (streaming decisions)
 - User reviews preview showing new content in target page context
 - Accept/skip each decision (writes immediately on accept)
-- Atomic provenance: Add `processed::` marker to journal only after successful write
+- Atomic provenance: Add `extracted-to::` marker to journal only after successful write
 - Workers:
   - Polls for new decisions if Phase 2 worker still streaming
   - Starts Integration Decision Worker if no decisions exist yet
@@ -369,7 +369,7 @@ From `specs/002-logsqueak-spec/spec.md` and project constitution:
 
 #### 1. Non-Destructive Operations (NON-NEGOTIABLE)
 
-- All integrations are traceable via `processed::` markers in journal entries
+- All integrations are traceable via `extracted-to::` markers in journal entries
 - APPEND operations add new blocks without modifying existing content
 - Every integrated block gets a unique `id::` property (UUID)
 - Atomic consistency: Journal marked only when page write succeeds
@@ -585,7 +585,7 @@ Key principles:
 
 ### II. Non-Destructive Operations (NON-NEGOTIABLE)
 
-- All operations traceable via `processed::` markers in journal entries
+- All operations traceable via `extracted-to::` markers in journal entries
 - APPEND operations add new blocks without modifying existing content
 - Every integrated block generates unique `id::` property (UUID)
 - Journal entries atomically marked with block references to integrated knowledge

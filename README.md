@@ -53,7 +53,7 @@ All operations are **keyboard-driven** with vim-style navigation and **streaming
 - **Phase 8**: Final documentation and validation
 
 ### Key Design Principles
-- **Non-Destructive**: All integrations traceable via `processed::` markers
+- **Non-Destructive**: All integrations traceable via `extracted-to::` markers
 - **Property Order Preservation**: NEVER reorder (insertion order sacred)
 - **Keyboard-Driven**: Vim-style navigation (j/k), no mouse required
 - **Streaming LLM**: Real-time updates as results arrive
@@ -210,7 +210,7 @@ logsqueak search "python tips" --reindex
 - Accept all decisions for current block with `a`
 - Press `n` to move to next knowledge block
 - Press `q` to go back to Phase 2
-- Journal marked with `processed::` markers after successful writes
+- Journal marked with `extracted-to::` markers after successful writes
 
 All keyboard-driven, no mouse required. LLM results stream in real-time across all phases.
 
@@ -398,7 +398,7 @@ All three phases working end-to-end with optimized LLM prompts:
 ### Key Design Principles
 
 1. **Property Order Preservation**: NEVER reorder (insertion order sacred)
-2. **Non-Destructive Operations**: All integrations traceable via `processed::` markers
+2. **Non-Destructive Operations**: All integrations traceable via `extracted-to::` markers
 3. **Atomic Consistency**: Journal marked only when page write succeeds
 4. **Keyboard-Driven**: Vim-style navigation (j/k), context-sensitive shortcuts
 5. **Streaming LLM**: Real-time UI updates as results arrive

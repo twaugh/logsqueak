@@ -119,9 +119,9 @@ class BlockTree(Tree):
         # Get block state
         state = self.block_states.get(block_id)
 
-        # Find the actual LogseqBlock to check for processed:: property
+        # Find the actual LogseqBlock to check for extracted-to:: property
         block = self._find_block_in_journals(block_id)
-        is_processed = block and block.get_property("processed") is not None
+        is_processed = block and block.get_property("extracted-to") is not None
 
         label = Text()
 

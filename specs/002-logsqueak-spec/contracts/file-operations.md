@@ -11,7 +11,7 @@ This document defines the contract for all Logseq file operations in the Logsque
 **Key Principles** (from constitution):
 
 - **Property Order Preservation (NON-NEGOTIABLE)**: Property insertion order is sacred in Logseq
-- **Non-Destructive Operations**: All operations traceable via `processed::` markers
+- **Non-Destructive Operations**: All operations traceable via `extracted-to::` markers
 - **Atomic Writes**: Journal marked only when page write succeeds
 - **Concurrent Modification Detection**: Check file mtimes before all writes
 
@@ -410,9 +410,9 @@ def add_provenance(
     target_block_id: str
 ) -> None:
     """
-    Add processed:: property to journal block.
+    Add extracted-to:: property to journal block.
 
-    Format: processed:: [Page Name](((uuid))), [Other Page](((uuid2)))
+    Format: extracted-to:: [Page Name](((uuid))), [Other Page](((uuid2)))
 
     Args:
         journal_block: Journal block that was processed
@@ -423,7 +423,7 @@ def add_provenance(
     display_name = target_page.replace("___", "/")
     provenance_link = f"[{display_name}]((({target_block_id})))"
 
-    # Get existing processed:: value or empty string
+    # Get existing extracted-to:: value or empty string
     existing = journal_block.get_property("processed") or ""
 
     # Append new link (comma-separated)
@@ -439,10 +439,10 @@ def add_provenance(
 
 **Contract**:
 
-- Multiple integrations append to same `processed::` property (comma-separated)
+- Multiple integrations append to same `extracted-to::` property (comma-separated)
 - Link format: `[Display Name](((block-uuid)))` (markdown link with Logseq block reference)
 - Display name uses `/` for hierarchical pages
-- Property order preserved (existing `processed::` stays in same position)
+- Property order preserved (existing `extracted-to::` stays in same position)
 
 ### Property Format Examples
 
@@ -451,7 +451,7 @@ def add_provenance(
 ```markdown
 
 - Knowledge block content
-  processed:: [Python/Concurrency](((550e8400-e29b-41d4-a716-446655440000)))
+  extracted-to:: [Python/Concurrency](((550e8400-e29b-41d4-a716-446655440000)))
   id:: abc123-def456-...
 
 ```
@@ -461,7 +461,7 @@ def add_provenance(
 ```markdown
 
 - Knowledge block content
-  processed:: [Python/Concurrency](((550e8400-e29b-41d4-a716-446655440000))), [Textual/Architecture](((6ba7b810-9dad-11d1-80b4-00c04fd430c8)))
+  extracted-to:: [Python/Concurrency](((550e8400-e29b-41d4-a716-446655440000))), [Textual/Architecture](((6ba7b810-9dad-11d1-80b4-00c04fd430c8)))
   id:: abc123-def456-...
 
 ```
@@ -472,19 +472,19 @@ def add_provenance(
 
 - Knowledge block content
   tags:: #python #async
-  processed:: [Python/Concurrency](((uuid)))
+  extracted-to:: [Python/Concurrency](((uuid)))
   id:: abc123-def456-...
   author:: User Name
 
 ```
 
-If new integration added, `processed::` line updates but stays in same position:
+If new integration added, `extracted-to::` line updates but stays in same position:
 
 ```markdown
 
 - Knowledge block content
   tags:: #python #async
-  processed:: [Python/Concurrency](((uuid))), [Textual/Workers](((uuid2)))
+  extracted-to:: [Python/Concurrency](((uuid))), [Textual/Workers](((uuid2)))
   id:: abc123-def456-...
   author:: User Name
 
@@ -501,7 +501,7 @@ Integration requires **TWO writes** to be atomic:
 1. Write knowledge block to target page
 2. Add provenance marker to journal entry
 
-**Contract**: Journal marked with `processed::` only after successful page write.
+**Contract**: Journal marked with `extracted-to::` only after successful page write.
 
 ```python
 from pathlib import Path
@@ -724,7 +724,7 @@ Page: Python/Concurrency
 Journal: 2025-11-05
 
 - Original knowledge block
-  id:: abc123  ← Missing processed:: property (journal write failed)
+  id:: abc123  ← Missing extracted-to:: property (journal write failed)
 
 ```
 
@@ -990,7 +990,7 @@ def test_property_order_preservation():
     """Test that property order is preserved after modifications."""
     original = """- Block
   tags:: #python
-  processed:: [[Page1]]((uuid1))
+  extracted-to:: [[Page1]]((uuid1))
   id:: abc123
   author:: User
 """
@@ -1006,7 +1006,7 @@ def test_property_order_preservation():
     # Verify property order unchanged
     lines = rendered.strip().split("\n")
     assert "tags::" in lines[1]
-    assert "processed::" in lines[2]
+    assert "extracted-to::" in lines[2]
     assert "id::" in lines[3]
     assert "author::" in lines[4]
 
@@ -1030,7 +1030,7 @@ def test_atomic_write_failure_recovery():
     new_block, _ = page_outline.find_block_by_id(new_block_id)
     assert new_block is not None
 
-    # Journal should NOT have processed:: marker
+    # Journal should NOT have extracted-to:: marker
     journal_block, _ = journal_outline.find_block_by_id(knowledge_block_id)
     assert journal_block.get_property("processed") is None
 
@@ -1047,7 +1047,7 @@ File operations in Logsqueak adhere to strict contracts:
 3. **Atomic writes**: Page written before journal marked
 4. **Idempotent operations**: Retry detection via deterministic UUIDs prevents duplicate blocks
 5. **Concurrent modification detection**: Check mtimes before all writes
-6. **Non-destructive operations**: All changes traceable via `processed::` markers
+6. **Non-destructive operations**: All changes traceable via `extracted-to::` markers
 7. **Validation before writes**: Ensure targets exist before modifying files
 8. **Descriptive errors**: All errors include context and remediation suggestions
 

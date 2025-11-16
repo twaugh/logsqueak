@@ -575,7 +575,7 @@ When all knowledge blocks are processed, you'll see:
 - **No relevant pages**: If LLM finds no good match, it shows "No relevant pages found" - press `n` to skip
 - **Already recorded**: If knowledge already exists in a page, the status shows "N already recorded" - these duplicates are skipped automatically
 - **Atomic writes**: Each `y` press writes immediately and marks journal - if you quit mid-session, completed integrations remain
-- **Provenance**: Check your journal entry after completion - `processed::` property links to all integrated blocks
+- **Provenance**: Check your journal entry after completion - `extracted-to::` property links to all integrated blocks
 
 ---
 
@@ -759,7 +759,7 @@ The tree view will show entries grouped by date.
 
 **Q: What if I quit mid-session?**
 
-A: Integrations already written (✓ Completed) remain in your pages. The journal's `processed::` property tracks which blocks were integrated. Blocks you hadn't reached or skipped are not modified.
+A: Integrations already written (✓ Completed) remain in your pages. The journal's `extracted-to::` property tracks which blocks were integrated. Blocks you hadn't reached or skipped are not modified.
 
 **Q: Can I edit the LLM's suggestions?**
 
@@ -767,7 +767,7 @@ A: Yes! In Phase 2, press `Tab` to manually edit any knowledge block content. In
 
 **Q: How do I undo an integration?**
 
-A: Currently no built-in undo. You'll need to manually remove the integrated block from the target page in Logseq. The journal's `processed::` property shows which blocks were integrated and where.
+A: Currently no built-in undo. You'll need to manually remove the integrated block from the target page in Logseq. The journal's `extracted-to::` property shows which blocks were integrated and where.
 
 **Q: Why isn't the 'n' key working in Phase 2?**
 
@@ -784,7 +784,7 @@ A: Pressing Ctrl+C during Phase 3 will show a warning about partial journal stat
 After completing your first extraction session:
 
 1. **Review integrated blocks**: Open the target pages in Logseq and verify integrations look correct
-2. **Check journal provenance**: Open the journal entry and see the `processed::` property with links to integrated blocks
+2. **Check journal provenance**: Open the journal entry and see the `extracted-to::` property with links to integrated blocks
 3. **Process more journals**: Run `logsqueak extract` on different dates or date ranges
 4. **Refine workflow**: Experiment with accepting all LLM suggestions (`a` key) vs manually reviewing each block
 

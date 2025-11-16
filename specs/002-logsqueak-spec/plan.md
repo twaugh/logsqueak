@@ -69,10 +69,10 @@ Build an interactive TUI application for extracting lasting knowledge from Logse
 ### Principle II: Non-Destructive Operations
 **Status**: ✅ PASS
 
-- All journal modifications are APPEND-only (adding `processed::` property)
+- All journal modifications are APPEND-only (adding `extracted-to::` property)
 - Target page modifications require explicit user approval (Phase 3 'y' key)
 - Every integrated block gets deterministic `id::` (UUID v5) for traceability and idempotent retries
-- Provenance links from journal to integrated blocks via `processed::` property
+- Provenance links from journal to integrated blocks via `extracted-to::` property
 - Property order preservation enforced (FR-068)
 - Atomic writes: journal marked only after successful page write (FR-043)
 - External file modification detection and validation (FR-071a-d)
@@ -206,7 +206,7 @@ pyproject.toml                  # Dependencies and entry points
 - File operations contract enforces atomic two-phase writes
 - Property order preservation explicitly documented as NON-NEGOTIABLE
 - Concurrent modification detection pattern validated in contracts
-- Provenance tracking formalized in `processed::` property format
+- Provenance tracking formalized in `extracted-to::` property format
 
 #### Principle III: Simplicity and Transparency
 **Status**: ✅ PASS (unchanged)

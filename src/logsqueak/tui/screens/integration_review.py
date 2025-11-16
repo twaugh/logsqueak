@@ -994,7 +994,7 @@ Confidence: {decision.confidence:.0%}
                     "  - ## Journal Entry",
                     "    - Journal entry updated with provenance markers:",
                     f"      `{journal_path}`",
-                    "    - You can view the processed blocks in your Logseq graph with the `processed::` property.",
+                    "    - You can view the processed blocks in your Logseq graph with the `extracted-to::` property.",
                 ])
             else:
                 summary_lines.extend([
@@ -1004,7 +1004,7 @@ Confidence: {decision.confidence:.0%}
                 for date in dates:
                     journal_path = self.graph_paths.get_journal_path(date)
                     summary_lines.append(f"      - `{journal_path}`")
-                summary_lines.append("    - You can view the processed blocks in your Logseq graph with the `processed::` property.")
+                summary_lines.append("    - You can view the processed blocks in your Logseq graph with the `extracted-to::` property.")
 
         summary_lines.extend([
             "  - ---",

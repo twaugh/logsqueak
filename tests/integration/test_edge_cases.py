@@ -282,8 +282,8 @@ class TestCancellationHandling:
         T119: Test detection of partial journal state (some blocks processed, some not).
 
         Scenario:
-        1. Journal has some blocks with processed:: markers (completed writes)
-        2. Journal has other blocks without processed:: markers (not yet written)
+        1. Journal has some blocks with extracted-to:: markers (completed writes)
+        2. Journal has other blocks without extracted-to:: markers (not yet written)
         3. System can detect this partial state
         4. This is used to warn user before exiting in Phase 3
 
@@ -295,11 +295,11 @@ class TestCancellationHandling:
         journal_path = journals_dir / "2025-11-14.md"
 
         # Simulate partial journal state:
-        # Block 1 has processed:: marker (written successfully)
-        # Block 2 does NOT have processed:: marker (not yet written)
+        # Block 1 has extracted-to:: marker (written successfully)
+        # Block 2 does NOT have extracted-to:: marker (not yet written)
         journal_content = """- First block
   id:: block-1
-  processed:: [[Test Page]]
+  extracted-to:: [[Test Page]]
 - Second block
   id:: block-2
 """
@@ -309,18 +309,18 @@ class TestCancellationHandling:
         outline = LogseqOutline.parse(journal_content)
         assert len(outline.blocks) == 2
 
-        # Block 1 has processed property
+        # Block 1 has extracted-to property
         block1 = outline.blocks[0]
-        assert block1.get_property("processed") == "[[Test Page]]"
+        assert block1.get_property("extracted-to") == "[[Test Page]]"
 
-        # Block 2 does NOT have processed property
+        # Block 2 does NOT have extracted-to property
         block2 = outline.blocks[1]
-        assert block2.get_property("processed") is None
+        assert block2.get_property("extracted-to") is None
 
-        # Count blocks with processed markers
+        # Count blocks with extracted-to markers
         processed_count = sum(
             1 for block in outline.blocks
-            if block.get_property("processed") is not None
+            if block.get_property("extracted-to") is not None
         )
         total_count = len(outline.blocks)
 

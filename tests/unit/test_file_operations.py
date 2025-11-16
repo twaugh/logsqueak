@@ -282,15 +282,15 @@ class TestAddProvenance:
             target_block_id="integrated-block-uuid"
         )
 
-        processed = journal_block.get_property("processed")
+        processed = journal_block.get_property("extracted-to")
         assert processed == "[Python/Concurrency](((integrated-block-uuid)))"
 
     def test_appends_to_existing_processed_property(self):
-        """Test that multiple integrations append to processed::."""
+        """Test that multiple integrations append to extracted-to::."""
         outline = LogseqOutline.parse(
             "- Knowledge block\n"
             "  id:: journal-block-1\n"
-            "  processed:: [Page1](((uuid1)))"
+            "  extracted-to:: [Page1](((uuid1)))"
         )
 
         journal_block = outline.blocks[0]
@@ -301,7 +301,7 @@ class TestAddProvenance:
             target_block_id="uuid2"
         )
 
-        processed = journal_block.get_property("processed")
+        processed = journal_block.get_property("extracted-to")
         assert processed == "[Page1](((uuid1))), [Page2](((uuid2)))"
 
     def test_converts_hierarchical_page_names(self):
@@ -316,7 +316,7 @@ class TestAddProvenance:
             target_block_id="uuid"
         )
 
-        processed = journal_block.get_property("processed")
+        processed = journal_block.get_property("extracted-to")
         assert processed == "[Projects/Logsqueak](((uuid)))"
 
 
