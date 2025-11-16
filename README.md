@@ -65,7 +65,8 @@ All operations are **keyboard-driven** with vim-style navigation and **streaming
 
 - Python 3.11 or later
 - A Logseq graph with journal entries
-- Access to an LLM API (OpenAI, Anthropic, or local Ollama)
+- Access to an LLM API (OpenAI compatible, or local Ollama)
+- ~500MB disk space for dependencies (includes sentence-transformers for semantic search)
 
 ### Setup
 
@@ -119,11 +120,11 @@ Create `~/.config/logsqueak/config.yaml` with mode 600 permissions:
 ```yaml
 llm:
   endpoint: https://api.openai.com/v1  # Or http://localhost:11434/v1 for Ollama
-  api_key: sk-your-api-key-here
-  model: gpt-4-turbo-preview
+  api_key: sk-your-api-key-here       # Required for OpenAI; can be any string for Ollama
+  model: gpt-4-turbo-preview          # Or mistral:latest, qwen2.5:latest, etc. for Ollama
 
 logseq:
-  graph_path: ~/Documents/logseq-graph
+  graph_path: ~/Documents/logseq-graph  # Path to your Logseq graph directory
 
 rag:
   top_k: 10  # Number of similar blocks to retrieve per search (default: 10)
@@ -133,7 +134,50 @@ rag:
 ```yaml
 llm:
   num_ctx: 32768  # Ollama context window size (controls VRAM usage)
+                  # Automatically sent to Ollama when detected
+                  # Ignored for OpenAI endpoints
 ```
+
+**Example configurations:**
+
+<details>
+<summary>OpenAI / ChatGPT</summary>
+
+```yaml
+llm:
+  endpoint: https://api.openai.com/v1
+  api_key: sk-proj-xxxxxxxxxxxxx  # Your OpenAI API key
+  model: gpt-4o                    # Or gpt-4-turbo-preview, gpt-3.5-turbo
+
+logseq:
+  graph_path: ~/Documents/my-graph
+```
+</details>
+
+<details>
+<summary>Ollama (Local)</summary>
+
+```yaml
+llm:
+  endpoint: http://localhost:11434/v1
+  api_key: ollama  # Any string works for local Ollama
+  model: qwen2.5:latest  # Or mistral:latest, llama3.2:latest
+  num_ctx: 32768         # Optional: adjust based on VRAM
+
+logseq:
+  graph_path: ~/Documents/my-graph
+```
+
+**Recommended Ollama models:**
+- `qwen2.5:latest` - Fast, good quality (4GB VRAM)
+- `mistral:latest` - Balanced performance (4GB VRAM)
+- `llama3.2:latest` - Meta's latest (4GB VRAM)
+
+**Install Ollama models:**
+```bash
+ollama pull qwen2.5:latest
+```
+</details>
 
 **Configuration behavior:**
 - File must exist before first run (not auto-created)
@@ -143,10 +187,26 @@ llm:
 
 Set correct permissions:
 ```bash
+# Create config directory if it doesn't exist
+mkdir -p ~/.config/logsqueak
+
+# Create config file (edit with your settings)
+nano ~/.config/logsqueak/config.yaml
+
+# Set correct permissions (REQUIRED)
 chmod 600 ~/.config/logsqueak/config.yaml
 ```
 
 ## Usage
+
+**Quick Start:**
+
+1. Install Logsqueak (see [Installation](#installation))
+2. Create config file at `~/.config/logsqueak/config.yaml` (see [Configuration](#configuration))
+3. Run `logsqueak extract` to start extracting from today's journal
+4. Navigate with `j`/`k`, select blocks with `Space`, press `n` to continue through phases
+5. Accept or skip integration decisions in Phase 3
+6. Your knowledge is now integrated into your Logseq graph!
 
 ### Interactive Knowledge Extraction
 
@@ -213,6 +273,63 @@ logsqueak search "python tips" --reindex
 - Journal marked with `extracted-to::` markers after successful writes
 
 All keyboard-driven, no mouse required. LLM results stream in real-time across all phases.
+
+### Common Issues
+
+<details>
+<summary>Config file permission error</summary>
+
+**Error:** `Configuration file has insecure permissions`
+
+**Solution:**
+```bash
+chmod 600 ~/.config/logsqueak/config.yaml
+```
+
+Config file must be mode 600 (read/write for owner only) for security.
+</details>
+
+<details>
+<summary>LLM connection errors</summary>
+
+**For Ollama:**
+- Check Ollama is running: `ollama list`
+- Start Ollama if needed: `ollama serve`
+- Verify model is installed: `ollama pull qwen2.5:latest`
+
+**For OpenAI:**
+- Verify API key is correct in config.yaml
+- Check API key has credits/quota remaining
+- Ensure endpoint is `https://api.openai.com/v1`
+</details>
+
+<details>
+<summary>ChromaDB / Embedding errors</summary>
+
+**Error:** Model download fails or embeddings error
+
+**Solution:**
+```bash
+# Force rebuild search index
+logsqueak search "test" --reindex
+
+# Or delete index and let it rebuild
+rm -rf ~/.cache/logsqueak/chromadb/
+```
+
+The first run downloads sentence-transformers model (~500MB). This is cached for future runs.
+</details>
+
+<details>
+<summary>Journal not found</summary>
+
+**Error:** `Journal file not found`
+
+**Solution:**
+- Verify `graph_path` in config.yaml points to your Logseq graph directory
+- Check journal files exist in `<graph_path>/journals/`
+- Logseq journal files use format `YYYY_MM_DD.md` (e.g., `2025_01_15.md`)
+</details>
 
 ## Project Structure
 

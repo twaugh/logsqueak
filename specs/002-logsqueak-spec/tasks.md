@@ -703,7 +703,7 @@ User should manually test:
 - [x] T126 [P] Add logging for file operations (writes, validations, errors) in src/logsqueak/services/file_operations.py
 - [x] T127 [P] Code cleanup and refactoring across all modules
 - [x] T128 [P] Add type hints and docstrings to all public functions
-- [ ] T129 [P] Update README.md with installation, configuration, and usage instructions
+- [x] T129 [P] Update README.md with installation, configuration, and usage instructions
 
 ### Performance Optimizations
 
