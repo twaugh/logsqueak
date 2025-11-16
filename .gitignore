@@ -41,6 +41,7 @@ ENV/
 htmlcov/
 .tox/
 .nox/
+snapshot_report.html
 
 # Type checking
 .mypy_cache/
