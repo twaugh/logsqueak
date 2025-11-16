@@ -267,7 +267,7 @@ class BlockTree(Tree):
                     if state and state.llm_classification == "knowledge":
                         return current_line
                 current_line += 1
-            except:
+            except Exception:
                 found_end = True
                 break
 
@@ -282,7 +282,7 @@ class BlockTree(Tree):
                         if state and state.llm_classification == "knowledge":
                             return current_line
                     current_line += 1
-                except:
+                except Exception:
                     break
 
         return None
@@ -307,7 +307,7 @@ class BlockTree(Tree):
                     if state and state.llm_classification == "knowledge":
                         return current_line
                 current_line -= 1
-            except:
+            except Exception:
                 break
 
         # If we reached the beginning, wrap around and search from the end
@@ -323,7 +323,7 @@ class BlockTree(Tree):
                     break
                 last_valid_line = current_line
                 current_line += 1
-            except:
+            except Exception:
                 break
 
         # Now search backwards from the end to from_line
@@ -336,7 +336,7 @@ class BlockTree(Tree):
                     if state and state.llm_classification == "knowledge":
                         return current_line
                 current_line -= 1
-            except:
+            except Exception:
                 break
 
         return None

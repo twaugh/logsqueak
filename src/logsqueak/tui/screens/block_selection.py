@@ -431,9 +431,9 @@ class Phase1Screen(Screen):
                             state = self.block_states[block_id]
                             panel = self.query_one(BlockDetailPanel)
                             self.call_later(panel.show_block, block, state)
-                except:
+                except Exception:
                     pass
-        except:
+        except Exception:
             # Widget not ready yet
             pass
 
