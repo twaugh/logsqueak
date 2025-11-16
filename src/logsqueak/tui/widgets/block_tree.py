@@ -101,7 +101,7 @@ class BlockTree(Tree):
 
         Uses emoji indicators to show selection and processing state:
         Priority order (first match wins):
-        1. ✓ = User selected this session (green background)
+        1. ✅ = User selected this session (green background)
         2. 📌 = Previously processed (blue if LLM suggested, default if not)
         3. 🤖 = LLM suggested (blue background)
         4. Invisible padding = Not selected
@@ -132,7 +132,7 @@ class BlockTree(Tree):
         # Determine emoji and style based on priority
         if state and state.classification == "knowledge":
             # Priority 1: User selected this session - checkmark + green
-            label.append("✓", style="")
+            label.append("✅", style="")
             label.append(content, style="on dark_green")
         elif is_processed:
             # Priority 2: Previously processed - pushpin
