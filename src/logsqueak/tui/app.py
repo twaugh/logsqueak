@@ -44,7 +44,6 @@ See tests/integration/test_worker_dependencies.py for dependency ordering tests.
 from typing import Dict, List, Optional
 from pathlib import Path
 import asyncio
-from dataclasses import dataclass
 from enum import IntEnum
 
 from textual.app import App
@@ -72,14 +71,6 @@ class LLMRequestPriority(IntEnum):
     CLASSIFICATION = 1  # Phase 1: Block classification
     REWORDING = 2  # Phase 2: Content rewording
     INTEGRATION = 3  # Phase 3: Integration decisions
-
-
-@dataclass
-class LLMRequest:
-    """Represents a queued LLM request."""
-    priority: LLMRequestPriority
-    request_id: str
-    ready_event: asyncio.Event  # Set when request can proceed
 
 
 class LogsqueakApp(App):
