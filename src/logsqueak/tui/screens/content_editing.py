@@ -8,7 +8,7 @@ from typing import Optional, Dict
 import asyncio
 from textual.app import ComposeResult
 from textual.screen import Screen
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Vertical
 from textual.widgets import Footer, Label
 from textual.reactive import reactive
 from logseq_outline.parser import LogseqBlock, LogseqOutline
@@ -21,7 +21,6 @@ from logsqueak.services.llm_client import LLMClient
 from logsqueak.services.llm_wrappers import reword_content, plan_integrations
 from logsqueak.services.rag_search import RAGSearch
 from logsqueak.models.integration_decision import IntegrationDecision
-from logsqueak.models.llm_chunks import IntegrationDecisionChunk
 from logseq_outline.graph import GraphPaths
 import structlog
 

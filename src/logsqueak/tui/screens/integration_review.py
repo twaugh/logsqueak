@@ -7,8 +7,8 @@ see target page previews, and accept/skip decisions for writing to pages.
 from typing import Optional, List, Dict, AsyncIterator
 from textual.app import ComposeResult
 from textual.screen import Screen
-from textual.containers import Container, Vertical, VerticalScroll
-from textual.widgets import Static, Footer, Label
+from textual.containers import Container, Vertical
+from textual.widgets import Footer, Label
 from textual.reactive import reactive
 from logseq_outline.parser import LogseqBlock, LogseqOutline
 from logseq_outline.graph import GraphPaths
@@ -23,7 +23,6 @@ from logsqueak.tui.widgets.status_panel import StatusPanel
 from logsqueak.services.file_operations import write_integration_atomic
 from logsqueak.services.file_monitor import FileMonitor
 from logsqueak.services.llm_client import LLMClient
-from logsqueak.services.llm_wrappers import plan_integrations
 import structlog
 
 logger = structlog.get_logger()

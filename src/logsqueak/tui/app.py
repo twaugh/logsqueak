@@ -41,7 +41,7 @@ Phase 3:
 See tests/integration/test_worker_dependencies.py for dependency ordering tests.
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from pathlib import Path
 import asyncio
 from dataclasses import dataclass
@@ -49,7 +49,6 @@ from enum import IntEnum
 
 from textual.app import App
 from textual.binding import Binding
-from textual.widgets import Footer, Header
 from textual.worker import Worker
 import structlog
 

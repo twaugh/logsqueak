@@ -2,7 +2,6 @@
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 from pathlib import Path
-from typing import Optional
 import yaml
 import os
 import stat

@@ -4,13 +4,13 @@ This screen displays journal blocks in a tree view, streams LLM classification
 results, and allows users to select knowledge blocks for extraction.
 """
 
-from typing import Dict, Optional, Callable, Any
+from typing import Dict, Optional, Callable
 from pathlib import Path
 import asyncio
 from textual.app import ComposeResult
 from textual.screen import Screen
-from textual.containers import Container, Vertical, Horizontal
-from textual.widgets import Footer, Header, Static
+from textual.containers import Container, Vertical
+from textual.widgets import Footer, Header
 from textual.reactive import reactive
 from textual.worker import Worker
 from textual.binding import Binding

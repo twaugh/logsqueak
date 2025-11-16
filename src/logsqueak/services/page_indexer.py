@@ -9,7 +9,7 @@ from typing import Optional, Callable, Any
 import hashlib
 import sqlite3
 import chromadb
-from logseq_outline.parser import LogseqOutline, LogseqBlock
+from logseq_outline.parser import LogseqOutline
 from logseq_outline.context import generate_chunks
 from logseq_outline.graph import GraphPaths
 import structlog

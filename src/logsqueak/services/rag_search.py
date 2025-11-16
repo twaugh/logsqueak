@@ -10,7 +10,7 @@ import re
 from collections import defaultdict
 import chromadb
 from logsqueak.models.edited_content import EditedContent
-from logseq_outline.parser import LogseqOutline, LogseqBlock
+from logseq_outline.parser import LogseqOutline
 from logseq_outline.graph import GraphPaths
 import structlog
 

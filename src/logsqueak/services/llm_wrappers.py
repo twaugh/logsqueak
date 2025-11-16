@@ -1,6 +1,6 @@
 """LLM wrapper functions that wrap LLMClient.stream_ndjson with specific prompts."""
 
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator
 import copy
 from logseq_outline.parser import LogseqOutline, LogseqBlock
 from logseq_outline.context import generate_full_context, generate_content_hash

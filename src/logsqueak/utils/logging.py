@@ -3,7 +3,6 @@
 import structlog
 from pathlib import Path
 from typing import Any
-import sys
 import os
 
 

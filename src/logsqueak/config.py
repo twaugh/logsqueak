@@ -1,7 +1,6 @@
 """Configuration management with lazy validation."""
 
 from pathlib import Path
-from typing import Optional
 from functools import cached_property
 
 from logsqueak.models.config import Config, LLMConfig, LogseqConfig, RAGConfig

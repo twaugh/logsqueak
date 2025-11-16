@@ -6,7 +6,6 @@ such as LLM classification, page indexing, and RAG search.
 
 from typing import Dict
 from textual.widgets import Static
-from rich.text import Text
 from logsqueak.models.background_task import BackgroundTask
 
 
