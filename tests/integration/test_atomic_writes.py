@@ -356,10 +356,10 @@ async def test_idempotent_retry_detection(
 
 
 @pytest.mark.asyncio
-async def test_write_failure_target_not_found(
+async def test_write_fallback_when_target_not_found(
     graph_paths, file_monitor, sample_journal, sample_page
 ):
-    """Test write failure when target block doesn't exist."""
+    """Test fallback to add_section when target block doesn't exist."""
     decision = IntegrationDecision(
         knowledge_block_id="knowledge-block-1",
         target_page="Python/Concurrency",
@@ -367,25 +367,31 @@ async def test_write_failure_target_not_found(
         target_block_id="nonexistent-block",
         confidence=0.85,
         refined_text="Content",
-        reasoning="Test error"
+        reasoning="Test fallback"
     )
 
     file_monitor.record(sample_page)
     file_monitor.record(sample_journal)
 
-    # Should raise error
-    with pytest.raises(ValueError, match="Target block not found"):
-        await write_integration_atomic(
-            decision=decision,
-            journal_date="2025-11-06",
-            graph_paths=graph_paths,
-            file_monitor=file_monitor
-        )
+    # Should fallback to add_section instead of raising error
+    await write_integration_atomic(
+        decision=decision,
+        journal_date="2025-11-06",
+        graph_paths=graph_paths,
+        file_monitor=file_monitor
+    )
 
-    # Verify journal was NOT modified (atomic guarantee)
+    # Verify page was updated with new root-level block (fallback to add_section)
+    page_outline = LogseqOutline.parse(sample_page.read_text())
+    assert len(page_outline.blocks) == 3  # Original 2 + new 1
+    new_block = page_outline.blocks[2]
+    assert "Content" in new_block.content[0]
+    assert new_block.get_property("id") is not None
+
+    # Verify journal was updated with provenance
     journal_outline = LogseqOutline.parse(sample_journal.read_text())
     knowledge_block = journal_outline.find_block_by_id("knowledge-block-1")
-    assert knowledge_block.get_property("extracted-to") is None
+    assert knowledge_block.get_property("extracted-to") is not None
 
 
 @pytest.mark.asyncio

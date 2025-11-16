@@ -370,13 +370,36 @@ def apply_integration(
         )
 
     elif decision.action == "add_under":
-        return write_add_under(
-            page_outline,
-            decision.target_block_id,
-            decision.refined_text,
-            knowledge_block_id=decision.knowledge_block_id,
-            target_page=decision.target_page
-        )
+        try:
+            return write_add_under(
+                page_outline,
+                decision.target_block_id,
+                decision.refined_text,
+                knowledge_block_id=decision.knowledge_block_id,
+                target_page=decision.target_page
+            )
+        except ValueError as e:
+            # Target block not found - fallback to add_section
+            # This can happen if the page was modified after RAG indexing
+            if "Target block not found" in str(e):
+                logger = structlog.get_logger()
+                logger.warning(
+                    "target_block_not_found_fallback_to_section",
+                    target_id=decision.target_block_id,
+                    target_page=decision.target_page,
+                    knowledge_block_id=decision.knowledge_block_id,
+                    reason="Block may have been modified/deleted since RAG indexing, adding as section instead"
+                )
+                # Fallback to add_section
+                return write_add_section(
+                    page_outline,
+                    decision.refined_text,
+                    knowledge_block_id=decision.knowledge_block_id,
+                    target_page=decision.target_page
+                )
+            else:
+                # Re-raise other ValueErrors
+                raise
 
     elif decision.action == "replace":
         return write_replace(

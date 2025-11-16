@@ -549,3 +549,27 @@ class TestApplyIntegration:
 
         with pytest.raises(ValueError, match="Unknown action"):
             apply_integration(decision, outline)
+
+    def test_add_under_falls_back_to_add_section_when_target_not_found(self):
+        """Test that add_under falls back to add_section when target block not found."""
+        decision = IntegrationDecision(
+            knowledge_block_id="block-1",
+            target_page="Python/Concurrency",
+            action="add_under",
+            target_block_id="nonexistent-id",  # Target block doesn't exist
+            confidence=0.8,
+            refined_text="New knowledge",
+            reasoning="Add under specific section"
+        )
+
+        outline = LogseqOutline.parse("- Existing block\n  id:: other-id")
+
+        # Should fallback to add_section instead of raising error
+        block_id = apply_integration(decision, outline)
+
+        # Should have added as new root-level block (not as child)
+        assert len(outline.blocks) == 2
+        assert outline.blocks[1].content[0] == "New knowledge"
+        assert block_id is not None
+        # Should not have added as child of existing block
+        assert len(outline.blocks[0].children) == 0
