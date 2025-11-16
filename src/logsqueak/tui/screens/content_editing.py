@@ -294,10 +294,11 @@ class Phase2Screen(Screen):
                 result.append(line)
                 continue
 
-            # Count leading spaces
-            stripped = line.lstrip(' ')
+            # Count leading whitespace (spaces or tabs)
+            stripped = line.lstrip()
             indent_count = len(line) - len(stripped)
-            indent = ' ' * indent_count
+            # Preserve the original indentation characters (spaces or tabs)
+            indent = line[:indent_count]
 
             # Add bullet if line doesn't already have one
             if not stripped.startswith('- '):
