@@ -442,14 +442,6 @@ def _display_search_results(results: list[dict], graph_path: Path):
         confidence = result["confidence"]
         snippet = result["snippet"]
 
-        # Format confidence with color coding
-        if confidence >= 80:
-            confidence_color = "green"
-        elif confidence >= 60:
-            confidence_color = "yellow"
-        else:
-            confidence_color = "red"
-
         # Create clickable logseq:// link using OSC 8 escape codes
         clickable_link = _create_clickable_link(page_name, graph_path)
 

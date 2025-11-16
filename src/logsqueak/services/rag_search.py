@@ -177,10 +177,8 @@ class RAGSearch:
             similarity = 1.0 - distance  # Convert distance to similarity
 
             # Boost pages mentioned in explicit links
-            boost_applied = False
             if page_name in explicit_links or page_name.replace("/", "___") in explicit_links:
                 similarity *= 1.5
-                boost_applied = True
 
             page_scores[page_name] += similarity
 

@@ -313,7 +313,6 @@ class Phase2Screen(Screen):
 
         # Get current edited content
         current_ec = self.edited_content[self.current_block_index]
-        current_block = self.blocks[self.current_block_index]
 
         # Update block counter
         counter = self.query_one("#block-counter", Label)

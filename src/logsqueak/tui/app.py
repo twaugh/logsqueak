@@ -280,11 +280,6 @@ class LogsqueakApp(App):
                 app.release_llm_slot("classification_worker")
         """
         ready_event = asyncio.Event()
-        request = LLMRequest(
-            priority=priority,
-            request_id=request_id,
-            ready_event=ready_event,
-        )
 
         logger.info(
             "llm_queue_request_submitted",
