@@ -4,7 +4,7 @@ This screen allows users to review integration decisions for each knowledge bloc
 see target page previews, and accept/skip decisions for writing to pages.
 """
 
-from typing import Optional, List, Dict, AsyncIterator
+from typing import Optional, List, Dict
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.containers import Container, Vertical
@@ -16,7 +16,6 @@ from logseq_outline.context import generate_full_context, generate_content_hash
 from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.models.edited_content import EditedContent
 from logsqueak.models.background_task import BackgroundTask, BackgroundTaskState
-from logsqueak.models.llm_chunks import IntegrationDecisionChunk
 from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
 from logsqueak.tui.widgets.decision_list import DecisionList
 from logsqueak.tui.widgets.status_panel import StatusPanel
@@ -781,44 +780,6 @@ Confidence: {decision.confidence:.0%}
 
             # Update the known count
             self._last_known_decision_count = current_count
-
-    async def _convert_chunks_to_decisions(
-        self,
-        chunk_stream: AsyncIterator[IntegrationDecisionChunk]
-    ) -> AsyncIterator[IntegrationDecision]:
-        """Convert IntegrationDecisionChunk stream to IntegrationDecision stream.
-
-        Adds refined_text from edited_content to each chunk.
-
-        Args:
-            chunk_stream: Stream of IntegrationDecisionChunk from LLM
-
-        Yields:
-            IntegrationDecision with refined_text populated
-        """
-        async for chunk in chunk_stream:
-            # Look up the refined_text from edited_content
-            edited_content = self.edited_content_map.get(chunk.knowledge_block_id)
-            if not edited_content:
-                logger.warning(
-                    "chunk_missing_edited_content",
-                    block_id=chunk.knowledge_block_id
-                )
-                continue
-
-            # Convert chunk to full decision
-            decision = IntegrationDecision(
-                knowledge_block_id=chunk.knowledge_block_id,
-                target_page=chunk.target_page,
-                action=chunk.action,
-                target_block_id=chunk.target_block_id,
-                target_block_title=chunk.target_block_title,
-                confidence=chunk.confidence,
-                refined_text=edited_content.current_content,
-                reasoning=chunk.reasoning,
-                write_status="pending",
-            )
-            yield decision
 
     async def _llm_decisions_worker(self) -> None:
         """Worker: Generate integration decisions using LLM with batching and filtering."""

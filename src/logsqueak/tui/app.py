@@ -355,14 +355,6 @@ class LogsqueakApp(App):
                 reason="not found"
             )
 
-    def cancel_all_llm_workers(self) -> None:
-        """Cancel all active LLM workers.
-
-        This is useful for cleanup or during app shutdown.
-        """
-        for worker_name in list(self._active_llm_workers.keys()):
-            self.cancel_llm_worker(worker_name)
-
     def _start_model_preload(self) -> None:
         """Start the model preload worker (called after screen is visible)."""
         self.run_worker(self._preload_embedding_model(), name="model_preload")
