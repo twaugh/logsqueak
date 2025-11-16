@@ -705,6 +705,99 @@ User should manually test:
 - [x] T128 [P] Add type hints and docstrings to all public functions
 - [ ] T129 [P] Update README.md with installation, configuration, and usage instructions
 
+### Performance Optimizations
+
+**Note**: These optimizations reduce CPU/memory usage and improve code clarity. They do NOT significantly reduce wall-clock time (LLM response latency dominates). Benefits: cleaner architecture, lower battery consumption, reduced resource usage.
+
+- [ ] T139 [P] **Eliminate redundant journal parsing** - Remove deep copy and re-augmentation in app.py
+  - **Location**: `src/logsqueak/cli.py` and `src/logsqueak/tui/app.py`
+  - **Problem**: Journals are parsed in CLI, then deep copied and re-augmented with IDs in App.__init__
+  - **Fix**: Move `_augment_outline_with_ids()` into CLI's journal loading
+    - In cli.py load_journal_entries(): Parse journal → augment with IDs → return augmented outline
+    - In app.py __init__(): Remove deep copy, use journals dict directly: `self.journals = journals`
+  - **Impact**: Eliminates ~500ms overhead for 10 journals, removes duplicate context generation
+  - **Dependencies**: None (standalone change)
+
+- [ ] T140 [P] **Cache hierarchical contexts during augmentation** - Avoid regenerating same contexts 3-5 times
+  - **Location**: `src/logseq-outline-parser/src/logseq_outline/parser.py` and `src/logsqueak/services/llm_wrappers.py`
+  - **Problem**: Same hierarchical context is generated multiple times per block:
+    - Once during `_augment_outline_with_ids()` for hashing
+    - Again in Phase 1→2 transition via `generate_chunks()`
+    - Again immediately after with different frontmatter handling
+    - Again during RAG indexing
+  - **Fix**: Add caching to LogseqBlock:
+    - Add fields: `_cached_context: Optional[str] = None`, `_cached_context_no_frontmatter: Optional[str] = None`
+    - In `_augment_outline_with_ids()`: Generate context once, cache both versions (with/without frontmatter)
+    - In `generate_chunks()` and phase transitions: Use cached contexts instead of regenerating
+  - **Impact**: Reduces 3-5 full tree walks to 1 per block, saves ~2-5s for 100 blocks
+  - **Dependencies**: None (internal optimization)
+
+- [ ] T141 [P] **Extend generate_chunks() to return parent list** - Eliminate double tree traversal
+  - **Location**: `src/logseq-outline-parser/src/logseq_outline/context.py` and `src/logsqueak/tui/app.py`
+  - **Problem**: Phase 1→2 transition does TWO complete tree traversals:
+    - First: `generate_chunks()` finds block and builds parent chain internally
+    - Code throws away parent chain from generate_chunks()
+    - Second: `find_block_with_parents()` rebuilds same parent chain via second traversal
+  - **Fix**: Extend generate_chunks() signature:
+    - Change return type from `(block, context, hybrid_id)` to `(block, context, hybrid_id, parents)`
+    - Update generate_chunks() implementation to include parents list in each tuple
+    - In app.py transition_to_phase2(): Use parents directly from generate_chunks(), remove find_block_with_parents() call
+  - **Impact**: Eliminates ~100ms tree walk per selected block during phase transition
+  - **Dependencies**: None (API extension, backwards compatible if default parents=[])
+
+- [ ] T142 [P] **Store page frontmatter in ChromaDB metadata** - Avoid re-parsing page files
+  - **Location**: `src/logsqueak/services/page_indexer.py` and `src/logsqueak/services/rag_search.py`
+  - **Problem**: RAG pipeline stores full hierarchical contexts in ChromaDB, but then re-parses entire page files from disk to get frontmatter
+  - **Fix**: Store frontmatter in ChromaDB metadata during indexing:
+    - In PageIndexer.build_index(): Add to metadata dict: `"page_properties": json.dumps(outline.frontmatter)`
+    - In RAGSearch.find_candidates(): Extract frontmatter from metadata: `page_properties = json.loads(metadata.get("page_properties", ""))`
+    - Remove page file re-parsing in Phase 2 content_editing.py (lines ~876)
+  - **Impact**: Eliminates file I/O and parsing for ~20 candidate pages, saves ~1-2s per Phase 2→3 transition
+  - **Dependencies**: None (internal ChromaDB schema change, requires reindex)
+
+- [ ] T143 [P] **Use EditedContent reference in IntegrationDecision** - Eliminate data duplication
+  - **Location**: `src/logsqueak/models/integration_decision.py` and `src/logsqueak/tui/screens/content_editing.py`
+  - **Problem**: IntegrationDecision stores both:
+    - `knowledge_block_id: str` (reference to EditedContent)
+    - `refined_text: str` (copy of content string)
+    - Requires update loop in Phase 2→3 transition to sync refined_text with latest edits
+  - **Fix**: Replace string copy with reference:
+    - In IntegrationDecision model: Remove `refined_text: str` field, add `edited_content: EditedContent` reference
+    - Add property: `@property def refined_text(self) -> str: return self.edited_content.current_content`
+    - Remove update loop in content_editing.py:467-477 (no longer needed)
+  - **Impact**: Cleaner design, eliminates ~10ms update loop, always fresh content without sync
+  - **Dependencies**: Requires updating all code that reads decision.refined_text (still works via property)
+
+- [ ] T144 [P] **Pre-clean contexts during RAG indexing** - Move regex processing out of hot path
+  - **Location**: `src/logsqueak/services/page_indexer.py` and `src/logsqueak/services/llm_helpers.py`
+  - **Problem**: format_chunks_for_llm() scans each chunk twice on EVERY LLM call:
+    - `strip_id_properties()` - regex scan to remove id:: properties
+    - `strip_page_properties()` - second regex scan to remove page properties
+    - This happens in hot path (every integration decision LLM call)
+  - **Fix**: Pre-clean contexts during one-time indexing:
+    - In PageIndexer.build_index(): Add `_clean_context_for_llm()` helper that strips id/page properties
+    - Store cleaned context in ChromaDB documents field instead of raw context
+    - In format_chunks_for_llm(): Use contexts directly (already clean, no regex needed)
+  - **Impact**: Moves ~50ms regex processing from hot path (per LLM call) to cold path (one-time indexing)
+  - **Dependencies**: Requires ChromaDB reindex (schema change in document storage)
+
+### Performance Optimization Testing
+
+- [ ] T145 Write unit tests for cached context generation in tests/unit/test_context_caching.py
+  - Test: Context generated once, cached, subsequent calls return same object
+  - Test: Cache invalidation works correctly when block modified
+  - Test: Both frontmatter variants cached separately
+
+- [ ] T146 Write integration test for optimized phase transitions in tests/integration/test_optimized_transitions.py
+  - Test: Phase 1→2 transition uses cached contexts (verify no regeneration)
+  - Test: generate_chunks() returns parents, no second traversal occurs
+  - Test: Measure time improvement (not wall-clock, but CPU cycles)
+
+- [ ] T147 Update performance documentation in docs/performance.md
+  - Document each optimization with before/after measurements
+  - Explain why wall-clock latency is still dominated by LLM responses
+  - Provide guidance on when optimizations matter (battery life, resource-constrained environments)
+
 ### Final Validation
 
 - [ ] T130 Run full test suite with coverage and verify quality gates:
