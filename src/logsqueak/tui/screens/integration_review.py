@@ -24,7 +24,6 @@ from logsqueak.services.file_operations import write_integration_atomic
 from logsqueak.services.file_monitor import FileMonitor
 from logsqueak.services.llm_client import LLMClient
 from logsqueak.services.llm_wrappers import plan_integrations
-from logsqueak.services.llm_helpers import filter_skip_exists_blocks
 import structlog
 
 logger = structlog.get_logger()
@@ -163,9 +162,6 @@ class Phase3Screen(Screen):
         if decisions:
             for block_id in self.decisions_by_block.keys():
                 self.decisions_ready[block_id] = True
-
-        # Track skipped blocks (for status display)
-        self.skipped_block_count = 0
 
         # Track decision count for polling updates (when using shared list from Phase 2)
         self._last_known_decision_count = len(self.decisions)
@@ -600,6 +596,11 @@ Confidence: {decision.confidence:.0%}
 
         decision = block_decisions[self.current_decision_index]
 
+        # Skip if already exists (informational only, no action needed)
+        if decision.action == "skip_exists":
+            logger.info("decision_skip_exists_no_action", decision_id=id(decision))
+            return
+
         # Skip if already completed
         if decision.write_status == "completed":
             logger.info("decision_already_completed", decision_id=id(decision))
@@ -682,6 +683,10 @@ Confidence: {decision.confidence:.0%}
         accepted_count = 0
         failed_count = 0
         for decision in block_decisions:
+            # Skip skip_exists decisions (informational only)
+            if decision.action == "skip_exists":
+                continue
+
             if decision.write_status == "pending":
                 try:
                     await self.write_integration(decision)
@@ -857,15 +862,13 @@ Confidence: {decision.confidence:.0%}
                 # (add refined_text from edited_content)
                 converted_stream = self._convert_chunks_to_decisions(raw_decision_stream)
 
-                # Step 3: Filter out skip_exists blocks and track count
-                filtered_stream = filter_skip_exists_blocks(converted_stream)
-
-                # Step 4: Process filtered decisions (already grouped by block via per-block LLM calls)
+                # Step 3: Process decisions (already grouped by block via per-block LLM calls)
+                # Note: We now include skip_exists decisions for transparency
                 block_count = 0
                 decisions_in_current_block = []
                 current_block_id = None
 
-                async for decision in filtered_stream:
+                async for decision in converted_stream:
                     # Track when we move to a new block
                     if current_block_id is not None and decision.knowledge_block_id != current_block_id:
                         # Finished a block - store its decisions
@@ -920,9 +923,6 @@ Confidence: {decision.confidence:.0%}
                         num_decisions=len(decisions_in_current_block)
                     )
 
-                # Get skipped count from filter
-                self.skipped_block_count = filtered_stream.skipped_count
-
                 # Mark complete
                 self.llm_decisions_state = BackgroundTaskState.COMPLETED
                 from logsqueak.tui.app import LogsqueakApp
@@ -930,9 +930,6 @@ Confidence: {decision.confidence:.0%}
                     self.app.background_tasks["llm_decisions"].status = "completed"
                     status_panel = self.query_one(StatusPanel)
                     status_panel.update_status()
-
-                # Update block counter to show skipped count
-                self._update_block_counter_with_skip_count()
 
                 logger.info(
                     "llm_decisions_complete",
@@ -961,18 +958,17 @@ Confidence: {decision.confidence:.0%}
                 exc_info=True
             )
 
-    def _update_block_counter_with_skip_count(self) -> None:
-        """Update block counter to show new integrations vs already recorded."""
-        try:
-            counter = self.query_one("#block-counter", Label)
-            total_blocks = len(self.edited_content)
-            new_integrations = total_blocks - self.skipped_block_count
-            counter.update(
-                f"Block {self.current_block_index + 1} of {len(self.journal_blocks)} | "
-                f"{new_integrations} new integrations, {self.skipped_block_count} already recorded"
-            )
-        except Exception:
-            pass  # Widget not mounted yet
+    def _count_skip_exists_blocks(self) -> int:
+        """Count how many knowledge blocks have all skip_exists decisions.
+
+        Returns:
+            Number of blocks where ALL decisions are skip_exists
+        """
+        skip_count = 0
+        for block_id, block_decisions in self.decisions_by_block.items():
+            if block_decisions and all(d.action == "skip_exists" for d in block_decisions):
+                skip_count += 1
+        return skip_count
 
     async def _show_completion_summary(self) -> None:
         """Show completion summary screen with statistics and journal link."""
@@ -983,7 +979,8 @@ Confidence: {decision.confidence:.0%}
         pending_count = sum(1 for d in self.decisions if d.write_status == "pending")
 
         total_blocks = len(self.edited_content)
-        new_integrations = total_blocks - self.skipped_block_count
+        skipped_block_count = self._count_skip_exists_blocks()
+        new_integrations = total_blocks - skipped_block_count
 
         # Build summary text in Logseq bullet format
         summary_lines = [
@@ -991,7 +988,7 @@ Confidence: {decision.confidence:.0%}
             "  - ## Summary Statistics",
             f"    - **Total knowledge blocks processed:** {total_blocks}",
             f"    - **New integrations:** {new_integrations}",
-            f"    - **Already recorded:** {self.skipped_block_count}",
+            f"    - **Already recorded:** {skipped_block_count}",
             "  - ## Write Operations",
             f"    - **Total integration points:** {total_decisions}",
             f"    - **Completed:** {completed_count} ✓",
@@ -1050,7 +1047,7 @@ Confidence: {decision.confidence:.0%}
             "completion_summary_displayed",
             total_blocks=total_blocks,
             new_integrations=new_integrations,
-            skipped=self.skipped_block_count,
+            skipped=skipped_block_count,
             completed=completed_count,
             failed=failed_count,
             pending=pending_count

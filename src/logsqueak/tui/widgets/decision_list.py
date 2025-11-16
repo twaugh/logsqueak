@@ -44,7 +44,11 @@ class DecisionList(Static):
 
         for i, decision in enumerate(self.decisions):
             # Status indicator
-            if decision.write_status == "completed":
+            if decision.action == "skip_exists":
+                # Already exists - show as completed with different label
+                indicator = "✓"
+                style = "green dim"
+            elif decision.write_status == "completed":
                 indicator = "✓"
                 style = "green"
             elif decision.write_status == "failed":
@@ -81,8 +85,11 @@ class DecisionList(Static):
                 result.append(f"{decision.target_page}", style="bold" if i == self.current_index else "")
 
             # Action type and confidence
-            action_display = decision.action.replace("_", " ").title()
-            result.append(f" ({action_display}, {decision.confidence:.0%})", style="dim")
+            if decision.action == "skip_exists":
+                result.append(" (Already Exists)", style="green dim")
+            else:
+                action_display = decision.action.replace("_", " ").title()
+                result.append(f" ({action_display}, {decision.confidence:.0%})", style="dim")
 
             # Show target block title if applicable
             if decision.target_block_title:

@@ -181,6 +181,7 @@ class LogsqueakApp(App):
         phase1_screen = Phase1Screen(
             journals=self.journals,
             llm_client=self.llm_client,
+            graph_path=Path(self.config.logseq.graph_path),
             auto_start_workers=True,  # Auto-start LLM classification
             name="phase1",
         )

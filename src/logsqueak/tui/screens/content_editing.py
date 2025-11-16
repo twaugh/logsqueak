@@ -19,7 +19,6 @@ from logsqueak.tui.widgets.status_panel import StatusPanel
 from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
 from logsqueak.services.llm_client import LLMClient
 from logsqueak.services.llm_wrappers import reword_content, plan_integrations
-from logsqueak.services.llm_helpers import filter_skip_exists_blocks
 from logsqueak.services.rag_search import RAGSearch
 from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.models.llm_chunks import IntegrationDecisionChunk
@@ -700,15 +699,13 @@ class Phase2Screen(Screen):
 
                 converted_stream = convert_chunks()
 
-                # Filter out skip_exists blocks
-                filtered_stream = filter_skip_exists_blocks(converted_stream)
-
                 # Collect all decisions (already grouped by block via per-block LLM calls)
+                # Note: We now include skip_exists decisions for transparency
                 block_count = 0
                 decisions_in_current_block = []
                 current_block_id = None
 
-                async for decision in filtered_stream:
+                async for decision in converted_stream:
                     # Track when we move to a new block
                     if current_block_id is not None and decision.knowledge_block_id != current_block_id:
                         # Finished a block - store its decisions

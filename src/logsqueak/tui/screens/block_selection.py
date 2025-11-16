@@ -5,6 +5,7 @@ results, and allows users to select knowledge blocks for extraction.
 """
 
 from typing import Dict, Optional, Callable, Any
+from pathlib import Path
 import asyncio
 from textual.app import ComposeResult
 from textual.screen import Screen
@@ -67,6 +68,7 @@ class Phase1Screen(Screen):
         self,
         journals: Dict[str, LogseqOutline],
         llm_client: Optional[LLMClient] = None,
+        graph_path: Optional[Path] = None,
         initial_block_states: Optional[Dict[str, BlockState]] = None,
         llm_stream_fn: Optional[Callable] = None,
         auto_start_workers: bool = True,
@@ -78,6 +80,7 @@ class Phase1Screen(Screen):
         Args:
             journals: Dictionary mapping date string (YYYY-MM-DD) to LogseqOutline
             llm_client: LLM client instance (None for testing with mock)
+            graph_path: Path to Logseq graph (for creating clickable links)
             initial_block_states: Optional pre-populated block states
             llm_stream_fn: Optional mock LLM streaming function (for testing)
             auto_start_workers: Whether to auto-start background workers on mount
@@ -85,6 +88,7 @@ class Phase1Screen(Screen):
         super().__init__(*args, **kwargs)
         self.journals = journals
         self.llm_client = llm_client
+        self.graph_path = graph_path
         self.llm_stream_fn = llm_stream_fn
         self.auto_start_workers = auto_start_workers
 
@@ -177,7 +181,7 @@ class Phase1Screen(Screen):
                 )
 
                 # Selected block details (bottom panel)
-                yield BlockDetailPanel()
+                yield BlockDetailPanel(graph_path=self.graph_path)
 
         # Status panel for background tasks (uses app-level shared dict or test dict)
         from logsqueak.tui.app import LogsqueakApp

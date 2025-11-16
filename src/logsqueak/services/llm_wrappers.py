@@ -381,10 +381,9 @@ async def plan_integrations(
         IntegrationDecisionChunk for each integration decision (raw stream)
 
     Note:
-        The returned stream is RAW and includes all decisions (including skip_exists).
+        The returned stream includes all decisions (including skip_exists).
         Decisions are naturally grouped by block (one LLM call per block).
-        Caller should use filter_skip_exists_blocks() to process the stream before
-        displaying to user.
+        Skip_exists decisions are displayed to the user for transparency.
 
     Example:
         >>> async for chunk in plan_integrations(client, edited_contents, pages, chunks):

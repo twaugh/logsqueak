@@ -8,11 +8,14 @@ The layout is horizontal: block content on the left, metadata on the right.
 """
 
 from typing import Optional
+from pathlib import Path
 from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widget import Widget
 from textual.widgets import Static
 from rich.text import Text
+from rich.style import Style
+from rich.color import Color
 
 from logseq_outline.parser import LogseqBlock
 from logsqueak.models.block_state import BlockState
@@ -39,15 +42,21 @@ class StatusInfoPanel(Static):
     }
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize StatusInfoPanel."""
-        super().__init__("", *args, id="status-info-panel", **kwargs)
+    def __init__(self, graph_path: Optional[Path] = None, *args, **kwargs):
+        """Initialize StatusInfoPanel.
 
-    def show_status(self, state: BlockState) -> None:
+        Args:
+            graph_path: Path to Logseq graph (for creating clickable links)
+        """
+        super().__init__("", *args, id="status-info-panel", **kwargs)
+        self.graph_path = graph_path
+
+    def show_status(self, state: BlockState, block: Optional[LogseqBlock] = None) -> None:
         """Display status information for a block.
 
         Args:
             state: BlockState for the current block
+            block: Optional LogseqBlock (for extracting extracted-to:: property)
         """
         lines = []
 
@@ -105,6 +114,17 @@ class StatusInfoPanel(Static):
                 if current_line:
                     lines.append(Text(" ".join(current_line), style="italic"))
 
+        # Show extracted-to:: links (if block has been previously integrated)
+        if block:
+            extracted_to = block.get_property("extracted-to")
+            if extracted_to:
+                lines.append(Text(""))
+                lines.append(Text("Previously integrated:", style="bold"))
+
+                # Parse extracted-to:: property
+                # Format: [Page Name](((uuid))), [Another Page](((uuid2)))
+                self._add_extracted_to_links(lines, extracted_to)
+
         # Combine all lines
         combined = Text()
         for i, line in enumerate(lines):
@@ -113,6 +133,40 @@ class StatusInfoPanel(Static):
             combined.append_text(line)
 
         self.update(combined)
+
+    def _add_extracted_to_links(self, lines: list[Text], extracted_to: str) -> None:
+        """Parse and add extracted-to:: links to lines list.
+
+        Args:
+            lines: List to append formatted link lines to
+            extracted_to: Raw extracted-to:: property value
+        """
+        import re
+
+        # Pattern to match [Page Name](((block-id)))
+        pattern = r'\[([^\]]+)\]\(\(\(([^)]+)\)\)\)'
+        matches = re.findall(pattern, extracted_to)
+
+        for page_name, block_id in matches:
+            link_text = Text()
+            link_text.append("  • ", style="dim")
+
+            if self.graph_path:
+                # Create logseq:// URL with block reference
+                from logsqueak.utils.logseq_urls import create_logseq_url
+                logseq_url = create_logseq_url(page_name, self.graph_path, block_id=block_id)
+
+                # Use Rich Style with link parameter for clickable links
+                page_style = Style(
+                    bold=True,
+                    color=Color.from_rgb(100, 149, 237),  # Cornflower blue
+                    link=logseq_url
+                )
+                link_text.append(page_name, style=page_style)
+            else:
+                link_text.append(page_name, style="bold blue")
+
+            lines.append(link_text)
 
     def show_empty(self) -> None:
         """Display empty state message."""
@@ -146,9 +200,14 @@ class BlockDetailPanel(Widget):
     }
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize BlockDetailPanel."""
+    def __init__(self, graph_path: Optional[Path] = None, *args, **kwargs):
+        """Initialize BlockDetailPanel.
+
+        Args:
+            graph_path: Path to Logseq graph (for creating clickable links)
+        """
         super().__init__(*args, id="block-detail-panel", **kwargs)
+        self.graph_path = graph_path
         self._preview: Optional[TargetPagePreview] = None
         self._status: Optional[StatusInfoPanel] = None
 
@@ -157,7 +216,7 @@ class BlockDetailPanel(Widget):
         with Horizontal():
             self._preview = TargetPagePreview()
             yield self._preview
-            self._status = StatusInfoPanel()
+            self._status = StatusInfoPanel(graph_path=self.graph_path)
             yield self._status
 
     async def show_block(
@@ -214,7 +273,7 @@ class BlockDetailPanel(Widget):
         )
 
         # Update status panel
-        self._status.show_status(state)
+        self._status.show_status(state, block)
 
     def show_empty(self) -> None:
         """Display empty state message."""
