@@ -286,13 +286,12 @@ async def plan_integration_for_block(
         ... ):
         ...     print(f"Decision: {chunk.target_page}")
     """
-    from logsqueak.services.llm_helpers import format_chunks_for_llm, strip_id_properties
+    from logsqueak.services.llm_helpers import format_chunks_for_llm
 
-    # Generate XML for single block (no indentation, no refined_content, no id:: properties)
-    clean_context = strip_id_properties(edited_content.hierarchical_context)
+    # Generate XML for single block
     knowledge_block_xml = (
         f"<block id=\"{edited_content.block_id}\">\n"
-        f"{clean_context}\n"
+        f"{edited_content.hierarchical_context}\n"
         f"</block>"
     )
 

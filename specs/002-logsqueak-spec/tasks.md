@@ -771,7 +771,7 @@ User should manually test:
   - **Impact**: Cleaner design, eliminates ~10ms update loop, always fresh content without sync
   - **Dependencies**: Requires updating all code that reads decision.refined_text (still works via property)
 
-- [ ] T144 [P] **Pre-clean contexts during RAG indexing** - Move regex processing out of hot path
+- [x] T144 [P] **Pre-clean contexts during RAG indexing** - Move regex processing out of hot path
   - **Location**: `src/logsqueak/services/page_indexer.py` and `src/logsqueak/services/llm_helpers.py`
   - **Problem**: format_chunks_for_llm() scans each chunk twice on EVERY LLM call:
     - `strip_id_properties()` - regex scan to remove id:: properties

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional, Callable, Any
 import hashlib
 import sqlite3
+import re
 import chromadb
 from logseq_outline.parser import LogseqOutline
 from logseq_outline.context import generate_chunks
@@ -21,7 +22,8 @@ logger = structlog.get_logger()
 # - 1 (implicit): Initial implementation (no version tracking)
 # - 2: Added deleted page cleanup, version tracking
 # - 3: Added page_frontmatter to metadata (avoids re-parsing pages during RAG search)
-INDEX_SCHEMA_VERSION = 3
+# - 4: Pre-clean contexts during indexing (strip id:: and page properties)
+INDEX_SCHEMA_VERSION = 4
 
 
 def generate_graph_db_name(graph_path: Path) -> str:
@@ -48,6 +50,53 @@ def generate_graph_db_name(graph_path: Path) -> str:
     hash_hex = hash_obj.hexdigest()[:16]  # First 16 characters
 
     return f"{basename}-{hash_hex}"
+
+
+def _clean_context_for_llm(context: str, page_properties: list[str]) -> str:
+    """
+    Clean hierarchical context for LLM consumption during indexing.
+
+    Removes id:: properties and page-level properties from context strings
+    during the one-time indexing phase, avoiding redundant regex processing
+    during every LLM call.
+
+    Args:
+        context: Hierarchical block context from generate_chunks()
+        page_properties: List of page property lines to remove
+
+    Returns:
+        Cleaned context string ready for LLM prompts
+    """
+    lines = context.split('\n')
+
+    # Create set of property lines (stripped) for fast lookup
+    property_set = {prop.strip() for prop in page_properties if prop.strip()}
+
+    filtered_lines = []
+    found_first_bullet = False
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Skip id:: properties (with any indentation)
+        if re.match(r'^\s*id::\s+\S', line):
+            continue
+
+        # Once we find the first bullet, keep everything (except id:: properties)
+        if stripped.startswith('- '):
+            found_first_bullet = True
+
+        # Skip property lines before first bullet
+        if not found_first_bullet and stripped in property_set:
+            continue
+
+        # Skip blank lines before first bullet
+        if not found_first_bullet and not stripped:
+            continue
+
+        filtered_lines.append(line)
+
+    return '\n'.join(filtered_lines)
 
 
 class PageIndexer:
@@ -384,10 +433,13 @@ class PageIndexer:
         chunks = generate_chunks(outline, page_name)
 
         for block, full_context, hybrid_id, parents in chunks:
+            # Clean context for LLM consumption (strip id:: and page properties)
+            cleaned_context = _clean_context_for_llm(full_context, outline.frontmatter)
+
             # Store chunk (overwrites if duplicate ID)
             full_id = f"{page_name}::{hybrid_id}"
             chunks_by_id[full_id] = {
-                "document": full_context,
+                "document": cleaned_context,
                 "metadata": {
                     "page_name": page_name,
                     "block_id": hybrid_id,
