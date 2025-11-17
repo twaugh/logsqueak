@@ -1,6 +1,7 @@
 """Unit tests for atomic_write function."""
 
 import pytest
+import time
 from pathlib import Path
 from logsqueak.services.file_operations import atomic_write
 from logsqueak.services.file_monitor import FileMonitor
@@ -53,6 +54,9 @@ class TestAtomicWrite:
         monitor = FileMonitor()
         monitor.record(target)
 
+        # Small sleep to ensure mtime changes on filesystems with low precision (CI environments)
+        time.sleep(0.01)
+
         # Simulate external modification
         target.write_text("Modified by external process")
 
@@ -78,6 +82,8 @@ class TestAtomicWrite:
             write_attempted.append(True)
             # Simulate external modification to target file during temp file write
             if self.name.startswith('.'):  # This is the temp file
+                # Small sleep to ensure mtime changes on filesystems with low precision (CI environments)
+                time.sleep(0.01)
                 target.write_text("Modified during write")
             return original_write_text(self, *args, **kwargs)
 
@@ -116,6 +122,9 @@ class TestAtomicWrite:
         monitor = FileMonitor()
         monitor.record(target)
 
+        # Small sleep to ensure mtime changes on filesystems with low precision (CI environments)
+        time.sleep(0.01)
+
         # Simulate external modification (triggers early check)
         target.write_text("Modified externally")
 
@@ -135,6 +144,9 @@ class TestAtomicWrite:
 
         monitor = FileMonitor()
         monitor.record(target)
+
+        # Small sleep to ensure mtime changes on filesystems with low precision (CI environments)
+        time.sleep(0.01)
 
         # Simulate external modification
         modified_content = "Modified by external process"

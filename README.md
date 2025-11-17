@@ -1,5 +1,7 @@
 # Logsqueak
 
+[![codecov](https://codecov.io/gh/twaugh/logsqueak/branch/main/graph/badge.svg)](https://codecov.io/gh/twaugh/logsqueak)
+
 Turn your Logseq journal chaos into organized knowledge. Interactive TUI (Text User Interface) for extracting lasting insights from journal entries using LLM-powered analysis.
 
 ## Overview
