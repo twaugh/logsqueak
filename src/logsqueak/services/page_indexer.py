@@ -20,7 +20,8 @@ logger = structlog.get_logger()
 # Version history:
 # - 1 (implicit): Initial implementation (no version tracking)
 # - 2: Added deleted page cleanup, version tracking
-INDEX_SCHEMA_VERSION = 2
+# - 3: Added page_frontmatter to metadata (avoids re-parsing pages during RAG search)
+INDEX_SCHEMA_VERSION = 3
 
 
 def generate_graph_db_name(graph_path: Path) -> str:
@@ -355,12 +356,17 @@ class PageIndexer:
         Returns:
             Dict of {chunk_id: {"document": str, "metadata": dict}}
         """
+        import json
+
         # Use dict to deduplicate by ID (keeps last occurrence)
         chunks_by_id = {}
 
         # ALWAYS create page-level chunk (enables empty page indexing and name search)
         page_title = self._extract_page_title(outline)
         page_context = self._create_page_context(page_name, page_title, outline)
+
+        # Store frontmatter as JSON in metadata to avoid re-parsing pages
+        page_frontmatter = "\n".join(outline.frontmatter) if outline.frontmatter else ""
 
         page_chunk_id = f"{page_name}::__PAGE__"
         chunks_by_id[page_chunk_id] = {
@@ -369,7 +375,8 @@ class PageIndexer:
                 "page_name": page_name,
                 "block_id": "__PAGE__",
                 "mtime": mtime,
-                "page_title": page_title  # Store title:: for display
+                "page_title": page_title,  # Store title:: for display
+                "page_frontmatter": json.dumps(page_frontmatter)
             }
         }
 
@@ -385,7 +392,8 @@ class PageIndexer:
                     "page_name": page_name,
                     "block_id": hybrid_id,
                     "mtime": mtime,
-                    "page_title": page_title  # Include in block metadata too
+                    "page_title": page_title,  # Include in block metadata too
+                    "page_frontmatter": json.dumps(page_frontmatter)
                 }
             }
 

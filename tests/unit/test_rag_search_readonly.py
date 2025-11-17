@@ -101,11 +101,13 @@ async def test_find_candidates_returns_relevant_pages(indexed_db, temp_graph):
 
     # Should find Python Programming page as most relevant
     assert "block-1" in results
-    candidates = results["block-1"]
+    candidates, frontmatter = results["block-1"]
     assert len(candidates) > 0
     # candidates is list of (page_name, block_id, hierarchical_context) tuples
     page_names = [page_name for page_name, _, _ in candidates]
     assert "Python Programming" in page_names
+    # Verify frontmatter is returned
+    assert isinstance(frontmatter, dict)
 
     await search.close()
 
@@ -137,7 +139,7 @@ async def test_find_candidates_ranks_pages_by_relevance(indexed_db, temp_graph):
         top_k=3
     )
 
-    candidates = results["block-1"]
+    candidates, frontmatter = results["block-1"]
 
     # Machine Learning page should be highly ranked (mentions both ML and Python)
     page_names = [page_name for page_name, _, _ in candidates]
@@ -217,7 +219,7 @@ async def test_find_candidates_respects_top_k_limit(indexed_db, temp_graph):
         top_k=2
     )
 
-    candidates = results["block-1"]
+    candidates, frontmatter = results["block-1"]
 
     # Should return at most 2 candidates
     assert len(candidates) <= 2
@@ -252,7 +254,7 @@ async def test_explicit_link_boosting(indexed_db, temp_graph):
         top_k=3
     )
 
-    candidates = results["block-1"]
+    candidates, frontmatter = results["block-1"]
 
     # Python Programming should be in results (boosted by explicit link)
     page_names = [page_name for page_name, _, _ in candidates]
@@ -291,7 +293,7 @@ async def test_find_candidates_uses_original_context(indexed_db, temp_graph):
         top_k=3
     )
 
-    candidates = results["block-1"]
+    candidates, frontmatter = results["block-1"]
 
     # Should use original context which mentions decorators
     assert len(candidates) > 0

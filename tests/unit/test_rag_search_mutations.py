@@ -101,7 +101,7 @@ async def test_find_candidates_handles_hierarchical_page_links(indexed_db, temp_
         top_k=3
     )
 
-    candidates = results["block-1"]
+    candidates, frontmatter = results["block-1"]
 
     # Should find the hierarchical page
     page_names = [page_name for page_name, _, _ in candidates]

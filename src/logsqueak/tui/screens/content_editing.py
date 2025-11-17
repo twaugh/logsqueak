@@ -845,19 +845,26 @@ class Phase2Screen(Screen):
                 for ec in self.edited_content
             }
 
-            # Find candidate chunks (now returns hierarchical chunks, not just page names)
-            self.candidate_chunks = await self.rag_search.find_candidates(
+            # Find candidate chunks (returns hierarchical chunks + frontmatter from ChromaDB)
+            rag_results = await self.rag_search.find_candidates(
                 edited_content=self.edited_content,
                 original_contexts=original_contexts,
                 graph_paths=self.graph_paths,
                 top_k=10  # TODO: Get from config
             )
 
+            # Unpack results: chunks per block and page frontmatter
+            self.candidate_chunks = {}
+            page_frontmatter = {}
+            for block_id, (chunks, frontmatter) in rag_results.items():
+                self.candidate_chunks[block_id] = chunks
+                page_frontmatter.update(frontmatter)
+
             # Update progress
             self._background_tasks["rag_search"].progress_current = 1
             status_panel.update_status()
 
-            # Extract unique pages and load page outlines (for frontmatter/properties)
+            # Extract unique pages for logging
             unique_pages = set()
             for chunks in self.candidate_chunks.values():
                 for page_name, _, _ in chunks:
@@ -866,21 +873,26 @@ class Phase2Screen(Screen):
             logger.info(
                 "rag_search_chunks_found",
                 unique_pages=len(unique_pages),
-                total_chunks=sum(len(chunks) for chunks in self.candidate_chunks.values())
+                total_chunks=sum(len(chunks) for chunks in self.candidate_chunks.values()),
+                frontmatter_pages=len(page_frontmatter)
             )
 
-            # Load page outlines for frontmatter/properties
-            logger.info("rag_page_loading_starting")
+            # Use frontmatter from ChromaDB instead of re-parsing pages
+            from logseq_outline.parser import LogseqOutline
             self.page_contents = {}
-            for page_name in unique_pages:
-                page_path = self.graph_paths.get_page_path(page_name)
-                if page_path.exists():
-                    try:
-                        page_text = page_path.read_text()
-                        from logseq_outline.parser import LogseqOutline
-                        self.page_contents[page_name] = LogseqOutline.parse(page_text)
-                    except Exception as e:
-                        logger.error("page_load_failed", page_name=page_name, error=str(e))
+            for page_name, frontmatter_str in page_frontmatter.items():
+                # Create minimal LogseqOutline with just frontmatter (no blocks needed)
+                outline = LogseqOutline(
+                    blocks=[],
+                    source_text="",  # Not needed for frontmatter-only usage
+                    frontmatter=frontmatter_str.split("\n") if frontmatter_str else []
+                )
+                self.page_contents[page_name] = outline
+
+            logger.debug(
+                "page_frontmatter_loaded_from_chromadb",
+                pages_count=len(self.page_contents)
+            )
 
             # Mark complete and remove from background tasks
             self.rag_search_state = BackgroundTaskState.COMPLETED

@@ -77,11 +77,11 @@ class RAGSearch:
         original_contexts: dict[str, str],
         graph_paths: GraphPaths,
         top_k: int = 10
-    ) -> dict[str, list[tuple[str, str, str]]]:
+    ) -> dict[str, tuple[list[tuple[str, str, str]], dict[str, str]]]:
         """
         Find candidate chunks for each knowledge block.
 
-        Returns hierarchical context strings directly from ChromaDB documents.
+        Returns hierarchical context strings and page frontmatter from ChromaDB.
 
         Args:
             edited_content: List of EditedContent to find candidates for
@@ -90,8 +90,10 @@ class RAGSearch:
             top_k: Number of candidate chunks per block
 
         Returns:
-            dict mapping block_id to list of (page_name, block_id, hierarchical_context) tuples
-            Empty lists if no indexed data exists
+            dict mapping block_id to tuple of:
+                - list of (page_name, block_id, hierarchical_context) tuples
+                - dict mapping page_name to frontmatter string
+            Empty lists/dicts if no indexed data exists
 
         Raises:
             ValueError: If ChromaDB collection doesn't exist
@@ -102,7 +104,7 @@ class RAGSearch:
                 "rag_search_skipped_no_data",
                 message="ChromaDB collection is empty, returning empty results"
             )
-            return {ec.block_id: [] for ec in edited_content}
+            return {ec.block_id: ([], {}) for ec in edited_content}
 
         results = {}
 
@@ -126,15 +128,15 @@ class RAGSearch:
                 n_results=top_k * 3  # Over-fetch for diversity
             )
 
-            # Extract chunks with hierarchy
-            chunks = await self._extract_chunks_from_results(
+            # Extract chunks with hierarchy and frontmatter
+            chunks, page_frontmatter = await self._extract_chunks_from_results(
                 query_results,
                 context,
                 graph_paths,
                 top_k
             )
 
-            results[ec.block_id] = chunks
+            results[ec.block_id] = (chunks, page_frontmatter)
 
             logger.info(
                 "rag_search_chunks_found",
@@ -208,11 +210,12 @@ class RAGSearch:
         context: str,
         graph_paths: GraphPaths,
         top_k: int
-    ) -> list[tuple[str, str, str]]:
+    ) -> tuple[list[tuple[str, str, str]], dict[str, str]]:
         """
-        Extract hierarchical chunks from ChromaDB results.
+        Extract hierarchical chunks and page frontmatter from ChromaDB results.
 
-        Returns (page_name, block_id, hierarchical_context_string) tuples.
+        Returns (page_name, block_id, hierarchical_context_string) tuples and
+        a dict of page_name -> frontmatter.
         The hierarchical_context_string already contains the full block hierarchy
         from ChromaDB's documents field.
 
@@ -223,13 +226,19 @@ class RAGSearch:
             top_k: Number of chunks to return
 
         Returns:
-            List of (page_name, block_id, hierarchical_context) tuples
+            Tuple of:
+                - List of (page_name, block_id, hierarchical_context) tuples
+                - Dict mapping page_name to frontmatter string
         """
+        import json
+
         # Extract explicit page links for boosting
         explicit_links = set(re.findall(r'\[\[([^\]]+)\]\]', context))
 
         # Score each chunk
         chunk_scores = []
+        page_frontmatter = {}  # Track frontmatter per page
+
         for metadata, distance, document in zip(
             query_results["metadatas"][0],
             query_results["distances"][0],
@@ -238,6 +247,19 @@ class RAGSearch:
             page_name = metadata["page_name"]
             block_id = metadata["block_id"]
             similarity = 1.0 - distance
+
+            # Extract frontmatter from metadata
+            if page_name not in page_frontmatter:
+                frontmatter_json = metadata.get("page_frontmatter", '""')
+                try:
+                    page_frontmatter[page_name] = json.loads(frontmatter_json)
+                except json.JSONDecodeError:
+                    page_frontmatter[page_name] = ""
+                    logger.warning(
+                        "invalid_frontmatter_json",
+                        page_name=page_name,
+                        frontmatter_json=frontmatter_json
+                    )
 
             # Boost chunks from explicitly linked pages
             if page_name in explicit_links or page_name.replace("/", "___") in explicit_links:
@@ -250,14 +272,23 @@ class RAGSearch:
         chunk_scores.sort(key=lambda x: x[3], reverse=True)
         chunks = [(page_name, block_id, doc) for page_name, block_id, doc, _ in chunk_scores[:top_k]]
 
+        # Filter frontmatter to only include pages that appear in the final chunks
+        unique_pages = set(page_name for page_name, _, _ in chunks)
+        filtered_frontmatter = {
+            page_name: frontmatter
+            for page_name, frontmatter in page_frontmatter.items()
+            if page_name in unique_pages
+        }
+
         logger.debug(
             "chunks_extracted",
             total_results=len(chunk_scores),
             chunks_returned=len(chunks),
-            unique_pages=len(set(page_name for page_name, _, _ in chunks))
+            unique_pages=len(unique_pages),
+            frontmatter_pages=len(filtered_frontmatter)
         )
 
-        return chunks
+        return chunks, filtered_frontmatter
 
     async def load_page_contents(
         self,

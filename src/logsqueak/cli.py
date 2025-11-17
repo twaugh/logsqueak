@@ -401,8 +401,8 @@ def search(query: str, reindex: bool):
                 top_k=top_k
             )
 
-            # Extract results
-            chunks = chunks_dict.get("search_query", [])
+            # Extract results (find_candidates returns (chunks, frontmatter) tuple)
+            chunks, frontmatter = chunks_dict.get("search_query", ([], {}))
             if not chunks:
                 click.echo("No results found.")
                 return

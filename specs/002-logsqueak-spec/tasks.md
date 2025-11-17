@@ -747,15 +747,16 @@ User should manually test:
   - **Impact**: Eliminates ~100ms tree walk per selected block during phase transition
   - **Dependencies**: None (API extension, backwards compatible if default parents=[])
 
-- [ ] T142 [P] **Store page frontmatter in ChromaDB metadata** - Avoid re-parsing page files
+- [X] T142 [P] **Store page frontmatter in ChromaDB metadata** - Avoid re-parsing page files
   - **Location**: `src/logsqueak/services/page_indexer.py` and `src/logsqueak/services/rag_search.py`
   - **Problem**: RAG pipeline stores full hierarchical contexts in ChromaDB, but then re-parses entire page files from disk to get frontmatter
   - **Fix**: Store frontmatter in ChromaDB metadata during indexing:
-    - In PageIndexer.build_index(): Add to metadata dict: `"page_properties": json.dumps(outline.frontmatter)`
-    - In RAGSearch.find_candidates(): Extract frontmatter from metadata: `page_properties = json.loads(metadata.get("page_properties", ""))`
+    - In PageIndexer.build_index(): Add to metadata dict: `"page_frontmatter": json.dumps(outline.frontmatter)`
+    - In RAGSearch.find_candidates(): Extract frontmatter from metadata: `page_frontmatter = json.loads(metadata.get("page_frontmatter", ""))`
     - Remove page file re-parsing in Phase 2 content_editing.py (lines ~876)
   - **Impact**: Eliminates file I/O and parsing for ~20 candidate pages, saves ~1-2s per Phase 2→3 transition
   - **Dependencies**: None (internal ChromaDB schema change, requires reindex)
+  - **Implementation**: Bumped INDEX_SCHEMA_VERSION to 3, modified metadata storage/retrieval, updated content_editing.py to use ChromaDB frontmatter
 
 - [ ] T143 [P] **Use EditedContent reference in IntegrationDecision** - Eliminate data duplication
   - **Location**: `src/logsqueak/models/integration_decision.py` and `src/logsqueak/tui/screens/content_editing.py`
