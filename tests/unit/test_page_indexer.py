@@ -456,3 +456,75 @@ async def test_reindexing_deletes_old_chunks(temp_graph, temp_db, shared_sentenc
     assert has_new_content, "New content not found in index after re-indexing"
 
     await indexer.close()
+
+
+@pytest.mark.asyncio
+async def test_batched_encoding_progress(tmp_path, shared_sentence_transformer):
+    """Test that batched encoding provides incremental progress updates."""
+    # Create a graph with enough pages to generate multiple encoding batches
+    graph_path = tmp_path / "test-graph"
+    graph_path.mkdir()
+    pages_dir = graph_path / "pages"
+    pages_dir.mkdir()
+
+    # Create 10 pages with multiple blocks each to generate enough chunks
+    # for multiple encoding batches (batch_size = 256 in PageIndexer)
+    for i in range(10):
+        page_file = pages_dir / f"Page {i}.md"
+        # Each page has 30 blocks to generate ~300+ chunks total
+        blocks = "\n".join([f"- Block {j} content with some text" for j in range(30)])
+        page_file.write_text(blocks)
+
+    graph_paths = GraphPaths(graph_path)
+    db_path = tmp_path / "chromadb"
+    indexer = PageIndexer(graph_paths, db_path, encoder=shared_sentence_transformer)
+
+    progress_updates = []
+
+    def progress_callback(current: int, total: int):
+        progress_updates.append((current, total))
+
+    await indexer.build_index(progress_callback)
+
+    # Verify we got progress updates
+    assert len(progress_updates) > 0
+
+    # Find where encoding phase starts (total jumps from page count to chunk count)
+    encoding_updates = []
+    parsing_total = 0
+
+    for i, (current, total) in enumerate(progress_updates):
+        # Skip model loading signal
+        if current == -1:
+            continue
+
+        # Detect phase transition (total increases significantly)
+        if parsing_total > 0 and total > parsing_total * 2:
+            # Found encoding phase - collect all subsequent updates
+            encoding_updates = progress_updates[i:]
+            break
+        parsing_total = total
+
+    # Verify we got multiple incremental encoding updates (batched encoding is working)
+    # Should have more than 1 update (start and end) if batching is working
+    assert len(encoding_updates) > 1, \
+        f"Expected multiple encoding updates from batching, got {len(encoding_updates)}"
+
+    # Verify encoding updates show incremental progress
+    if len(encoding_updates) > 1:
+        # First encoding update should be partial
+        first_current, first_total = encoding_updates[0]
+        assert first_current <= first_total
+
+        # Last update should show completion
+        last_current, last_total = encoding_updates[-1]
+        assert last_current == last_total
+
+        # Updates should be monotonically increasing
+        for i in range(len(encoding_updates) - 1):
+            curr_current, curr_total = encoding_updates[i]
+            next_current, next_total = encoding_updates[i + 1]
+            assert next_current >= curr_current, "Progress should increase"
+            assert curr_total == next_total, "Total should remain constant during encoding"
+
+    await indexer.close()

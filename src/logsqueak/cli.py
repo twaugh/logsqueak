@@ -315,33 +315,46 @@ def search(query: str, reindex: bool):
     # Build/update index with progress indicator
     async def build_index_with_progress():
         total_pages = 0
-        current_page = 0
         status_context = None
+        page_count = None
 
         def progress_callback(current, total):
-            nonlocal total_pages, current_page, status_context
-            total_pages = total
-            current_page = current
+            nonlocal total_pages, status_context, page_count
 
             # Negative current signals model loading phase
             if current < 0:
+                # Capture page count for completion message and phase detection
+                total_pages = total
+                page_count = total
                 # Clear the progress line completely
-                sys.stdout.write(f"\r{' ' * 50}\r")
+                sys.stdout.write(f"\r{' ' * 80}\r")
                 sys.stdout.flush()
                 # Start spinner for model loading
+                if status_context:
+                    status_context.__exit__(None, None, None)
                 status_context = console.status("[bold green]Loading embedding model...")
                 status_context.__enter__()
-            # When current == total, we're in the embedding generation phase
-            elif current == total and status_context is not None:
-                # Stop model loading spinner
-                status_context.__exit__(None, None, None)
-                # Start embedding generation spinner
-                status_context = console.status("[bold green]Generating embeddings...")
-                status_context.__enter__()
-            elif current < total:
-                # Simple progress indicator for page indexing
+                return
+
+            # Detect encoding phase: total has changed from page count to chunk count
+            if page_count is not None and total != page_count:
+                # Encoding phase - show spinner with progress percentage
                 percent = int((current / total) * 100) if total > 0 else 0
-                click.echo(f"\rIndexing pages: {current}/{total} ({percent}%)", nl=False)
+
+                # Start encoding spinner if not already running
+                if not status_context:
+                    sys.stdout.write(f"\r{' ' * 80}\r")
+                    sys.stdout.flush()
+                    status_context = console.status(f"[bold green]Building page index: {percent}%")
+                    status_context.__enter__()
+                else:
+                    # Update spinner message with current percentage
+                    status_context.update(f"[bold green]Building page index: {percent}%")
+            else:
+                # Parsing phase - stop spinner but don't show progress
+                if status_context:
+                    status_context.__exit__(None, None, None)
+                    status_context = None
 
         try:
             await page_indexer.build_index(progress_callback=progress_callback)

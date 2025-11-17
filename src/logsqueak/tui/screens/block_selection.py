@@ -722,26 +722,39 @@ class Phase1Screen(Screen):
             page_indexer = self.app.page_indexer
 
             # Define progress callback to update status panel
+            page_count = [None]  # Track page count from model loading phase
+
             def on_progress(current: int, total: int):
-                """Update progress percentage as pages are indexed."""
-                # When current == total, we're moving to the embedding phase
-                # Clear progress counts to show "Processing pages..." instead of "100/100"
-                if current == total:
-                    self._background_tasks["page_indexing"].progress_percentage = None
-                    self._background_tasks["page_indexing"].progress_current = None
-                    self._background_tasks["page_indexing"].progress_total = None
-                else:
+                """Update progress percentage during encoding.
+
+                Only shows progress during encoding phase (85-95% of total time).
+                Parsing phase is too fast (1-5%) to show meaningful progress.
+
+                Phases:
+                - Model loading: current == -1, total == page_count (no progress shown)
+                - Parsing phase: total == page_count (no progress shown)
+                - Encoding phase: total == chunk_count (progress shown)
+                """
+                # Model loading signal - capture page count
+                if current == -1:
+                    page_count[0] = total
+                    return
+
+                # Detect encoding phase: total has changed from page count to chunk count
+                if page_count[0] is not None and total != page_count[0]:
+                    # We're in encoding phase - show progress
                     percentage = (current / total) * 100.0
                     self._background_tasks["page_indexing"].progress_percentage = percentage
                     self._background_tasks["page_indexing"].progress_current = current
                     self._background_tasks["page_indexing"].progress_total = total
 
-                # Update status panel
-                try:
-                    status_panel = self.query_one(StatusPanel)
-                    status_panel.update_status()
-                except Exception:
-                    pass  # Widget not mounted yet
+                    # Update status panel
+                    try:
+                        status_panel = self.query_one(StatusPanel)
+                        status_panel.update_status()
+                    except Exception:
+                        pass  # Widget not mounted yet
+                # else: parsing phase, ignore
 
             # Run PageIndexer in thread pool to avoid blocking UI
             # (file I/O and SentenceTransformer.encode() are CPU-intensive)

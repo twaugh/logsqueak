@@ -108,13 +108,13 @@ class PageIndexer:
         Build or update vector index for all pages in graph.
 
         Uses incremental indexing: only re-indexes modified pages.
-        Uses batch embedding for performance: all chunks are collected and embedded together.
+        Uses batch embedding with progress reporting: chunks are encoded in batches of 256.
 
         Args:
             progress_callback: Optional callback(current, total) for progress updates.
-                Called during Phase 1 (page scanning/parsing) with (current_page, total_pages).
-                Called at start of Phase 3 (batch encoding) with (total_pages, total_pages) to signal 100%.
-                Note: Batch encoding itself doesn't provide incremental updates since it's a single operation.
+                Phase 1 (parsing): Called with (current_page, total_pages)
+                Model loading: Called with (-1, total_pages) to signal model is loading
+                Phase 4 (encoding): Called with (chunks_encoded, total_chunks) after each batch
 
         Raises:
             ValueError: If graph pages directory doesn't exist or contains no pages
@@ -212,10 +212,6 @@ class PageIndexer:
             chunk_ids = list(all_chunks.keys())
             documents = [chunk["document"] for chunk in all_chunks.values()]
 
-            # Batch encode all documents at once
-            # Note: SentenceTransformer's show_progress_bar doesn't integrate with our progress_callback,
-            # but we can at least signal that encoding is happening
-
             # Signal model loading phase (before first encoder access)
             if progress_callback:
                 # Use negative progress to signal model loading phase
@@ -224,12 +220,31 @@ class PageIndexer:
             # Access encoder (triggers lazy loading on first use)
             encoder = self.encoder
 
-            # Signal encoding phase after model is loaded
-            if progress_callback:
-                # Use total_pages as both current and total to signal encoding phase
-                progress_callback(len(page_files), len(page_files))
+            # Encode in batches with progress reporting
+            # Encoding is the slowest phase (85-95% of total time), so we report incremental progress
+            import numpy as np
 
-            embeddings = encoder.encode(documents, convert_to_numpy=True, show_progress_bar=False)
+            batch_size = 256  # Balance between progress granularity and overhead
+            embeddings_list = []
+
+            for batch_start in range(0, len(documents), batch_size):
+                batch_end = min(batch_start + batch_size, len(documents))
+                batch_docs = documents[batch_start:batch_end]
+
+                # Encode batch
+                batch_embeddings = encoder.encode(
+                    batch_docs,
+                    convert_to_numpy=True,
+                    show_progress_bar=False
+                )
+                embeddings_list.append(batch_embeddings)
+
+                # Report progress (chunks encoded so far, total chunks)
+                if progress_callback:
+                    progress_callback(batch_end, len(documents))
+
+            # Concatenate all batch embeddings
+            embeddings = np.vstack(embeddings_list) if embeddings_list else np.array([])
 
             # Phase 5: Prepare data for bulk upsert
             metadatas = [chunk["metadata"] for chunk in all_chunks.values()]
