@@ -224,27 +224,55 @@ async def reword_content(
     xml_blocks = _generate_xml_blocks_for_rewording(edited_contents, journal_outline)
 
     system_prompt = (
-        f"You are a JSON-only content rewriter. Output ONLY valid JSON lines (NDJSON format).\n"
-        f"NO markdown. NO explanations. NO conversational text. ONLY JSON objects.\n\n"
+        f"You are a JSON-only content rewriter. Output ONLY valid NDJSON (newline-delimited JSON).\n"
+        f"CRITICAL FORMAT RULES:\n"
+        f"- Each line is a separate JSON object (NOT an array)\n"
+        f"- NO opening [ or closing ] brackets\n"
+        f"- NO commas between objects\n"
+        f"- NO markdown, explanations, or conversational text\n"
+        f"- Start output immediately with first {{\n\n"
         f"Task: Transform journal content to evergreen knowledge (remove temporal context).\n\n"
         f"Input format:\n"
         f"- XML blocks with hierarchical context ({indent_style})\n"
         f"- The deepest (most indented) block is the target to reword\n"
         f"- Parent blocks provide context for pronoun resolution\n\n"
         f"Rules:\n"
-        f"1. Remove temporal context (today, yesterday, dates, times)\n"
-        f"2. Convert first-person → third-person or neutral voice\n"
-        f"3. Resolve pronouns using parent block context\n"
-        f"4. Keep technical details, links, and code intact\n"
-        f"5. Reword ONLY the deepest block (target), not parent blocks\n\n"
-        f"Example pronoun resolution:\n"
-        f'Parent: "Tried Textual framework"\n'
-        f'Child: "This is Python-specific"\n'
-        f'→ Reword child to: "The Textual framework is Python-specific"\n\n'
-        f"Output format (STRICT NDJSON - one JSON object per line):\n"
+        f"1. Extract the knowledge/insight itself, not the activity that led to it\n"
+        f"   - BAD: \"Reviewing Python docs reveals type hints are powerful\"\n"
+        f"   - GOOD: \"Python type hints are becoming more powerful\"\n"
+        f"2. Remove activity verbs (reviewing, learned, discovered, found, tried, tested)\n"
+        f"3. Remove temporal context (today, yesterday, dates, times)\n"
+        f"4. Convert first-person → third-person or neutral voice\n"
+        f"5. Resolve pronouns using parent block context\n"
+        f"6. Preserve ALL technical details EXACTLY as written:\n"
+        f"   - Copy links character-for-character: [text](url) or [id|text](url)\n"
+        f"   - NEVER drop URLs or convert links to plain text\n"
+        f"   - Code snippets, commands, file paths unchanged\n"
+        f"   - Specific names, IDs, version numbers preserved\n"
+        f"   - Do NOT summarize, paraphrase, or simplify technical content\n"
+        f"7. Reword ONLY the deepest block (target), not parent blocks\n\n"
+        f"Example transformations:\n"
+        f'Parent: "DONE Review [[Python]] documentation for new features"\n'
+        f'Child: "Type hints are becoming more powerful"\n'
+        f'Grandchild: "PEP 692 adds TypedDict to function signatures"\n'
+        f'→ Reword grandchild to: "PEP 692 adds TypedDict support to function signatures in Python"\n'
+        f'(NOT: "Reviewing Python documentation reveals that PEP 692...")\n\n'
+        f'Parent: "Tested asyncio.gather() behavior"\n'
+        f'Child: "It preserves execution order"\n'
+        f'→ Reword child to: "asyncio.gather() preserves execution order"\n'
+        f'(NOT: "Testing revealed that it preserves order")\n\n'
+        f'Parent: "Database optimization work"\n'
+        f'Child: "Applied fix from [PERF-1234|query performance](https://tickets.example.com/PERF-1234)"\n'
+        f'→ Reword child to: "Database query performance improved via [PERF-1234|query performance](https://tickets.example.com/PERF-1234)"\n'
+        f'(NOT: "Applied fix from PERF-1234" - URL must be preserved exactly)\n\n'
+        f"Output format (STRICT NDJSON - one JSON object per line, NO arrays):\n"
         f'{{"block_id": "abc123", "reworded_content": "PyTest supports fixture dependency injection"}}\n'
         f'{{"block_id": "def456", "reworded_content": "The Textual framework is Python-specific"}}\n\n'
-        f"CRITICAL: Output ONLY JSON lines. Use block_id from XML attribute. No markdown, no prose."
+        f"CRITICAL:\n"
+        f"- Output ONLY JSON objects, one per line\n"
+        f"- NO array brackets [ ]\n"
+        f"- Use block_id from XML attribute\n"
+        f"- First character of output must be {{"
     )
 
     # User prompt: Instruction BEFORE data (critical for attention)
