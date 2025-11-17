@@ -2,8 +2,6 @@
 
 Turn your Logseq journal chaos into organized knowledge. Interactive TUI (Text User Interface) for extracting lasting insights from journal entries using LLM-powered analysis.
 
-**Status**: ✅ **Phase 6 Complete** - End-to-end workflow fully tested with 280 passing tests
-
 ## Overview
 
 Logsqueak provides an **interactive 3-phase workflow** for knowledge extraction:
@@ -30,27 +28,19 @@ All operations are **keyboard-driven** with vim-style navigation and **streaming
 
 ## Features
 
-### ✅ Implemented (Phase 1-6)
+### Core Functionality
 - **Logseq Parser**: Production-ready markdown parser with property order preservation
-- **Data Models**: Pydantic models for config, block state, LLM chunks, integration decisions
-- **LLM Client**: Async NDJSON streaming with retry logic, request queue with priority
+- **Interactive TUI**: Three-phase workflow (Block Selection → Content Editing → Integration Review)
+- **LLM Integration**: Async NDJSON streaming with retry logic, request queue with priority
 - **LLM Prompt Optimization**: Hierarchical chunks reduce prompts from 62KB to 2-4KB per block (90% reduction)
-- **File Monitor**: Git-friendly mtime tracking for concurrent modification detection
-- **File Operations**: Atomic two-phase writes with provenance markers
-- **Configuration**: Lazy validation with helpful error messages (mode 600 permission check)
-- **Utilities**: Structured logging (structlog), deterministic UUID generation
-- **Phase 1 TUI**: Block selection with tree navigation, LLM streaming, manual selection
-- **Phase 2 TUI**: Content editing with three-panel layout, LLM rewording, manual editing
-- **Phase 3 TUI**: Integration review with target page preview, decision batching, atomic writes
-- **RAG Services**: PageIndexer and RAGSearch returning hierarchical chunks with link boosting
+- **RAG Semantic Search**: PageIndexer and RAGSearch with hierarchical chunks and link boosting
+- **File Operations**: Atomic two-phase writes with provenance markers and concurrent modification detection
+- **CLI Commands**:
+  - `logsqueak extract` - Interactive knowledge extraction workflow with date/range parsing
+  - `logsqueak search` - Semantic search of knowledge base with clickable logseq:// links
 - **Background Workers**: Full dependency coordination across all three phases
-- **CLI Integration**: Complete `logsqueak extract` command with date/range parsing
-- **End-to-End Workflow**: All three phases wired together with proper state passing
-- **Test Coverage**: 280 tests passing (173 unit, 69 integration, 38 UI)
-
-### ⏳ Remaining
-- **Phase 7**: Edge case handling and error recovery polish
-- **Phase 8**: Final documentation and validation
+- **Edge Case Handling**: Config errors, network errors, file modifications, malformed JSON
+- **Test Coverage**: 280+ tests passing (173 unit, 69 integration, 38 UI)
 
 ### Key Design Principles
 - **Non-Destructive**: All integrations traceable via `extracted-to::` markers

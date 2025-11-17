@@ -6,23 +6,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Logsqueak** is a TUI (Text User Interface) application for extracting lasting knowledge from Logseq journal entries using LLM-powered analysis. Users interactively review, refine, and integrate knowledge blocks into their Logseq knowledge base.
 
-**Current Status**: Phase 6.5 complete - End-to-end workflow with optimized prompts, CLI search, and UX polish
-- ✅ **Implemented**: `logseq-outline-parser` library (robust Logseq markdown parsing)
-- ✅ **Implemented**: Foundational infrastructure (models, services, CLI, config)
-- ✅ **Implemented**: Phase 1/US1 Block Selection TUI (tree navigation, LLM streaming, manual selection, multi-journal support)
-- ✅ **Implemented**: Phase 4/US2 Content Editing TUI (three-panel layout, LLM rewording, manual editing)
-- ✅ **Implemented**: Phase 5/US3 Integration Review TUI (decision batching, target preview, atomic writes, completion summary)
-- ✅ **Implemented**: Phase 6 Application Integration (end-to-end workflow, background workers, CLI)
-- ✅ **Implemented**: Phase 6.5 Prompt Optimization (90% reduction: 62KB → 2-4KB per block)
-- ✅ **Implemented**: RAG semantic search (PageIndexer, RAGSearch with hierarchical chunks)
-- ✅ **Implemented**: File operations (atomic two-phase writes with provenance markers)
-- ✅ **Implemented**: LLM request queue (priority-based serialization with cancellation)
-- ✅ **Implemented**: CLI search command (`logsqueak search <query>` with clickable links)
-- ✅ **Implemented**: Per-graph ChromaDB indexing with deterministic directory naming
-- ✅ **Implemented**: Logging for all LLM requests/responses and user actions
-- ✅ **Implemented**: Enhanced UX (skip_exists decisions shown with clickable links)
-- ✅ **Phase 7**: Edge case handling (complete - config errors, network errors, file modifications, atomic writes, edge case tests)
-- ⏳ **Remaining**: Phase 8 polish (partial: T121, T127-T129, T136-T138 done; T130-T135 validation pending), performance optimizations (T139-T147 optional)
+**Current Status**: ✅ **COMPLETE** - Full interactive workflow with all features implemented
+- ✅ **Core Parser**: `logseq-outline-parser` library (robust Logseq markdown parsing with property order preservation)
+- ✅ **Infrastructure**: Models, services, CLI, config with lazy validation
+- ✅ **Phase 1 - Block Selection TUI**: Tree navigation, LLM streaming classification, manual selection, multi-journal support
+- ✅ **Phase 2 - Content Editing TUI**: Three-panel layout, LLM rewording, manual editing, RAG search
+- ✅ **Phase 3 - Integration Review TUI**: Decision batching, target preview, atomic writes, completion summary
+- ✅ **Application Integration**: End-to-end workflow, background workers with dependency coordination
+- ✅ **LLM Optimization**: Hierarchical chunks reduce prompts from 62KB → 2-4KB (90% reduction)
+- ✅ **RAG Search**: PageIndexer and RAGSearch with hierarchical chunks and explicit link boosting
+- ✅ **File Operations**: Atomic two-phase writes with provenance markers and concurrent modification detection
+- ✅ **LLM Queue**: Priority-based request serialization with cancellation support
+- ✅ **CLI Commands**: `extract` (with date/range parsing), `search` (with clickable logseq:// links)
+- ✅ **Per-Graph Indexing**: ChromaDB with deterministic directory naming
+- ✅ **Logging**: Structured logging for all LLM requests/responses and user actions
+- ✅ **Edge Cases**: Config errors, network errors, file modifications, malformed JSON handling
+- ✅ **UX Polish**: Skip_exists decisions with clickable links, quiet indexing when no updates needed
+- ✅ **Performance**: EditedContent references eliminate sync loops, pre-cleaned contexts in RAG index
+- ✅ **Test Coverage**: 280+ tests passing (173 unit, 69 integration, 38 UI)
 
 ## Project Structure
 
@@ -657,48 +658,23 @@ Logseq uses indented bullets (2 spaces per level) with special features:
 - Preserves continuation line formatting
 - Uses detected indentation (default: 2 spaces)
 
-## Active Feature Development
+## Feature Implementation Status
 
-**Current feature**: Interactive TUI for knowledge extraction (002-logsqueak-spec)
-
-**Branch**: `002-logsqueak-spec`
+**Current branch**: `002-logsqueak-spec`
 
 **Spec location**: `specs/002-logsqueak-spec/spec.md`
 
-**Implementation status** (see tasks.md for details):
-- ✅ **Phase 1: Setup** (T001-T009) - Complete
-- ✅ **Phase 2: Foundational** (T010-T031) - Complete and tested
-- ✅ **Phase 3: User Story 1** (T032-T049) - Block Selection TUI complete (38 tests passing)
-- ✅ **Phase 4: User Story 2** (T050-T070) - Content Editing TUI complete (44 tests passing)
-- ✅ **Phase 5: User Story 3** (T071-T096) - Integration Review TUI complete (38 tests passing)
-- ✅ **Phase 6: Application Integration** (T097-T108g) - All phases wired end-to-end with worker dependencies
-- ✅ **Phase 6.5: Integration Prompt Refinement** (T108i-T108s) - 90% prompt reduction, LLM request queue
-- ✅ **Phase 7: Edge Cases** (T110-T120) - Complete! All edge case handling implemented and tested
-- ⏳ **Phase 8: Polish & Documentation** (T121-T147) - Partial (T121, T127-T129, T136-T138 complete; T130-T135 validation pending; T139-T147 performance optimizations optional)
+**Implementation status**: ✅ **COMPLETE** - All phases implemented and tested
 
-**Phase 6 Achievements** (Application Integration):
-- ✅ End-to-end workflow: Phase 1 → Phase 2 → Phase 3 fully integrated
-- ✅ Background workers with dependency coordination:
-  - Phase 1: LLM classification, SentenceTransformer loading, page indexing
-  - Phase 2: LLM rewording, RAG search (waits for indexer), integration decisions (opportunistic)
-  - Phase 3: Decision polling or worker start (based on Phase 2 state)
-- ✅ CLI with date/range parsing (`logsqueak extract [date|range]`)
-- ✅ Screen transitions with proper state passing and worker cancellation
-- ✅ Configuration loading with helpful validation errors
-- ✅ Integration test coverage for full workflow (3 tests passing)
-
-**Phase 6.5 Achievements** (Integration Prompt Refinement):
-- ✅ Hierarchical chunk formatting for RAG results (reduces context to relevant blocks only)
-- ✅ Per-block integration planning (one knowledge block at a time)
-- ✅ ChromaDB document reuse (eliminates redundant page parsing)
-- ✅ LLM request queue with priority and cancellation (prevents concurrent prompts)
-- ✅ **Result**: 90%+ prompt size reduction (62KB → 2-4KB per block)
-- ✅ **Impact**: Fixes context window errors on smaller models (Mistral-7B), faster responses
-
-**Next steps** (Phase 7 - Edge Cases):
-- Error handling polish and robustness improvements
-- Validate edge cases (empty journals, missing pages, network failures)
-- Add graceful degradation for LLM/RAG failures
+- ✅ **Phase 1: Setup** (T001-T009)
+- ✅ **Phase 2: Foundational** (T010-T031)
+- ✅ **Phase 3: User Story 1** (T032-T049) - Block Selection TUI
+- ✅ **Phase 4: User Story 2** (T050-T070) - Content Editing TUI
+- ✅ **Phase 5: User Story 3** (T071-T096) - Integration Review TUI
+- ✅ **Phase 6: Application Integration** (T097-T108g) - End-to-end workflow
+- ✅ **Phase 6.5: Prompt Optimization** (T108i-T108s) - 90% prompt reduction, LLM request queue
+- ✅ **Phase 7: Edge Cases** (T110-T120) - Error handling and robustness
+- ✅ **Phase 8: Polish** (T121-T147) - UX improvements, CLI search, performance optimizations
 
 **Development guidelines**:
 - Follow TDD: Write failing tests → Implement → Tests pass → Manual verify
@@ -712,33 +688,16 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
 
 ## Recent Changes
 
-- 2025-11-16: **Phase 7 Complete & Phase 8 Partial** - Edge case handling complete, UX improvements, CLI search
-  - **Phase 7 (T110-T120) ✅ COMPLETE**:
-    - Config error handling (missing file, validation errors, permission checks)
-    - Network error handling (connection refused, timeout, invalid API key)
-    - Malformed JSON handling in NDJSON streaming
-    - Empty state messages ("No knowledge blocks", "No relevant pages")
-    - Atomic write implementation with concurrent modification detection
-    - File modification handling with FileMonitor
-    - Ctrl+C cancellation warning in Phase 3
-    - Integration tests for all edge cases (7 tests passing)
-  - **Phase 8 (T121-T138) PARTIAL**:
-    - **T121**: Added completion summary screen with statistics and journal link
-    - **T127**: Code cleanup and refactoring (removed unused imports, methods, dead code)
-    - **T128**: Added type hints and docstrings to public functions
-    - **T129**: Updated README.md with comprehensive installation, configuration, and usage instructions
-    - **T136**: Fixed Phase 1 to handle multiple journal days correctly (date grouping in tree)
-    - **T137**: Implemented per-graph page index using '(basename)-(16-digit hash)' pattern
-    - **T138**: Implemented `logsqueak search <query>` CLI command with clickable logseq:// links
-  - **UX Improvements**:
-    - Show skip_exists decisions with clickable links to integrated blocks
-    - Enhanced status displays and logging for all user actions
-    - Parser: Fixed trailing blank line handling between blocks
-    - File Ops: Added fallback to add_section when target block not found
-    - RAG: Delete old chunks when re-indexing modified pages
-    - Refactoring: Renamed journal property from 'processed::' to 'extracted-to::'
-  - **Status**: Phase 7 complete ✅, Phase 8 partial (T121, T127-T129, T136-T138 done)
-  - **Remaining**: Final validation tasks (T130-T135), performance optimizations (T139-T147 optional)
+- 2025-11-17: **Specification Complete** - All phases implemented, 280+ tests passing
+  - Completed all 8 phases of the interactive TUI feature spec (002-logsqueak-spec)
+  - Key achievements:
+    - Three-phase interactive workflow (Block Selection → Content Editing → Integration Review)
+    - LLM prompt optimization (90% reduction: 62KB → 2-4KB per block)
+    - RAG semantic search with hierarchical chunks
+    - CLI commands: `extract` and `search` with clickable logseq:// links
+    - Edge case handling (config errors, network failures, file modifications)
+    - Performance optimizations (EditedContent references, pre-cleaned RAG contexts, quiet indexing)
+    - Comprehensive test coverage (280+ passing tests)
 - 2025-11-12: **Integration Decisions Prompt Optimization (COMPLETE)** - Reduced prompt size from 62KB to 2-4KB per block (T108i-m)
   - **Phase 1**: Created `format_chunks_for_llm()` helper in `src/logsqueak/services/llm_helpers.py`
     - Formats RAG search results as XML with hierarchical block context

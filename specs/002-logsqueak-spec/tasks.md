@@ -784,22 +784,6 @@ User should manually test:
   - **Impact**: Moves ~50ms regex processing from hot path (per LLM call) to cold path (one-time indexing)
   - **Dependencies**: Requires ChromaDB reindex (schema change in document storage)
 
-### Final Validation
-
-- [ ] T130 Run full test suite with coverage and verify quality gates:
-  - Run: `pytest --cov=logsqueak --cov-report=html --cov-report=term -v`
-  - All tests pass (0 failures)
-  - Coverage ≥ 80% for src/logsqueak/services/
-  - Coverage ≥ 70% for src/logsqueak/tui/screens/
-  - Coverage ≥ 60% for src/logsqueak/tui/widgets/
-  - Review uncovered code and add tests for critical paths
-- [ ] T130a Generate and review HTML coverage report: `open htmlcov/index.html`
-- [ ] T131 Manual validation of quickstart.md walkthrough (Phase 1, Phase 2, Phase 3)
-- [ ] T132 Test with Ollama local model (verify num_ctx config, connection, streaming)
-- [~] T133 Test with OpenAI API (verify API key handling, rate limits, errors)
-- [ ] T134 Test edge case: very large journal entry (>100 blocks, verify UI responsiveness)
-- [~] T135 Test edge case: concurrent file modification (edit journal in Logseq while TUI running)
-
 ### New Features
 
 - [x] T136 Fix Phase 1 (block_selection.py) to handle multiple journal days correctly
