@@ -567,3 +567,52 @@ async def test_deleted_pages_removed_from_index(temp_graph, temp_db, shared_sent
     assert len(results["ids"]) > 0, "Test Page 2 should still be indexed"
 
     await indexer.close()
+
+
+@pytest.mark.asyncio
+async def test_schema_version_mismatch_triggers_rebuild(temp_graph, temp_db, shared_sentence_transformer):
+    """Test that schema version mismatch causes index rebuild."""
+    from logsqueak.services.page_indexer import INDEX_SCHEMA_VERSION
+    import chromadb
+
+    graph_paths = GraphPaths(temp_graph)
+
+    # Create a collection with old schema version
+    db_path = temp_db / "test-graph-abc123"
+    db_path.mkdir(parents=True, exist_ok=True)
+    chroma_client = chromadb.PersistentClient(path=str(db_path))
+
+    # Create collection with wrong version
+    old_collection = chroma_client.create_collection(
+        name="logsqueak_blocks",
+        metadata={
+            "hnsw:space": "cosine",
+            "schema_version": INDEX_SCHEMA_VERSION - 1  # Old version
+        }
+    )
+
+    # Add some dummy data to the old collection
+    old_collection.add(
+        ids=["test_id"],
+        documents=["test document"],
+        metadatas=[{"page_name": "test"}]
+    )
+
+    assert old_collection.count() == 1, "Old collection should have data"
+
+    # Now initialize PageIndexer - should detect version mismatch and rebuild
+    indexer = PageIndexer(graph_paths, temp_db, encoder=shared_sentence_transformer)
+
+    # Verify collection was recreated with correct version
+    assert indexer.collection.metadata.get("schema_version") == INDEX_SCHEMA_VERSION
+
+    # Verify old data was cleared (collection was deleted and recreated)
+    assert indexer.collection.count() == 0, "Collection should be empty after version mismatch rebuild"
+
+    # Build index with new version
+    await indexer.build_index()
+
+    # Verify index was built successfully
+    assert indexer.collection.count() > 0, "Index should have data after rebuild"
+
+    await indexer.close()

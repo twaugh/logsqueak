@@ -16,6 +16,12 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Index schema version - increment when making breaking changes to index structure
+# Version history:
+# - 1 (implicit): Initial implementation (no version tracking)
+# - 2: Added deleted page cleanup, version tracking
+INDEX_SCHEMA_VERSION = 2
+
 
 def generate_graph_db_name(graph_path: Path) -> str:
     """
@@ -81,14 +87,42 @@ class PageIndexer:
 
         # Initialize ChromaDB with per-graph directory
         self.chroma_client = chromadb.PersistentClient(path=str(self.db_path))
+
+        # Check if collection exists and verify schema version
+        existing_collections = [c.name for c in self.chroma_client.list_collections()]
+        needs_rebuild = False
+
+        if "logsqueak_blocks" in existing_collections:
+            # Collection exists - check schema version
+            collection = self.chroma_client.get_collection(name="logsqueak_blocks")
+            stored_version = collection.metadata.get("schema_version")
+
+            if stored_version != INDEX_SCHEMA_VERSION:
+                logger.warning(
+                    "index_schema_mismatch",
+                    stored_version=stored_version,
+                    current_version=INDEX_SCHEMA_VERSION,
+                    action="will_rebuild"
+                )
+                # Delete old collection to force full rebuild
+                self.chroma_client.delete_collection(name="logsqueak_blocks")
+                needs_rebuild = True
+
+        # Create collection with current schema version
         self.collection = self.chroma_client.get_or_create_collection(
             name="logsqueak_blocks",
-            metadata={"hnsw:space": "cosine"}
+            metadata={
+                "hnsw:space": "cosine",
+                "schema_version": INDEX_SCHEMA_VERSION
+            }
         )
+
         logger.info(
             "page_indexer_initialized",
             graph_path=str(graph_paths.graph_path),
-            db_path=str(self.db_path)
+            db_path=str(self.db_path),
+            schema_version=INDEX_SCHEMA_VERSION,
+            needs_rebuild=needs_rebuild
         )
 
     @property
