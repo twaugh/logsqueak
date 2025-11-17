@@ -659,17 +659,7 @@ class Phase1Screen(Screen):
 
     def start_page_indexing(self) -> None:
         """Start page indexing worker."""
-        # Create background task
-        self._background_tasks["page_indexing"] = BackgroundTask(
-            task_type="page_indexing",
-            status="running",
-            progress_percentage=0.0,
-        )
-
-        status_panel = self.query_one(StatusPanel)
-        status_panel.update_status()
-
-        # Launch worker
+        # Launch worker (background task created after model loading)
         self._indexing_worker = self.run_worker(
             self._page_indexing_worker(),
             exclusive=False,
@@ -709,6 +699,20 @@ class Phase1Screen(Screen):
 
             # Wait before polling again
             await asyncio.sleep(0.1)
+
+        # Now create the background task (after model has loaded)
+        self._background_tasks["page_indexing"] = BackgroundTask(
+            task_type="page_indexing",
+            status="running",
+            progress_percentage=0.0,
+        )
+
+        # Update status panel to show the new task
+        try:
+            status_panel = self.query_one(StatusPanel)
+            status_panel.update_status()
+        except Exception:
+            pass  # Widget not mounted yet
 
         # Now implement real PageIndexer (T108c)
         try:
