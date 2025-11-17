@@ -218,7 +218,7 @@ class TestLLMClient:
 
     @pytest.mark.asyncio
     async def test_stream_ndjson_no_retry_on_4xx_errors(self, llm_client):
-        """Test that 4xx errors don't trigger retry."""
+        """Test that 4xx errors (except 429) don't trigger retry."""
         def mock_stream_factory(*args, **kwargs):
             mock_response = Mock()
             mock_response.status_code = 401
@@ -238,6 +238,118 @@ class TestLLMClient:
                     max_retries=1
                 ):
                     pass
+
+    @pytest.mark.asyncio
+    async def test_stream_ndjson_retry_on_429_rate_limit(self, llm_client):
+        """Test automatic retry on 429 rate limit errors with exponential backoff."""
+        # First attempt: 429, second attempt: success
+        mock_lines = [
+            '{"type": "classification", "block_id": "abc123", "confidence": 0.92}',
+        ]
+
+        attempts = [0]
+
+        def mock_stream_factory(*args, **kwargs):
+            attempts[0] += 1
+            if attempts[0] == 1:
+                mock_response = Mock()
+                mock_response.status_code = 429
+                mock_response.headers = {}  # No Retry-After header
+                raise httpx.HTTPStatusError("Rate limited", request=Mock(), response=mock_response)
+            else:
+                return create_mock_response(mock_lines)
+
+        mock_client = AsyncMock()
+        mock_client.stream = mock_stream_factory
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('httpx.AsyncClient', return_value=mock_client):
+            with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+                chunks = []
+                async for chunk in llm_client.stream_ndjson(
+                    prompt="Test",
+                    system_prompt="Test",
+                    chunk_model=KnowledgeClassificationChunk,
+                    max_retries=1,
+                    retry_delay=2.0
+                ):
+                    chunks.append(chunk)
+
+                # Should succeed after retry
+                assert len(chunks) == 1
+                assert attempts[0] == 2
+                # Should use exponential backoff: 2.0 * (2 ** 0) = 2.0 seconds
+                mock_sleep.assert_called_once_with(2.0)
+
+    @pytest.mark.asyncio
+    async def test_stream_ndjson_429_respects_retry_after_header(self, llm_client):
+        """Test that 429 retry respects Retry-After header from API."""
+        mock_lines = [
+            '{"type": "classification", "block_id": "abc123", "confidence": 0.92}',
+        ]
+
+        attempts = [0]
+
+        def mock_stream_factory(*args, **kwargs):
+            attempts[0] += 1
+            if attempts[0] == 1:
+                mock_response = Mock()
+                mock_response.status_code = 429
+                mock_response.headers = {"Retry-After": "5"}  # API says wait 5 seconds
+                raise httpx.HTTPStatusError("Rate limited", request=Mock(), response=mock_response)
+            else:
+                return create_mock_response(mock_lines)
+
+        mock_client = AsyncMock()
+        mock_client.stream = mock_stream_factory
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('httpx.AsyncClient', return_value=mock_client):
+            with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+                chunks = []
+                async for chunk in llm_client.stream_ndjson(
+                    prompt="Test",
+                    system_prompt="Test",
+                    chunk_model=KnowledgeClassificationChunk,
+                    max_retries=1
+                ):
+                    chunks.append(chunk)
+
+                # Should succeed after retry
+                assert len(chunks) == 1
+                assert attempts[0] == 2
+                # Should respect Retry-After header
+                mock_sleep.assert_called_once_with(5)
+
+    @pytest.mark.asyncio
+    async def test_stream_ndjson_429_fails_after_max_retries(self, llm_client):
+        """Test that 429 errors fail after max retries exhausted."""
+        def mock_stream_factory(*args, **kwargs):
+            mock_response = Mock()
+            mock_response.status_code = 429
+            mock_response.headers = {}
+            raise httpx.HTTPStatusError("Rate limited", request=Mock(), response=mock_response)
+
+        mock_client = AsyncMock()
+        mock_client.stream = mock_stream_factory
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('httpx.AsyncClient', return_value=mock_client):
+            with patch('asyncio.sleep', new_callable=AsyncMock):
+                with pytest.raises(httpx.HTTPStatusError) as exc_info:
+                    async for chunk in llm_client.stream_ndjson(
+                        prompt="Test",
+                        system_prompt="Test",
+                        chunk_model=KnowledgeClassificationChunk,
+                        max_retries=1
+                    ):
+                        pass
+
+                # Verify it's a 429 error
+                assert exc_info.value.response.status_code == 429
 
     @pytest.mark.asyncio
     async def test_stream_sse_format(self, llm_client):
