@@ -758,7 +758,7 @@ User should manually test:
   - **Dependencies**: None (internal ChromaDB schema change, requires reindex)
   - **Implementation**: Bumped INDEX_SCHEMA_VERSION to 3, modified metadata storage/retrieval, updated content_editing.py to use ChromaDB frontmatter
 
-- [ ] T143 [P] **Use EditedContent reference in IntegrationDecision** - Eliminate data duplication
+- [x] T143 [P] **Use EditedContent reference in IntegrationDecision** - Eliminate data duplication
   - **Location**: `src/logsqueak/models/integration_decision.py` and `src/logsqueak/tui/screens/content_editing.py`
   - **Problem**: IntegrationDecision stores both:
     - `knowledge_block_id: str` (reference to EditedContent)

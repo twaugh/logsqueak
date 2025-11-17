@@ -1,7 +1,12 @@
 """IntegrationDecision model for Phase 3 (Integration Review)."""
 
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
-from typing import Literal, Optional
+from typing import Literal, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from logsqueak.models.edited_content import EditedContent
 
 
 class IntegrationDecision(BaseModel):
@@ -39,9 +44,9 @@ class IntegrationDecision(BaseModel):
         description="LLM's confidence score for this integration (0.0-1.0)"
     )
 
-    refined_text: str = Field(
+    edited_content: "EditedContent" = Field(
         ...,
-        description="The content to integrate (from Phase 2 EditedContent)"
+        description="Reference to EditedContent object (contains current_content)"
     )
 
     reasoning: str = Field(
@@ -59,4 +64,13 @@ class IntegrationDecision(BaseModel):
         description="Error details if write_status is 'failed'"
     )
 
-    model_config = {"frozen": False}  # Allow mutation when user accepts/writes
+    @property
+    def refined_text(self) -> str:
+        """Get the current content from the referenced EditedContent.
+
+        This property provides backward compatibility while ensuring we always
+        have the latest edited content without manual synchronization.
+        """
+        return self.edited_content.current_content
+
+    model_config = {"frozen": False, "arbitrary_types_allowed": True}  # Allow mutation and EditedContent reference

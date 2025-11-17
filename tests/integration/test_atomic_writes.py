@@ -74,12 +74,21 @@ async def test_atomic_write_add_section(
     graph_paths, file_monitor, sample_journal, sample_page
 ):
     """Test atomic write with add_section action."""
+    from logsqueak.models.edited_content import EditedContent
+
+    edited_content = EditedContent(
+        block_id="knowledge-block-1",
+        original_content="Async/await patterns for concurrent operations",
+        hierarchical_context="- Async/await patterns for concurrent operations",
+        current_content="Async/await patterns for concurrent operations"
+    )
+
     decision = IntegrationDecision(
         knowledge_block_id="knowledge-block-1",
         target_page="Python/Concurrency",
         action="add_section",
         confidence=0.85,
-        refined_text="Async/await patterns for concurrent operations",
+        edited_content=edited_content,
         reasoning="Relevant to async programming"
     )
 
@@ -118,6 +127,15 @@ async def test_atomic_write_add_under(
     graph_paths, file_monitor, sample_journal, sample_page
 ):
     """Test atomic write with add_under action."""
+    from logsqueak.models.edited_content import EditedContent
+
+    edited_content = EditedContent(
+        block_id="knowledge-block-1",
+        original_content="Async/await patterns for concurrent operations",
+        hierarchical_context="- Async/await patterns for concurrent operations",
+        current_content="Async/await patterns for concurrent operations"
+    )
+
     decision = IntegrationDecision(
         knowledge_block_id="knowledge-block-1",
         target_page="Python/Concurrency",
@@ -125,7 +143,7 @@ async def test_atomic_write_add_under(
         target_block_id="async-concepts",
         target_block_title="Async programming concepts",
         confidence=0.90,
-        refined_text="Async/await patterns for concurrent operations",
+        edited_content=edited_content,
         reasoning="Fits under async concepts"
     )
 
@@ -159,6 +177,15 @@ async def test_atomic_write_replace(
     graph_paths, file_monitor, sample_journal, sample_page
 ):
     """Test atomic write with replace action."""
+    from logsqueak.models.edited_content import EditedContent
+
+    edited_content = EditedContent(
+        block_id="knowledge-block-1",
+        original_content="Updated best practices for async programming",
+        hierarchical_context="- Updated best practices for async programming",
+        current_content="Updated best practices for async programming"
+    )
+
     decision = IntegrationDecision(
         knowledge_block_id="knowledge-block-1",
         target_page="Python/Concurrency",
@@ -166,7 +193,7 @@ async def test_atomic_write_replace(
         target_block_id="best-practices",
         target_block_title="Best practices",
         confidence=0.75,
-        refined_text="Updated best practices for async programming",
+        edited_content=edited_content,
         reasoning="Replaces outdated content"
     )
 
@@ -197,12 +224,21 @@ async def test_atomic_write_multiple_integrations_same_block(
     graph_paths, file_monitor, sample_journal, sample_page
 ):
     """Test multiple integrations from same knowledge block."""
+    from logsqueak.models.edited_content import EditedContent
+
+    edited_content = EditedContent(
+        block_id="knowledge-block-1",
+        original_content="Async patterns content",
+        hierarchical_context="- Async patterns content",
+        current_content="Async patterns content"
+    )
+
     decision1 = IntegrationDecision(
         knowledge_block_id="knowledge-block-1",
         target_page="Python/Concurrency",
         action="add_section",
         confidence=0.85,
-        refined_text="Async patterns content",
+        edited_content=edited_content,
         reasoning="First integration"
     )
 
@@ -212,7 +248,7 @@ async def test_atomic_write_multiple_integrations_same_block(
         action="add_under",
         target_block_id="async-concepts",
         confidence=0.90,
-        refined_text="Async patterns content",
+        edited_content=edited_content,
         reasoning="Second integration"
     )
 
@@ -250,12 +286,21 @@ async def test_concurrent_page_modification_detection(
     graph_paths, file_monitor, sample_journal, sample_page
 ):
     """Test that concurrent page modifications are detected."""
+    from logsqueak.models.edited_content import EditedContent
+
+    edited_content = EditedContent(
+        block_id="knowledge-block-1",
+        original_content="New content",
+        hierarchical_context="- New content",
+        current_content="New content"
+    )
+
     decision = IntegrationDecision(
         knowledge_block_id="knowledge-block-1",
         target_page="Python/Concurrency",
         action="add_section",
         confidence=0.85,
-        refined_text="New content",
+        edited_content=edited_content,
         reasoning="Test"
     )
 
@@ -283,12 +328,21 @@ async def test_concurrent_journal_modification_detection(
     graph_paths, file_monitor, sample_journal, sample_page
 ):
     """Test that concurrent journal modifications are detected."""
+    from logsqueak.models.edited_content import EditedContent
+
+    edited_content = EditedContent(
+        block_id="knowledge-block-1",
+        original_content="New content",
+        hierarchical_context="- New content",
+        current_content="New content"
+    )
+
     decision = IntegrationDecision(
         knowledge_block_id="knowledge-block-1",
         target_page="Python/Concurrency",
         action="add_section",
         confidence=0.85,
-        refined_text="New content",
+        edited_content=edited_content,
         reasoning="Test"
     )
 
@@ -318,12 +372,21 @@ async def test_idempotent_retry_detection(
     graph_paths, file_monitor, sample_journal, sample_page
 ):
     """Test that retry with same decision is idempotent."""
+    from logsqueak.models.edited_content import EditedContent
+
+    edited_content = EditedContent(
+        block_id="knowledge-block-1",
+        original_content="Content to add",
+        hierarchical_context="- Content to add",
+        current_content="Content to add"
+    )
+
     decision = IntegrationDecision(
         knowledge_block_id="knowledge-block-1",
         target_page="Python/Concurrency",
         action="add_section",
         confidence=0.85,
-        refined_text="Content to add",
+        edited_content=edited_content,
         reasoning="Test idempotency"
     )
 
@@ -360,13 +423,22 @@ async def test_write_fallback_when_target_not_found(
     graph_paths, file_monitor, sample_journal, sample_page
 ):
     """Test fallback to add_section when target block doesn't exist."""
+    from logsqueak.models.edited_content import EditedContent
+
+    edited_content = EditedContent(
+        block_id="knowledge-block-1",
+        original_content="Content",
+        hierarchical_context="- Content",
+        current_content="Content"
+    )
+
     decision = IntegrationDecision(
         knowledge_block_id="knowledge-block-1",
         target_page="Python/Concurrency",
         action="add_under",
         target_block_id="nonexistent-block",
         confidence=0.85,
-        refined_text="Content",
+        edited_content=edited_content,
         reasoning="Test fallback"
     )
 
@@ -399,12 +471,21 @@ async def test_write_failure_page_not_found(
     graph_paths, file_monitor, sample_journal
 ):
     """Test write failure when target page doesn't exist."""
+    from logsqueak.models.edited_content import EditedContent
+
+    edited_content = EditedContent(
+        block_id="knowledge-block-1",
+        original_content="Content",
+        hierarchical_context="- Content",
+        current_content="Content"
+    )
+
     decision = IntegrationDecision(
         knowledge_block_id="knowledge-block-1",
         target_page="Nonexistent/Page",
         action="add_section",
         confidence=0.85,
-        refined_text="Content",
+        edited_content=edited_content,
         reasoning="Test error"
     )
 
@@ -430,6 +511,8 @@ async def test_property_order_preservation(
     graph_paths, file_monitor, sample_journal, sample_page
 ):
     """Test that property order is preserved during integration."""
+    from logsqueak.models.edited_content import EditedContent
+
     # Create page with specific property order
     page_path = graph_paths.get_page_path("Python/Concurrency")
     # Ensure parent directory exists
@@ -442,13 +525,20 @@ async def test_property_order_preservation(
 """
     page_path.write_text(page_content)
 
+    edited_content = EditedContent(
+        block_id="knowledge-block-1",
+        original_content="Replaced content",
+        hierarchical_context="- Replaced content",
+        current_content="Replaced content"
+    )
+
     decision = IntegrationDecision(
         knowledge_block_id="knowledge-block-1",
         target_page="Python/Concurrency",
         action="replace",
         target_block_id="test-block",
         confidence=0.85,
-        refined_text="Replaced content",
+        edited_content=edited_content,
         reasoning="Test property order"
     )
 
@@ -481,6 +571,8 @@ async def test_atomic_write_skip_exists_with_id(
     sample_page
 ):
     """Test skip_exists with existing id:: adds provenance without modifying page."""
+    from logsqueak.models.edited_content import EditedContent
+
     # Create page with existing block that has id::
     page_path = graph_paths.get_page_path("Python/Concurrency")
     page_path.parent.mkdir(parents=True, exist_ok=True)
@@ -490,13 +582,20 @@ async def test_atomic_write_skip_exists_with_id(
 """
     page_path.write_text(page_content)
 
+    edited_content = EditedContent(
+        block_id="knowledge-block-1",
+        original_content="Duplicate content",
+        hierarchical_context="- Duplicate content",
+        current_content="Duplicate content"
+    )
+
     decision = IntegrationDecision(
         knowledge_block_id="knowledge-block-1",
         target_page="Python/Concurrency",
         action="skip_exists",
         target_block_id="existing-block-id",
         confidence=0.95,
-        refined_text="Duplicate content",
+        edited_content=edited_content,
         reasoning="Block already exists with same content"
     )
 
@@ -534,6 +633,8 @@ async def test_atomic_write_skip_exists_adds_id_if_missing(
     sample_page
 ):
     """Test skip_exists adds id:: property if block doesn't have one."""
+    from logsqueak.models.edited_content import EditedContent
+
     # Create page with existing block WITHOUT id:: property
     page_path = graph_paths.get_page_path("Python/Concurrency")
     page_path.parent.mkdir(parents=True, exist_ok=True)
@@ -550,6 +651,13 @@ async def test_atomic_write_skip_exists_adds_id_if_missing(
     chunks = generate_chunks(page_outline, page_name="Python/Concurrency")
     _, _, content_hash, _ = chunks[0]  # Get hybrid_id from first chunk
 
+    edited_content = EditedContent(
+        block_id="knowledge-block-1",
+        original_content="Duplicate content",
+        hierarchical_context="- Duplicate content",
+        current_content="Duplicate content"
+    )
+
     # LLM identified duplicate using content hash (implicit ID)
     decision = IntegrationDecision(
         knowledge_block_id="knowledge-block-1",
@@ -557,7 +665,7 @@ async def test_atomic_write_skip_exists_adds_id_if_missing(
         action="skip_exists",
         target_block_id=content_hash,  # Content hash from hybrid ID system
         confidence=0.95,
-        refined_text="Duplicate content",
+        edited_content=edited_content,
         reasoning="Block already exists with same content"
     )
 

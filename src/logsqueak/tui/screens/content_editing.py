@@ -461,21 +461,6 @@ class Phase2Screen(Screen):
 
         logger.info("phase2_complete", blocks_edited=len(self.edited_content))
 
-        # Update refined_text in all existing decisions with latest edited content
-        # This ensures decisions use the user's final edits, even if they were
-        # created by the worker while user was still editing
-        from logsqueak.tui.app import LogsqueakApp
-        if isinstance(self.app, LogsqueakApp):
-            for decision in self.app.integration_decisions:
-                edited_content = self.edited_content_map.get(decision.knowledge_block_id)
-                if edited_content:
-                    decision.refined_text = edited_content.current_content
-                    logger.debug(
-                        "updated_decision_refined_text",
-                        block_id=decision.knowledge_block_id,
-                        refined_text_length=len(decision.refined_text)
-                    )
-
         # Call app transition method
         from logsqueak.tui.app import LogsqueakApp
         if isinstance(self.app, LogsqueakApp):
@@ -689,7 +674,7 @@ class Phase2Screen(Screen):
                             target_block_id=chunk.target_block_id,
                             target_block_title=chunk.target_block_title,
                             confidence=chunk.confidence,
-                            refined_text=edited_content.current_content,
+                            edited_content=edited_content,
                             reasoning=chunk.reasoning,
                             write_status="pending",
                         )

@@ -60,7 +60,7 @@ def sample_edited_content():
 
 
 @pytest.fixture
-def sample_decisions():
+def sample_decisions(sample_edited_content):
     """Create sample integration decisions for testing."""
     return [
         IntegrationDecision(
@@ -68,7 +68,7 @@ def sample_decisions():
             target_page="Python/Concurrency",
             action="add_section",
             confidence=0.85,
-            refined_text="Async/await pattern for concurrent file I/O operations",
+            edited_content=sample_edited_content[0],
             reasoning="This knowledge is directly relevant to Python concurrency patterns. "
                       "Adding as a new section allows it to stand independently."
         ),
@@ -79,7 +79,7 @@ def sample_decisions():
             target_block_id="async-patterns-block",
             target_block_title="Async Patterns",
             confidence=0.90,
-            refined_text="Async/await pattern for concurrent file I/O operations",
+            edited_content=sample_edited_content[0],
             reasoning="Best fit under existing 'Async Patterns' section. "
                       "Complements existing async documentation."
         ),
@@ -90,7 +90,7 @@ def sample_decisions():
             target_block_id="file-io-block",
             target_block_title="File I/O Best Practices",
             confidence=0.75,
-            refined_text="Async/await pattern for concurrent file I/O operations",
+            edited_content=sample_edited_content[0],
             reasoning="Relevant to file operations best practices. "
                       "Lower confidence due to less direct semantic match."
         ),

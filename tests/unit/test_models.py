@@ -125,6 +125,13 @@ class TestIntegrationDecision:
 
     def test_create_integration_decision(self):
         """Test creating integration decision."""
+        edited_content = EditedContent(
+            block_id="abc123",
+            original_content="asyncio enables concurrent programming.",
+            hierarchical_context="- asyncio enables concurrent programming.",
+            current_content="asyncio enables concurrent programming."
+        )
+
         decision = IntegrationDecision(
             knowledge_block_id="abc123",
             target_page="Programming Notes/Python",
@@ -132,7 +139,7 @@ class TestIntegrationDecision:
             target_block_id="section-async",
             target_block_title="Async Patterns",
             confidence=0.87,
-            refined_text="asyncio enables concurrent programming.",
+            edited_content=edited_content,
             reasoning="Fits well under Async Patterns section."
         )
 
@@ -141,15 +148,23 @@ class TestIntegrationDecision:
         assert decision.action == "add_under"
         assert decision.write_status == "pending"
         assert decision.error_message is None
+        assert decision.refined_text == "asyncio enables concurrent programming."
 
     def test_decision_write_status_transitions(self):
         """Test decision write status can transition."""
+        edited_content = EditedContent(
+            block_id="abc123",
+            original_content="Test content",
+            hierarchical_context="- Test content",
+            current_content="Test content"
+        )
+
         decision = IntegrationDecision(
             knowledge_block_id="abc123",
             target_page="Test Page",
             action="add_section",
             confidence=0.9,
-            refined_text="Test content",
+            edited_content=edited_content,
             reasoning="Test reasoning"
         )
 
@@ -161,13 +176,20 @@ class TestIntegrationDecision:
 
     def test_decision_write_failure(self):
         """Test decision write failure tracking."""
+        edited_content = EditedContent(
+            block_id="abc123",
+            original_content="Test content",
+            hierarchical_context="- Test content",
+            current_content="Test content"
+        )
+
         decision = IntegrationDecision(
             knowledge_block_id="abc123",
             target_page="Test Page",
             action="replace",
             target_block_id="missing-block",
             confidence=0.9,
-            refined_text="Test content",
+            edited_content=edited_content,
             reasoning="Test reasoning"
         )
 

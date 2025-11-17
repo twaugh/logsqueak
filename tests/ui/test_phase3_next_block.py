@@ -64,7 +64,7 @@ def sample_edited_content():
 
 
 @pytest.fixture
-def sample_decisions():
+def sample_decisions(sample_edited_content):
     """Create sample integration decisions for testing."""
     # Block 1 has 3 decisions
     return [
@@ -73,7 +73,7 @@ def sample_decisions():
             target_page="Python/Concurrency",
             action="add_section",
             confidence=0.85,
-            refined_text="Python async programming patterns",
+            edited_content=sample_edited_content[0],
             reasoning="Relevant to async programming concepts"
         ),
         IntegrationDecision(
@@ -83,7 +83,7 @@ def sample_decisions():
             target_block_id="target-1",
             target_block_title="Async Patterns",
             confidence=0.90,
-            refined_text="Python async programming patterns",
+            edited_content=sample_edited_content[0],
             reasoning="Fits under async patterns section"
         ),
         IntegrationDecision(
@@ -93,7 +93,7 @@ def sample_decisions():
             target_block_id="target-2",
             target_block_title="Code Patterns",
             confidence=0.75,
-            refined_text="Python async programming patterns",
+            edited_content=sample_edited_content[0],
             reasoning="Relevant to coding best practices"
         ),
         # Block 2 has 2 decisions
@@ -102,7 +102,7 @@ def sample_decisions():
             target_page="Textual/Architecture",
             action="add_section",
             confidence=0.88,
-            refined_text="Textual TUI framework architecture",
+            edited_content=sample_edited_content[1],
             reasoning="Core architectural concepts"
         ),
         IntegrationDecision(
@@ -112,7 +112,7 @@ def sample_decisions():
             target_block_id="target-3",
             target_block_title="Custom Widgets",
             confidence=0.82,
-            refined_text="Textual TUI framework architecture",
+            edited_content=sample_edited_content[1],
             reasoning="Relevant to widget design"
         ),
     ]

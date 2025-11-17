@@ -52,7 +52,7 @@ def sample_edited_content():
 
 
 @pytest.fixture
-def sample_decisions():
+def sample_decisions(sample_edited_content):
     """Create sample integration decisions for testing."""
     return [
         IntegrationDecision(
@@ -60,7 +60,7 @@ def sample_decisions():
             target_page="Python/Concurrency",
             action="add_section",
             confidence=0.85,
-            refined_text="Python async programming patterns",
+            edited_content=sample_edited_content[0],
             reasoning="Relevant to async programming concepts"
         ),
         IntegrationDecision(
@@ -70,7 +70,7 @@ def sample_decisions():
             target_block_id="target-1",
             target_block_title="Code Patterns",
             confidence=0.75,
-            refined_text="Python async programming patterns",
+            edited_content=sample_edited_content[0],
             reasoning="Relevant to coding best practices"
         ),
     ]

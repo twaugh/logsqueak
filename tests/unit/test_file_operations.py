@@ -325,13 +325,22 @@ class TestValidateDecision:
 
     def test_validates_add_under_requires_target_block_id(self):
         """Test that add_under action requires target_block_id."""
+        from logsqueak.models.edited_content import EditedContent
+
+        edited_content = EditedContent(
+            block_id="block-1",
+            original_content="Content",
+            hierarchical_context="- Content",
+            current_content="Content"
+        )
+
         decision = IntegrationDecision(
             knowledge_block_id="block-1",
             target_page="Python/Concurrency",
             action="add_under",
             target_block_id=None,  # Missing
             confidence=0.8,
-            refined_text="Content",
+            edited_content=edited_content,
             reasoning="Reason"
         )
 
@@ -342,13 +351,22 @@ class TestValidateDecision:
 
     def test_validates_target_block_exists(self):
         """Test that validation checks if target block exists."""
+        from logsqueak.models.edited_content import EditedContent
+
+        edited_content = EditedContent(
+            block_id="block-1",
+            original_content="Content",
+            hierarchical_context="- Content",
+            current_content="Content"
+        )
+
         decision = IntegrationDecision(
             knowledge_block_id="block-1",
             target_page="Python/Concurrency",
             action="add_under",
             target_block_id="nonexistent-id",
             confidence=0.8,
-            refined_text="Content",
+            edited_content=edited_content,
             reasoning="Reason"
         )
 
@@ -359,13 +377,22 @@ class TestValidateDecision:
 
     def test_validation_passes_for_valid_decision(self):
         """Test that valid decision passes validation."""
+        from logsqueak.models.edited_content import EditedContent
+
+        edited_content = EditedContent(
+            block_id="block-1",
+            original_content="Content",
+            hierarchical_context="- Content",
+            current_content="Content"
+        )
+
         decision = IntegrationDecision(
             knowledge_block_id="block-1",
             target_page="Python/Concurrency",
             action="add_under",
             target_block_id="existing-1",
             confidence=0.8,
-            refined_text="Content",
+            edited_content=edited_content,
             reasoning="Reason"
         )
 
@@ -376,13 +403,22 @@ class TestValidateDecision:
 
     def test_validates_skip_exists_requires_target_block_id(self):
         """Test that skip_exists action requires target_block_id."""
+        from logsqueak.models.edited_content import EditedContent
+
+        edited_content = EditedContent(
+            block_id="block-1",
+            original_content="Content",
+            hierarchical_context="- Content",
+            current_content="Content"
+        )
+
         decision = IntegrationDecision(
             knowledge_block_id="block-1",
             target_page="Python/Concurrency",
             action="skip_exists",
             target_block_id=None,  # Missing
             confidence=0.8,
-            refined_text="Content",
+            edited_content=edited_content,
             reasoning="Block already exists"
         )
 
@@ -393,13 +429,22 @@ class TestValidateDecision:
 
     def test_validates_skip_exists_target_block_exists(self):
         """Test that skip_exists validates target block exists."""
+        from logsqueak.models.edited_content import EditedContent
+
+        edited_content = EditedContent(
+            block_id="block-1",
+            original_content="Content",
+            hierarchical_context="- Content",
+            current_content="Content"
+        )
+
         decision = IntegrationDecision(
             knowledge_block_id="block-1",
             target_page="Python/Concurrency",
             action="skip_exists",
             target_block_id="existing-1",
             confidence=0.8,
-            refined_text="Content",
+            edited_content=edited_content,
             reasoning="Block already exists"
         )
 
@@ -414,12 +459,21 @@ class TestApplyIntegration:
 
     def test_applies_add_section_action(self):
         """Test that add_section action is applied correctly."""
+        from logsqueak.models.edited_content import EditedContent
+
+        edited_content = EditedContent(
+            block_id="block-1",
+            original_content="New knowledge",
+            hierarchical_context="- New knowledge",
+            current_content="New knowledge"
+        )
+
         decision = IntegrationDecision(
             knowledge_block_id="block-1",
             target_page="Python/Concurrency",
             action="add_section",
             confidence=0.8,
-            refined_text="New knowledge",
+            edited_content=edited_content,
             reasoning="Reason"
         )
 
@@ -434,13 +488,22 @@ class TestApplyIntegration:
 
     def test_applies_add_under_action(self):
         """Test that add_under action is applied correctly."""
+        from logsqueak.models.edited_content import EditedContent
+
+        edited_content = EditedContent(
+            block_id="block-1",
+            original_content="Child knowledge",
+            hierarchical_context="- Child knowledge",
+            current_content="Child knowledge"
+        )
+
         decision = IntegrationDecision(
             knowledge_block_id="block-1",
             target_page="Python/Concurrency",
             action="add_under",
             target_block_id="parent-1",
             confidence=0.8,
-            refined_text="Child knowledge",
+            edited_content=edited_content,
             reasoning="Reason"
         )
 
@@ -454,13 +517,22 @@ class TestApplyIntegration:
 
     def test_applies_replace_action(self):
         """Test that replace action is applied correctly."""
+        from logsqueak.models.edited_content import EditedContent
+
+        edited_content = EditedContent(
+            block_id="block-1",
+            original_content="Replacement content",
+            hierarchical_context="- Replacement content",
+            current_content="Replacement content"
+        )
+
         decision = IntegrationDecision(
             knowledge_block_id="block-1",
             target_page="Python/Concurrency",
             action="replace",
             target_block_id="target-1",
             confidence=0.8,
-            refined_text="Replacement content",
+            edited_content=edited_content,
             reasoning="Reason"
         )
 
@@ -475,13 +547,22 @@ class TestApplyIntegration:
 
     def test_applies_skip_exists_action_with_existing_id(self):
         """Test that skip_exists with existing id:: returns it without modification."""
+        from logsqueak.models.edited_content import EditedContent
+
+        edited_content = EditedContent(
+            block_id="block-1",
+            original_content="Duplicate content",
+            hierarchical_context="- Duplicate content",
+            current_content="Duplicate content"
+        )
+
         decision = IntegrationDecision(
             knowledge_block_id="block-1",
             target_page="Python/Concurrency",
             action="skip_exists",
             target_block_id="existing-1",
             confidence=0.8,
-            refined_text="Duplicate content",
+            edited_content=edited_content,
             reasoning="Block already exists with same content"
         )
 
@@ -499,6 +580,8 @@ class TestApplyIntegration:
 
     def test_applies_skip_exists_action_adds_id_if_missing(self):
         """Test that skip_exists adds id:: property if block doesn't have one."""
+        from logsqueak.models.edited_content import EditedContent
+
         # Block without explicit id:: property (uses content hash as implicit ID)
         outline = LogseqOutline.parse("- Existing content without id")
 
@@ -508,13 +591,20 @@ class TestApplyIntegration:
         full_context = generate_full_context(outline.blocks[0], [])
         content_hash = generate_content_hash(full_context, page_name="Python/Concurrency")
 
+        edited_content = EditedContent(
+            block_id="block-1",
+            original_content="Duplicate content",
+            hierarchical_context="- Duplicate content",
+            current_content="Duplicate content"
+        )
+
         decision = IntegrationDecision(
             knowledge_block_id="block-1",
             target_page="Python/Concurrency",
             action="skip_exists",
             target_block_id=content_hash,  # Content hash (implicit ID)
             confidence=0.8,
-            refined_text="Duplicate content",
+            edited_content=edited_content,
             reasoning="Block already exists with same content"
         )
 
@@ -530,9 +620,18 @@ class TestApplyIntegration:
 
     def test_raises_error_for_unknown_action(self):
         """Test that unknown action raises error."""
+        from logsqueak.models.edited_content import EditedContent
+
         # Pydantic will validate action before we even get to apply_integration
         # So let's manually bypass validation for this test
         outline = LogseqOutline.parse("- Existing block")
+
+        edited_content = EditedContent(
+            block_id="block-1",
+            original_content="Content",
+            hierarchical_context="- Content",
+            current_content="Content"
+        )
 
         # Create a valid decision and then manually set invalid action
         decision = IntegrationDecision(
@@ -540,7 +639,7 @@ class TestApplyIntegration:
             target_page="Python/Concurrency",
             action="add_section",
             confidence=0.8,
-            refined_text="Content",
+            edited_content=edited_content,
             reasoning="Reason"
         )
 
@@ -552,13 +651,22 @@ class TestApplyIntegration:
 
     def test_add_under_falls_back_to_add_section_when_target_not_found(self):
         """Test that add_under falls back to add_section when target block not found."""
+        from logsqueak.models.edited_content import EditedContent
+
+        edited_content = EditedContent(
+            block_id="block-1",
+            original_content="New knowledge",
+            hierarchical_context="- New knowledge",
+            current_content="New knowledge"
+        )
+
         decision = IntegrationDecision(
             knowledge_block_id="block-1",
             target_page="Python/Concurrency",
             action="add_under",
             target_block_id="nonexistent-id",  # Target block doesn't exist
             confidence=0.8,
-            refined_text="New knowledge",
+            edited_content=edited_content,
             reasoning="Add under specific section"
         )
 

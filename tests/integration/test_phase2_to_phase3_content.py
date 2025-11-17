@@ -7,13 +7,19 @@ from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.models.llm_chunks import IntegrationDecisionChunk
 
 
-@pytest.mark.asyncio
+@pytest.fixture
+def anyio_backend():
+    """Force asyncio backend only for these tests."""
+    return "asyncio"
+
+
+@pytest.mark.anyio
 async def test_manual_edits_flow_to_integration_decisions():
-    """Test that manual edits in Phase 2 are captured in refined_text for Phase 3.
+    """Test that manual edits in Phase 2 are captured via EditedContent reference.
 
     This test simulates the user manually editing content in Phase 2, then
-    verifies that the Integration Decision worker uses the edited content
-    (not the original or LLM reworded version) in the refined_text field.
+    verifies that the Integration Decision worker uses the EditedContent reference
+    which provides access to the latest edited content via the refined_text property.
     """
     # Create EditedContent with different versions
     edited_content = EditedContent(
@@ -45,18 +51,18 @@ async def test_manual_edits_flow_to_integration_decisions():
         target_block_id=chunk.target_block_id,
         target_block_title=chunk.target_block_title,
         confidence=chunk.confidence,
-        refined_text=edited_content.current_content,  # Should use current_content!
+        edited_content=edited_content,  # Pass EditedContent reference!
         reasoning=chunk.reasoning,
         write_status="pending",
     )
 
-    # Verify the decision uses the manually edited content
+    # Verify the decision uses the manually edited content via the property
     assert decision.refined_text == "Manually edited by user content"
     assert decision.refined_text != edited_content.original_content
     assert decision.refined_text != edited_content.reworded_content
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_unsaved_edits_captured_before_integration_worker():
     """Test that unsaved edits are saved before Integration Decision worker starts.
 
@@ -88,7 +94,7 @@ async def test_unsaved_edits_captured_before_integration_worker():
     editor_content = "Edited in UI"  # What's in the TextArea
     edited_content.current_content = editor_content  # Saved by _save_all_content()
 
-    # Now when worker creates decision, it sees the latest content
+    # Now when worker creates decision, it sees the latest content via reference
     decision = IntegrationDecision(
         knowledge_block_id="block-1",
         target_page="TestPage",
@@ -96,11 +102,11 @@ async def test_unsaved_edits_captured_before_integration_worker():
         target_block_id=None,
         target_block_title=None,
         confidence=0.95,
-        refined_text=edited_content.current_content,
+        edited_content=edited_content,  # Pass EditedContent reference!
         reasoning="Test",
         write_status="pending",
     )
 
-    # Verify decision has the edited content
+    # Verify decision has the edited content via the property
     assert decision.refined_text == "Edited in UI"
     assert decision.refined_text != "Original content"
