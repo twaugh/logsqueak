@@ -415,10 +415,11 @@ class LLMClient:
 
                         # After stream ends, try to parse any remaining accumulated content
                         if needs_content_extraction and accumulated_content.strip():
-                            logger.debug(
-                                "llm_processing_final_accumulated_content",
+                            logger.info(
+                                "llm_raw_response_received",
                                 request_id=request_id,
                                 content_length=len(accumulated_content),
+                                raw_content=accumulated_content,  # Log complete LLM response
                             )
 
                             # Split and process any remaining complete lines
