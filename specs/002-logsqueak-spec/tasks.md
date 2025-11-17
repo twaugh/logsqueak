@@ -711,7 +711,7 @@ User should manually test:
 
 **Note**: These optimizations reduce CPU/memory usage and improve code clarity. They do NOT significantly reduce wall-clock time (LLM response latency dominates). Benefits: cleaner architecture, lower battery consumption, reduced resource usage.
 
-- [ ] T139 [P] **Eliminate redundant journal parsing** - Remove deep copy and re-augmentation in app.py
+- [x] T139 [P] **Eliminate redundant journal parsing** - Remove deep copy and re-augmentation in app.py
   - **Location**: `src/logsqueak/cli.py` and `src/logsqueak/tui/app.py`
   - **Problem**: Journals are parsed in CLI, then deep copied and re-augmented with IDs in App.__init__
   - **Fix**: Move `_augment_outline_with_ids()` into CLI's journal loading

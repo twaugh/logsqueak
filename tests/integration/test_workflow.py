@@ -16,6 +16,7 @@ from logsqueak.services.llm_client import LLMClient
 from logsqueak.services.page_indexer import PageIndexer
 from logsqueak.services.rag_search import RAGSearch
 from logsqueak.services.file_monitor import FileMonitor
+from logsqueak.services.llm_wrappers import _augment_outline_with_ids
 from logsqueak.tui.app import LogsqueakApp
 
 
@@ -194,7 +195,9 @@ async def test_full_workflow_phase1_to_phase2_to_phase3(
     client, mock_classify, mock_reword, mock_decisions = mock_llm_client
 
     # Initialize app with mocked services
-    journals = {"2025-01-15": sample_journal_outline}
+    # Augment journal outline with IDs (CLI does this before passing to app)
+    augmented_outline = _augment_outline_with_ids(sample_journal_outline)
+    journals = {"2025-01-15": augmented_outline}
     app = LogsqueakApp(
         journals=journals,
         config=mock_config,
@@ -237,7 +240,9 @@ async def test_app_initialization_with_services(
     """Test that app initializes correctly with all services wired up."""
     client, _, _, _ = mock_llm_client
 
-    journals = {"2025-01-15": sample_journal_outline}
+    # Augment journal outline with IDs (CLI does this before passing to app)
+    augmented_outline = _augment_outline_with_ids(sample_journal_outline)
+    journals = {"2025-01-15": augmented_outline}
     app = LogsqueakApp(
         journals=journals,
         config=mock_config,
@@ -279,7 +284,9 @@ async def test_app_can_initialize_without_crashing(
     client, _, _, _ = mock_llm_client
 
     try:
-        journals = {"2025-01-15": sample_journal_outline}
+        # Augment journal outline with IDs (CLI does this before passing to app)
+        augmented_outline = _augment_outline_with_ids(sample_journal_outline)
+        journals = {"2025-01-15": augmented_outline}
         app = LogsqueakApp(
             journals=journals,
             config=mock_config,

@@ -60,7 +60,6 @@ from logsqueak.services.llm_client import LLMClient
 from logsqueak.services.page_indexer import PageIndexer
 from logsqueak.services.rag_search import RAGSearch
 from logsqueak.services.file_monitor import FileMonitor
-from logsqueak.services.llm_wrappers import _augment_outline_with_ids
 from logsqueak.tui.screens import Phase1Screen, Phase2Screen, Phase3Screen
 
 logger = structlog.get_logger()
@@ -103,6 +102,7 @@ class LogsqueakApp(App):
 
         Args:
             journals: Dictionary mapping date string (YYYY-MM-DD) to LogseqOutline
+                      (already augmented with hybrid IDs by CLI's load_journal_entries)
             config: Application configuration
             llm_client: LLM client for streaming responses
             page_indexer: Page indexing service for RAG
@@ -111,12 +111,9 @@ class LogsqueakApp(App):
         """
         super().__init__()
 
-        # Augment all journal outlines with temporary IDs for blocks without explicit id:: properties
-        # This ensures all blocks have stable IDs for LLM classification and tracking
-        self.journals = {
-            date: _augment_outline_with_ids(outline)
-            for date, outline in journals.items()
-        }
+        # Store journals directly (no deep copy or re-augmentation needed)
+        # Journals are already augmented with hybrid IDs in CLI's load_journal_entries()
+        self.journals = journals
 
         # Store services
         self.config = config

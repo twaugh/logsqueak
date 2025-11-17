@@ -9,6 +9,7 @@ from logsqueak.utils.logging import configure_logging, get_logger
 from logsqueak.models.config import Config
 from logseq_outline.parser import LogseqOutline
 from logseq_outline.graph import GraphPaths
+from logsqueak.services.llm_wrappers import _augment_outline_with_ids
 
 
 logger = get_logger(__name__)
@@ -110,8 +111,12 @@ def load_journal_entries(graph_path: Path, dates: list[date]) -> dict[str, Logse
         journal_text = journal_path.read_text(encoding="utf-8")
         outline = LogseqOutline.parse(journal_text)
 
+        # Augment outline with hybrid IDs (content hashes for blocks without explicit id:: properties)
+        # This ensures all blocks have stable IDs for LLM classification and tracking
+        augmented_outline = _augment_outline_with_ids(outline)
+
         # Store using ISO format (YYYY-MM-DD) for consistency with user input
-        journals[journal_date.strftime("%Y-%m-%d")] = outline
+        journals[journal_date.strftime("%Y-%m-%d")] = augmented_outline
 
     logger.info("journals_loaded", count=len(journals))
     return journals
