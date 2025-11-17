@@ -330,26 +330,27 @@ class LLMClient:
                                         accumulated_content += content_fragment
 
                                         # Try to parse complete JSON objects from accumulated content
-                                        # Split by newlines to find complete JSON lines
+                                        # Split by newlines to find potential complete JSON lines
                                         lines = accumulated_content.split('\n')
 
                                         # Process all complete lines (all but the last, which may be incomplete)
-                                        for complete_line in lines[:-1]:
+                                        # Keep track of which lines were successfully parsed
+                                        successfully_parsed_lines = []
+
+                                        for i, complete_line in enumerate(lines[:-1]):
                                             if complete_line.strip():
                                                 try:
-                                                    # Log the raw complete line before parsing
-                                                    logger.debug(
+                                                    # Try to parse as single-line NDJSON
+                                                    custom_data = json.loads(complete_line)
+                                                    chunk = chunk_model(**custom_data)
+                                                    chunk_count += 1
+
+                                                    logger.info(
                                                         "llm_response_complete_line",
                                                         request_id=request_id,
                                                         raw_line=complete_line,  # Raw NDJSON line
                                                     )
 
-                                                    # Parse the complete JSON line as our custom format
-                                                    custom_data = json.loads(complete_line)
-                                                    chunk = chunk_model(**custom_data)
-                                                    chunk_count += 1
-
-                                                    # Log the successfully parsed chunk
                                                     logger.debug(
                                                         "llm_response_chunk",
                                                         request_id=request_id,
@@ -359,6 +360,7 @@ class LLMClient:
                                                     )
 
                                                     yield chunk
+                                                    successfully_parsed_lines.append(i)
                                                 except (json.JSONDecodeError, Exception) as e:
                                                     logger.debug(
                                                         "llm_incomplete_json_line",
@@ -366,9 +368,18 @@ class LLMClient:
                                                         line=complete_line,  # Full line (no truncation)
                                                         error=str(e),
                                                     )
+                                                    # Don't remove failed lines - they might be part of multi-line JSON
 
-                                        # Keep the last incomplete line for next iteration
-                                        accumulated_content = lines[-1]
+                                        # Remove successfully parsed lines from accumulated content
+                                        if successfully_parsed_lines:
+                                            # Rebuild accumulated_content without successfully parsed lines
+                                            remaining_lines = [line for i, line in enumerate(lines[:-1]) if i not in successfully_parsed_lines]
+                                            remaining_lines.append(lines[-1])  # Always keep the last incomplete line
+                                            accumulated_content = '\n'.join(remaining_lines)
+                                        else:
+                                            # No lines parsed successfully - keep accumulating (might be multi-line JSON)
+                                            # Only reset if we have too much accumulated (prevent unbounded growth)
+                                            pass  # Keep accumulated_content as-is
 
                                 else:
                                     # Direct NDJSON format - parse immediately
@@ -415,14 +426,17 @@ class LLMClient:
 
                         # After stream ends, try to parse any remaining accumulated content
                         if needs_content_extraction and accumulated_content.strip():
-                            logger.debug(
-                                "llm_processing_final_accumulated_content",
+                            logger.info(
+                                "llm_raw_response_received",
                                 request_id=request_id,
                                 content_length=len(accumulated_content),
+                                raw_content=accumulated_content,  # Log complete LLM response
                             )
 
                             # Split and process any remaining complete lines
                             lines = accumulated_content.split('\n')
+                            ndjson_chunks_parsed = 0
+
                             for complete_line in lines:
                                 if complete_line.strip():
                                     try:
@@ -436,6 +450,7 @@ class LLMClient:
                                         custom_data = json.loads(complete_line)
                                         chunk = chunk_model(**custom_data)
                                         chunk_count += 1
+                                        ndjson_chunks_parsed += 1
 
                                         logger.debug(
                                             "llm_response_chunk_final",
@@ -452,6 +467,115 @@ class LLMClient:
                                             line=complete_line,  # Full line (no truncation)
                                             error=str(e),
                                         )
+
+                            # Fallback: If no NDJSON lines parsed, try parsing entire content as JSON
+                            if ndjson_chunks_parsed == 0 and accumulated_content.strip():
+                                logger.info(
+                                    "llm_attempting_json_fallback",
+                                    request_id=request_id,
+                                )
+
+                                # Try 1: Parse as JSON array or single object
+                                try:
+                                    parsed_data = json.loads(accumulated_content.strip())
+
+                                    # Check if it's a list/array or single object
+                                    if isinstance(parsed_data, list):
+                                        logger.info(
+                                            "llm_json_array_fallback_success",
+                                            request_id=request_id,
+                                            array_length=len(parsed_data),
+                                        )
+
+                                        for item in parsed_data:
+                                            chunk = chunk_model(**item)
+                                            chunk_count += 1
+
+                                            logger.debug(
+                                                "llm_response_chunk_from_array",
+                                                request_id=request_id,
+                                                chunk_num=chunk_count,
+                                                chunk_data=chunk.model_dump(),
+                                            )
+
+                                            yield chunk
+                                    elif isinstance(parsed_data, dict):
+                                        # Single JSON object (multi-line formatted)
+                                        logger.info(
+                                            "llm_json_object_fallback_success",
+                                            request_id=request_id,
+                                        )
+
+                                        chunk = chunk_model(**parsed_data)
+                                        chunk_count += 1
+
+                                        logger.debug(
+                                            "llm_response_chunk_from_object",
+                                            request_id=request_id,
+                                            chunk_num=chunk_count,
+                                            chunk_data=chunk.model_dump(),
+                                        )
+
+                                        yield chunk
+                                    else:
+                                        logger.warning(
+                                            "llm_json_fallback_unexpected_type",
+                                            request_id=request_id,
+                                            data_type=type(parsed_data).__name__,
+                                        )
+                                except json.JSONDecodeError as e:
+                                    # Try 2: Multiple JSON objects separated by blank lines
+                                    # Split on double newlines to find object boundaries
+                                    logger.info(
+                                        "llm_attempting_multiobject_fallback",
+                                        request_id=request_id,
+                                    )
+
+                                    object_blocks = [block.strip() for block in accumulated_content.split('\n\n') if block.strip()]
+                                    objects_parsed = 0
+
+                                    for block in object_blocks:
+                                        try:
+                                            parsed_obj = json.loads(block)
+                                            if isinstance(parsed_obj, dict):
+                                                chunk = chunk_model(**parsed_obj)
+                                                chunk_count += 1
+                                                objects_parsed += 1
+
+                                                logger.debug(
+                                                    "llm_response_chunk_from_multiobject",
+                                                    request_id=request_id,
+                                                    chunk_num=chunk_count,
+                                                    chunk_data=chunk.model_dump(),
+                                                )
+
+                                                yield chunk
+                                        except (json.JSONDecodeError, Exception) as block_error:
+                                            logger.debug(
+                                                "llm_multiobject_block_parse_failed",
+                                                request_id=request_id,
+                                                block=block[:100],  # Log first 100 chars
+                                                error=str(block_error),
+                                            )
+
+                                    if objects_parsed > 0:
+                                        logger.info(
+                                            "llm_multiobject_fallback_success",
+                                            request_id=request_id,
+                                            objects_parsed=objects_parsed,
+                                        )
+                                    else:
+                                        logger.warning(
+                                            "llm_multiobject_fallback_failed",
+                                            request_id=request_id,
+                                            original_error=str(e),
+                                        )
+                                except Exception as e:
+                                    logger.warning(
+                                        "llm_json_fallback_failed",
+                                        request_id=request_id,
+                                        error=str(e),
+                                    )
 
                     logger.info(
                         "llm_request_completed",

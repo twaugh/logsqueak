@@ -429,3 +429,212 @@ class TestLLMClient:
             assert chunks[0].confidence == 0.92
             assert chunks[1].block_id == "def456"
             assert chunks[1].confidence == 0.25
+
+    @pytest.mark.asyncio
+    async def test_stream_ndjson_json_array_fallback(self, llm_client):
+        """Test that JSON array fallback works when NDJSON parsing fails."""
+        # Simulate LLM returning JSON array instead of NDJSON
+        mock_lines = [
+            'data: {"choices":[{"delta":{"content":"[{\\"block_id\\": \\"abc123\\", \\"confidence\\": 0.92}, {\\"block_id\\": \\"def456\\", \\"confidence\\": 0.25}]"}}]}',
+            'data: [DONE]',
+        ]
+
+        mock_response = create_mock_response(
+            mock_lines,
+            headers={"content-type": "text/event-stream"}
+        )
+
+        mock_client = AsyncMock()
+        mock_client.stream = Mock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('httpx.AsyncClient', return_value=mock_client):
+            chunks = []
+            async for chunk in llm_client.stream_ndjson(
+                prompt="Test JSON array fallback",
+                system_prompt="Test system",
+                chunk_model=KnowledgeClassificationChunk
+            ):
+                chunks.append(chunk)
+
+            # Should fallback to parsing as JSON array and yield 2 chunks
+            assert len(chunks) == 2
+            assert chunks[0].block_id == "abc123"
+            assert chunks[0].confidence == 0.92
+            assert chunks[1].block_id == "def456"
+            assert chunks[1].confidence == 0.25
+
+    @pytest.mark.asyncio
+    async def test_stream_ndjson_no_fallback_if_ndjson_succeeds(self, llm_client):
+        """Test that fallback is NOT triggered when some NDJSON lines parse successfully."""
+        # Mix of valid NDJSON and invalid lines
+        mock_lines = [
+            'data: {"choices":[{"delta":{"content":"{\\"block_id\\": \\"abc123\\", \\"confidence\\": 0.92}\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"invalid line\\n"}}]}',
+            'data: [DONE]',
+        ]
+
+        mock_response = create_mock_response(
+            mock_lines,
+            headers={"content-type": "text/event-stream"}
+        )
+
+        mock_client = AsyncMock()
+        mock_client.stream = Mock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('httpx.AsyncClient', return_value=mock_client):
+            chunks = []
+            async for chunk in llm_client.stream_ndjson(
+                prompt="Test no fallback",
+                system_prompt="Test system",
+                chunk_model=KnowledgeClassificationChunk
+            ):
+                chunks.append(chunk)
+
+            # Should parse 1 valid NDJSON line, skip invalid, NOT trigger fallback
+            assert len(chunks) == 1
+            assert chunks[0].block_id == "abc123"
+
+    @pytest.mark.asyncio
+    async def test_stream_ndjson_fallback_fails_on_invalid_json(self, llm_client):
+        """Test that fallback gracefully fails on invalid JSON."""
+        # Invalid JSON that can't be parsed as NDJSON or array
+        mock_lines = [
+            'data: {"choices":[{"delta":{"content":"not valid json at all"}}]}',
+            'data: [DONE]',
+        ]
+
+        mock_response = create_mock_response(
+            mock_lines,
+            headers={"content-type": "text/event-stream"}
+        )
+
+        mock_client = AsyncMock()
+        mock_client.stream = Mock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('httpx.AsyncClient', return_value=mock_client):
+            chunks = []
+            async for chunk in llm_client.stream_ndjson(
+                prompt="Test invalid JSON",
+                system_prompt="Test system",
+                chunk_model=KnowledgeClassificationChunk
+            ):
+                chunks.append(chunk)
+
+            # Should return 0 chunks and log warnings
+            assert len(chunks) == 0
+
+    @pytest.mark.asyncio
+    async def test_stream_ndjson_fallback_handles_wrapped_object(self, llm_client):
+        """Test that fallback handles JSON object wrapped with extra text."""
+        # JSON object with conversational wrapper (not valid NDJSON or array)
+        mock_lines = [
+            'data: {"choices":[{"delta":{"content":"Here is the result: {\\"block_id\\": \\"abc123\\", \\"confidence\\": 0.92}"}}]}',
+            'data: [DONE]',
+        ]
+
+        mock_response = create_mock_response(
+            mock_lines,
+            headers={"content-type": "text/event-stream"}
+        )
+
+        mock_client = AsyncMock()
+        mock_client.stream = Mock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('httpx.AsyncClient', return_value=mock_client):
+            chunks = []
+            async for chunk in llm_client.stream_ndjson(
+                prompt="Test wrapped JSON",
+                system_prompt="Test system",
+                chunk_model=KnowledgeClassificationChunk
+            ):
+                chunks.append(chunk)
+
+            # Should return 0 chunks (wrapped text can't be parsed as NDJSON,
+            # and fallback won't work because it's not valid JSON or array)
+            assert len(chunks) == 0
+
+    @pytest.mark.asyncio
+    async def test_stream_ndjson_handles_multiline_json(self, llm_client):
+        """Test that multi-line formatted JSON objects are reassembled and parsed."""
+        # LLM returns pretty-printed JSON (multi-line) instead of single-line NDJSON
+        mock_lines = [
+            'data: {"choices":[{"delta":{"content":" {\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"  \\"block_id\\": \\"abc123\\",\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"  \\"confidence\\": 0.92\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"}"}}]}',
+            'data: [DONE]',
+        ]
+
+        mock_response = create_mock_response(
+            mock_lines,
+            headers={"content-type": "text/event-stream"}
+        )
+
+        mock_client = AsyncMock()
+        mock_client.stream = Mock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('httpx.AsyncClient', return_value=mock_client):
+            chunks = []
+            async for chunk in llm_client.stream_ndjson(
+                prompt="Test multiline JSON",
+                system_prompt="Test system",
+                chunk_model=KnowledgeClassificationChunk
+            ):
+                chunks.append(chunk)
+
+            # Should reassemble multi-line JSON and parse 1 chunk
+            assert len(chunks) == 1
+            assert chunks[0].block_id == "abc123"
+            assert chunks[0].confidence == 0.92
+
+    @pytest.mark.asyncio
+    async def test_stream_ndjson_handles_multiple_multiline_objects(self, llm_client):
+        """Test that multiple multi-line JSON objects separated by blank lines are parsed."""
+        # LLM returns multiple pretty-printed JSON objects separated by blank lines
+        mock_lines = [
+            'data: {"choices":[{"delta":{"content":" {\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"\\"block_id\\": \\"abc123\\",\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"\\"confidence\\": 0.92\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"}\\n\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"{\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"\\"block_id\\": \\"def456\\",\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"\\"confidence\\": 0.85\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"}"}}]}',
+            'data: [DONE]',
+        ]
+
+        mock_response = create_mock_response(
+            mock_lines,
+            headers={"content-type": "text/event-stream"}
+        )
+
+        mock_client = AsyncMock()
+        mock_client.stream = Mock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('httpx.AsyncClient', return_value=mock_client):
+            chunks = []
+            async for chunk in llm_client.stream_ndjson(
+                prompt="Test multiple multiline",
+                system_prompt="Test system",
+                chunk_model=KnowledgeClassificationChunk
+            ):
+                chunks.append(chunk)
+
+            # Should split on blank lines and parse 2 chunks
+            assert len(chunks) == 2
+            assert chunks[0].block_id == "abc123"
+            assert chunks[0].confidence == 0.92
+            assert chunks[1].block_id == "def456"
+            assert chunks[1].confidence == 0.85
