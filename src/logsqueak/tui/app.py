@@ -445,14 +445,21 @@ class LogsqueakApp(App):
             # generate_chunks() uses cached contexts from _augment_outline_with_ids()
             # T141: Now returns parents list, eliminating need for second tree traversal
             for date, outline in self.journals.items():
-                # Generate chunks WITHOUT frontmatter (we don't want journal properties in context)
-                # This will use block._cached_context_no_frontmatter if available
+                # Generate chunks WITHOUT frontmatter (we don't want journal properties in LLM prompts)
+                # Temporarily clear frontmatter to use block._cached_context_no_frontmatter
+                original_frontmatter = outline.frontmatter
+                outline.frontmatter = []
+
                 for found_block, context, hybrid_id, parents in generate_chunks(outline):
                     if hybrid_id == block_state.block_id:
                         block = found_block
                         hierarchical_context = context  # Use cached context directly
                         # Parents list is now available from generate_chunks (no second traversal needed)
                         break
+
+                # Restore frontmatter
+                outline.frontmatter = original_frontmatter
+
                 if block:
                     break
 
