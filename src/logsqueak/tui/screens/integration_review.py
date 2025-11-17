@@ -140,7 +140,7 @@ class Phase3Screen(Screen):
         from logseq_outline.context import generate_chunks
         self.block_to_date = {}
         for date, outline in journals.items():
-            for block, _, hybrid_id in generate_chunks(outline):
+            for block, _, hybrid_id, _ in generate_chunks(outline):
                 self.block_to_date[hybrid_id] = date
 
         # Map block_id to EditedContent for quick lookup

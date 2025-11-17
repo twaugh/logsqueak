@@ -548,7 +548,7 @@ async def test_atomic_write_skip_exists_adds_id_if_missing(
     page_outline = LogseqOutline.parse(page_content)
     # Use generate_chunks with page_name to match RAG indexing behavior
     chunks = generate_chunks(page_outline, page_name="Python/Concurrency")
-    _, _, content_hash = chunks[0]  # Get hybrid_id from first chunk
+    _, _, content_hash, _ = chunks[0]  # Get hybrid_id from first chunk
 
     # LLM identified duplicate using content hash (implicit ID)
     decision = IntegrationDecision(

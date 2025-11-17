@@ -734,7 +734,7 @@ User should manually test:
   - **Impact**: Reduces 3-5 full tree walks to 1 per block, saves ~2-5s for 100 blocks
   - **Dependencies**: None (internal optimization)
 
-- [ ] T141 [P] **Extend generate_chunks() to return parent list** - Eliminate double tree traversal
+- [X] T141 [P] **Extend generate_chunks() to return parent list** - Eliminate double tree traversal
   - **Location**: `src/logseq-outline-parser/src/logseq_outline/context.py` and `src/logsqueak/tui/app.py`
   - **Problem**: Phase 1→2 transition does TWO complete tree traversals:
     - First: `generate_chunks()` finds block and builds parent chain internally

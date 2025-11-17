@@ -315,7 +315,7 @@ class PageIndexer:
         # Generate block-level chunks with full context and hybrid IDs
         chunks = generate_chunks(outline, page_name)
 
-        for block, full_context, hybrid_id in chunks:
+        for block, full_context, hybrid_id, parents in chunks:
             # Store chunk (overwrites if duplicate ID)
             full_id = f"{page_name}::{hybrid_id}"
             chunks_by_id[full_id] = {

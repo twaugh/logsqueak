@@ -104,11 +104,13 @@ class TestGenerateChunks:
         chunks = generate_chunks(outline)
 
         assert len(chunks) == 1
-        block, context, hybrid_id = chunks[0]
+        block, context, hybrid_id, parents = chunks[0]
         assert block.content == ["Root block"]
         assert context == "- Root block"
         # Should be hash since no id:: property
         assert len(hybrid_id) == 32  # MD5 hex length
+        # Root block should have no parents
+        assert parents == []
 
     def test_multiple_root_blocks(self):
         """Test chunking multiple root blocks."""
@@ -159,8 +161,9 @@ class TestGenerateChunks:
         chunks = generate_chunks(outline)
 
         assert len(chunks) == 1
-        block, context, hybrid_id = chunks[0]
+        block, context, hybrid_id, parents = chunks[0]
         assert hybrid_id == "explicit-id-123"  # Uses id:: property
+        assert parents == []  # Root block has no parents
 
     def test_hybrid_id_uses_hash_without_id_property(self):
         """Test that blocks without id:: use content hash."""
@@ -169,9 +172,10 @@ class TestGenerateChunks:
 
         chunks = generate_chunks(outline)
 
-        block, context, hybrid_id = chunks[0]
+        block, context, hybrid_id, parents = chunks[0]
         expected_hash = generate_content_hash("- Block without ID")
         assert hybrid_id == expected_hash
+        assert parents == []  # Root block has no parents
 
     def test_sibling_blocks_different_hashes(self):
         """Test that sibling blocks with different content get different hashes."""
@@ -327,5 +331,7 @@ class TestGenerateChunks:
 
         # Should produce identical hashes despite different internal representation
         assert len(chunks_default) == len(chunks_strict)
-        for (block_default, context_default, hash_default), (block_strict, context_strict, hash_strict) in zip(chunks_default, chunks_strict):
+        for (block_default, context_default, hash_default, parents_default), (block_strict, context_strict, hash_strict, parents_strict) in zip(chunks_default, chunks_strict):
             assert hash_default == hash_strict, f"Hashes should match: {hash_default} vs {hash_strict}"
+            # Parents lists should have same length
+            assert len(parents_default) == len(parents_strict)

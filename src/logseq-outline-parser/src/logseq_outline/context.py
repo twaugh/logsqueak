@@ -151,12 +151,13 @@ def generate_content_hash(full_context: str, page_name: str | None = None) -> st
     return hashlib.md5(content_to_hash.encode()).hexdigest()
 
 
-def generate_chunks(outline: "LogseqOutline", page_name: str | None = None) -> list[tuple["LogseqBlock", str, str]]:
+def generate_chunks(outline: "LogseqOutline", page_name: str | None = None) -> list[tuple["LogseqBlock", str, str, list["LogseqBlock"]]]:
     """Generate chunks with full context and hybrid IDs for all blocks.
 
     This recursively traverses the outline and generates:
     - Full context string (for embedding and uniqueness, includes frontmatter)
     - Hybrid ID (id:: property if present, otherwise content hash)
+    - Parent list (from root to immediate parent)
 
     Performance optimization: Uses cached contexts from _augment_outline_with_ids() if available,
     avoiding redundant tree traversals and context generation.
@@ -166,12 +167,12 @@ def generate_chunks(outline: "LogseqOutline", page_name: str | None = None) -> l
         page_name: Optional page name to include in hash (ensures global uniqueness)
 
     Returns:
-        List of (block, full_context, hybrid_id) tuples
+        List of (block, full_context, hybrid_id, parents) tuples
 
     Examples:
         >>> chunks = generate_chunks(outline)
-        >>> for block, context, hybrid_id in chunks:
-        ...     print(f"{hybrid_id}: {context[:50]}")
+        >>> for block, context, hybrid_id, parents in chunks:
+        ...     print(f"{hybrid_id}: {context[:50]}, parents={len(parents)}")
         >>> chunks_with_page = generate_chunks(outline, "My Page")
         >>> # Hashes will be different due to page name
     """
@@ -201,8 +202,8 @@ def generate_chunks(outline: "LogseqOutline", page_name: str | None = None) -> l
             # Generate hash of full context (with page name for global uniqueness)
             hybrid_id = generate_content_hash(full_context, page_name)
 
-        # Add chunk
-        chunks.append((block, full_context, hybrid_id))
+        # Add chunk with parents list
+        chunks.append((block, full_context, hybrid_id, parents))
 
         # Traverse children
         new_parents = parents + [block]

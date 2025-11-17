@@ -621,5 +621,5 @@ class TestStrictIndentPreservation:
         chunks = generate_chunks(outline)
 
         # Verify no outdent markers in any chunk contexts
-        for block, context, hybrid_id in chunks:
+        for block, context, hybrid_id, parents in chunks:
             assert "\x00" not in context, f"Outdent marker found in context: {context}"

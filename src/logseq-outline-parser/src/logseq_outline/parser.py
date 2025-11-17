@@ -336,7 +336,7 @@ class LogseqOutline:
         chunks = generate_chunks(self, page_name=page_name)
 
         # Search for matching ID
-        for block, _context, hybrid_id in chunks:
+        for block, _context, hybrid_id, _parents in chunks:
             if hybrid_id == target_id:
                 return block
 
