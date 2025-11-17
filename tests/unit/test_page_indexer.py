@@ -528,3 +528,42 @@ async def test_batched_encoding_progress(tmp_path, shared_sentence_transformer):
             assert curr_total == next_total, "Total should remain constant during encoding"
 
     await indexer.close()
+
+
+@pytest.mark.asyncio
+async def test_deleted_pages_removed_from_index(temp_graph, temp_db, shared_sentence_transformer):
+    """Test that chunks for deleted pages are removed from the index."""
+    graph_paths = GraphPaths(temp_graph)
+    indexer = PageIndexer(graph_paths, temp_db, encoder=shared_sentence_transformer)
+
+    # First build - index all pages
+    await indexer.build_index()
+    initial_count = indexer.collection.count()
+    assert initial_count > 0
+
+    # Verify "Test Page 1" is in the index
+    results = indexer.collection.get(where={"page_name": "Test Page 1"})
+    assert len(results["ids"]) > 0, "Test Page 1 should be indexed"
+    page1_chunk_count = len(results["ids"])
+
+    # Delete "Test Page 1" from filesystem
+    page1_file = temp_graph / "pages" / "Test Page 1.md"
+    page1_file.unlink()
+
+    # Rebuild index
+    await indexer.build_index()
+    final_count = indexer.collection.count()
+
+    # Verify chunks were removed
+    assert final_count == initial_count - page1_chunk_count, \
+        f"Expected {page1_chunk_count} chunks to be removed"
+
+    # Verify "Test Page 1" is no longer in the index
+    results = indexer.collection.get(where={"page_name": "Test Page 1"})
+    assert len(results["ids"]) == 0, "Test Page 1 should be removed from index"
+
+    # Verify "Test Page 2" is still there
+    results = indexer.collection.get(where={"page_name": "Test Page 2"})
+    assert len(results["ids"]) > 0, "Test Page 2 should still be indexed"
+
+    await indexer.close()

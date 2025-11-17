@@ -183,7 +183,19 @@ class PageIndexer:
             if progress_callback:
                 progress_callback(idx, len(page_files))
 
-        # Phase 2: Delete old chunks for modified pages
+        # Phase 2: Delete chunks for pages that no longer exist in the filesystem
+        # Find pages in index that are not in current file list
+        deleted_pages = set(indexed_pages.keys()) - set(file_mtimes.keys())
+        if deleted_pages:
+            logger.info("deleting_chunks_for_removed_pages", count=len(deleted_pages))
+            for page_name in deleted_pages:
+                try:
+                    self.collection.delete(where={"page_name": page_name})
+                    logger.debug("deleted_chunks_for_removed_page", page_name=page_name)
+                except Exception as e:
+                    logger.warning("failed_to_delete_chunks_for_removed_page", page_name=page_name, error=str(e))
+
+        # Phase 3: Delete old chunks for modified pages
         # When a page is re-indexed, its content may have changed, leading to new content hashes
         # (new block IDs). We must delete the old chunks to prevent stale data in the index.
         if pages_to_index:
@@ -199,7 +211,7 @@ class PageIndexer:
                     except Exception as e:
                         logger.warning("failed_to_delete_old_chunks", page_name=page_name, error=str(e))
 
-        # Phase 3: Generate chunks for all pages to index
+        # Phase 4: Generate chunks for all pages to index
         if pages_to_index:
             logger.info("generating_chunks", pages_to_index=len(pages_to_index))
             for page_name, outline, mtime in pages_to_index:
@@ -207,7 +219,7 @@ class PageIndexer:
                 all_chunks.update(page_chunks)  # Merge with deduplication
                 logger.debug("page_chunks_prepared", page_name=page_name, chunk_count=len(page_chunks))
 
-            # Phase 4: Batch encode all chunks
+            # Phase 5: Batch encode all chunks
             logger.info("batch_encoding", total_chunks=len(all_chunks))
             chunk_ids = list(all_chunks.keys())
             documents = [chunk["document"] for chunk in all_chunks.values()]
@@ -246,10 +258,10 @@ class PageIndexer:
             # Concatenate all batch embeddings
             embeddings = np.vstack(embeddings_list) if embeddings_list else np.array([])
 
-            # Phase 5: Prepare data for bulk upsert
+            # Phase 6: Prepare data for bulk upsert
             metadatas = [chunk["metadata"] for chunk in all_chunks.values()]
 
-            # Phase 6: Bulk upsert to ChromaDB
+            # Phase 7: Bulk upsert to ChromaDB
             logger.info("bulk_upserting", total_chunks=len(chunk_ids))
             self.collection.upsert(
                 documents=documents,
@@ -258,7 +270,7 @@ class PageIndexer:
                 metadatas=metadatas
             )
 
-            # Phase 7: Compact database to reclaim fragmented space
+            # Phase 8: Compact database to reclaim fragmented space
             # Bulk upserts can leave ~70% wasted space due to SQLite fragmentation
             self._vacuum_database()
 
