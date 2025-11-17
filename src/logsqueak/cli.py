@@ -305,30 +305,32 @@ def search(query: str, reindex: bool):
 
     # Always update index (incremental indexing is fast - only modified pages)
     has_data = rag_search.has_indexed_data()
-    if reindex:
-        click.echo("Rebuilding search index...")
-    elif not has_data:
-        click.echo("Building search index...")
-    else:
-        click.echo("Updating search index...")
 
     # Build/update index with progress indicator
     async def build_index_with_progress():
         total_pages = 0
         status_context = None
         page_count = None
+        showed_initial_message = False
 
         def progress_callback(current, total):
-            nonlocal total_pages, status_context, page_count
+            nonlocal total_pages, status_context, page_count, showed_initial_message
 
             # Negative current signals model loading phase
             if current < 0:
+                # Show initial message only when actual work starts
+                if not showed_initial_message:
+                    if reindex:
+                        click.echo("Rebuilding search index...")
+                    elif not has_data:
+                        click.echo("Building search index...")
+                    else:
+                        click.echo("Updating search index...")
+                    showed_initial_message = True
+
                 # Capture page count for completion message and phase detection
                 total_pages = total
                 page_count = total
-                # Clear the progress line completely
-                sys.stdout.write(f"\r{' ' * 80}\r")
-                sys.stdout.flush()
                 # Start spinner for model loading
                 if status_context:
                     status_context.__exit__(None, None, None)
@@ -343,8 +345,6 @@ def search(query: str, reindex: bool):
 
                 # Start encoding spinner if not already running
                 if not status_context:
-                    sys.stdout.write(f"\r{' ' * 80}\r")
-                    sys.stdout.flush()
                     status_context = console.status(f"[bold green]Building page index: {percent}%")
                     status_context.__enter__()
                 else:
@@ -357,17 +357,20 @@ def search(query: str, reindex: bool):
                     status_context = None
 
         try:
-            await page_indexer.build_index(progress_callback=progress_callback)
+            pages_indexed = await page_indexer.build_index(progress_callback=progress_callback)
             # Stop spinner if it was started
             if status_context:
                 status_context.__exit__(None, None, None)
-            click.echo()  # Newline after progress
-            if reindex:
-                click.echo("Index rebuilt successfully")
-            elif not has_data:
-                click.echo("Index built successfully")
-            else:
-                click.echo("Index updated successfully")
+
+            # Only show completion message if we did work
+            if pages_indexed > 0:
+                click.echo()  # Newline after progress
+                if reindex:
+                    click.echo("Index rebuilt successfully")
+                elif not has_data:
+                    click.echo("Index built successfully")
+                else:
+                    click.echo("Index updated successfully")
         except Exception as e:
             # Stop spinner on error
             if status_context:

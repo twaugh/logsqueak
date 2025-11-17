@@ -187,7 +187,7 @@ class PageIndexer:
     async def build_index(
         self,
         progress_callback: Optional[Callable[[int, int], None]] = None
-    ) -> None:
+    ) -> int:
         """
         Build or update vector index for all pages in graph.
 
@@ -199,6 +199,9 @@ class PageIndexer:
                 Phase 1 (parsing): Called with (current_page, total_pages)
                 Model loading: Called with (-1, total_pages) to signal model is loading
                 Phase 4 (encoding): Called with (chunks_encoded, total_chunks) after each batch
+
+        Returns:
+            Number of pages that were re-indexed (0 if all pages up-to-date)
 
         Raises:
             ValueError: If graph pages directory doesn't exist or contains no pages
@@ -359,8 +362,10 @@ class PageIndexer:
             self._vacuum_database()
 
             logger.info("page_indexing_completed", total_pages=len(page_files), chunks_indexed=len(all_chunks))
+            return len(pages_to_index)
         else:
             logger.info("page_indexing_completed", total_pages=len(page_files), chunks_indexed=0, reason="all_up_to_date")
+            return 0
 
     def _get_all_indexed_pages(self) -> dict[str, float]:
         """
