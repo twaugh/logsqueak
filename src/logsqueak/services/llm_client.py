@@ -338,7 +338,7 @@ class LLMClient:
                                             if complete_line.strip():
                                                 try:
                                                     # Log the raw complete line before parsing
-                                                    logger.debug(
+                                                    logger.info(
                                                         "llm_response_complete_line",
                                                         request_id=request_id,
                                                         raw_line=complete_line,  # Raw NDJSON line
