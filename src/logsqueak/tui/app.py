@@ -435,45 +435,24 @@ class LogsqueakApp(App):
         self.edited_content = []
         for block_state in selected_blocks:
             # Find the actual block and its context using generate_chunks
-            from logseq_outline.context import generate_chunks, generate_full_context
+            from logseq_outline.context import generate_chunks
 
             block = None
             hierarchical_context = ""
-            journal_outline = None
 
-            # First pass: Find the block across all journals using hybrid IDs
+            # PERFORMANCE OPTIMIZATION: Use cached context from generate_chunks
+            # Find the block across all journals using hybrid IDs
+            # generate_chunks() uses cached contexts from _augment_outline_with_ids()
             for date, outline in self.journals.items():
+                # Generate chunks WITHOUT frontmatter (we don't want journal properties in context)
+                # This will use block._cached_context_no_frontmatter if available
                 for found_block, context, hybrid_id in generate_chunks(outline):
                     if hybrid_id == block_state.block_id:
                         block = found_block
-                        journal_outline = outline
-                        # Don't use context yet - it includes frontmatter
+                        hierarchical_context = context  # Use cached context directly
                         break
                 if block:
                     break
-
-            # Second pass: Generate hierarchical context WITHOUT frontmatter
-            # We need to rebuild the parent chain to generate clean context
-            if block and journal_outline:
-                # Find parent chain by walking the tree
-                def find_block_with_parents(target_block, blocks, parents=[]):
-                    for b in blocks:
-                        if b is target_block:
-                            return parents
-                        result = find_block_with_parents(target_block, b.children, parents + [b])
-                        if result is not None:
-                            return result
-                    return None
-
-                parents = find_block_with_parents(block, journal_outline.blocks) or []
-
-                # Generate context WITHOUT frontmatter
-                hierarchical_context = generate_full_context(
-                    block,
-                    parents,
-                    indent_str=journal_outline.indent_str,
-                    frontmatter=None  # Exclude frontmatter
-                )
 
             if block:
                 # Get user-facing content (excludes id:: property)

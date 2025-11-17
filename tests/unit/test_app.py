@@ -13,6 +13,7 @@ from logsqueak.services.llm_client import LLMClient
 from logsqueak.services.page_indexer import PageIndexer
 from logsqueak.services.rag_search import RAGSearch
 from logsqueak.services.file_monitor import FileMonitor
+from logsqueak.services.llm_wrappers import _augment_outline_with_ids
 from logseq_outline.parser import LogseqOutline, LogseqBlock
 
 
@@ -60,7 +61,12 @@ def mock_services(mock_config):
 
 @pytest.fixture
 def sample_journal_outline():
-    """Create sample journal outline."""
+    """Create sample journal outline with augmented hybrid IDs.
+
+    Note: This fixture augments the outline with hybrid IDs to match the
+    behavior of load_journal_entries() in the CLI, which augments journals
+    before passing them to the app.
+    """
     source_text = "- Root block 1\n  - Child block\n- Root block 2"
     outline = LogseqOutline(
         blocks=[
@@ -84,7 +90,8 @@ def sample_journal_outline():
         source_text=source_text,
         frontmatter=[],
     )
-    return outline
+    # Augment with hybrid IDs (matches CLI behavior)
+    return _augment_outline_with_ids(outline)
 
 
 def test_app_instantiates_without_errors(mock_services, sample_journal_outline):

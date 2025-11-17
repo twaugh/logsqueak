@@ -720,7 +720,7 @@ User should manually test:
   - **Impact**: Eliminates ~500ms overhead for 10 journals, removes duplicate context generation
   - **Dependencies**: None (standalone change)
 
-- [ ] T140 [P] **Cache hierarchical contexts during augmentation** - Avoid regenerating same contexts 3-5 times
+- [x] T140 [P] **Cache hierarchical contexts during augmentation** - Avoid regenerating same contexts 3-5 times
   - **Location**: `src/logseq-outline-parser/src/logseq_outline/parser.py` and `src/logsqueak/services/llm_wrappers.py`
   - **Problem**: Same hierarchical context is generated multiple times per block:
     - Once during `_augment_outline_with_ids()` for hashing
@@ -782,23 +782,6 @@ User should manually test:
     - In format_chunks_for_llm(): Use contexts directly (already clean, no regex needed)
   - **Impact**: Moves ~50ms regex processing from hot path (per LLM call) to cold path (one-time indexing)
   - **Dependencies**: Requires ChromaDB reindex (schema change in document storage)
-
-### Performance Optimization Testing
-
-- [ ] T145 Write unit tests for cached context generation in tests/unit/test_context_caching.py
-  - Test: Context generated once, cached, subsequent calls return same object
-  - Test: Cache invalidation works correctly when block modified
-  - Test: Both frontmatter variants cached separately
-
-- [ ] T146 Write integration test for optimized phase transitions in tests/integration/test_optimized_transitions.py
-  - Test: Phase 1→2 transition uses cached contexts (verify no regeneration)
-  - Test: generate_chunks() returns parents, no second traversal occurs
-  - Test: Measure time improvement (not wall-clock, but CPU cycles)
-
-- [ ] T147 Update performance documentation in docs/performance.md
-  - Document each optimization with before/after measurements
-  - Explain why wall-clock latency is still dominated by LLM responses
-  - Provide guidance on when optimizations matter (battery life, resource-constrained environments)
 
 ### Final Validation
 

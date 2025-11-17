@@ -31,11 +31,14 @@ def _augment_outline_with_ids(outline: LogseqOutline) -> LogseqOutline:
     For blocks without explicit id:: properties, adds a temporary ID based on
     content hash. This allows the LLM to reference specific blocks in its response.
 
+    Performance optimization: Caches hierarchical contexts during augmentation to avoid
+    regenerating them 3-5 times per block during the workflow.
+
     Args:
         outline: Original outline
 
     Returns:
-        Deep copy of outline with all blocks having id:: properties
+        Deep copy of outline with all blocks having id:: properties and cached contexts
     """
     # Deep copy to avoid modifying the original
     augmented = copy.deepcopy(outline)
@@ -45,7 +48,7 @@ def _augment_outline_with_ids(outline: LogseqOutline) -> LogseqOutline:
     indent_str = augmented.indent_str
 
     def augment_block(block: LogseqBlock, parents: list[LogseqBlock]) -> LogseqBlock:
-        """Recursively augment a block and its children with IDs."""
+        """Recursively augment a block and its children with IDs and cached contexts."""
         # If block already has an explicit ID, keep it
         if block.block_id is not None:
             block_id = block.block_id
@@ -67,6 +70,11 @@ def _augment_outline_with_ids(outline: LogseqOutline) -> LogseqOutline:
         # NOW set the id:: property (after children are processed)
         if block.get_property("id") is None:
             block.set_property("id", block_id)
+
+        # PERFORMANCE OPTIMIZATION: Cache hierarchical contexts to avoid regeneration
+        # Generate both versions (with and without frontmatter) once here
+        block._cached_context = generate_full_context(block, parents, indent_str, frontmatter)
+        block._cached_context_no_frontmatter = generate_full_context(block, parents, indent_str, None)
 
         return block
 

@@ -24,12 +24,17 @@ class LogseqBlock:
         indent_level: Indentation level (0 = root)
         block_id: Persistent block ID from id:: property (None if not present)
         children: Child blocks
+        _cached_context: Cached full context string (with frontmatter if applicable)
+        _cached_context_no_frontmatter: Cached full context string without frontmatter
     """
 
     content: list[str]
     indent_level: int
     block_id: Optional[str] = None  # Persistent ID from id:: property
     children: list["LogseqBlock"] = field(default_factory=list)
+    # Performance optimization: cache hierarchical context strings to avoid regeneration
+    _cached_context: Optional[str] = field(default=None, repr=False, compare=False)
+    _cached_context_no_frontmatter: Optional[str] = field(default=None, repr=False, compare=False)
 
     def __post_init__(self):
         """Initialize block_id from id:: property if not explicitly set."""

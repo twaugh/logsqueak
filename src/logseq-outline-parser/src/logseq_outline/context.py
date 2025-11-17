@@ -158,6 +158,9 @@ def generate_chunks(outline: "LogseqOutline", page_name: str | None = None) -> l
     - Full context string (for embedding and uniqueness, includes frontmatter)
     - Hybrid ID (id:: property if present, otherwise content hash)
 
+    Performance optimization: Uses cached contexts from _augment_outline_with_ids() if available,
+    avoiding redundant tree traversals and context generation.
+
     Args:
         outline: Parsed LogseqOutline
         page_name: Optional page name to include in hash (ensures global uniqueness)
@@ -178,8 +181,17 @@ def generate_chunks(outline: "LogseqOutline", page_name: str | None = None) -> l
 
     def traverse(block: "LogseqBlock", parents: list["LogseqBlock"]) -> None:
         """Recursively traverse blocks and generate chunks."""
-        # Generate full context for this block (with frontmatter, bullets and indentation)
-        full_context = generate_full_context(block, parents, indent_str, frontmatter)
+        # PERFORMANCE OPTIMIZATION: Use cached context if available
+        # Check if we want frontmatter and if appropriate cache exists
+        if frontmatter and block._cached_context is not None:
+            # Use cached context with frontmatter
+            full_context = block._cached_context
+        elif not frontmatter and block._cached_context_no_frontmatter is not None:
+            # Use cached context without frontmatter
+            full_context = block._cached_context_no_frontmatter
+        else:
+            # Cache miss - generate context normally
+            full_context = generate_full_context(block, parents, indent_str, frontmatter)
 
         # Determine hybrid ID (id:: property or content hash)
         if block.block_id:
