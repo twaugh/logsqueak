@@ -487,11 +487,44 @@ class LLMClient:
                     raise
 
             except httpx.HTTPStatusError as e:
-                # Don't retry on 4xx errors (bad request, auth, etc.)
-                logger.error(
-                    "llm_http_error",
-                    request_id=request_id,
-                    status_code=e.response.status_code,
-                    error=str(e)
-                )
-                raise
+                # Retry on 429 (rate limit) with exponential backoff
+                if e.response.status_code == 429:
+                    last_error = e
+                    attempt += 1
+
+                    # Check for Retry-After header (in seconds)
+                    retry_after = e.response.headers.get("Retry-After")
+                    if retry_after and retry_after.isdigit():
+                        wait_time = int(retry_after)
+                    else:
+                        # Exponential backoff: 2s, 4s, 8s, etc.
+                        wait_time = retry_delay * (2 ** (attempt - 1))
+
+                    logger.warning(
+                        "llm_rate_limited",
+                        request_id=request_id,
+                        attempt=attempt,
+                        max_retries=max_retries,
+                        retry_after=retry_after,
+                        wait_time=wait_time
+                    )
+
+                    if attempt <= max_retries:
+                        await asyncio.sleep(wait_time)
+                    else:
+                        logger.error(
+                            "llm_rate_limit_exceeded",
+                            request_id=request_id,
+                            attempts=attempt,
+                            error=str(e)
+                        )
+                        raise
+                else:
+                    # Don't retry on other 4xx errors (bad request, auth, etc.)
+                    logger.error(
+                        "llm_http_error",
+                        request_id=request_id,
+                        status_code=e.response.status_code,
+                        error=str(e)
+                    )
+                    raise
