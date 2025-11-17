@@ -69,24 +69,27 @@ class Phase2Screen(Screen):
         layout: vertical;
     }
 
-    #editor-panel {
-        height: 1fr;
-        min-height: 4;
-        border: solid $accent;
-        border-title-align: center;
-        layout: vertical;
-    }
-
     #original-context {
         height: 1fr;
+        border: solid $accent;
+        border-title-align: center;
     }
 
     #llm-reworded {
         height: 1fr;
+        border: solid $accent;
+        border-title-align: center;
+    }
+
+    #editor-panel {
+        height: 1fr;
+        min-height: 4;
+        layout: vertical;
     }
 
     ContentEditor {
         height: 1fr;
+        border-title-align: center;
     }
     """
 
@@ -209,10 +212,10 @@ class Phase2Screen(Screen):
 
     async def on_mount(self) -> None:
         """Handle screen mount event."""
-        # Set border titles for panels
-        self.query_one("#original-panel").border_title = "Original Context"
-        self.query_one("#llm-panel").border_title = "LLM Reworded"
-        self.query_one("#editor-panel").border_title = "Current Content (Editable)"
+        # Set border titles for widgets
+        self.query_one("#original-context").border_title = "Original Context"
+        self.query_one("#llm-reworded").border_title = "Suggested Wording"
+        self.query_one(ContentEditor).border_title = "Current Content (Editable)"
 
         # Update initial display
         await self._update_display()
