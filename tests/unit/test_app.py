@@ -44,6 +44,13 @@ def mock_config(temp_graph_dir):
 def mock_services(mock_config):
     """Create mock services."""
     llm_client = Mock(spec=LLMClient)
+    # Configure llm_client.stream_ndjson to return an async iterator
+    async def mock_stream_ndjson(*args, **kwargs):
+        # Return empty async iterator (no chunks)
+        return
+        yield  # Make this an async generator
+    llm_client.stream_ndjson = Mock(side_effect=mock_stream_ndjson)
+
     page_indexer = Mock(spec=PageIndexer)
     rag_search = Mock(spec=RAGSearch)
     # Configure rag_search.find_candidates to return an empty dict (not an AsyncMock)
