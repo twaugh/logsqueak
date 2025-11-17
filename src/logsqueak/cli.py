@@ -308,7 +308,7 @@ def search(query: str, reindex: bool):
     if reindex:
         click.echo("Rebuilding search index...")
     elif not has_data:
-        click.echo("Building search index (first run)...")
+        click.echo("Building search index...")
     else:
         click.echo("Updating search index...")
 
@@ -363,11 +363,11 @@ def search(query: str, reindex: bool):
                 status_context.__exit__(None, None, None)
             click.echo()  # Newline after progress
             if reindex:
-                click.echo(f"Index rebuilt successfully ({total_pages} pages)")
+                click.echo("Index rebuilt successfully")
             elif not has_data:
-                click.echo(f"Index built successfully ({total_pages} pages)")
+                click.echo("Index built successfully")
             else:
-                click.echo(f"Index updated successfully ({total_pages} pages checked)")
+                click.echo("Index updated successfully")
         except Exception as e:
             # Stop spinner on error
             if status_context:

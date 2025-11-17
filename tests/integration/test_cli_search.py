@@ -115,7 +115,7 @@ def test_search_builds_index_on_first_run(temp_config, temp_graph_with_pages, us
 
     # Should build index on first run
     assert result.exit_code == 0
-    assert "Building search index (first run)" in result.output or "Rebuilding search index" in result.output
+    assert "Building search index" in result.output or "Rebuilding search index" in result.output
     assert "Searching for: machine learning" in result.output
 
 
