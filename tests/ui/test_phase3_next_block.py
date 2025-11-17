@@ -254,12 +254,11 @@ async def test_n_key_skips_remaining_pending_decisions(
         assert sample_decisions[2].write_status == "pending"
 
 
-@pytest.mark.skip(reason="decisions_ready tracking not yet implemented - requires background worker integration")
 @pytest.mark.asyncio
 async def test_n_key_shows_processing_status_if_next_block_not_ready(
     sample_journal_blocks, sample_edited_content, sample_page_contents, sample_decisions, sample_journal_content, sample_journals
 ):
-    """Test n key shows 'Processing knowledge blocks...' if next block decisions not ready."""
+    """Test n key blocks navigation if next block decisions not ready."""
     screen = Phase3Screen(
         journal_blocks=sample_journal_blocks,
         edited_content=sample_edited_content,
@@ -271,8 +270,9 @@ async def test_n_key_shows_processing_status_if_next_block_not_ready(
     )
     app = Phase3TestApp(screen)
 
-    # Simulate next block not ready yet
-    screen.decisions_ready = {0: True, 1: False}
+    # Simulate: block 0 ready, block 1 not ready yet
+    block_0_id = sample_journal_blocks[0].block_id
+    screen.decisions_ready = {block_0_id: True}
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -281,8 +281,7 @@ async def test_n_key_shows_processing_status_if_next_block_not_ready(
         await pilot.press("n")
         await pilot.pause()
 
-        # Should show "Processing knowledge blocks..." status
-        # Should NOT advance to next block yet
+        # Should NOT advance to next block yet (decisions not ready)
         assert screen.current_block_index == 0
 
 
