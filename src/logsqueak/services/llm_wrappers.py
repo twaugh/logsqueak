@@ -373,52 +373,57 @@ async def plan_integration_for_block(
     )
 
     system_prompt = (
-        "CRITICAL CONSTRAINTS:\n"
-        "- NO conversational responses (\"Great\", \"Here's\", \"I'll\", \"Let me\", etc.)\n"
-        "- NO markdown formatting (no bullets, no headers, no bold)\n"
-        "- NO preambles, explanations, or summaries\n"
-        "- Output ONLY raw NDJSON (newline-delimited JSON objects)\n"
-        "- Start output immediately with first JSON object\n\n"
-        "TASK: Find where knowledge belongs in existing pages.\n\n"
-        "INPUT FORMAT:\n"
-        "- <knowledge_blocks>: Content to integrate (block ID in XML attribute)\n"
+        "You are a JSON-only integration planner. Output ONLY valid NDJSON (one JSON object per line).\n"
+        "Start output immediately with first JSON object (first character: '{').\n\n"
+        "TASK: Find where knowledge blocks belong in existing pages.\n\n"
+        "INPUT:\n"
+        "- <knowledge_blocks>: Content to integrate (block id in XML attribute)\n"
         "- <pages>: Existing page structure\n"
-        "  Each <page name=\"PageName\"> contains blocks with id attributes\n"
-        "  CRITICAL: Use the page NAME (e.g. \"TDD\") NOT the block id (e.g. \"abc123\")\n\n"
-        "HOW TO FIND THE BEST LOCATION:\n"
-        "Pages show hierarchical structure (parent → child → grandchild).\n"
-        "Look for semantic relationships in the hierarchy.\n"
-        "Prefer specific, deeper locations over generic top-level sections.\n"
-        "Return ONLY the best 1-2 locations per page.\n\n"
-        "CRITICAL: If a candidate block is NOT semantically related to the knowledge, DO NOT create a decision for it.\n"
-        "Only create decisions for blocks where you can explain a clear semantic relationship.\n\n"
-        "DECISION RULES:\n"
-        "1. Confidence ≥ 0.30 only (if confidence < 0.30, omit the decision entirely)\n"
-        "2. Prefer add_under semantically related parent blocks\n"
-        "3. Use skip_exists ONLY when the exact same knowledge already exists at that location\n\n"
+        "  - Each <page name=\"PageName\"> contains blocks\n"
+        "  - Blocks have id attributes\n"
+        "  - Use page NAME (e.g. \"TDD\") as target_page, NOT block id\n\n"
+        "DECISION TREE (follow in order):\n"
+        "1. Is the candidate block semantically related to the knowledge?\n"
+        "   NO → Skip this candidate (create no decision for it)\n"
+        "   YES → Continue to step 2\n\n"
+        "2. Does this block already contain this exact knowledge?\n"
+        "   YES → action: skip_exists\n"
+        "   NO → Continue to step 3\n\n"
+        "3. Is confidence ≥ 0.30?\n"
+        "   NO → Skip this candidate (create no decision for it)\n"
+        "   YES → action: add_under (or add_section if no good parent)\n\n"
         "ACTIONS:\n"
-        "- add_under: Best - add as child of semantically related block\n"
-        "- add_section: Add as new top-level section if no good parent exists\n"
-        "- replace: Replace existing block with updated knowledge\n"
-        "- skip_exists: ONLY use when duplicate content already exists (NOT for irrelevant blocks)\n\n"
-        "FIELD DEFINITIONS:\n"
-        "- knowledge_block_id: The block id from <knowledge_blocks>\n"
-        "- target_page: The PAGE NAME from <page name=\"...\"> (example: \"TDD\" not \"abc123\")\n"
-        "- target_block_id: The block id from <block id=\"...\"> within the page\n\n"
-        "REQUIRED JSON SCHEMA (one object per line):\n"
-        '{"knowledge_block_id": "string", "target_page": "string", "action": "add_section|add_under|replace|skip_exists", '
-        '"target_block_id": "string|null", "target_block_title": "string|null", '
-        '"confidence": 0.0-1.0, "reasoning": "string"}\n\n'
-        'EXAMPLE: {"knowledge_block_id": "xyz789", "target_page": "TDD", "action": "add_under", '
-        '"target_block_id": "abc123", "target_block_title": "Core concepts", "confidence": 0.85, '
-        '"reasoning": "Fits under existing section"}\n\n'
-        "START OUTPUT NOW (first character must be '{'):"
+        "- add_under: Add knowledge as child of this block\n"
+        "- add_section: Add as new top-level section\n"
+        "- skip_exists: Knowledge already exists here (duplicate)\n"
+        "- replace: Update existing block with new knowledge\n\n"
+        "OUTPUT SCHEMA (one object per line):\n"
+        '{"knowledge_block_id": "abc123", "target_page": "PageName", "action": "add_under", '
+        '"target_block_id": "def456", "target_block_title": "Section title", '
+        '"confidence": 0.85, "reasoning": "Why this location fits"}'
     )
 
-    # User prompt
+    # User prompt with few-shot examples (leverages recency bias for Mistral-7B)
     prompt = (
-        f"Generate integration decisions as NDJSON (one JSON object per line).\n"
-        f"Output first JSON object now:\n\n"
+        f"Generate integration decisions as NDJSON (one JSON object per line).\n\n"
+        f"EXAMPLES:\n\n"
+        f"Example 1 - skip_exists (duplicate already exists):\n"
+        f"Knowledge: \"Python type hints improve code quality\"\n"
+        f"Candidate: \"- Type hints are essential for maintainable Python code\"\n"
+        f"Decision: {{\"knowledge_block_id\": \"k123\", \"target_page\": \"Python\", \"action\": \"skip_exists\", "
+        f"\"target_block_id\": \"b456\", \"target_block_title\": \"Type hints\", \"confidence\": 0.95, "
+        f"\"reasoning\": \"Duplicate content already exists\"}}\n\n"
+        f"Example 2 - add_under (good semantic match):\n"
+        f"Knowledge: \"Redis supports pub/sub messaging patterns\"\n"
+        f"Candidate: \"- Database systems (parent block)\"\n"
+        f"Decision: {{\"knowledge_block_id\": \"k789\", \"target_page\": \"Databases\", \"action\": \"add_under\", "
+        f"\"target_block_id\": \"b123\", \"target_block_title\": \"Database systems\", \"confidence\": 0.80, "
+        f"\"reasoning\": \"Redis is a database system\"}}\n\n"
+        f"Example 3 - omit (not semantically related):\n"
+        f"Knowledge: \"Kubernetes uses YAML for configuration\"\n"
+        f"Candidate: \"- Python testing frameworks\"\n"
+        f"Decision: (NO DECISION - candidate not related to Kubernetes)\n\n"
+        f"Now generate decisions for the following:\n\n"
         f"{xml_formatted_content}"
     )
 
