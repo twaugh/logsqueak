@@ -323,8 +323,8 @@ class TestAddProvenance:
 class TestValidateDecision:
     """Tests for validate_decision function."""
 
-    def test_validates_add_under_requires_target_block_id(self):
-        """Test that add_under action requires target_block_id."""
+    def test_validates_add_under_allows_none_target_block_id(self):
+        """Test that add_under action allows None target_block_id (will fallback to add_section)."""
         from logsqueak.models.edited_content import EditedContent
 
         edited_content = EditedContent(
@@ -338,7 +338,7 @@ class TestValidateDecision:
             knowledge_block_id="block-1",
             target_page="Python/Concurrency",
             action="add_under",
-            target_block_id=None,  # Missing
+            target_block_id=None,  # None is allowed - will fallback to add_section
             confidence=0.8,
             edited_content=edited_content,
             reasoning="Reason"
@@ -346,8 +346,8 @@ class TestValidateDecision:
 
         outline = LogseqOutline.parse("- Existing block")
 
-        with pytest.raises(ValueError, match="requires target_block_id"):
-            validate_decision(decision, outline)
+        # Should not raise - None target_block_id is allowed for add_under
+        validate_decision(decision, outline)
 
     def test_validates_target_block_exists(self):
         """Test that validation checks if target block exists."""
@@ -648,6 +648,39 @@ class TestApplyIntegration:
 
         with pytest.raises(ValueError, match="Unknown action"):
             apply_integration(decision, outline)
+
+    def test_add_under_falls_back_to_add_section_when_target_is_none(self):
+        """Test that add_under falls back to add_section when target_block_id is None."""
+        from logsqueak.models.edited_content import EditedContent
+
+        edited_content = EditedContent(
+            block_id="block-1",
+            original_content="New knowledge",
+            hierarchical_context="- New knowledge",
+            current_content="New knowledge"
+        )
+
+        decision = IntegrationDecision(
+            knowledge_block_id="block-1",
+            target_page="Python/Concurrency",
+            action="add_under",
+            target_block_id=None,  # LLM didn't specify a target
+            confidence=0.8,
+            edited_content=edited_content,
+            reasoning="Add under specific section"
+        )
+
+        outline = LogseqOutline.parse("- Existing block\n  id:: other-id")
+
+        # Should fallback to add_section instead of raising error
+        block_id = apply_integration(decision, outline)
+
+        # Should have added as new root-level block (not as child)
+        assert len(outline.blocks) == 2
+        assert outline.blocks[1].content[0] == "New knowledge"
+        assert block_id is not None
+        # Should not have added as child of existing block
+        assert len(outline.blocks[0].children) == 0
 
     def test_add_under_falls_back_to_add_section_when_target_not_found(self):
         """Test that add_under falls back to add_section when target block not found."""

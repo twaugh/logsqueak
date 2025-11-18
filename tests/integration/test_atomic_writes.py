@@ -419,6 +419,54 @@ async def test_idempotent_retry_detection(
 
 
 @pytest.mark.asyncio
+async def test_write_fallback_when_target_is_none(
+    graph_paths, file_monitor, sample_journal, sample_page
+):
+    """Test fallback to add_section when target_block_id is None (LLM didn't specify target)."""
+    from logsqueak.models.edited_content import EditedContent
+
+    edited_content = EditedContent(
+        block_id="knowledge-block-1",
+        original_content="Content",
+        hierarchical_context="- Content",
+        current_content="Content"
+    )
+
+    decision = IntegrationDecision(
+        knowledge_block_id="knowledge-block-1",
+        target_page="Python/Concurrency",
+        action="add_under",
+        target_block_id=None,  # LLM didn't specify a target
+        confidence=0.85,
+        edited_content=edited_content,
+        reasoning="Test fallback when LLM returns None target"
+    )
+
+    file_monitor.record(sample_page)
+    file_monitor.record(sample_journal)
+
+    # Should fallback to add_section instead of raising error
+    await write_integration_atomic(
+        decision=decision,
+        journal_date="2025-11-06",
+        graph_paths=graph_paths,
+        file_monitor=file_monitor
+    )
+
+    # Verify page was updated with new root-level block (fallback to add_section)
+    page_outline = LogseqOutline.parse(sample_page.read_text())
+    assert len(page_outline.blocks) == 3  # Original 2 + new 1
+    new_block = page_outline.blocks[2]
+    assert "Content" in new_block.content[0]
+    assert new_block.get_property("id") is not None
+
+    # Verify journal was updated with provenance
+    journal_outline = LogseqOutline.parse(sample_journal.read_text())
+    knowledge_block = journal_outline.find_block_by_id("knowledge-block-1")
+    assert knowledge_block.get_property("extracted-to") is not None
+
+
+@pytest.mark.asyncio
 async def test_write_fallback_when_target_not_found(
     graph_paths, file_monitor, sample_journal, sample_page
 ):
