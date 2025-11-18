@@ -4,6 +4,8 @@
 
 Turn your Logseq journal chaos into organized knowledge. Interactive TUI (Text User Interface) for extracting lasting insights from journal entries using LLM-powered analysis.
 
+![Logsqueak Demo](demo/demo.gif)
+
 ## Overview
 
 Logsqueak provides an **interactive 3-phase workflow** for knowledge extraction:
