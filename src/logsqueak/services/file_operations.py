@@ -324,24 +324,29 @@ def validate_decision(
     Raises:
         ValueError: If target block doesn't exist or structure invalid
     """
-    if decision.action in ["add_under", "replace", "skip_exists"]:
+    # For replace and skip_exists, target_block_id is mandatory
+    if decision.action in ["replace", "skip_exists"]:
         if decision.target_block_id is None:
             raise ValueError(
                 f"Action {decision.action} requires target_block_id, but it is None"
             )
 
-        # IMPORTANT: Pass page_name for content hash matching
-        # Page blocks indexed by RAG have content hashes that include page_name
-        block = page_outline.find_block_by_id(decision.target_block_id, page_name=decision.target_page)
-        if block is None:
-            raise ValueError(
-                f"Target block not found: {decision.target_block_id}\n"
-                f"Page: {decision.target_page}\n"
-                f"Possible reasons:\n"
-                f"- Block was deleted externally\n"
-                f"- Block ID changed (id:: property modified)\n"
-                f"- Page structure changed significantly"
-            )
+    # For add_under, target_block_id is optional (falls back to add_section if None)
+    # Only validate if target_block_id is provided
+    if decision.action in ["add_under", "replace", "skip_exists"]:
+        if decision.target_block_id is not None:
+            # IMPORTANT: Pass page_name for content hash matching
+            # Page blocks indexed by RAG have content hashes that include page_name
+            block = page_outline.find_block_by_id(decision.target_block_id, page_name=decision.target_page)
+            if block is None:
+                raise ValueError(
+                    f"Target block not found: {decision.target_block_id}\n"
+                    f"Page: {decision.target_page}\n"
+                    f"Possible reasons:\n"
+                    f"- Block was deleted externally\n"
+                    f"- Block ID changed (id:: property modified)\n"
+                    f"- Page structure changed significantly"
+                )
 
 
 def apply_integration(
@@ -370,6 +375,23 @@ def apply_integration(
         )
 
     elif decision.action == "add_under":
+        # If target_block_id is None, fallback to add_section
+        # This can happen if LLM couldn't find a suitable parent block
+        if decision.target_block_id is None:
+            logger = structlog.get_logger()
+            logger.warning(
+                "add_under_null_target_fallback_to_section",
+                target_page=decision.target_page,
+                knowledge_block_id=decision.knowledge_block_id,
+                reason="LLM did not specify target_block_id for add_under, adding as section instead"
+            )
+            return write_add_section(
+                page_outline,
+                decision.refined_text,
+                knowledge_block_id=decision.knowledge_block_id,
+                target_page=decision.target_page
+            )
+
         try:
             return write_add_under(
                 page_outline,

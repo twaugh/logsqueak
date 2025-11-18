@@ -141,12 +141,17 @@ class TestExternalFileModification:
         Note: Full atomic write tests are in test_atomic_writes.py
         This test verifies FileMonitor concurrent modification detection.
         """
+        import asyncio
+
         # Create file monitor and record initial state
         monitor = FileMonitor()
         monitor.record(target_page)
 
         # Verify file is not modified initially
         assert not monitor.is_modified(target_page)
+
+        # Small delay to ensure mtime changes (CI filesystem timing)
+        await asyncio.sleep(0.01)
 
         # Simulate external modification (Logseq editing the page)
         target_page.write_text("- Modified by Logseq\n  - New content\n")
@@ -165,10 +170,14 @@ class TestExternalFileModification:
         3. When user proceeds to Phase 3, journal reload is attempted
         4. User sees warning about journal changes
         """
+        import asyncio
         from logsqueak.services.file_monitor import FileMonitor
 
         monitor = FileMonitor()
         monitor.record(journal_file)
+
+        # Small delay to ensure mtime changes (CI filesystem timing)
+        await asyncio.sleep(0.01)
 
         # Simulate external modification
         original_content = journal_file.read_text()
