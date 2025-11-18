@@ -6,9 +6,19 @@ from typing import Literal, Optional
 
 class KnowledgeClassificationChunk(BaseModel):
     """
-    NDJSON chunk for knowledge classification streaming (Phase 1).
+    NDJSON chunk for knowledge extraction streaming (Phase 1).
 
-    Each line in the LLM response stream represents one classified block.
+    Each line represents ONE INSIGHT extracted from ONE journal block.
+
+    Insight-first approach:
+    - LLM identifies valuable insights/knowledge in journal blocks
+    - Each insight is already reworded (timeless, no temporal context)
+    - One insight = One block (1:1 mapping)
+    - One block can have at most one insight
+    - The 'reasoning' field contains the reworded insight text
+
+    This approach combines classification and rewording in a single pass,
+    focusing on the insight first rather than mechanically classifying blocks.
     """
 
     type: Literal["classification"] = Field(
@@ -18,19 +28,19 @@ class KnowledgeClassificationChunk(BaseModel):
 
     block_id: str = Field(
         ...,
-        description="Block identifier being classified"
+        description="Single journal block ID containing this insight"
+    )
+
+    insight: str = Field(
+        ...,
+        description="The reworded insight suitable for knowledge base integration (timeless, no temporal context)"
     )
 
     confidence: float = Field(
-        ...,
+        default=0.8,
         ge=0.0,
         le=1.0,
-        description="Confidence score (0.0-1.0)"
-    )
-
-    reason: Optional[str] = Field(
-        default=None,
-        description="Reasoning for classification"
+        description="Confidence score for this insight (0.0-1.0)"
     )
 
 
