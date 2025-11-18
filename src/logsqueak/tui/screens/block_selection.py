@@ -504,7 +504,7 @@ class Phase1Screen(Screen):
                 self.app.register_llm_worker("llm_classification", self._llm_worker)
 
     async def _llm_classification_worker_mock(self) -> None:
-        """Mock LLM classification worker (for testing)."""
+        """Mock LLM classification worker (for testing, insight-based format)."""
         # Create background task
         self._background_tasks["llm_classification"] = BackgroundTask(
             task_type="llm_classification",
@@ -516,17 +516,21 @@ class Phase1Screen(Screen):
         status_panel = self.query_one(StatusPanel)
         status_panel.update_status()
 
-        # Stream results (LLM only returns knowledge blocks, omits activity blocks)
+        # Stream results (insights with reworded content, one per block)
         count = 0
         async for result in self.llm_stream_fn():
+            # Each result is an insight for exactly one block
             block_id = result["block_id"]
+            reworded_insight = result["insight"]
+
             if block_id in self.block_states:
                 state = self.block_states[block_id]
 
-                # All results are knowledge blocks (LLM filters out activity blocks)
+                # Mark as knowledge and store LLM-provided reworded content
                 state.llm_classification = "knowledge"
                 state.llm_confidence = result["confidence"]
-                state.reason = result["reason"]
+                state.reason = f"Insight: {reworded_insight[:100]}"
+                state.llm_reworded_content = reworded_insight
 
                 # Update visual (shows robot emoji but block not selected yet)
                 tree = self.query_one(BlockTree)
@@ -573,18 +577,23 @@ class Phase1Screen(Screen):
             await self.app.acquire_llm_slot(request_id, LLMRequestPriority.CLASSIFICATION)
 
             try:
-                # Stream results from LLM for all journals (only returns knowledge blocks)
+                # Stream results from LLM for all journals (returns insights with reworded content)
                 count = 0
                 for journal_date, journal_outline in sorted(self.journals.items()):
                     async for chunk in classify_blocks(self.llm_client, journal_outline):
+                        # Each chunk is an insight for exactly one block
+                        # The 'insight' field contains the reworded insight
                         block_id = chunk.block_id
+                        reworded_insight = chunk.insight
+
                         if block_id in self.block_states:
                             state = self.block_states[block_id]
 
-                            # All chunks are knowledge blocks (LLM filters out activity blocks)
+                            # Mark as knowledge and store LLM-provided reworded content
                             state.llm_classification = "knowledge"
                             state.llm_confidence = chunk.confidence
-                            state.reason = chunk.reason
+                            state.reason = f"Insight: {reworded_insight[:100]}"  # Truncate for display
+                            state.llm_reworded_content = reworded_insight  # Full reworded text
 
                             # Update visual (shows robot emoji but block not selected yet)
                             tree = self.query_one(BlockTree)
@@ -595,10 +604,10 @@ class Phase1Screen(Screen):
                                 self._update_current_block()
 
                             logger.info(
-                                "llm_classification_chunk",
+                                "llm_classification_block_marked",
                                 block_id=block_id,
                                 confidence=chunk.confidence,
-                                reason=chunk.reason[:100] if chunk.reason else None
+                                insight_preview=reworded_insight[:100]
                             )
                         else:
                             logger.warning(

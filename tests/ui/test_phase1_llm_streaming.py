@@ -65,22 +65,22 @@ def journals(journal_outline):
 
 @pytest.fixture
 def mock_llm_classification_stream():
-    """Mock LLM classification streaming results (only returns knowledge blocks)."""
+    """Mock LLM classification streaming results (insight-based format, 1:1 mapping)."""
     async def stream():
         # Simulate streaming results arriving incrementally
-        # LLM only returns knowledge blocks (omits activity blocks like "block-2")
+        # LLM returns insights with reworded content, one per block
         await asyncio.sleep(0.1)
         yield {
             "block_id": "block-1",
-            "confidence": 0.92,
-            "reason": "Explains asyncio patterns"
+            "insight": "Asyncio patterns enable efficient concurrent programming",
+            "confidence": 0.92
         }
 
         await asyncio.sleep(0.1)
         yield {
             "block_id": "block-3",
-            "confidence": 0.88,
-            "reason": "Explains Python type system"
+            "insight": "Python type hints improve code maintainability and catch errors at development time",
+            "confidence": 0.88
         }
 
     return stream

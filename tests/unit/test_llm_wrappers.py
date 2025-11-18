@@ -31,8 +31,8 @@ async def test_classify_blocks_calls_llm_client_correctly():
     async def mock_stream(*args, **kwargs):
         yield KnowledgeClassificationChunk(
             block_id="abc",
-            confidence=0.85,
-            reason="Technical insight"
+            insight="Python asyncio.Queue is thread-safe for concurrent access",
+            confidence=0.85
         )
 
     mock_client.stream_ndjson = mock_stream
@@ -45,6 +45,7 @@ async def test_classify_blocks_calls_llm_client_correctly():
     # Assert
     assert len(results) == 1
     assert results[0].block_id == "abc"
+    assert results[0].insight == "Python asyncio.Queue is thread-safe for concurrent access"
     assert results[0].confidence == 0.85
 
     # Note: Since we're using a plain function (not AsyncMock),
@@ -104,8 +105,8 @@ async def test_classify_blocks_excludes_frontmatter():
         captured_prompt = kwargs.get('prompt', args[0] if args else None)
         yield KnowledgeClassificationChunk(
             block_id="abc",
-            confidence=0.85,
-            reason="Technical insight"
+            insight="Python asyncio.Queue is thread-safe for concurrent access",
+            confidence=0.85
         )
 
     mock_client.stream_ndjson = mock_stream

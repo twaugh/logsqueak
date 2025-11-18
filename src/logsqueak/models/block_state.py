@@ -43,7 +43,12 @@ class BlockState(BaseModel):
 
     reason: Optional[str] = Field(
         default=None,
-        description="LLM's reasoning for why block is knowledge"
+        description="LLM's reasoning for why block is knowledge (DEPRECATED: use llm_reworded_content)"
+    )
+
+    llm_reworded_content: Optional[str] = Field(
+        default=None,
+        description="LLM-generated reworded insight from Phase 1 (if LLM suggested this block)"
     )
 
     model_config = {"frozen": False}  # Allow mutation during user interaction

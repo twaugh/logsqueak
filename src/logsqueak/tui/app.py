@@ -467,12 +467,18 @@ class LogsqueakApp(App):
                 # Get user-facing content (excludes id:: property)
                 user_content = block.get_user_content()
 
+                # Check if LLM provided reworded content in Phase 1
+                llm_reworded = block_state.llm_reworded_content
+                rewording_complete = llm_reworded is not None
+
                 # Create EditedContent
                 edited = EditedContent(
                     block_id=block_state.block_id,
                     original_content=user_content,
                     hierarchical_context=hierarchical_context,
+                    reworded_content=llm_reworded,  # Use Phase 1 reworded content if available
                     current_content=user_content,
+                    rewording_complete=rewording_complete,  # Mark as complete if LLM provided it
                 )
                 self.edited_content.append(edited)
 
