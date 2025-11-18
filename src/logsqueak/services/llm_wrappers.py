@@ -166,9 +166,9 @@ async def classify_blocks(
         f"- Output each block_id at most once\n\n"
         f"Input format:\n"
         f"- Markdown bullets with {indent_style}\n"
-        f"- Each block has id:: property\n"
-        f"- Properties format: key:: value\n"
-        f"- Indented blocks have parent context (ancestors are included when selected)\n\n"
+        f"- Each block's content is on the bullet line (starts with -)\n"
+        f"- The id:: property appears on the NEXT indented line below the content\n"
+        f"- Other properties (time-estimate::, etc.) also appear below the content\n\n"
         f"What is an insight?\n"
         f"An insight is content that would be valuable long-term, even without journal context.\n"
         f"It contains learnings, discoveries, best practices, solutions, patterns, or principles.\n"
@@ -205,10 +205,21 @@ async def classify_blocks(
     )
 
     # User prompt: Instruction BEFORE data (critical for attention)
+    # Few-shot example to show id:: property location (critical for parsing)
     prompt = (
         f"Extract insights and output as NDJSON (one JSON object per line).\n"
-        f"Each insight must be reworded and associated with exactly ONE block ID.\n"
-        f"Output first JSON object now:\n\n"
+        f"Each insight must be reworded and associated with exactly ONE block ID.\n\n"
+        f"EXAMPLE (shows how to find the id:: property):\n"
+        f"Input:\n"
+        f"- tags::\n"
+        f"  id:: abc123\n"
+        f"- Learned that Python type hints improve code quality\n"
+        f"  id:: def456\n\n"
+        f"Output:\n"
+        f'{{\"block_id\": \"def456\", \"insight\": \"Python type hints improve code quality\", \"confidence\": 0.85}}\n\n'
+        f"Note: Block 1 (\"tags::\") has id:: abc123 but no insight.\n"
+        f"Block 2 (\"Learned that...\") has id:: def456 - the id:: is on the indented line below.\n\n"
+        f"Now extract from the following journal entries:\n\n"
         f"{journal_content}"
     )
 
