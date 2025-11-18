@@ -331,10 +331,11 @@ def validate_decision(
                 f"Action {decision.action} requires target_block_id, but it is None"
             )
 
-    # For add_under, target_block_id is optional (falls back to add_section if None)
-    # Only validate if target_block_id is provided
+    # For add_under, target_block_id is optional (falls back to add_section if None or __PAGE__)
+    # Only validate if target_block_id is provided and not the __PAGE__ sentinel
     if decision.action in ["add_under", "replace", "skip_exists"]:
-        if decision.target_block_id is not None:
+        # Skip validation for __PAGE__ sentinel (will fallback to add_section in apply_integration)
+        if decision.target_block_id is not None and decision.target_block_id != "__PAGE__":
             # IMPORTANT: Pass page_name for content hash matching
             # Page blocks indexed by RAG have content hashes that include page_name
             block = page_outline.find_block_by_id(decision.target_block_id, page_name=decision.target_page)
@@ -375,15 +376,18 @@ def apply_integration(
         )
 
     elif decision.action == "add_under":
-        # If target_block_id is None, fallback to add_section
-        # This can happen if LLM couldn't find a suitable parent block
-        if decision.target_block_id is None:
+        # If target_block_id is None or __PAGE__, fallback to add_section
+        # This can happen if:
+        # - LLM couldn't find a suitable parent block (returns None)
+        # - LLM wants to add under page itself (returns "__PAGE__" from RAG chunk)
+        if decision.target_block_id is None or decision.target_block_id == "__PAGE__":
             logger = structlog.get_logger()
             logger.warning(
                 "add_under_null_target_fallback_to_section",
                 target_page=decision.target_page,
                 knowledge_block_id=decision.knowledge_block_id,
-                reason="LLM did not specify target_block_id for add_under, adding as section instead"
+                target_block_id=decision.target_block_id,
+                reason="LLM specified page-level target (__PAGE__) or None for add_under, adding as section instead"
             )
             return write_add_section(
                 page_outline,
