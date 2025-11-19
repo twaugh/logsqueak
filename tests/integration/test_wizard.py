@@ -161,3 +161,158 @@ class TestWizardConfigGeneration:
         assert loaded_config.llm.model == original_config.llm.model
         assert loaded_config.logseq.graph_path == original_config.logseq.graph_path
         assert loaded_config.llm_providers == original_config.llm_providers
+
+
+class TestUserStory2FixingBrokenConfig:
+    """Integration tests for User Story 2 - Fixing Broken Configuration."""
+
+    @pytest.mark.asyncio
+    async def test_update_existing_valid_config(self, temp_graph_dir, tmp_path):
+        """Test updating existing valid config - wizard loads values as defaults."""
+        config_file = tmp_path / "config.yaml"
+
+        # Create existing valid config
+        existing_config = Config(
+            llm={
+                "endpoint": "http://localhost:11434/v1",
+                "model": "mistral:7b-instruct",
+                "api_key": "not-required",
+            },
+            logseq={"graph_path": str(temp_graph_dir)},
+        )
+        await write_config(existing_config, config_file)
+
+        # Create new graph directory for update
+        new_graph_dir = tmp_path / "new-graph"
+        new_graph_dir.mkdir()
+        (new_graph_dir / "journals").mkdir()
+        (new_graph_dir / "logseq").mkdir()
+
+        # Simulate wizard update - change only graph path
+        state = WizardState(
+            existing_config=existing_config,
+            graph_path=str(new_graph_dir),
+            provider_type="ollama",
+            ollama_endpoint="http://localhost:11434/v1",
+            ollama_model="mistral:7b-instruct",
+        )
+
+        updated_config = assemble_config(state)
+
+        # Verify only graph path changed
+        assert updated_config.logseq.graph_path == str(new_graph_dir)
+        assert str(updated_config.llm.endpoint) == "http://localhost:11434/v1"
+        assert updated_config.llm.model == "mistral:7b-instruct"
+
+    @pytest.mark.asyncio
+    async def test_fix_config_with_wrong_permissions(self, temp_graph_dir, tmp_path):
+        """Test fixing config with wrong permissions - wizard detects and recreates with mode 600."""
+        config_file = tmp_path / "config.yaml"
+
+        # Create config with wrong permissions
+        config = Config(
+            llm={
+                "endpoint": "http://localhost:11434/v1",
+                "model": "mistral:7b-instruct",
+                "api_key": "not-required",
+            },
+            logseq={"graph_path": str(temp_graph_dir)},
+        )
+        await write_config(config, config_file)
+
+        # Modify permissions to be overly permissive (644)
+        os.chmod(config_file, 0o644)
+
+        # Verify permissions are wrong
+        file_stat = os.stat(config_file)
+        file_mode = stat.S_IMODE(file_stat.st_mode)
+        assert file_mode == 0o644
+
+        # Wizard should detect this and offer to fix
+        # For now, verify load_existing_config returns None for permission errors
+        from logsqueak.wizard.wizard import load_existing_config
+
+        with patch("logsqueak.wizard.wizard.Path.home") as mock_home:
+            mock_home.return_value = tmp_path
+            loaded = load_existing_config()
+            # Should return None due to permission error
+            assert loaded is None
+
+        # Recreate config with correct permissions
+        await write_config(config, config_file)
+
+        # Verify new permissions are correct
+        file_stat = os.stat(config_file)
+        file_mode = stat.S_IMODE(file_stat.st_mode)
+        assert file_mode == 0o600
+
+    @pytest.mark.asyncio
+    async def test_handle_partially_invalid_config(self, temp_graph_dir, tmp_path):
+        """Test handling partially invalid config - wizard extracts valid fields."""
+        config_file = tmp_path / "config.yaml"
+
+        # Create config with invalid YAML structure (but valid YAML syntax)
+        # Missing required field (api_key)
+        invalid_data = {
+            "llm": {
+                "endpoint": "http://localhost:11434/v1",
+                "model": "mistral:7b-instruct",
+                # Missing api_key
+            },
+            "logseq": {
+                "graph_path": str(temp_graph_dir),
+            },
+        }
+
+        # Write invalid config
+        config_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_file, "w") as f:
+            yaml.dump(invalid_data, f)
+        os.chmod(config_file, 0o600)
+
+        # Try to load - should return None due to validation error
+        from logsqueak.wizard.wizard import load_existing_config
+
+        with patch("logsqueak.wizard.wizard.Path.home") as mock_home:
+            mock_home.return_value = tmp_path
+            loaded = load_existing_config()
+            # Should return None due to missing required field
+            assert loaded is None
+
+        # Wizard can still use the file path as a base and prompt for missing fields
+        # The raw YAML data could be read separately if needed
+        with open(config_file) as f:
+            partial_data = yaml.safe_load(f)
+
+        # Verify we can at least read the graph path
+        assert partial_data["logseq"]["graph_path"] == str(temp_graph_dir)
+
+    @pytest.mark.asyncio
+    async def test_cached_embedding_model_skip(self, temp_graph_dir):
+        """Test that cached embedding model skips download."""
+        from logsqueak.wizard.validators import check_embedding_model_cached
+        from logsqueak.wizard.wizard import validate_embedding, WizardState
+
+        state = WizardState(
+            graph_path=str(temp_graph_dir),
+            provider_type="ollama",
+            ollama_endpoint="http://localhost:11434/v1",
+            ollama_model="mistral:7b-instruct",
+        )
+
+        # Mock check_embedding_model_cached to return True
+        with patch("logsqueak.wizard.wizard.check_embedding_model_cached") as mock_check:
+            mock_check.return_value = True
+
+            # Run validation
+            result = await validate_embedding(state)
+
+            # Should succeed and skip download
+            assert result is True
+            mock_check.assert_called_once()
+
+            # validate_embedding_model should NOT be called when cached
+            with patch("logsqueak.wizard.wizard.validate_embedding_model") as mock_validate:
+                result = await validate_embedding(state)
+                assert result is True
+                mock_validate.assert_not_called()

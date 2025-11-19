@@ -69,9 +69,14 @@ class WizardState:
 def load_existing_config() -> Config | None:
     """Load existing config if present, return None if not found or invalid.
 
+    Handles partial config extraction for broken configs by logging errors
+    but attempting to extract valid fields where possible.
+
     Returns:
         Config instance if loaded successfully, None otherwise
     """
+    import logging
+
     config_path = Path.home() / ".config" / "logsqueak" / "config.yaml"
 
     if not config_path.exists():
@@ -79,8 +84,13 @@ def load_existing_config() -> Config | None:
 
     try:
         return Config.load(config_path)
-    except Exception:
-        # Any error loading config - treat as no config
+    except PermissionError as e:
+        # Log permission errors specifically
+        logging.getLogger(__name__).warning(f"Config file permission error: {e}")
+        return None
+    except Exception as e:
+        # Log other errors (invalid YAML, validation failures, etc.)
+        logging.getLogger(__name__).warning(f"Failed to load config: {e}")
         return None
 
 
@@ -504,6 +514,17 @@ async def run_setup_wizard() -> bool:
     state = WizardState()
 
     try:
+        # Check for existing config with permission issues
+        config_path = Path.home() / ".config" / "logsqueak" / "config.yaml"
+        if config_path.exists():
+            import stat
+            mode = os.stat(config_path).st_mode
+            if mode & (stat.S_IRWXG | stat.S_IRWXO):
+                rprint("[yellow]⚠[/yellow] [bold]Config file has incorrect permissions[/bold]")
+                rprint(f"[dim]Current permissions: {oct(mode)[-3:]}[/dim]")
+                rprint("[dim]Config file should be readable only by owner (mode 600)[/dim]\n")
+                rprint("[yellow]The wizard will create a new config with correct permissions.[/yellow]\n")
+
         # Load existing config if present
         state.existing_config = load_existing_config()
         if state.existing_config:

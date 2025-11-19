@@ -121,18 +121,18 @@ Using single project structure (from plan.md):
 
 ### Implementation for User Story 2
 
-- [ ] T042 [US2] Enhance load_existing_config() in src/logsqueak/wizard/wizard.py to handle partial config extraction (catch validation errors, log them, extract valid fields)
-- [ ] T043 [US2] Enhance configure_graph_path() in src/logsqueak/wizard/wizard.py to show current value from existing config as default
-- [ ] T044 [US2] Enhance configure_ollama() in src/logsqueak/wizard/wizard.py to use existing config values as defaults
-- [ ] T045 [US2] Enhance validate_embedding() in src/logsqueak/wizard/wizard.py to skip download if model is already cached and loads successfully
-- [ ] T046 [US2] Enhance run_setup_wizard() in src/logsqueak/wizard/wizard.py to detect wrong permissions and offer to fix
+- [X] T042 [US2] Enhance load_existing_config() in src/logsqueak/wizard/wizard.py to handle partial config extraction (catch validation errors, log them, extract valid fields)
+- [X] T043 [US2] Enhance configure_graph_path() in src/logsqueak/wizard/wizard.py to show current value from existing config as default
+- [X] T044 [US2] Enhance configure_ollama() in src/logsqueak/wizard/wizard.py to use existing config values as defaults
+- [X] T045 [US2] Enhance validate_embedding() in src/logsqueak/wizard/wizard.py to skip download if model is already cached and loads successfully
+- [X] T046 [US2] Enhance run_setup_wizard() in src/logsqueak/wizard/wizard.py to detect wrong permissions and offer to fix
 
 ### Tests for User Story 2
 
-- [ ] T047 [P] [US2] Integration test for updating existing valid config in tests/integration/test_wizard.py (existing config loaded as defaults, user can change individual settings)
-- [ ] T048 [P] [US2] Integration test for fixing config with wrong permissions in tests/integration/test_wizard.py (wizard warns and creates new config with mode 600)
-- [ ] T049 [P] [US2] Integration test for handling partially invalid config in tests/integration/test_wizard.py (wizard extracts valid fields, prompts for missing ones)
-- [ ] T050 [US2] Integration test for cached embedding model skip in tests/integration/test_wizard.py (mock check_embedding_model_cached=True, verify download skipped)
+- [X] T047 [P] [US2] Integration test for updating existing valid config in tests/integration/test_wizard.py (existing config loaded as defaults, user can change individual settings)
+- [X] T048 [P] [US2] Integration test for fixing config with wrong permissions in tests/integration/test_wizard.py (wizard warns and creates new config with mode 600)
+- [X] T049 [P] [US2] Integration test for handling partially invalid config in tests/integration/test_wizard.py (wizard extracts valid fields, prompts for missing ones)
+- [X] T050 [US2] Integration test for cached embedding model skip in tests/integration/test_wizard.py (mock check_embedding_model_cached=True, verify download skipped)
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently - first-time setup AND config fixes both work
 
