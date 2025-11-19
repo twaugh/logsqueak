@@ -908,7 +908,8 @@ async def run_setup_wizard() -> bool:
         return True
 
     except KeyboardInterrupt:
-        rprint("\n[yellow]Setup cancelled[/yellow]")
+        rprint("\n[yellow]✗ Setup cancelled by user (Ctrl+C)[/yellow]")
+        rprint("[dim]No configuration was saved.[/dim]")
         return False
     except Exception as e:
         rprint(f"\n[red]✗ Setup failed: {str(e)}[/red]")

@@ -215,10 +215,10 @@ Using single project structure (from plan.md):
 - [X] T080 [P] Add error handling for empty/whitespace config file in src/logsqueak/wizard/wizard.py (treat as no config, start fresh)
 - [X] T081 [P] Add error handling for invalid YAML syntax in src/logsqueak/wizard/wizard.py (log error, treat as no config, start fresh)
 - [X] T082 [P] Add error handling for config directory creation failure in src/logsqueak/wizard/wizard.py (permission denied, show helpful error with suggestions)
-- [ ] T083 [P] Add error handling for corrupted embedding model download in src/logsqueak/wizard/validators.py (detect via load failure, prompt retry)
+- [X] T083 [P] Add error handling for corrupted embedding model download in src/logsqueak/wizard/validators.py (detect via load failure, prompt retry)
 - [X] T084 [P] Add error handling for disk space running out during download in src/logsqueak/wizard/validators.py (clear error message with disk space info)
-- [ ] T085 Add KeyboardInterrupt handling in src/logsqueak/wizard/wizard.py (catch Ctrl+C, show abort message, return False)
-- [ ] T086 Add validation for graph path with spaces/special characters in src/logsqueak/wizard/validators.py (ensure Path handles correctly)
+- [X] T085 Add KeyboardInterrupt handling in src/logsqueak/wizard/wizard.py (catch Ctrl+C, show abort message, return False)
+- [X] T086 Add validation for graph path with spaces/special characters in src/logsqueak/wizard/validators.py (ensure Path handles correctly)
 
 ### Edge Case Tests
 

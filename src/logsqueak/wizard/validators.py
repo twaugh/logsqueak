@@ -229,9 +229,19 @@ async def validate_embedding_model(
             )
 
     except Exception as e:
+        # Catch all other errors including corrupted downloads
+        error_msg = str(e)
+        if "pickle" in error_msg.lower() or "corrupt" in error_msg.lower() or "EOF" in error_msg:
+            return ValidationResult(
+                success=False,
+                error_message=f"[CORRUPTED MODEL] Embedding model appears corrupted or incomplete.\n"
+                             f"The cached model may be damaged. Retry to re-download.\n"
+                             f"Error: {error_msg}"
+            )
         return ValidationResult(
             success=False,
-            error_message=f"Failed to load embedding model: {str(e)}"
+            error_message=f"Failed to load embedding model: {error_msg}\n"
+                         f"Try retrying to re-download the model."
         )
 
 
