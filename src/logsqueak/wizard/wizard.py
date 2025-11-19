@@ -93,6 +93,17 @@ def load_existing_config() -> Config | None:
     if not config_path.exists():
         return None
 
+    # Check for empty or whitespace-only files
+    try:
+        with open(config_path) as f:
+            content = f.read()
+            if not content.strip():
+                logging.getLogger(__name__).warning("Config file is empty, treating as no config")
+                return None
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"Could not read config file: {e}")
+        return None
+
     try:
         return Config.load(config_path)
     except PermissionError as e:
@@ -745,9 +756,26 @@ async def write_config(config: Config, config_path: Path) -> None:
     Args:
         config: Config instance to write
         config_path: Path to write config file
+
+    Raises:
+        PermissionError: If cannot create config directory or write file
+        OSError: If filesystem error occurs during write
     """
     # Ensure directory exists
-    config_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+    except PermissionError as e:
+        raise PermissionError(
+            f"[PERMISSION DENIED] Cannot create config directory: {config_path.parent}\n"
+            f"Please ensure you have write permissions to ~/.config/\n"
+            f"You may need to run: chmod u+w ~/.config"
+        ) from e
+    except OSError as e:
+        raise OSError(
+            f"[FILESYSTEM ERROR] Failed to create config directory: {config_path.parent}\n"
+            f"Error: {e}\n"
+            f"Please check disk space and filesystem health."
+        ) from e
 
     # Convert config to dict for YAML serialization
     config_dict = config.model_dump(mode='json')

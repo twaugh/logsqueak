@@ -51,13 +51,17 @@ def validate_graph_path(path: str) -> ValidationResult:
     if not (expanded / "journals").exists():
         return ValidationResult(
             success=False,
-            error_message=f"Missing journals/ directory in {expanded}"
+            error_message=f"[INVALID GRAPH] Missing journals/ subdirectory in {expanded}\n"
+                         f"A valid Logseq graph must contain a 'journals/' directory.\n"
+                         f"Please verify you've selected the correct Logseq graph directory."
         )
 
     if not (expanded / "logseq").exists():
         return ValidationResult(
             success=False,
-            error_message=f"Missing logseq/ directory in {expanded}"
+            error_message=f"[INVALID GRAPH] Missing logseq/ subdirectory in {expanded}\n"
+                         f"A valid Logseq graph must contain a 'logseq/' directory.\n"
+                         f"Please verify you've selected the correct Logseq graph directory."
         )
 
     return ValidationResult(success=True, data={"path": str(expanded)})
