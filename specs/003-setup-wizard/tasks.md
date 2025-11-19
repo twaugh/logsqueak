@@ -79,13 +79,16 @@ Using single project structure (from plan.md):
 - [ ] T023 [P] [US1] Implement prompt_retry_on_failure() in src/logsqueak/wizard/prompts.py (choices: retry, skip, abort)
 - [ ] T024 [P] [US1] Implement prompt_continue_on_timeout() in src/logsqueak/wizard/prompts.py (choices: continue, retry, skip)
 - [ ] T025 [P] [US1] Implement prompt_confirm_overwrite() in src/logsqueak/wizard/prompts.py (Rich Confirm.ask for config overwrite)
+- [ ] T025a [P] [US1] Implement prompt_advanced_settings() in src/logsqueak/wizard/prompts.py (ask if user wants advanced settings, default No)
+- [ ] T025b [P] [US1] Implement prompt_num_ctx() in src/logsqueak/wizard/prompts.py (default 32768, only for Ollama)
+- [ ] T025c [P] [US1] Implement prompt_top_k() in src/logsqueak/wizard/prompts.py (default 10, all providers)
 
 ### Wizard Orchestration for User Story 1
 
 - [ ] T026 [US1] Implement load_existing_config() in src/logsqueak/wizard/wizard.py (try Config.load, return None on any error)
 - [ ] T027 [US1] Implement configure_graph_path() in src/logsqueak/wizard/wizard.py (prompt, validate, retry loop, update WizardState)
 - [ ] T028 [US1] Implement configure_ollama() in src/logsqueak/wizard/wizard.py (try existing endpoint, try localhost, prompt for custom, fetch models, select model, update WizardState)
-- [ ] T029 [US1] Implement configure_provider() in src/logsqueak/wizard/wizard.py (prompt provider choice, branch to configure_ollama)
+- [ ] T029 [US1] Implement configure_provider() in src/logsqueak/wizard/wizard.py (prompt provider choice, branch to configure_ollama, optionally prompt advanced settings)
 - [ ] T030 [US1] Implement validate_llm_connection() in src/logsqueak/wizard/wizard.py (call test_ollama_connection with timeout handling, retry logic)
 - [ ] T031 [US1] Implement validate_embedding() in src/logsqueak/wizard/wizard.py (check disk space, check cache, download with progress if needed, timeout handling)
 - [ ] T032 [US1] Implement assemble_config() in src/logsqueak/wizard/wizard.py (create LLMConfig from WizardState, merge llm_providers, return Config)
@@ -103,6 +106,7 @@ Using single project structure (from plan.md):
 - [ ] T038 [P] [US1] Unit tests for validators in tests/unit/wizard/test_validators.py (validate_graph_path, check_disk_space, test_ollama_connection with mocked httpx)
 - [ ] T039 [P] [US1] Unit tests for providers in tests/unit/wizard/test_providers.py (fetch_ollama_models, get_recommended_ollama_model, format_model_size, get_provider_key)
 - [ ] T040 [P] [US1] Unit tests for prompts in tests/unit/wizard/test_prompts.py (mock Rich Prompt.ask and Confirm.ask, verify all prompt functions)
+- [ ] T040a [P] [US1] Unit tests for advanced settings prompts in tests/unit/wizard/test_prompts.py (test defaults, validation, Ollama-specific num_ctx)
 - [ ] T041 [US1] Integration test for first-time Ollama setup in tests/integration/test_wizard.py (mock prompts, mock API calls, verify config file created with correct permissions and content)
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - users can run `logsqueak init` and configure Ollama
@@ -373,16 +377,16 @@ With multiple developers:
 
 - **Phase 1 (Setup)**: 4 tasks
 - **Phase 2 (Foundational)**: 5 tasks
-- **Phase 3 (User Story 1 - P1)**: 32 tasks
+- **Phase 3 (User Story 1 - P1)**: 36 tasks (includes advanced settings: T025a-T025c, T040a)
 - **Phase 4 (User Story 2 - P2)**: 9 tasks
 - **Phase 5 (User Story 3 - P2)**: 17 tasks
 - **Phase 6 (User Story 4 - P3)**: 6 tasks
 - **Phase 7 (Edge Cases)**: 20 tasks
 - **Phase 8 (Polish)**: 7 tasks
 
-**Total**: 100 tasks
+**Total**: 104 tasks
 
-**Parallelization**: ~40 tasks can run in parallel (40% parallelizable)
+**Parallelization**: ~42 tasks can run in parallel (40% parallelizable)
 
 ---
 

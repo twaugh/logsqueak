@@ -145,11 +145,14 @@ A user has a working config but wants to change one thing (switch from OpenAI to
 - **FR-022**: Wizard MUST allow user to retry configuration if LLM connection test fails
 - **FR-023**: Wizard MUST allow user to continue without successful test if they explicitly confirm
 - **FR-024**: Wizard MUST optionally prompt for advanced settings (num_ctx for Ollama, top_k for RAG)
+- **FR-024a**: For Ollama provider, wizard MUST optionally prompt for num_ctx (context window size) with default 32768
+- **FR-024b**: Wizard MUST optionally prompt for RAG top_k (number of search results) with default 10
+- **FR-024c**: Advanced settings prompts MUST be clearly marked as optional with sensible defaults shown
 - **FR-025**: Wizard MUST create `~/.config/logsqueak/` directory if it doesn't exist
 - **FR-026**: Wizard MUST write configuration as valid YAML to `~/.config/logsqueak/config.yaml`
 - **FR-027**: Wizard MUST set config file permissions to mode 600 (read/write for owner only)
 - **FR-028**: Wizard MUST display success message with next steps after successful configuration
-- **FR-029**: Wizard MUST use Rich library for formatted output (panels, tables, colored text, spinners)
+- **FR-029**: Wizard MUST use Rich library for formatted output: panels for success/error messages, tables for model lists, spinners for network operations, progress bars for downloads
 - **FR-030**: Wizard MUST display current values from existing config when prompting for updates
 - **FR-031**: For existing API keys from config, wizard MUST display masked version only (first 8 chars + "..." + last 4 chars), never full key on screen
 - **FR-032**: When prompting for NEW API key entry, wizard MUST show input visible (unmasked) so user can visually verify correctness
@@ -158,9 +161,9 @@ A user has a working config but wants to change one thing (switch from OpenAI to
 - **FR-035**: Wizard MUST handle partial config extraction when existing config has validation errors
 - **FR-036**: Wizard MUST provide helpful error messages for all failure scenarios (network errors, permission errors, invalid paths)
 - **FR-037**: Wizard MUST allow user to abort at any prompt without creating/modifying config file
-- **FR-038**: Wizard MUST check if embedding model (sentence-transformers) is already cached and loadable
-- **FR-039**: Wizard MUST skip embedding model test if model is already cached and loads successfully (quick validation)
-- **FR-040**: Wizard MUST test embedding model after successful LLM connection test only if model is not cached or fails quick validation
+- **FR-038**: Wizard MUST check if embedding model is already cached at `~/.cache/torch/sentence_transformers/` and validate it loads successfully
+- **FR-039**: Wizard MUST skip downloading embedding model if cached model passes validation (quick load test)
+- **FR-040**: Wizard MUST download and fully test embedding model if not cached or if cached model fails validation
 - **FR-041**: Wizard MUST check available disk space before attempting embedding model download
 - **FR-042**: Wizard MUST warn user if available disk space is less than 1GB and embedding model download is needed
 - **FR-043**: Wizard MUST allow user to proceed with download despite low disk space warning if they explicitly confirm
@@ -171,14 +174,14 @@ A user has a working config but wants to change one thing (switch from OpenAI to
 - **FR-048**: Wizard MUST allow user to continue without successful embedding test if they explicitly confirm (warn that RAG search will fail)
 - **FR-049**: Wizard MUST use 30-second timeout for LLM connection test operations
 - **FR-050**: Wizard MUST use 5-minute timeout for embedding model download operations
-- **FR-051**: When timeout is reached, wizard MUST prompt user with options to continue waiting, retry, or skip (not auto-abort)
+- **FR-051**: When timeout is reached, wizard MUST prompt user with options to continue waiting, retry, or skip with warning (skip option warns that LLM/RAG functionality may not work)
 
 ### Key Entities *(include if feature involves data)*
 
 - **Configuration File**: YAML file at `~/.config/logsqueak/config.yaml` containing three sections (llm, logseq, rag) with proper permissions (mode 600), can store settings for multiple LLM providers simultaneously
 - **LLM Provider**: One of three types (Ollama, OpenAI, Custom OpenAI-compatible) with provider-specific settings (endpoint, API key, model, optional num_ctx), config preserves all provider settings even when switching active provider, Custom type includes Azure OpenAI, LocalAI, LM Studio, vLLM, and other OpenAI-compatible services
 - **Ollama Model**: Model installed in Ollama instance with name and size attributes, retrieved from `/api/tags` endpoint
-- **Embedding Model**: Sentence-transformers model for RAG semantic search, approximately 500MB download, cached locally after first successful load
+- **Embedding Model**: Sentence-transformers model (`sentence-transformers/all-mpnet-base-v2`) for RAG semantic search, approximately 500MB download, cached at `~/.cache/torch/sentence_transformers/` after first successful load
 - **Validation Result**: Success/failure status from LLM connection test and embedding model test, includes error details if failed
 
 ## Success Criteria *(mandatory)*
@@ -187,7 +190,7 @@ A user has a working config but wants to change one thing (switch from OpenAI to
 
 - **SC-001**: New users can complete initial setup in under 3 minutes from running `logsqueak init` to successful `logsqueak extract`
 - **SC-002**: Users with broken configs can fix issues in under 2 minutes without manually editing YAML
-- **SC-003**: LLM connection validation catches 100% of invalid configurations before saving config file
+- **SC-003**: LLM connection validation catches 100% of invalid configurations (network errors, authentication failures, endpoint unavailability) before saving config file
 - **SC-004**: Zero manual YAML editing required for common configuration tasks (initial setup, provider change, API key update)
 - **SC-005**: All config files created by wizard pass permission check (mode 600) on first attempt
 - **SC-006**: Users can switch between LLM providers (OpenAI ↔ Ollama) in under 1 minute using wizard
