@@ -28,7 +28,7 @@ from logsqueak.wizard.providers import fetch_ollama_models, get_provider_key
 from logsqueak.wizard.validators import (
     check_disk_space,
     check_embedding_model_cached,
-    test_ollama_connection,
+    validate_ollama_connection,
     validate_embedding_model,
     validate_graph_path,
 )
@@ -96,7 +96,7 @@ async def detect_provider_type(endpoint: str) -> str:
     endpoint_str = str(endpoint).lower()
 
     # Try Ollama API first (it's fast and unique)
-    result = await test_ollama_connection(endpoint, timeout=5)
+    result = await validate_ollama_connection(endpoint, timeout=5)
     if result.success:
         return "ollama"
 
@@ -178,7 +178,7 @@ async def configure_ollama(state: WizardState) -> bool:
 
     with Status("[cyan]Testing Ollama connection...[/cyan]") as status:
         for endpoint in endpoints_to_try:
-            result = await test_ollama_connection(endpoint)
+            result = await validate_ollama_connection(endpoint)
             if result.success:
                 models = result.data["models"]
                 successful_endpoint = endpoint
@@ -192,7 +192,7 @@ async def configure_ollama(state: WizardState) -> bool:
         while True:
             endpoint = prompt_ollama_endpoint(default_endpoint)
             with Status(f"[cyan]Testing connection to {endpoint}...[/cyan]"):
-                result = await test_ollama_connection(endpoint)
+                result = await validate_ollama_connection(endpoint)
 
             if result.success:
                 models = result.data["models"]

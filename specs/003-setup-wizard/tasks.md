@@ -103,8 +103,8 @@ Using single project structure (from plan.md):
 
 ### Tests for User Story 1
 
-- [ ] T038 [P] [US1] Unit tests for validators in tests/unit/wizard/test_validators.py (validate_graph_path, check_disk_space, test_ollama_connection with mocked httpx)
-- [ ] T039 [P] [US1] Unit tests for providers in tests/unit/wizard/test_providers.py (fetch_ollama_models, get_recommended_ollama_model, format_model_size, get_provider_key)
+- [X] T038 [P] [US1] Unit tests for validators in tests/unit/wizard/test_validators.py (validate_graph_path, check_disk_space, test_ollama_connection with mocked httpx)
+- [X] T039 [P] [US1] Unit tests for providers in tests/unit/wizard/test_providers.py (fetch_ollama_models, get_recommended_ollama_model, format_model_size, get_provider_key)
 - [ ] T040 [P] [US1] Unit tests for prompts in tests/unit/wizard/test_prompts.py (mock Rich Prompt.ask and Confirm.ask, verify all prompt functions)
 - [ ] T040a [P] [US1] Unit tests for advanced settings prompts in tests/unit/wizard/test_prompts.py (test defaults, validation, Ollama-specific num_ctx)
 - [ ] T041 [US1] Integration test for first-time Ollama setup in tests/integration/test_wizard.py (mock prompts, mock API calls, verify config file created with correct permissions and content)

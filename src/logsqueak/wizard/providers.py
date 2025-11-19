@@ -31,9 +31,9 @@ async def fetch_ollama_models(endpoint: str, timeout: int = 30) -> list[OllamaMo
         httpx.HTTPError: If request fails
         asyncio.TimeoutError: If request exceeds timeout
     """
-    from logsqueak.wizard.validators import test_ollama_connection
+    from logsqueak.wizard.validators import validate_ollama_connection
 
-    result = await test_ollama_connection(endpoint, timeout)
+    result = await validate_ollama_connection(endpoint, timeout)
     if not result.success:
         raise Exception(result.error_message)
 
