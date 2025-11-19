@@ -896,3 +896,99 @@ class TestEdgeCases:
                         assert result is True
                         # Should have hit max retries (3 attempts)
                         assert call_count["value"] == 3
+
+    @pytest.mark.asyncio
+    async def test_low_disk_space_warning_allows_proceed(self, temp_graph_dir):
+        """Test that low disk space shows warning but allows user to proceed."""
+        from logsqueak.wizard.wizard import validate_embedding, WizardState
+
+        state = WizardState(graph_path=str(temp_graph_dir))
+
+        # Mock low disk space (500 MB available, <1GB threshold)
+        def mock_low_disk_space(required_mb):
+            return ValidationResult(
+                success=False,
+                error_message=f"Low disk space: 500 MB available ({required_mb} MB recommended)",
+                data={"available_mb": 500}
+            )
+
+        # Mock user choosing to proceed anyway
+        confirm_called = {"value": False}
+        def mock_confirm_proceed(prompt, default=False):
+            confirm_called["value"] = True
+            assert "Proceed with download anyway?" in prompt
+            return True  # User chooses to proceed
+
+        # Mock successful download
+        async def mock_successful_download(*args, **kwargs):
+            return ValidationResult(success=True)
+
+        with patch("logsqueak.wizard.wizard.check_embedding_model_cached", return_value=False):
+            with patch("logsqueak.wizard.wizard.check_disk_space", mock_low_disk_space):
+                with patch("rich.prompt.Confirm.ask", mock_confirm_proceed):
+                    with patch("logsqueak.wizard.wizard.validate_embedding_model", mock_successful_download):
+                        result = await validate_embedding(state)
+
+                        # Should succeed (user proceeded)
+                        assert result is True
+                        # Verify user was prompted to confirm
+                        assert confirm_called["value"] is True
+
+    @pytest.mark.asyncio
+    async def test_low_disk_space_warning_allows_skip(self, temp_graph_dir):
+        """Test that user can decline to proceed when disk space is low."""
+        from logsqueak.wizard.wizard import validate_embedding, WizardState
+
+        state = WizardState(graph_path=str(temp_graph_dir))
+
+        # Mock low disk space
+        def mock_low_disk_space(required_mb):
+            return ValidationResult(
+                success=False,
+                error_message=f"Low disk space: 500 MB available ({required_mb} MB recommended)",
+                data={"available_mb": 500}
+            )
+
+        # Mock user choosing NOT to proceed
+        def mock_confirm_decline(prompt, default=False):
+            return False  # User declines
+
+        with patch("logsqueak.wizard.wizard.check_embedding_model_cached", return_value=False):
+            with patch("logsqueak.wizard.wizard.check_disk_space", mock_low_disk_space):
+                with patch("rich.prompt.Confirm.ask", mock_confirm_decline):
+                    result = await validate_embedding(state)
+
+                    # Should skip validation
+                    assert result is True
+
+    @pytest.mark.asyncio
+    async def test_disk_space_exhausted_during_download(self, temp_graph_dir):
+        """Test error handling when disk space runs out during download."""
+        from logsqueak.wizard.wizard import validate_embedding, WizardState
+
+        state = WizardState(graph_path=str(temp_graph_dir))
+
+        # Mock disk space exhaustion during download
+        async def mock_disk_full_error(*args, **kwargs):
+            # Return failure result (error handling happens in validate_embedding_model)
+            return ValidationResult(
+                success=False,
+                error_message="Disk space exhausted during download (10 MB available). Free up space and try again."
+            )
+
+        # Mock disk check showing sufficient space initially
+        def mock_sufficient_space(required_mb):
+            return ValidationResult(success=True, data={"available_mb": 2000})
+
+        # Mock prompt to skip after disk error
+        def mock_prompt_skip(operation):
+            return "skip"
+
+        with patch("logsqueak.wizard.wizard.check_embedding_model_cached", return_value=False):
+            with patch("logsqueak.wizard.wizard.check_disk_space", mock_sufficient_space):
+                with patch("logsqueak.wizard.wizard.validate_embedding_model", mock_disk_full_error):
+                    with patch("logsqueak.wizard.wizard.prompt_retry_on_failure", mock_prompt_skip):
+                        result = await validate_embedding(state)
+
+                        # Should return True (skip validation after disk error)
+                        assert result is True

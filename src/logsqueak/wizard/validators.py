@@ -208,6 +208,22 @@ async def validate_embedding_model(
 
         return ValidationResult(success=True)
 
+    except OSError as e:
+        # Disk space issues during download
+        if "No space left on device" in str(e) or "Disk quota exceeded" in str(e):
+            # Check current disk space
+            disk_result = check_disk_space(0)  # Check any available space
+            available_mb = disk_result.data.get("available_mb", 0) if disk_result.data else 0
+            return ValidationResult(
+                success=False,
+                error_message=f"Disk space exhausted during download ({available_mb} MB available). Free up space and try again."
+            )
+        else:
+            return ValidationResult(
+                success=False,
+                error_message=f"File system error: {str(e)}"
+            )
+
     except Exception as e:
         return ValidationResult(
             success=False,

@@ -513,13 +513,23 @@ async def validate_embedding(state: WizardState) -> bool:
 
     # Check disk space
     rprint("[dim]Checking available disk space...[/dim]")
-    disk_result = check_disk_space(512)  # Need ~420MB for model
+    disk_result = check_disk_space(1024)  # Warn if <1GB available
     if not disk_result.success:
-        rprint(f"[yellow]⚠[/yellow] {disk_result.error_message}")
-        choice = prompt_retry_on_failure("Disk space check")
-        if choice == "abort":
-            return False
-        elif choice == "skip":
+        # Low disk space warning - allow user to proceed or abort
+        available_mb = disk_result.data.get("available_mb", 0) if disk_result.data else 0
+        rprint(f"[yellow]⚠[/yellow] Low disk space detected:")
+        rprint(f"[yellow]  Available: {available_mb} MB[/yellow]")
+        rprint(f"[yellow]  Recommended: 1024 MB (1 GB)[/yellow]")
+        rprint(f"[yellow]  Model size: ~420 MB[/yellow]\n")
+
+        # Prompt user whether to proceed
+        from logsqueak.wizard.prompts import Confirm
+        proceed = Confirm.ask(
+            "[bold yellow]Proceed with download anyway?[/bold yellow]",
+            default=False
+        )
+
+        if not proceed:
             rprint("[yellow]Skipping embedding model validation[/yellow]")
             return True
 
