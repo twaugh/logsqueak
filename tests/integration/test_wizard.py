@@ -207,7 +207,10 @@ class TestUserStory2FixingBrokenConfig:
     @pytest.mark.asyncio
     async def test_fix_config_with_wrong_permissions(self, temp_graph_dir, tmp_path):
         """Test fixing config with wrong permissions - wizard detects and recreates with mode 600."""
-        config_file = tmp_path / "config.yaml"
+        # Create proper .config/logsqueak directory structure
+        config_dir = tmp_path / ".config" / "logsqueak"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.yaml"
 
         # Create config with wrong permissions
         config = Config(
@@ -228,15 +231,16 @@ class TestUserStory2FixingBrokenConfig:
         file_mode = stat.S_IMODE(file_stat.st_mode)
         assert file_mode == 0o644
 
-        # Wizard should detect this and offer to fix
-        # For now, verify load_existing_config returns None for permission errors
+        # Wizard should still load config for defaults despite permission error
         from logsqueak.wizard.wizard import load_existing_config
 
         with patch("logsqueak.wizard.wizard.Path.home") as mock_home:
             mock_home.return_value = tmp_path
             loaded = load_existing_config()
-            # Should return None due to permission error
-            assert loaded is None
+            # Should load successfully by bypassing permission check
+            assert loaded is not None
+            assert loaded.llm.model == "mistral:7b-instruct"
+            assert loaded.logseq.graph_path == str(temp_graph_dir)
 
         # Recreate config with correct permissions
         await write_config(config, config_file)

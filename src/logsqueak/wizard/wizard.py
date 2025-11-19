@@ -70,12 +70,14 @@ def load_existing_config() -> Config | None:
     """Load existing config if present, return None if not found or invalid.
 
     Handles partial config extraction for broken configs by logging errors
-    but attempting to extract valid fields where possible.
+    but attempting to extract valid fields where possible. For permission
+    errors, bypasses permission check to read values as defaults.
 
     Returns:
         Config instance if loaded successfully, None otherwise
     """
     import logging
+    import stat
 
     config_path = Path.home() / ".config" / "logsqueak" / "config.yaml"
 
@@ -85,9 +87,17 @@ def load_existing_config() -> Config | None:
     try:
         return Config.load(config_path)
     except PermissionError as e:
-        # Log permission errors specifically
+        # Log permission error but try to read anyway for defaults
         logging.getLogger(__name__).warning(f"Config file permission error: {e}")
-        return None
+
+        # Bypass permission check - read YAML directly for defaults
+        try:
+            with open(config_path) as f:
+                data = yaml.safe_load(f)
+            return Config(**data)
+        except Exception as read_error:
+            logging.getLogger(__name__).warning(f"Could not read config for defaults: {read_error}")
+            return None
     except Exception as e:
         # Log other errors (invalid YAML, validation failures, etc.)
         logging.getLogger(__name__).warning(f"Failed to load config: {e}")
