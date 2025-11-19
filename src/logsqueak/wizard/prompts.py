@@ -214,15 +214,19 @@ def prompt_openai_model(default: str = "gpt-4o") -> str:
     return {"1": "gpt-4o", "2": "gpt-4-turbo", "3": "gpt-3.5-turbo"}[choice]
 
 
-def prompt_custom_endpoint() -> str:
+def prompt_custom_endpoint(existing: str | None = None) -> str:
     """Prompt user for custom OpenAI-compatible endpoint URL.
+
+    Args:
+        existing: Existing endpoint URL from config, if any
 
     Returns:
         Endpoint URL
     """
+    default = existing if existing else "http://localhost:8000/v1"
     endpoint = Prompt.ask(
         "[bold cyan]Custom endpoint URL[/bold cyan]",
-        default="http://localhost:8000/v1"
+        default=default
     )
 
     # Ensure /v1 suffix
@@ -233,26 +237,49 @@ def prompt_custom_endpoint() -> str:
     return endpoint
 
 
-def prompt_custom_api_key() -> str:
+def prompt_custom_api_key(existing: str | None = None) -> str:
     """Prompt user for custom provider API key.
 
+    Args:
+        existing: Existing API key from config, if any
+
     Returns:
-        API key string (visible during input)
+        API key string (visible during input for verification)
     """
-    key = Prompt.ask(
-        "[bold cyan]API key[/bold cyan]",
-        default="none"
-    )
+    from logsqueak.wizard.providers import mask_api_key
+
+    if existing:
+        masked = mask_api_key(existing)
+        rprint(f"\n[dim]Current API key: {masked}[/dim]")
+        rprint("[dim]Press Enter to keep current key, or enter new key:[/dim]")
+
+        key = Prompt.ask(
+            "[bold cyan]API key[/bold cyan]",
+            default=existing,
+            show_default=False
+        )
+    else:
+        key = Prompt.ask(
+            "[bold cyan]API key[/bold cyan]",
+            default="none"
+        )
+
     return key
 
 
-def prompt_custom_model() -> str:
+def prompt_custom_model(existing: str | None = None) -> str:
     """Prompt user for custom provider model name.
+
+    Args:
+        existing: Existing model name from config, if any
 
     Returns:
         Model name string
     """
-    model = Prompt.ask("[bold cyan]Model name[/bold cyan]")
+    if existing:
+        model = Prompt.ask("[bold cyan]Model name[/bold cyan]", default=existing)
+    else:
+        model = Prompt.ask("[bold cyan]Model name[/bold cyan]")
     return model
 
 

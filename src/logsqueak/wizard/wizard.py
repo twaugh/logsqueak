@@ -315,14 +315,25 @@ async def configure_custom(state: WizardState) -> bool:
     """
     rprint("[dim]Configure a custom OpenAI-compatible endpoint.[/dim]\n")
 
+    # Get existing values from config
+    existing_endpoint = None
+    existing_key = None
+    existing_model = None
+    if state.existing_config and state.existing_config.llm_providers:
+        custom_config = state.existing_config.llm_providers.get("custom")
+        if custom_config:
+            existing_endpoint = custom_config.get("endpoint")
+            existing_key = custom_config.get("api_key")
+            existing_model = custom_config.get("model")
+
     # Prompt for endpoint
-    state.custom_endpoint = prompt_custom_endpoint()
+    state.custom_endpoint = prompt_custom_endpoint(existing_endpoint)
 
     # Prompt for API key
-    state.custom_api_key = prompt_custom_api_key()
+    state.custom_api_key = prompt_custom_api_key(existing_key)
 
     # Prompt for model name
-    state.custom_model = prompt_custom_model()
+    state.custom_model = prompt_custom_model(existing_model)
 
     rprint(f"[green]✓[/green] Configured custom endpoint: {state.custom_endpoint}\n")
 
