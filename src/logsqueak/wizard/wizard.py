@@ -16,6 +16,7 @@ from logsqueak.models.config import Config, LLMConfig, LogseqConfig, RAGConfig
 from logsqueak.wizard.prompts import (
     prompt_advanced_settings,
     prompt_confirm_overwrite,
+    prompt_continue_on_timeout,
     prompt_custom_api_key,
     prompt_custom_endpoint,
     prompt_custom_model,
@@ -388,11 +389,14 @@ async def configure_provider(state: WizardState) -> bool:
 async def validate_llm_connection(state: WizardState) -> bool:
     """Test LLM connection with timeout handling.
 
+    Wraps the connection test with a 30-second timeout. If timeout occurs,
+    prompts user to continue waiting, retry, or skip validation.
+
     Args:
         state: Wizard state with provider settings
 
     Returns:
-        False if user skips, True otherwise
+        False if user aborts, True otherwise
     """
     # For Ollama, we already tested connection in configure_ollama
     if state.provider_type == "ollama":
@@ -417,23 +421,60 @@ async def validate_llm_connection(state: WizardState) -> bool:
         rprint("[yellow]⚠[/yellow] Missing provider configuration")
         return True  # Continue anyway
 
-    # Test connection
-    with Status(f"[cyan]Testing API connection...[/cyan]"):
-        result = await validate_openai_connection(endpoint, api_key, model)
+    # Test connection with timeout handling
+    timeout_seconds = 30
+    max_retries = 3
+    retry_count = 0
 
-    if result.success:
-        rprint(f"[green]✓[/green] API connection validated\n")
-        return True
-    else:
-        rprint(f"[red]✗[/red] {result.error_message}")
-        choice = prompt_retry_on_failure("API connection")
-        if choice == "abort":
-            return False
-        elif choice == "skip":
-            rprint("[yellow]Skipping API connection validation[/yellow]\n")
-            return True
-        # retry would need to loop - for now just continue
-        return True
+    while retry_count < max_retries:
+        try:
+            with Status(f"[cyan]Testing API connection...[/cyan]"):
+                # Wrap in timeout
+                async with asyncio.timeout(timeout_seconds):
+                    result = await validate_openai_connection(endpoint, api_key, model, timeout=timeout_seconds)
+
+            if result.success:
+                rprint(f"[green]✓[/green] API connection validated\n")
+                return True
+            else:
+                rprint(f"[red]✗[/red] {result.error_message}")
+                choice = prompt_retry_on_failure("API connection")
+                if choice == "abort":
+                    return False
+                elif choice == "skip":
+                    rprint("[yellow]Skipping API connection validation[/yellow]\n")
+                    return True
+                elif choice == "retry":
+                    retry_count += 1
+                    continue
+                return True
+
+        except asyncio.TimeoutError:
+            # Connection attempt timed out
+            choice = prompt_continue_on_timeout("API connection test", timeout_seconds)
+
+            if choice == "continue":
+                # User wants to keep waiting - increase timeout and retry
+                timeout_seconds = timeout_seconds * 2
+                retry_count += 1
+                rprint(f"[cyan]Retrying with {timeout_seconds}s timeout...[/cyan]\n")
+                continue
+            elif choice == "retry":
+                # User wants to retry with same timeout
+                retry_count += 1
+                continue
+            elif choice == "skip":
+                # User wants to skip validation
+                rprint("[yellow]Skipping API connection validation[/yellow]\n")
+                return True
+            else:
+                # Unknown choice, treat as skip
+                return True
+
+    # Max retries reached
+    rprint("[yellow]⚠[/yellow] Maximum retry attempts reached")
+    rprint("[yellow]Skipping API connection validation[/yellow]\n")
+    return True
 
 
 async def validate_embedding(state: WizardState) -> bool:

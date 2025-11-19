@@ -206,7 +206,7 @@ Using single project structure (from plan.md):
 
 **Purpose**: Handle all edge cases and failure scenarios from spec
 
-- [ ] T074 [P] Add timeout handling wrapper in src/logsqueak/wizard/wizard.py for LLM connection (30s timeout, prompt user: continue/retry/skip)
+- [X] T074 [P] Add timeout handling wrapper in src/logsqueak/wizard/wizard.py for LLM connection (30s timeout, prompt user: continue/retry/skip)
 - [ ] T075 [P] Add timeout handling wrapper in src/logsqueak/wizard/wizard.py for embedding download (5min timeout, prompt user: continue/retry/skip)
 - [ ] T076 [P] Add disk space warning logic in src/logsqueak/wizard/wizard.py (warn if <1GB, allow proceeding if user confirms)
 - [ ] T077 [P] Add error handling for missing journals/ subdirectory in src/logsqueak/wizard/validators.py (clear error message stating which directory missing)
@@ -222,7 +222,7 @@ Using single project structure (from plan.md):
 
 ### Edge Case Tests
 
-- [ ] T087 [P] Integration test for LLM connection timeout in tests/integration/test_wizard.py (mock timeout, verify user prompted)
+- [X] T087 [P] Integration test for LLM connection timeout in tests/integration/test_wizard.py (mock timeout, verify user prompted)
 - [ ] T088 [P] Integration test for embedding download timeout in tests/integration/test_wizard.py (mock timeout, verify user prompted)
 - [ ] T089 [P] Integration test for low disk space warning in tests/integration/test_wizard.py (mock disk_usage, verify warning shown)
 - [ ] T090 [P] Integration test for Ollama with no models in tests/integration/test_wizard.py (empty models list, verify suggestion shown)

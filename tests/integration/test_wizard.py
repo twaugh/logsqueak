@@ -667,3 +667,124 @@ class TestUserStory4:
             # When cached=True, validate_embedding() skips the download
             # This is the key optimization for fast config updates in US4
             # The validate_embedding() function in wizard.py checks this at line ~450-465
+
+
+class TestEdgeCases:
+    """Tests for edge cases and error handling."""
+
+    @pytest.mark.asyncio
+    async def test_llm_connection_timeout_prompts_user(self, temp_graph_dir):
+        """Test that LLM connection timeout prompts user for action.
+
+        When the API connection test times out, the wizard should prompt
+        the user with options: continue, retry, or skip.
+        """
+        from logsqueak.wizard.wizard import validate_llm_connection, WizardState
+        import asyncio
+
+        # Create state for OpenAI provider
+        state = WizardState(
+            graph_path=str(temp_graph_dir),
+            provider_type="openai",
+            openai_endpoint="https://api.openai.com/v1",
+            openai_api_key="sk-test-timeout-key",
+            openai_model="gpt-4o",
+        )
+
+        # Mock validate_openai_connection to simulate timeout
+        # We raise TimeoutError directly to simulate the timeout
+        async def mock_timeout_connection(*args, **kwargs):
+            raise asyncio.TimeoutError()
+
+        # Mock prompt to auto-skip after timeout
+        prompted = {"value": False}
+        def mock_prompt_timeout(operation, timeout):
+            # Verify we're being prompted about timeout
+            prompted["value"] = True
+            assert "API connection test" in operation
+            return "skip"
+
+        with patch("logsqueak.wizard.wizard.validate_openai_connection", mock_timeout_connection):
+            with patch("logsqueak.wizard.wizard.prompt_continue_on_timeout", mock_prompt_timeout):
+                result = await validate_llm_connection(state)
+
+                # Should return True (skip validation)
+                assert result is True
+                # Verify prompt was called
+                assert prompted["value"] is True
+
+    @pytest.mark.asyncio
+    async def test_llm_connection_timeout_retry_with_longer_timeout(self, temp_graph_dir):
+        """Test that choosing 'continue' increases timeout and retries."""
+        from logsqueak.wizard.wizard import validate_llm_connection, WizardState
+        import asyncio
+
+        state = WizardState(
+            graph_path=str(temp_graph_dir),
+            provider_type="openai",
+            openai_endpoint="https://api.openai.com/v1",
+            openai_api_key="sk-test-key",
+            openai_model="gpt-4o",
+        )
+
+        call_count = {"value": 0}
+        timeout_values = []
+
+        async def mock_connection_timeout_then_success(*args, **kwargs):
+            call_count["value"] += 1
+            timeout = kwargs.get("timeout", 30)
+            timeout_values.append(timeout)
+
+            if call_count["value"] == 1:
+                # First call times out
+                raise asyncio.TimeoutError()
+            else:
+                # Second call succeeds
+                return ValidationResult(success=True)
+
+        def mock_prompt_continue(operation, timeout):
+            # First timeout: choose "continue" to increase timeout
+            return "continue"
+
+        with patch("logsqueak.wizard.wizard.validate_openai_connection", mock_connection_timeout_then_success):
+            with patch("logsqueak.wizard.wizard.prompt_continue_on_timeout", mock_prompt_continue):
+                result = await validate_llm_connection(state)
+
+                # Should succeed after retry with longer timeout
+                assert result is True
+                assert call_count["value"] == 2
+                # Verify timeout was increased (30s -> 60s)
+                assert timeout_values[0] == 30
+                assert timeout_values[1] == 60
+
+    @pytest.mark.asyncio
+    async def test_llm_connection_max_retries_reached(self, temp_graph_dir):
+        """Test that max retries limit prevents infinite loops."""
+        from logsqueak.wizard.wizard import validate_llm_connection, WizardState
+        import asyncio
+
+        state = WizardState(
+            graph_path=str(temp_graph_dir),
+            provider_type="custom",
+            custom_endpoint="https://custom.ai/v1",
+            custom_api_key="custom-key",
+            custom_model="custom-model",
+        )
+
+        call_count = {"value": 0}
+
+        async def mock_always_timeout(*args, **kwargs):
+            call_count["value"] += 1
+            raise asyncio.TimeoutError()
+
+        def mock_prompt_always_retry(operation, timeout):
+            return "retry"
+
+        with patch("logsqueak.wizard.wizard.validate_openai_connection", mock_always_timeout):
+            with patch("logsqueak.wizard.wizard.prompt_continue_on_timeout", mock_prompt_always_retry):
+                result = await validate_llm_connection(state)
+
+                # Should eventually give up and skip
+                assert result is True
+                # Should have hit max retries (3 attempts)
+                assert call_count["value"] == 3
