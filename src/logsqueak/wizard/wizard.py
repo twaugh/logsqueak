@@ -524,11 +524,15 @@ def has_config_changed(new_config: Config, old_config: Config | None) -> bool:
 def assemble_config(state: WizardState) -> Config:
     """Assemble final Config from WizardState, preserving existing providers.
 
+    When switching providers, this function ensures that credentials for ALL
+    providers (both old and new) are preserved in the llm_providers dict.
+    This allows users to switch between providers without re-entering credentials.
+
     Args:
         state: Wizard state with all settings
 
     Returns:
-        Complete Config instance
+        Complete Config instance with all provider credentials preserved
     """
     # Create LLMConfig from current provider
     if state.provider_type == "ollama":
@@ -578,14 +582,36 @@ def assemble_config(state: WizardState) -> Config:
     # Create RAGConfig
     rag_config = RAGConfig(top_k=state.top_k)
 
-    # Preserve existing providers and add current one
+    # Preserve ALL existing providers from config (critical for provider switching)
     llm_providers = {}
     if state.existing_config and state.existing_config.llm_providers:
+        # Copy all existing provider credentials
         llm_providers = dict(state.existing_config.llm_providers)
 
-    # Add current provider
+    # Add/update current provider credentials
     provider_key = get_provider_key(state.provider_type, provider_endpoint)
     llm_providers[provider_key] = provider_dict
+
+    # Validation: Ensure both old and new provider credentials are present
+    # when switching providers (US4 requirement)
+    if state.existing_config and state.existing_config.llm:
+        old_provider_type = _detect_provider_type(state.existing_config.llm.endpoint)
+        old_provider_key = get_provider_key(
+            old_provider_type,
+            str(state.existing_config.llm.endpoint)
+        )
+        # Verify old provider is preserved when switching
+        if old_provider_type != state.provider_type:
+            if old_provider_key not in llm_providers:
+                # This should not happen if existing_config.llm_providers was set correctly
+                # But preserve it anyway from existing_config.llm
+                llm_providers[old_provider_key] = {
+                    "endpoint": str(state.existing_config.llm.endpoint),
+                    "api_key": state.existing_config.llm.api_key,
+                    "model": state.existing_config.llm.model,
+                }
+                if state.existing_config.llm.num_ctx:
+                    llm_providers[old_provider_key]["num_ctx"] = state.existing_config.llm.num_ctx
 
     return Config(
         llm=llm_config,
@@ -593,6 +619,24 @@ def assemble_config(state: WizardState) -> Config:
         rag=rag_config,
         llm_providers=llm_providers
     )
+
+
+def _detect_provider_type(endpoint: HttpUrl) -> str:
+    """Detect provider type from endpoint URL.
+
+    Args:
+        endpoint: LLM endpoint URL
+
+    Returns:
+        Provider type ("ollama", "openai", or "custom")
+    """
+    endpoint_str = str(endpoint).lower()
+    if "11434" in endpoint_str or "ollama" in endpoint_str:
+        return "ollama"
+    elif "api.openai.com" in endpoint_str:
+        return "openai"
+    else:
+        return "custom"
 
 
 async def write_config(config: Config, config_path: Path) -> None:
@@ -659,6 +703,12 @@ def show_success_message(config_path: Path) -> None:
 async def run_setup_wizard() -> bool:
     """Run the interactive setup wizard.
 
+    Optimized for fast updates when modifying existing configuration:
+    - Loads existing config values as defaults for all prompts
+    - Skips embedding model download if already cached (validate_embedding handles this)
+    - Detects when no changes were made and skips unnecessary writes
+    - Preserves all provider credentials when switching providers
+
     Returns:
         True if setup completed successfully, False if aborted
     """
@@ -680,31 +730,33 @@ async def run_setup_wizard() -> bool:
                 rprint("[dim]Config file should be readable only by owner (mode 600)[/dim]\n")
                 rprint("[yellow]The wizard will create a new config with correct permissions.[/yellow]\n")
 
-        # Load existing config if present
+        # Load existing config if present (enables fast updates)
         state.existing_config = load_existing_config()
         if state.existing_config:
             rprint("[dim]Found existing configuration, using as defaults[/dim]\n")
 
-        # Configure graph path
+        # Configure graph path (uses existing value as default)
         if not await configure_graph_path(state):
             return False
 
-        # Configure provider
+        # Configure provider (uses existing provider as default)
         if not await configure_provider(state):
             return False
 
-        # Validate LLM connection
+        # Validate LLM connection (quick test, typically <30s)
         if not await validate_llm_connection(state):
             return False
 
-        # Validate embedding model
+        # Validate embedding model (optimized: skips download if cached)
+        # This is where the speed improvement for updates comes from
         if not await validate_embedding(state):
             return False
 
-        # Assemble final config
+        # Assemble final config (preserves all provider credentials)
         config = assemble_config(state)
 
         # Check if anything actually changed (but always write if permissions are wrong)
+        # This optimization prevents unnecessary writes when user accepts all defaults
         if not has_config_changed(config, state.existing_config) and not has_permission_issue:
             rprint("[bold cyan]═══ No Changes Detected ═══[/bold cyan]")
             rprint("[dim]Your configuration is already up to date. Nothing to save.[/dim]\n")

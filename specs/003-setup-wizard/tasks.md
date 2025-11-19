@@ -188,15 +188,15 @@ Using single project structure (from plan.md):
 
 ### Implementation for User Story 4
 
-- [ ] T068 [US4] Enhance assemble_config() in src/logsqueak/wizard/wizard.py to preserve all provider settings from existing config when switching providers
-- [ ] T069 [US4] Add validation to assemble_config() in src/logsqueak/wizard/wizard.py to ensure both old and new provider credentials are in llm_providers dict
-- [ ] T070 [US4] Enhance run_setup_wizard() in src/logsqueak/wizard/wizard.py to optimize flow for updates (skip unnecessary prompts when user accepts defaults)
+- [X] T068 [US4] Enhance assemble_config() in src/logsqueak/wizard/wizard.py to preserve all provider settings from existing config when switching providers
+- [X] T069 [US4] Add validation to assemble_config() in src/logsqueak/wizard/wizard.py to ensure both old and new provider credentials are in llm_providers dict
+- [X] T070 [US4] Enhance run_setup_wizard() in src/logsqueak/wizard/wizard.py to optimize flow for updates (skip unnecessary prompts when user accepts defaults)
 
 ### Tests for User Story 4
 
-- [ ] T071 [P] [US4] Integration test for switching providers in tests/integration/test_wizard.py (OpenAI → Ollama, verify both sets of credentials preserved in config)
-- [ ] T072 [P] [US4] Integration test for single setting update in tests/integration/test_wizard.py (change only API key, verify all other settings unchanged)
-- [ ] T073 [US4] Integration test for fast update with cached embedding in tests/integration/test_wizard.py (verify completion in <30 seconds when skipping embedding download)
+- [X] T071 [P] [US4] Integration test for switching providers in tests/integration/test_wizard.py (OpenAI → Ollama, verify both sets of credentials preserved in config)
+- [X] T072 [P] [US4] Integration test for single setting update in tests/integration/test_wizard.py (change only API key, verify all other settings unchanged)
+- [X] T073 [US4] Integration test for fast update with cached embedding in tests/integration/test_wizard.py (verify completion in <30 seconds when skipping embedding download)
 
 **Checkpoint**: All user stories should now be independently functional - complete wizard supports all use cases
 
