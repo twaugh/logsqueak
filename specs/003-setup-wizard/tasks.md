@@ -26,10 +26,10 @@ Using single project structure (from plan.md):
 
 **Purpose**: Create wizard module structure and extend Config model
 
-- [ ] T001 Create wizard package directory structure at src/logsqueak/wizard/
-- [ ] T002 Create src/logsqueak/wizard/__init__.py with public API exports
-- [ ] T003 [P] Create empty module files: src/logsqueak/wizard/validators.py, src/logsqueak/wizard/providers.py, src/logsqueak/wizard/prompts.py, src/logsqueak/wizard/wizard.py
-- [ ] T004 [P] Create test directory structure: tests/unit/wizard/, tests/integration/
+- [X] T001 Create wizard package directory structure at src/logsqueak/wizard/
+- [X] T002 Create src/logsqueak/wizard/__init__.py with public API exports
+- [X] T003 [P] Create empty module files: src/logsqueak/wizard/validators.py, src/logsqueak/wizard/providers.py, src/logsqueak/wizard/prompts.py, src/logsqueak/wizard/wizard.py
+- [X] T004 [P] Create test directory structure: tests/unit/wizard/, tests/integration/
 
 ---
 
@@ -39,11 +39,11 @@ Using single project structure (from plan.md):
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Add llm_providers field to Config model in src/logsqueak/models/config.py (type: dict[str, dict] | None, default: None)
-- [ ] T006 [P] Implement ValidationResult dataclass in src/logsqueak/wizard/validators.py
-- [ ] T007 [P] Implement WizardState dataclass in src/logsqueak/wizard/wizard.py
-- [ ] T008 [P] Implement OllamaModel dataclass in src/logsqueak/wizard/providers.py
-- [ ] T009 Write unit tests for Config model extension in tests/unit/test_config_wizard.py (test backwards compatibility, llm_providers field)
+- [X] T005 Add llm_providers field to Config model in src/logsqueak/models/config.py (type: dict[str, dict] | None, default: None)
+- [X] T006 [P] Implement ValidationResult dataclass in src/logsqueak/wizard/validators.py
+- [X] T007 [P] Implement WizardState dataclass in src/logsqueak/wizard/wizard.py
+- [X] T008 [P] Implement OllamaModel dataclass in src/logsqueak/wizard/providers.py
+- [X] T009 Write unit tests for Config model extension in tests/unit/test_config_wizard.py (test backwards compatibility, llm_providers field)
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
