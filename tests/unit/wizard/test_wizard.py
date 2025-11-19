@@ -268,3 +268,1173 @@ class TestIndexGraphAfterSetup:
         assert call_kwargs["reindex"] is False  # Wizard never forces reindex
         assert call_kwargs["use_echo"] is False  # Wizard uses rprint style
         assert "has_data" in call_kwargs
+
+
+class TestConfigureOpenAI:
+    """Tests for configure_openai function."""
+
+    @pytest.mark.asyncio
+    async def test_prompts_for_api_key_and_model(self):
+        """Test OpenAI configuration prompts for API key and model."""
+        from logsqueak.wizard.wizard import configure_openai, WizardState
+
+        state = WizardState()
+
+        # Mock prompts
+        with patch("logsqueak.wizard.wizard.prompt_openai_api_key") as mock_key, \
+             patch("logsqueak.wizard.wizard.prompt_openai_model") as mock_model, \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            mock_key.return_value = "sk-test-key-123"
+            mock_model.return_value = "gpt-4o"
+
+            result = await configure_openai(state)
+
+            # Verify prompts were called
+            assert result is True
+            mock_key.assert_called_once_with(None)
+            mock_model.assert_called_once_with("gpt-4o")
+
+            # Verify state was updated
+            assert state.openai_api_key == "sk-test-key-123"
+            assert state.openai_model == "gpt-4o"
+            assert state.openai_endpoint == "https://api.openai.com/v1"
+
+    @pytest.mark.asyncio
+    async def test_uses_existing_credentials_as_defaults(self, tmp_path):
+        """Test that existing OpenAI config is used as defaults."""
+        from logsqueak.wizard.wizard import configure_openai, WizardState
+        from logsqueak.models.config import Config
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        # Create existing config with OpenAI credentials
+        existing_config = Config(
+            llm={
+                "endpoint": "https://api.openai.com/v1",
+                "model": "gpt-4-turbo",
+                "api_key": "sk-existing-key",
+            },
+            logseq={"graph_path": str(graph_dir)},
+            llm_providers={
+                "openai": {
+                    "endpoint": "https://api.openai.com/v1",
+                    "model": "gpt-4-turbo",
+                    "api_key": "sk-existing-key",
+                }
+            }
+        )
+
+        state = WizardState(existing_config=existing_config)
+
+        # Mock prompts
+        with patch("logsqueak.wizard.wizard.prompt_openai_api_key") as mock_key, \
+             patch("logsqueak.wizard.wizard.prompt_openai_model") as mock_model, \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            mock_key.return_value = "sk-new-key"
+            mock_model.return_value = "gpt-4o"
+
+            result = await configure_openai(state)
+
+            # Verify existing key was passed as default
+            mock_key.assert_called_once_with("sk-existing-key")
+            # Verify existing model was passed as default
+            mock_model.assert_called_once_with("gpt-4-turbo")
+
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_sets_openai_endpoint_correctly(self):
+        """Test that OpenAI endpoint is always set to api.openai.com."""
+        from logsqueak.wizard.wizard import configure_openai, WizardState
+
+        state = WizardState()
+
+        with patch("logsqueak.wizard.wizard.prompt_openai_api_key", return_value="sk-key"), \
+             patch("logsqueak.wizard.wizard.prompt_openai_model", return_value="gpt-4o"), \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            await configure_openai(state)
+
+            # Verify endpoint is hardcoded to OpenAI
+            assert state.openai_endpoint == "https://api.openai.com/v1"
+
+
+class TestConfigureCustom:
+    """Tests for configure_custom function."""
+
+    @pytest.mark.asyncio
+    async def test_prompts_for_endpoint_key_and_model(self):
+        """Test custom provider configuration prompts for all required fields."""
+        from logsqueak.wizard.wizard import configure_custom, WizardState
+
+        state = WizardState()
+
+        # Mock prompts
+        with patch("logsqueak.wizard.wizard.prompt_custom_endpoint") as mock_endpoint, \
+             patch("logsqueak.wizard.wizard.prompt_custom_api_key") as mock_key, \
+             patch("logsqueak.wizard.wizard.prompt_custom_model") as mock_model, \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            mock_endpoint.return_value = "https://custom.ai/v1"
+            mock_key.return_value = "custom-key-456"
+            mock_model.return_value = "custom-model-7b"
+
+            result = await configure_custom(state)
+
+            # Verify all prompts were called
+            assert result is True
+            mock_endpoint.assert_called_once_with(None)
+            mock_key.assert_called_once_with(None)
+            mock_model.assert_called_once_with(None)
+
+            # Verify state was updated
+            assert state.custom_endpoint == "https://custom.ai/v1"
+            assert state.custom_api_key == "custom-key-456"
+            assert state.custom_model == "custom-model-7b"
+
+    @pytest.mark.asyncio
+    async def test_uses_existing_custom_config_as_defaults(self, tmp_path):
+        """Test that existing custom config is used as defaults."""
+        from logsqueak.wizard.wizard import configure_custom, WizardState
+        from logsqueak.models.config import Config
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        # Create existing config with custom provider
+        existing_config = Config(
+            llm={
+                "endpoint": "https://old-custom.ai/v1",
+                "model": "old-model",
+                "api_key": "old-key",
+            },
+            logseq={"graph_path": str(graph_dir)},
+            llm_providers={
+                "custom": {
+                    "endpoint": "https://old-custom.ai/v1",
+                    "model": "old-model",
+                    "api_key": "old-key",
+                }
+            }
+        )
+
+        state = WizardState(existing_config=existing_config)
+
+        # Mock prompts
+        with patch("logsqueak.wizard.wizard.prompt_custom_endpoint") as mock_endpoint, \
+             patch("logsqueak.wizard.wizard.prompt_custom_api_key") as mock_key, \
+             patch("logsqueak.wizard.wizard.prompt_custom_model") as mock_model, \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            mock_endpoint.return_value = "https://new-custom.ai/v1"
+            mock_key.return_value = "new-key"
+            mock_model.return_value = "new-model"
+
+            result = await configure_custom(state)
+
+            # Verify existing values were passed as defaults
+            mock_endpoint.assert_called_once_with("https://old-custom.ai/v1")
+            mock_key.assert_called_once_with("old-key")
+            mock_model.assert_called_once_with("old-model")
+
+            assert result is True
+
+
+class TestDetectProviderType:
+    """Tests for detect_provider_type function."""
+
+    @pytest.mark.asyncio
+    async def test_detects_ollama_provider(self):
+        """Test detecting Ollama by successful connection test."""
+        from logsqueak.wizard.wizard import detect_provider_type
+        from logsqueak.wizard.validators import ValidationResult
+
+        # Mock Ollama connection succeeding
+        async def mock_ollama_success(endpoint, timeout=5):
+            return ValidationResult(success=True, data={"models": []})
+
+        with patch("logsqueak.wizard.wizard.validate_ollama_connection", mock_ollama_success):
+            provider_type = await detect_provider_type("http://localhost:11434/v1")
+            assert provider_type == "ollama"
+
+    @pytest.mark.asyncio
+    async def test_detects_openai_by_url_pattern(self):
+        """Test detecting OpenAI by URL pattern when Ollama test fails."""
+        from logsqueak.wizard.wizard import detect_provider_type
+        from logsqueak.wizard.validators import ValidationResult
+
+        # Mock Ollama connection failing
+        async def mock_ollama_fail(endpoint, timeout=5):
+            return ValidationResult(success=False, error_message="Not Ollama")
+
+        with patch("logsqueak.wizard.wizard.validate_ollama_connection", mock_ollama_fail):
+            provider_type = await detect_provider_type("https://api.openai.com/v1")
+            assert provider_type == "openai"
+
+    @pytest.mark.asyncio
+    async def test_defaults_to_custom_for_unknown_endpoint(self):
+        """Test defaulting to custom for unknown endpoints."""
+        from logsqueak.wizard.wizard import detect_provider_type
+        from logsqueak.wizard.validators import ValidationResult
+
+        # Mock Ollama connection failing
+        async def mock_ollama_fail(endpoint, timeout=5):
+            return ValidationResult(success=False, error_message="Not Ollama")
+
+        with patch("logsqueak.wizard.wizard.validate_ollama_connection", mock_ollama_fail):
+            provider_type = await detect_provider_type("https://custom-llm.example.com/v1")
+            assert provider_type == "custom"
+
+
+class TestShowSuccessMessage:
+    """Tests for show_success_message function."""
+
+    def test_displays_next_steps(self):
+        """Test that success message shows next steps."""
+        from logsqueak.wizard.wizard import show_success_message
+        from pathlib import Path
+
+        config_path = Path("/home/user/.config/logsqueak/config.yaml")
+
+        with patch("logsqueak.wizard.wizard.rprint") as mock_rprint:
+            show_success_message(config_path)
+
+            # Verify rprint was called (Panel is printed)
+            mock_rprint.assert_called_once()
+
+            # Get the Panel argument
+            panel = mock_rprint.call_args[0][0]
+            panel_text = str(panel.renderable)
+
+            # Verify message contains key information
+            assert "Configuration saved successfully" in panel_text
+            assert "logsqueak extract" in panel_text
+            assert "logsqueak search" in panel_text
+            assert "logsqueak init" in panel_text
+            assert str(config_path) in panel_text
+
+    def test_includes_config_path(self):
+        """Test that config path is shown in message."""
+        from logsqueak.wizard.wizard import show_success_message
+        from pathlib import Path
+
+        config_path = Path("/custom/path/config.yaml")
+
+        with patch("logsqueak.wizard.wizard.rprint") as mock_rprint:
+            show_success_message(config_path)
+
+            panel = mock_rprint.call_args[0][0]
+            panel_text = str(panel.renderable)
+
+            assert "/custom/path/config.yaml" in panel_text
+
+
+class TestConfigureGraphPath:
+    """Tests for configure_graph_path function."""
+
+    @pytest.mark.asyncio
+    async def test_retry_on_validation_failure(self, tmp_path):
+        """Test retry loop when validation fails."""
+        from logsqueak.wizard.wizard import configure_graph_path, WizardState
+        from logsqueak.wizard.validators import ValidationResult
+
+        state = WizardState()
+
+        # Mock validation to fail once, then succeed
+        call_count = {"value": 0}
+
+        def mock_validate(path):
+            call_count["value"] += 1
+            if call_count["value"] == 1:
+                return ValidationResult(success=False, error_message="Invalid path")
+            else:
+                return ValidationResult(success=True, data={"path": str(tmp_path)})
+
+        # Mock prompts
+        prompt_calls = []
+
+        def mock_prompt(default):
+            prompt_calls.append(default)
+            return str(tmp_path)
+
+        def mock_retry_prompt(operation):
+            return "retry"
+
+        with patch("logsqueak.wizard.wizard.validate_graph_path", mock_validate), \
+             patch("logsqueak.wizard.wizard.prompt_graph_path", mock_prompt), \
+             patch("logsqueak.wizard.wizard.prompt_retry_on_failure", mock_retry_prompt), \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            result = await configure_graph_path(state)
+
+            # Should succeed after retry
+            assert result is True
+            assert state.graph_path == str(tmp_path)
+            assert call_count["value"] == 2
+
+    @pytest.mark.asyncio
+    async def test_abort_on_user_choice(self):
+        """Test abort when user chooses to abort after failure."""
+        from logsqueak.wizard.wizard import configure_graph_path, WizardState
+        from logsqueak.wizard.validators import ValidationResult
+
+        state = WizardState()
+
+        def mock_validate(path):
+            return ValidationResult(success=False, error_message="Invalid path")
+
+        def mock_prompt(default):
+            return "/invalid/path"
+
+        def mock_retry_prompt(operation):
+            return "abort"
+
+        with patch("logsqueak.wizard.wizard.validate_graph_path", mock_validate), \
+             patch("logsqueak.wizard.wizard.prompt_graph_path", mock_prompt), \
+             patch("logsqueak.wizard.wizard.prompt_retry_on_failure", mock_retry_prompt), \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            result = await configure_graph_path(state)
+
+            # Should abort
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_skip_not_allowed_for_required_field(self, tmp_path):
+        """Test that skip shows error for required graph path."""
+        from logsqueak.wizard.wizard import configure_graph_path, WizardState
+        from logsqueak.wizard.validators import ValidationResult
+
+        state = WizardState()
+
+        call_count = {"value": 0}
+
+        def mock_validate(path):
+            return ValidationResult(success=False, error_message="Invalid path")
+
+        def mock_prompt(default):
+            return "/invalid/path"
+
+        def mock_retry_prompt(operation):
+            call_count["value"] += 1
+            if call_count["value"] == 1:
+                return "skip"  # Try to skip
+            else:
+                return "abort"  # Then abort to exit test
+
+        with patch("logsqueak.wizard.wizard.validate_graph_path", mock_validate), \
+             patch("logsqueak.wizard.wizard.prompt_graph_path", mock_prompt), \
+             patch("logsqueak.wizard.wizard.prompt_retry_on_failure", mock_retry_prompt), \
+             patch("logsqueak.wizard.wizard.rprint") as mock_rprint:
+
+            result = await configure_graph_path(state)
+
+            # Should eventually abort after skip attempt
+            assert result is False
+            # Verify warning message was shown
+            calls_text = " ".join(str(call) for call in mock_rprint.call_args_list)
+            assert "required" in calls_text.lower() or "try again" in calls_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_keyboard_interrupt_handled(self):
+        """Test keyboard interrupt handling."""
+        from logsqueak.wizard.wizard import configure_graph_path, WizardState
+
+        state = WizardState()
+
+        def mock_prompt(default):
+            raise KeyboardInterrupt()
+
+        with patch("logsqueak.wizard.wizard.prompt_graph_path", mock_prompt), \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            result = await configure_graph_path(state)
+
+            # Should return False on keyboard interrupt
+            assert result is False
+
+
+class TestConfigureProvider:
+    """Tests for configure_provider function."""
+
+    @pytest.mark.asyncio
+    async def test_detects_existing_provider_type(self, tmp_path):
+        """Test provider detection from existing config."""
+        from logsqueak.wizard.wizard import configure_provider, WizardState, detect_provider_type
+        from logsqueak.models.config import Config
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        # Create existing config with Ollama
+        existing_config = Config(
+            llm={
+                "endpoint": "http://localhost:11434/v1",
+                "model": "mistral:7b-instruct",
+                "api_key": "ollama",
+            },
+            logseq={"graph_path": str(graph_dir)},
+        )
+
+        state = WizardState(existing_config=existing_config)
+
+        # Mock provider detection and configuration
+        with patch("logsqueak.wizard.wizard.detect_provider_type", return_value="ollama") as mock_detect, \
+             patch("logsqueak.wizard.wizard.prompt_provider_choice", return_value="ollama"), \
+             patch("logsqueak.wizard.wizard.configure_ollama", return_value=True), \
+             patch("logsqueak.wizard.wizard.prompt_advanced_settings", return_value=False), \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            result = await configure_provider(state)
+
+            # Should detect existing provider
+            assert result is True
+            mock_detect.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_advanced_settings_for_ollama(self, tmp_path):
+        """Test advanced settings prompt for Ollama (num_ctx, top_k)."""
+        from logsqueak.wizard.wizard import configure_provider, WizardState
+
+        state = WizardState()
+
+        # Mock provider selection and advanced settings
+        with patch("logsqueak.wizard.wizard.prompt_provider_choice", return_value="ollama"), \
+             patch("logsqueak.wizard.wizard.configure_ollama", return_value=True), \
+             patch("logsqueak.wizard.wizard.prompt_advanced_settings", return_value=True), \
+             patch("logsqueak.wizard.wizard.prompt_num_ctx", return_value=16384) as mock_num_ctx, \
+             patch("logsqueak.wizard.wizard.prompt_top_k", return_value=15) as mock_top_k, \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            result = await configure_provider(state)
+
+            # Should prompt for advanced settings
+            assert result is True
+            mock_num_ctx.assert_called_once()
+            mock_top_k.assert_called_once()
+            assert state.num_ctx == 16384
+            assert state.top_k == 15
+
+    @pytest.mark.asyncio
+    async def test_advanced_settings_for_openai(self):
+        """Test advanced settings prompt for OpenAI (top_k only)."""
+        from logsqueak.wizard.wizard import configure_provider, WizardState
+
+        state = WizardState()
+
+        # Mock provider selection and advanced settings
+        with patch("logsqueak.wizard.wizard.prompt_provider_choice", return_value="openai"), \
+             patch("logsqueak.wizard.wizard.configure_openai", return_value=True), \
+             patch("logsqueak.wizard.wizard.prompt_advanced_settings", return_value=True), \
+             patch("logsqueak.wizard.wizard.prompt_top_k", return_value=25) as mock_top_k, \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            result = await configure_provider(state)
+
+            # Should prompt for top_k only (not num_ctx for OpenAI)
+            assert result is True
+            mock_top_k.assert_called_once()
+            assert state.top_k == 25
+
+    @pytest.mark.asyncio
+    async def test_advanced_settings_for_custom(self):
+        """Test advanced settings prompt for custom (top_k only)."""
+        from logsqueak.wizard.wizard import configure_provider, WizardState
+
+        state = WizardState()
+
+        # Mock provider selection and advanced settings
+        with patch("logsqueak.wizard.wizard.prompt_provider_choice", return_value="custom"), \
+             patch("logsqueak.wizard.wizard.configure_custom", return_value=True), \
+             patch("logsqueak.wizard.wizard.prompt_advanced_settings", return_value=True), \
+             patch("logsqueak.wizard.wizard.prompt_top_k", return_value=30) as mock_top_k, \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            result = await configure_provider(state)
+
+            # Should prompt for top_k only
+            assert result is True
+            mock_top_k.assert_called_once()
+            assert state.top_k == 30
+
+    @pytest.mark.asyncio
+    async def test_unknown_provider_type_error(self):
+        """Test error handling for unknown provider types."""
+        from logsqueak.wizard.wizard import configure_provider, WizardState
+
+        state = WizardState()
+
+        # Mock invalid provider type
+        with patch("logsqueak.wizard.wizard.prompt_provider_choice", return_value="invalid_provider"), \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            result = await configure_provider(state)
+
+            # Should return False for unknown provider
+            assert result is False
+
+
+class TestHasConfigChanged:
+    """Tests for has_config_changed function."""
+
+    def test_detects_endpoint_change(self, tmp_path):
+        """Test detection of endpoint changes."""
+        from logsqueak.wizard.wizard import has_config_changed
+        from logsqueak.models.config import Config
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        old_config = Config(
+            llm={"endpoint": "http://localhost:11434/v1", "model": "test", "api_key": "key"},
+            logseq={"graph_path": str(graph_dir)},
+        )
+
+        new_config = Config(
+            llm={"endpoint": "http://remote:11434/v1", "model": "test", "api_key": "key"},
+            logseq={"graph_path": str(graph_dir)},
+        )
+
+        assert has_config_changed(new_config, old_config) is True
+
+    def test_detects_model_change(self, tmp_path):
+        """Test detection of model changes."""
+        from logsqueak.wizard.wizard import has_config_changed
+        from logsqueak.models.config import Config
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        old_config = Config(
+            llm={"endpoint": "http://localhost:11434/v1", "model": "old-model", "api_key": "key"},
+            logseq={"graph_path": str(graph_dir)},
+        )
+
+        new_config = Config(
+            llm={"endpoint": "http://localhost:11434/v1", "model": "new-model", "api_key": "key"},
+            logseq={"graph_path": str(graph_dir)},
+        )
+
+        assert has_config_changed(new_config, old_config) is True
+
+    def test_detects_num_ctx_change(self, tmp_path):
+        """Test detection of num_ctx changes."""
+        from logsqueak.wizard.wizard import has_config_changed
+        from logsqueak.models.config import Config
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        old_config = Config(
+            llm={"endpoint": "http://localhost:11434/v1", "model": "test", "api_key": "key", "num_ctx": 32768},
+            logseq={"graph_path": str(graph_dir)},
+        )
+
+        new_config = Config(
+            llm={"endpoint": "http://localhost:11434/v1", "model": "test", "api_key": "key", "num_ctx": 16384},
+            logseq={"graph_path": str(graph_dir)},
+        )
+
+        assert has_config_changed(new_config, old_config) is True
+
+    def test_detects_graph_path_change(self, tmp_path):
+        """Test detection of graph path changes."""
+        from logsqueak.wizard.wizard import has_config_changed
+        from logsqueak.models.config import Config
+
+        # Create valid graph directories
+        graph_dir1 = tmp_path / "graph1"
+        graph_dir1.mkdir()
+        (graph_dir1 / "journals").mkdir()
+        (graph_dir1 / "logseq").mkdir()
+
+        graph_dir2 = tmp_path / "graph2"
+        graph_dir2.mkdir()
+        (graph_dir2 / "journals").mkdir()
+        (graph_dir2 / "logseq").mkdir()
+
+        old_config = Config(
+            llm={"endpoint": "http://localhost:11434/v1", "model": "test", "api_key": "key"},
+            logseq={"graph_path": str(graph_dir1)},
+        )
+
+        new_config = Config(
+            llm={"endpoint": "http://localhost:11434/v1", "model": "test", "api_key": "key"},
+            logseq={"graph_path": str(graph_dir2)},
+        )
+
+        assert has_config_changed(new_config, old_config) is True
+
+    def test_detects_top_k_change(self, tmp_path):
+        """Test detection of top_k changes."""
+        from logsqueak.wizard.wizard import has_config_changed
+        from logsqueak.models.config import Config
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        old_config = Config(
+            llm={"endpoint": "http://localhost:11434/v1", "model": "test", "api_key": "key"},
+            logseq={"graph_path": str(graph_dir)},
+            rag={"top_k": 10},
+        )
+
+        new_config = Config(
+            llm={"endpoint": "http://localhost:11434/v1", "model": "test", "api_key": "key"},
+            logseq={"graph_path": str(graph_dir)},
+            rag={"top_k": 20},
+        )
+
+        assert has_config_changed(new_config, old_config) is True
+
+    def test_returns_false_when_configs_identical(self, tmp_path):
+        """Test that identical configs return False."""
+        from logsqueak.wizard.wizard import has_config_changed
+        from logsqueak.models.config import Config
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        config1 = Config(
+            llm={"endpoint": "http://localhost:11434/v1", "model": "test", "api_key": "key", "num_ctx": 32768},
+            logseq={"graph_path": str(graph_dir)},
+            rag={"top_k": 10},
+        )
+
+        config2 = Config(
+            llm={"endpoint": "http://localhost:11434/v1", "model": "test", "api_key": "key", "num_ctx": 32768},
+            logseq={"graph_path": str(graph_dir)},
+            rag={"top_k": 10},
+        )
+
+        assert has_config_changed(config2, config1) is False
+
+
+class TestAssembleConfig:
+    """Tests for assemble_config error handling."""
+
+    def test_raises_error_for_unknown_provider_type(self, tmp_path):
+        """Test error handling for unsupported provider types."""
+        from logsqueak.wizard.wizard import assemble_config, WizardState
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        state = WizardState(
+            graph_path=str(graph_dir),
+            provider_type="invalid_provider",  # Invalid provider type
+        )
+
+        with pytest.raises(ValueError, match="Unsupported provider type"):
+            assemble_config(state)
+
+    def test_preserves_old_provider_when_switching(self, tmp_path):
+        """Test old provider preservation in assemble_config."""
+        from logsqueak.wizard.wizard import assemble_config, WizardState
+        from logsqueak.models.config import Config
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        # Start with OpenAI config
+        existing_config = Config(
+            llm={
+                "endpoint": "https://api.openai.com/v1",
+                "model": "gpt-4o",
+                "api_key": "sk-old-key",
+            },
+            logseq={"graph_path": str(graph_dir)},
+            llm_providers={
+                "openai": {
+                    "endpoint": "https://api.openai.com/v1",
+                    "model": "gpt-4o",
+                    "api_key": "sk-old-key",
+                }
+            },
+        )
+
+        # Switch to Ollama
+        state = WizardState(
+            existing_config=existing_config,
+            graph_path=str(graph_dir),
+            provider_type="ollama",
+            ollama_endpoint="http://localhost:11434/v1",
+            ollama_model="mistral:7b-instruct",
+        )
+
+        new_config = assemble_config(state)
+
+        # Verify both providers are preserved
+        assert "openai" in new_config.llm_providers
+        assert "ollama_local" in new_config.llm_providers
+        assert new_config.llm_providers["openai"]["api_key"] == "sk-old-key"
+
+
+class TestValidateLLMConnection:
+    """Additional tests for validate_llm_connection edge cases."""
+
+    @pytest.mark.asyncio
+    async def test_shows_warning_for_missing_config(self, tmp_path):
+        """Test warning message when provider config is incomplete."""
+        from logsqueak.wizard.wizard import validate_llm_connection, WizardState
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        # Create state with OpenAI but missing fields
+        state = WizardState(
+            graph_path=str(graph_dir),
+            provider_type="openai",
+            openai_endpoint=None,  # Missing endpoint
+            openai_api_key=None,
+            openai_model=None,
+        )
+
+        with patch("logsqueak.wizard.wizard.rprint") as mock_rprint:
+            result = await validate_llm_connection(state)
+
+            # Should continue anyway but show warning
+            assert result is True
+            calls_text = " ".join(str(call) for call in mock_rprint.call_args_list)
+            assert "missing" in calls_text.lower() or "warning" in calls_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_retry_on_connection_failure(self, tmp_path):
+        """Test retry logic when connection fails."""
+        from logsqueak.wizard.wizard import validate_llm_connection, WizardState
+        from logsqueak.wizard.validators import ValidationResult
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        state = WizardState(
+            graph_path=str(graph_dir),
+            provider_type="openai",
+            openai_endpoint="https://api.openai.com/v1",
+            openai_api_key="sk-test-key",
+            openai_model="gpt-4o",
+        )
+
+        call_count = {"value": 0}
+
+        async def mock_connection_fail_then_success(*args, **kwargs):
+            call_count["value"] += 1
+            if call_count["value"] == 1:
+                return ValidationResult(success=False, error_message="Connection failed")
+            else:
+                return ValidationResult(success=True)
+
+        def mock_retry_prompt(operation):
+            return "retry"
+
+        with patch("logsqueak.wizard.wizard.validate_openai_connection", mock_connection_fail_then_success), \
+             patch("logsqueak.wizard.wizard.prompt_retry_on_failure", mock_retry_prompt), \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            result = await validate_llm_connection(state)
+
+            # Should succeed after retry
+            assert result is True
+            assert call_count["value"] == 2
+
+    @pytest.mark.asyncio
+    async def test_abort_on_connection_failure(self, tmp_path):
+        """Test abort when user chooses to abort after failure."""
+        from logsqueak.wizard.wizard import validate_llm_connection, WizardState
+        from logsqueak.wizard.validators import ValidationResult
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        state = WizardState(
+            graph_path=str(graph_dir),
+            provider_type="custom",
+            custom_endpoint="https://custom.ai/v1",
+            custom_api_key="custom-key",
+            custom_model="custom-model",
+        )
+
+        async def mock_connection_fail(*args, **kwargs):
+            return ValidationResult(success=False, error_message="Connection failed")
+
+        def mock_retry_prompt(operation):
+            return "abort"
+
+        with patch("logsqueak.wizard.wizard.validate_openai_connection", mock_connection_fail), \
+             patch("logsqueak.wizard.wizard.prompt_retry_on_failure", mock_retry_prompt), \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            result = await validate_llm_connection(state)
+
+            # Should abort
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_skip_on_connection_failure(self, tmp_path):
+        """Test skip when user chooses to skip after failure."""
+        from logsqueak.wizard.wizard import validate_llm_connection, WizardState
+        from logsqueak.wizard.validators import ValidationResult
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        state = WizardState(
+            graph_path=str(graph_dir),
+            provider_type="openai",
+            openai_endpoint="https://api.openai.com/v1",
+            openai_api_key="sk-test-key",
+            openai_model="gpt-4o",
+        )
+
+        async def mock_connection_fail(*args, **kwargs):
+            return ValidationResult(success=False, error_message="Connection failed")
+
+        def mock_retry_prompt(operation):
+            return "skip"
+
+        with patch("logsqueak.wizard.wizard.validate_openai_connection", mock_connection_fail), \
+             patch("logsqueak.wizard.wizard.prompt_retry_on_failure", mock_retry_prompt), \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            result = await validate_llm_connection(state)
+
+            # Should skip and continue
+            assert result is True
+
+
+class TestValidateEmbedding:
+    """Additional tests for validate_embedding edge cases."""
+
+    @pytest.mark.asyncio
+    async def test_retry_on_validation_failure(self, tmp_path):
+        """Test retry logic when validation fails."""
+        from logsqueak.wizard.wizard import validate_embedding, WizardState
+        from logsqueak.wizard.validators import ValidationResult
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        state = WizardState(graph_path=str(graph_dir))
+
+        call_count = {"value": 0}
+
+        async def mock_validation_fail_then_success(*args, **kwargs):
+            call_count["value"] += 1
+            if call_count["value"] == 1:
+                return ValidationResult(success=False, error_message="Validation failed")
+            else:
+                return ValidationResult(success=True)
+
+        def mock_retry_prompt(operation):
+            return "retry"
+
+        with patch("logsqueak.wizard.wizard.check_embedding_model_cached", return_value=False), \
+             patch("logsqueak.wizard.wizard.check_disk_space", return_value=ValidationResult(success=True)), \
+             patch("logsqueak.wizard.wizard.validate_embedding_model", mock_validation_fail_then_success), \
+             patch("logsqueak.wizard.wizard.prompt_retry_on_failure", mock_retry_prompt), \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            result = await validate_embedding(state)
+
+            # Should succeed after retry
+            assert result is True
+            assert call_count["value"] == 2
+
+    @pytest.mark.asyncio
+    async def test_abort_on_validation_failure(self, tmp_path):
+        """Test abort when user chooses to abort after failure."""
+        from logsqueak.wizard.wizard import validate_embedding, WizardState
+        from logsqueak.wizard.validators import ValidationResult
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        state = WizardState(graph_path=str(graph_dir))
+
+        async def mock_validation_fail(*args, **kwargs):
+            return ValidationResult(success=False, error_message="Validation failed")
+
+        def mock_retry_prompt(operation):
+            return "abort"
+
+        with patch("logsqueak.wizard.wizard.check_embedding_model_cached", return_value=False), \
+             patch("logsqueak.wizard.wizard.check_disk_space", return_value=ValidationResult(success=True)), \
+             patch("logsqueak.wizard.wizard.validate_embedding_model", mock_validation_fail), \
+             patch("logsqueak.wizard.wizard.prompt_retry_on_failure", mock_retry_prompt), \
+             patch("logsqueak.wizard.wizard.rprint"):
+
+            result = await validate_embedding(state)
+
+            # Should abort
+            assert result is False
+
+
+class TestWriteConfig:
+    """Additional tests for write_config error scenarios."""
+
+    @pytest.mark.asyncio
+    async def test_permission_error_on_directory_creation(self, tmp_path):
+        """Test helpful error message when cannot create directory."""
+        from logsqueak.wizard.wizard import write_config
+        from logsqueak.models.config import Config
+        from pathlib import Path
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        config = Config(
+            llm={"endpoint": "http://localhost:11434/v1", "model": "test", "api_key": "key"},
+            logseq={"graph_path": str(graph_dir)},
+        )
+
+        # Mock Path.mkdir to raise PermissionError
+        config_path = tmp_path / "no-permission" / "config.yaml"
+
+        original_mkdir = Path.mkdir
+
+        def mock_mkdir(self, *args, **kwargs):
+            if "no-permission" in str(self):
+                raise PermissionError("Permission denied")
+            return original_mkdir(self, *args, **kwargs)
+
+        with patch.object(Path, "mkdir", mock_mkdir):
+            with pytest.raises(PermissionError, match="PERMISSION DENIED"):
+                await write_config(config, config_path)
+
+    @pytest.mark.asyncio
+    async def test_os_error_on_directory_creation(self, tmp_path):
+        """Test error handling for filesystem errors."""
+        from logsqueak.wizard.wizard import write_config
+        from logsqueak.models.config import Config
+        from pathlib import Path
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        config = Config(
+            llm={"endpoint": "http://localhost:11434/v1", "model": "test", "api_key": "key"},
+            logseq={"graph_path": str(graph_dir)},
+        )
+
+        # Mock Path.mkdir to raise OSError
+        config_path = tmp_path / "fs-error" / "config.yaml"
+
+        original_mkdir = Path.mkdir
+
+        def mock_mkdir(self, *args, **kwargs):
+            if "fs-error" in str(self):
+                raise OSError("Filesystem error")
+            return original_mkdir(self, *args, **kwargs)
+
+        with patch.object(Path, "mkdir", mock_mkdir):
+            with pytest.raises(OSError, match="FILESYSTEM ERROR"):
+                await write_config(config, config_path)
+
+    @pytest.mark.asyncio
+    async def test_cleanup_on_write_failure(self, tmp_path):
+        """Test temp file cleanup on write failure."""
+        from logsqueak.wizard.wizard import write_config
+        from logsqueak.models.config import Config
+        import tempfile
+        import os
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        config = Config(
+            llm={"endpoint": "http://localhost:11434/v1", "model": "test", "api_key": "key"},
+            logseq={"graph_path": str(graph_dir)},
+        )
+
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        config_path = config_dir / "config.yaml"
+
+        temp_files_created = []
+
+        # Track temp files created
+        original_mkstemp = tempfile.mkstemp
+
+        def mock_mkstemp(*args, **kwargs):
+            fd, path = original_mkstemp(*args, **kwargs)
+            temp_files_created.append(path)
+            return fd, path
+
+        # Mock chmod to raise exception (simulating write failure)
+        with patch("tempfile.mkstemp", mock_mkstemp), \
+             patch("os.chmod", side_effect=Exception("Write failed")):
+
+            try:
+                await write_config(config, config_path)
+            except Exception:
+                pass
+
+            # Verify temp file was cleaned up
+            for temp_file in temp_files_created:
+                assert not os.path.exists(temp_file), f"Temp file not cleaned up: {temp_file}"
+
+
+class TestLoadExistingConfig:
+    """Tests for load_existing_config edge cases."""
+
+    def test_returns_none_for_empty_file(self, tmp_path):
+        """Test that empty config file returns None."""
+        from logsqueak.wizard.wizard import load_existing_config
+
+        # Create empty config file
+        config_dir = tmp_path / ".config" / "logsqueak"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.yaml"
+        config_file.write_text("")
+
+        with patch("logsqueak.wizard.wizard.Path.home", return_value=tmp_path):
+            config = load_existing_config()
+            assert config is None
+
+    def test_returns_none_for_whitespace_only_file(self, tmp_path):
+        """Test that whitespace-only config returns None."""
+        from logsqueak.wizard.wizard import load_existing_config
+
+        # Create whitespace-only config file
+        config_dir = tmp_path / ".config" / "logsqueak"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.yaml"
+        config_file.write_text("   \n\n  \t  \n")
+
+        with patch("logsqueak.wizard.wizard.Path.home", return_value=tmp_path):
+            config = load_existing_config()
+            assert config is None
+
+    def test_returns_none_on_read_error(self, tmp_path):
+        """Test that file read errors return None."""
+        from logsqueak.wizard.wizard import load_existing_config
+
+        # Create config file
+        config_dir = tmp_path / ".config" / "logsqueak"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.yaml"
+        config_file.write_text("llm:\n  endpoint: test\n")
+
+        with patch("logsqueak.wizard.wizard.Path.home", return_value=tmp_path):
+            # Mock open to raise exception
+            with patch("builtins.open", side_effect=IOError("Read error")):
+                config = load_existing_config()
+                assert config is None
+
+    def test_bypasses_permission_error_to_read_config(self, tmp_path):
+        """Test that permission errors are bypassed to read defaults."""
+        from logsqueak.wizard.wizard import load_existing_config
+        from logsqueak.models.config import Config
+        import yaml
+
+        # Create valid graph directory
+        graph_dir = tmp_path / "graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        # Create valid config file with wrong permissions
+        config_dir = tmp_path / ".config" / "logsqueak"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.yaml"
+
+        config_data = {
+            "llm": {
+                "endpoint": "http://localhost:11434/v1",
+                "model": "mistral:7b-instruct",
+                "api_key": "test-key",
+            },
+            "logseq": {
+                "graph_path": str(graph_dir),
+            }
+        }
+
+        with open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        with patch("logsqueak.wizard.wizard.Path.home", return_value=tmp_path):
+            # Mock Config.load to raise PermissionError
+            with patch.object(Config, "load", side_effect=PermissionError("Permission denied")):
+                config = load_existing_config()
+
+                # Should still load by bypassing permission check
+                assert config is not None
+                assert config.llm.model == "mistral:7b-instruct"
+
+    def test_returns_none_when_bypass_read_fails(self, tmp_path):
+        """Test that None is returned when bypass read also fails."""
+        from logsqueak.wizard.wizard import load_existing_config
+        from logsqueak.models.config import Config
+
+        # Create config file
+        config_dir = tmp_path / ".config" / "logsqueak"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.yaml"
+        config_file.write_text("invalid: yaml: content:")
+
+        with patch("logsqueak.wizard.wizard.Path.home", return_value=tmp_path):
+            # Mock Config.load to raise PermissionError, then open to fail
+            with patch.object(Config, "load", side_effect=PermissionError("Permission denied")):
+                with patch("builtins.open", side_effect=IOError("Cannot read")):
+                    config = load_existing_config()
+                    assert config is None
