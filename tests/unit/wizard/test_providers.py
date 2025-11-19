@@ -61,17 +61,6 @@ class TestGetRecommendedOllamaModel:
 class TestFormatModelSize:
     """Tests for format_model_size function."""
 
-    def test_formats_bytes(self):
-        """Test formatting of sizes in bytes."""
-        assert format_model_size(512) == "512 bytes"
-        assert format_model_size(1023) == "1023 bytes"
-
-    def test_formats_kilobytes(self):
-        """Test formatting of sizes in KB."""
-        assert format_model_size(1024) == "1.0 KB"
-        assert format_model_size(1536) == "1.5 KB"
-        assert format_model_size(10240) == "10.0 KB"
-
     def test_formats_megabytes(self):
         """Test formatting of sizes in MB."""
         assert format_model_size(1048576) == "1.0 MB"  # 1024^2
@@ -92,9 +81,12 @@ class TestFormatModelSize:
         # Llama2 7B (~3.8GB)
         assert format_model_size(3826793677) == "3.6 GB"
 
-    def test_zero_size(self):
-        """Test formatting of zero size."""
-        assert format_model_size(0) == "0 bytes"
+    def test_small_sizes_still_formatted_as_mb(self):
+        """Test that even small sizes are formatted as MB (models are never KB-sized)."""
+        # 512 KB = 524288 bytes
+        assert format_model_size(524288) == "0.5 MB"
+        # 1 KB = 1024 bytes
+        assert format_model_size(1024) == "0.0 MB"
 
 
 class TestMaskApiKey:

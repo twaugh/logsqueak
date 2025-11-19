@@ -69,18 +69,14 @@ def format_model_size(size_bytes: int) -> str:
         Formatted string (e.g., "4.1 GB", "512 MB")
     """
     # Use 1024 as base (binary)
-    kb = 1024
-    mb = kb * 1024
+    # Models are always at least MB in size
+    mb = 1024 * 1024
     gb = mb * 1024
 
     if size_bytes >= gb:
         return f"{size_bytes / gb:.1f} GB"
-    elif size_bytes >= mb:
-        return f"{size_bytes / mb:.1f} MB"
-    elif size_bytes >= kb:
-        return f"{size_bytes / kb:.1f} KB"
     else:
-        return f"{size_bytes} bytes"
+        return f"{size_bytes / mb:.1f} MB"
 
 
 def mask_api_key(api_key: str) -> str:
