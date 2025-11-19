@@ -526,10 +526,12 @@ async def run_setup_wizard() -> bool:
     try:
         # Check for existing config with permission issues
         config_path = Path.home() / ".config" / "logsqueak" / "config.yaml"
+        has_permission_issue = False
         if config_path.exists():
             import stat
             mode = os.stat(config_path).st_mode
             if mode & (stat.S_IRWXG | stat.S_IRWXO):
+                has_permission_issue = True
                 rprint("[yellow]⚠[/yellow] [bold]Config file has incorrect permissions[/bold]")
                 rprint(f"[dim]Current permissions: {oct(mode)[-3:]}[/dim]")
                 rprint("[dim]Config file should be readable only by owner (mode 600)[/dim]\n")
@@ -559,15 +561,16 @@ async def run_setup_wizard() -> bool:
         # Assemble final config
         config = assemble_config(state)
 
-        # Check if anything actually changed
-        if not has_config_changed(config, state.existing_config):
+        # Check if anything actually changed (but always write if permissions are wrong)
+        if not has_config_changed(config, state.existing_config) and not has_permission_issue:
             rprint("[bold cyan]═══ No Changes Detected ═══[/bold cyan]")
             rprint("[dim]Your configuration is already up to date. Nothing to save.[/dim]\n")
             return True
 
         # Check if config file exists and prompt for overwrite
         config_path = Path.home() / ".config" / "logsqueak" / "config.yaml"
-        if config_path.exists():
+        if config_path.exists() and not has_permission_issue:
+            # Only prompt if no permission issue (permission fix is automatic)
             rprint("[bold cyan]═══ Save Configuration ═══[/bold cyan]")
             if not prompt_confirm_overwrite():
                 rprint("[yellow]Setup cancelled - existing config preserved[/yellow]")

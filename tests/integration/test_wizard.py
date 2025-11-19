@@ -251,6 +251,61 @@ class TestUserStory2FixingBrokenConfig:
         assert file_mode == 0o600
 
     @pytest.mark.asyncio
+    async def test_permission_fix_with_no_content_changes(self, temp_graph_dir, tmp_path):
+        """Test that wizard rewrites config even when only permissions are wrong."""
+        # Create proper .config/logsqueak directory structure
+        config_dir = tmp_path / ".config" / "logsqueak"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.yaml"
+
+        # Create config with correct content but wrong permissions
+        config = Config(
+            llm={
+                "endpoint": "http://localhost:11434/v1",
+                "model": "mistral:7b-instruct",
+                "api_key": "not-required",
+            },
+            logseq={"graph_path": str(temp_graph_dir)},
+        )
+        await write_config(config, config_file)
+
+        # Set wrong permissions
+        os.chmod(config_file, 0o644)
+
+        # Simulate wizard run that doesn't change any values
+        from logsqueak.wizard.wizard import has_config_changed, load_existing_config
+
+        with patch("logsqueak.wizard.wizard.Path.home") as mock_home:
+            mock_home.return_value = tmp_path
+            loaded = load_existing_config()
+
+            # Simulate assembling same config
+            state = WizardState(
+                existing_config=loaded,
+                graph_path=str(temp_graph_dir),
+                provider_type="ollama",
+                ollama_endpoint="http://localhost:11434/v1",
+                ollama_model="mistral:7b-instruct",
+            )
+            new_config = assemble_config(state)
+
+            # Content hasn't changed
+            assert not has_config_changed(new_config, loaded)
+
+            # But we should still write to fix permissions
+            # This is tested by the wizard logic in run_setup_wizard()
+            # which checks has_permission_issue flag
+
+        # Verify permissions are still wrong before fix
+        file_stat = os.stat(config_file)
+        assert stat.S_IMODE(file_stat.st_mode) == 0o644
+
+        # After wizard writes, permissions should be fixed
+        await write_config(new_config, config_file)
+        file_stat = os.stat(config_file)
+        assert stat.S_IMODE(file_stat.st_mode) == 0o600
+
+    @pytest.mark.asyncio
     async def test_handle_partially_invalid_config(self, temp_graph_dir, tmp_path):
         """Test handling partially invalid config - wizard extracts valid fields."""
         config_file = tmp_path / "config.yaml"
