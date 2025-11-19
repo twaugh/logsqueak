@@ -59,7 +59,7 @@ Using single project structure (from plan.md):
 
 - [X] T010 [P] [US1] Implement validate_graph_path() in src/logsqueak/wizard/validators.py (check path exists, has journals/ and logseq/ subdirectories)
 - [X] T011 [P] [US1] Implement check_disk_space() in src/logsqueak/wizard/validators.py (use shutil.disk_usage, return ValidationResult with available_mb)
-- [X] T012 [P] [US1] Implement test_ollama_connection() in src/logsqueak/wizard/validators.py (async HTTP GET to /api/tags, parse models, return ValidationResult)
+- [X] T012 [P] [US1] Implement validate_ollama_connection() in src/logsqueak/wizard/validators.py (async HTTP GET to /api/tags, parse models, return ValidationResult)
 - [X] T013 [P] [US1] Implement check_embedding_model_cached() in src/logsqueak/wizard/validators.py (check ~/.cache/torch/sentence_transformers/ path)
 - [X] T014 [P] [US1] Implement validate_embedding_model() in src/logsqueak/wizard/validators.py (async, downloads all-mpnet-base-v2 if needed, progress callback support)
 
@@ -103,11 +103,11 @@ Using single project structure (from plan.md):
 
 ### Tests for User Story 1
 
-- [X] T038 [P] [US1] Unit tests for validators in tests/unit/wizard/test_validators.py (validate_graph_path, check_disk_space, test_ollama_connection with mocked httpx)
+- [X] T038 [P] [US1] Unit tests for validators in tests/unit/wizard/test_validators.py (validate_graph_path, check_disk_space, validate_ollama_connection with mocked httpx)
 - [X] T039 [P] [US1] Unit tests for providers in tests/unit/wizard/test_providers.py (fetch_ollama_models, get_recommended_ollama_model, format_model_size, get_provider_key)
-- [ ] T040 [P] [US1] Unit tests for prompts in tests/unit/wizard/test_prompts.py (mock Rich Prompt.ask and Confirm.ask, verify all prompt functions)
-- [ ] T040a [P] [US1] Unit tests for advanced settings prompts in tests/unit/wizard/test_prompts.py (test defaults, validation, Ollama-specific num_ctx)
-- [ ] T041 [US1] Integration test for first-time Ollama setup in tests/integration/test_wizard.py (mock prompts, mock API calls, verify config file created with correct permissions and content)
+- [X] T040 [P] [US1] Unit tests for prompts in tests/unit/wizard/test_prompts.py (mock Rich Prompt.ask and Confirm.ask, verify all prompt functions)
+- [X] T040a [P] [US1] Unit tests for advanced settings prompts in tests/unit/wizard/test_prompts.py (test defaults, validation, Ollama-specific num_ctx)
+- [X] T041 [US1] Integration test for first-time Ollama setup in tests/integration/test_wizard.py (wizard config generation, file permissions, write operations)
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - users can run `logsqueak init` and configure Ollama
 

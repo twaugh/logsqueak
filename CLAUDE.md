@@ -23,7 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - ✅ **Edge Cases**: Config errors, network errors, file modifications, malformed JSON handling
 - ✅ **UX Polish**: Skip_exists decisions with clickable links, quiet indexing when no updates needed
 - ✅ **Performance**: EditedContent references eliminate sync loops, pre-cleaned contexts in RAG index
-- ✅ **Test Coverage**: 280+ tests passing (173 unit, 69 integration, 38 UI)
+- ✅ **Test Coverage**: 376 tests passing (241 unit, 97 integration, 38 UI)
 
 ## Project Structure
 
