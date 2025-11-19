@@ -57,49 +57,49 @@ Using single project structure (from plan.md):
 
 ### Validation Functions for User Story 1
 
-- [ ] T010 [P] [US1] Implement validate_graph_path() in src/logsqueak/wizard/validators.py (check path exists, has journals/ and logseq/ subdirectories)
-- [ ] T011 [P] [US1] Implement check_disk_space() in src/logsqueak/wizard/validators.py (use shutil.disk_usage, return ValidationResult with available_mb)
-- [ ] T012 [P] [US1] Implement test_ollama_connection() in src/logsqueak/wizard/validators.py (async HTTP GET to /api/tags, parse models, return ValidationResult)
-- [ ] T013 [P] [US1] Implement check_embedding_model_cached() in src/logsqueak/wizard/validators.py (check ~/.cache/torch/sentence_transformers/ path)
-- [ ] T014 [P] [US1] Implement validate_embedding_model() in src/logsqueak/wizard/validators.py (async, downloads all-mpnet-base-v2 if needed, progress callback support)
+- [X] T010 [P] [US1] Implement validate_graph_path() in src/logsqueak/wizard/validators.py (check path exists, has journals/ and logseq/ subdirectories)
+- [X] T011 [P] [US1] Implement check_disk_space() in src/logsqueak/wizard/validators.py (use shutil.disk_usage, return ValidationResult with available_mb)
+- [X] T012 [P] [US1] Implement test_ollama_connection() in src/logsqueak/wizard/validators.py (async HTTP GET to /api/tags, parse models, return ValidationResult)
+- [X] T013 [P] [US1] Implement check_embedding_model_cached() in src/logsqueak/wizard/validators.py (check ~/.cache/torch/sentence_transformers/ path)
+- [X] T014 [P] [US1] Implement validate_embedding_model() in src/logsqueak/wizard/validators.py (async, downloads all-mpnet-base-v2 if needed, progress callback support)
 
 ### Provider Helpers for User Story 1
 
-- [ ] T015 [P] [US1] Implement fetch_ollama_models() in src/logsqueak/wizard/providers.py (call test_ollama_connection, extract OllamaModel list)
-- [ ] T016 [P] [US1] Implement get_recommended_ollama_model() in src/logsqueak/wizard/providers.py (search for mistral 7b instruct)
-- [ ] T017 [P] [US1] Implement format_model_size() in src/logsqueak/wizard/providers.py (convert bytes to GB/MB/KB with 1024 base)
-- [ ] T018 [P] [US1] Implement get_provider_key() in src/logsqueak/wizard/providers.py (generate unique key for llm_providers dict)
+- [X] T015 [P] [US1] Implement fetch_ollama_models() in src/logsqueak/wizard/providers.py (call test_ollama_connection, extract OllamaModel list)
+- [X] T016 [P] [US1] Implement get_recommended_ollama_model() in src/logsqueak/wizard/providers.py (search for mistral 7b instruct)
+- [X] T017 [P] [US1] Implement format_model_size() in src/logsqueak/wizard/providers.py (convert bytes to GB/MB/KB with 1024 base)
+- [X] T018 [P] [US1] Implement get_provider_key() in src/logsqueak/wizard/providers.py (generate unique key for llm_providers dict)
 
 ### Prompts for User Story 1
 
-- [ ] T019 [P] [US1] Implement prompt_graph_path() in src/logsqueak/wizard/prompts.py (Rich Prompt.ask with default, expand ~)
-- [ ] T020 [P] [US1] Implement prompt_provider_choice() in src/logsqueak/wizard/prompts.py (Rich Prompt.ask with choices: ollama, openai, custom)
-- [ ] T021 [P] [US1] Implement prompt_ollama_endpoint() in src/logsqueak/wizard/prompts.py (default http://localhost:11434)
-- [ ] T022 [P] [US1] Implement prompt_ollama_model() in src/logsqueak/wizard/prompts.py (display Rich table, highlight recommended, Prompt.ask with choices)
-- [ ] T023 [P] [US1] Implement prompt_retry_on_failure() in src/logsqueak/wizard/prompts.py (choices: retry, skip, abort)
-- [ ] T024 [P] [US1] Implement prompt_continue_on_timeout() in src/logsqueak/wizard/prompts.py (choices: continue, retry, skip)
-- [ ] T025 [P] [US1] Implement prompt_confirm_overwrite() in src/logsqueak/wizard/prompts.py (Rich Confirm.ask for config overwrite)
-- [ ] T025a [P] [US1] Implement prompt_advanced_settings() in src/logsqueak/wizard/prompts.py (ask if user wants advanced settings, default No)
-- [ ] T025b [P] [US1] Implement prompt_num_ctx() in src/logsqueak/wizard/prompts.py (default 32768, only for Ollama)
-- [ ] T025c [P] [US1] Implement prompt_top_k() in src/logsqueak/wizard/prompts.py (default 10, all providers)
+- [X] T019 [P] [US1] Implement prompt_graph_path() in src/logsqueak/wizard/prompts.py (Rich Prompt.ask with default, expand ~)
+- [X] T020 [P] [US1] Implement prompt_provider_choice() in src/logsqueak/wizard/prompts.py (Rich Prompt.ask with choices: ollama, openai, custom)
+- [X] T021 [P] [US1] Implement prompt_ollama_endpoint() in src/logsqueak/wizard/prompts.py (default http://localhost:11434)
+- [X] T022 [P] [US1] Implement prompt_ollama_model() in src/logsqueak/wizard/prompts.py (display Rich table, highlight recommended, Prompt.ask with choices)
+- [X] T023 [P] [US1] Implement prompt_retry_on_failure() in src/logsqueak/wizard/prompts.py (choices: retry, skip, abort)
+- [X] T024 [P] [US1] Implement prompt_continue_on_timeout() in src/logsqueak/wizard/prompts.py (choices: continue, retry, skip)
+- [X] T025 [P] [US1] Implement prompt_confirm_overwrite() in src/logsqueak/wizard/prompts.py (Rich Confirm.ask for config overwrite)
+- [X] T025a [P] [US1] Implement prompt_advanced_settings() in src/logsqueak/wizard/prompts.py (ask if user wants advanced settings, default No)
+- [X] T025b [P] [US1] Implement prompt_num_ctx() in src/logsqueak/wizard/prompts.py (default 32768, only for Ollama)
+- [X] T025c [P] [US1] Implement prompt_top_k() in src/logsqueak/wizard/prompts.py (default 10, all providers)
 
 ### Wizard Orchestration for User Story 1
 
-- [ ] T026 [US1] Implement load_existing_config() in src/logsqueak/wizard/wizard.py (try Config.load, return None on any error)
-- [ ] T027 [US1] Implement configure_graph_path() in src/logsqueak/wizard/wizard.py (prompt, validate, retry loop, update WizardState)
-- [ ] T028 [US1] Implement configure_ollama() in src/logsqueak/wizard/wizard.py (try existing endpoint, try localhost, prompt for custom, fetch models, select model, update WizardState)
-- [ ] T029 [US1] Implement configure_provider() in src/logsqueak/wizard/wizard.py (prompt provider choice, branch to configure_ollama, optionally prompt advanced settings)
-- [ ] T030 [US1] Implement validate_llm_connection() in src/logsqueak/wizard/wizard.py (call test_ollama_connection with timeout handling, retry logic)
-- [ ] T031 [US1] Implement validate_embedding() in src/logsqueak/wizard/wizard.py (check disk space, check cache, download with progress if needed, timeout handling)
-- [ ] T032 [US1] Implement assemble_config() in src/logsqueak/wizard/wizard.py (create LLMConfig from WizardState, merge llm_providers, return Config)
-- [ ] T033 [US1] Implement write_config() in src/logsqueak/wizard/wizard.py (create directory, atomic temp file write, chmod 600, rename)
-- [ ] T034 [US1] Implement show_success_message() in src/logsqueak/wizard/wizard.py (Rich panel with next steps)
-- [ ] T035 [US1] Implement run_setup_wizard() in src/logsqueak/wizard/wizard.py (orchestrate full flow: load config, configure graph, configure provider, validate LLM, validate embedding, assemble, prompt overwrite, write, show success)
+- [X] T026 [US1] Implement load_existing_config() in src/logsqueak/wizard/wizard.py (try Config.load, return None on any error)
+- [X] T027 [US1] Implement configure_graph_path() in src/logsqueak/wizard/wizard.py (prompt, validate, retry loop, update WizardState)
+- [X] T028 [US1] Implement configure_ollama() in src/logsqueak/wizard/wizard.py (try existing endpoint, try localhost, prompt for custom, fetch models, select model, update WizardState)
+- [X] T029 [US1] Implement configure_provider() in src/logsqueak/wizard/wizard.py (prompt provider choice, branch to configure_ollama, optionally prompt advanced settings)
+- [X] T030 [US1] Implement validate_llm_connection() in src/logsqueak/wizard/wizard.py (call test_ollama_connection with timeout handling, retry logic)
+- [X] T031 [US1] Implement validate_embedding() in src/logsqueak/wizard/wizard.py (check disk space, check cache, download with progress if needed, timeout handling)
+- [X] T032 [US1] Implement assemble_config() in src/logsqueak/wizard/wizard.py (create LLMConfig from WizardState, merge llm_providers, return Config)
+- [X] T033 [US1] Implement write_config() in src/logsqueak/wizard/wizard.py (create directory, atomic temp file write, chmod 600, rename)
+- [X] T034 [US1] Implement show_success_message() in src/logsqueak/wizard/wizard.py (Rich panel with next steps)
+- [X] T035 [US1] Implement run_setup_wizard() in src/logsqueak/wizard/wizard.py (orchestrate full flow: load config, configure graph, configure provider, validate LLM, validate embedding, assemble, prompt overwrite, write, show success)
 
 ### CLI Integration for User Story 1
 
-- [ ] T036 [US1] Add init command to src/logsqueak/cli.py (import run_setup_wizard, call with asyncio.run, handle result)
-- [ ] T037 [US1] Add CLI help text for init command in src/logsqueak/cli.py
+- [X] T036 [US1] Add init command to src/logsqueak/cli.py (import run_setup_wizard, call with asyncio.run, handle result)
+- [X] T037 [US1] Add CLI help text for init command in src/logsqueak/cli.py
 
 ### Tests for User Story 1
 

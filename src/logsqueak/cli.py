@@ -494,6 +494,38 @@ def _display_search_results(results: list[dict], graph_path: Path):
         click.echo()  # Blank line between results
 
 
+@cli.command()
+def init():
+    """
+    Initialize Logsqueak configuration interactively.
+
+    Guides you through:
+    - Logseq graph location
+    - LLM provider selection (Ollama, OpenAI, Custom)
+    - Connection validation
+    - Embedding model setup
+
+    Run this command to create or update your configuration file.
+    """
+    import asyncio
+    from logsqueak.wizard.wizard import run_setup_wizard
+
+    try:
+        result = asyncio.run(run_setup_wizard())
+        if result:
+            # Success message already shown by wizard
+            sys.exit(0)
+        else:
+            click.echo("Setup cancelled.")
+            sys.exit(1)
+    except KeyboardInterrupt:
+        click.echo("\nSetup cancelled.")
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Setup failed: {str(e)}", err=True)
+        sys.exit(1)
+
+
 def main():
     """Main entry point for setuptools console script."""
     cli()
