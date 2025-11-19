@@ -209,9 +209,9 @@ def check_disk_space(required_mb: int = 1024) -> ValidationResult:
         - data={"available_mb": int}
     """
 
-async def test_ollama_connection(endpoint: str, timeout: int = 30) -> ValidationResult:
+async def validate_ollama_connection(endpoint: str, timeout: int = 30) -> ValidationResult:
     """
-    Test Ollama API connectivity and retrieve models.
+    Validate Ollama API connectivity and retrieve models.
 
     Args:
         endpoint: Ollama endpoint URL
@@ -226,7 +226,7 @@ async def test_ollama_connection(endpoint: str, timeout: int = 30) -> Validation
         asyncio.TimeoutError: If request exceeds timeout
     """
 
-async def test_openai_connection(
+async def validate_openai_connection(
     endpoint: str,
     api_key: str,
     model: str,

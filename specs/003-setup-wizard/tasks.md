@@ -65,7 +65,7 @@ Using single project structure (from plan.md):
 
 ### Provider Helpers for User Story 1
 
-- [X] T015 [P] [US1] Implement fetch_ollama_models() in src/logsqueak/wizard/providers.py (call test_ollama_connection, extract OllamaModel list)
+- [X] T015 [P] [US1] Implement fetch_ollama_models() in src/logsqueak/wizard/providers.py (call validate_ollama_connection, extract OllamaModel list)
 - [X] T016 [P] [US1] Implement get_recommended_ollama_model() in src/logsqueak/wizard/providers.py (search for mistral 7b instruct)
 - [X] T017 [P] [US1] Implement format_model_size() in src/logsqueak/wizard/providers.py (convert bytes to GB/MB/KB with 1024 base)
 - [X] T018 [P] [US1] Implement get_provider_key() in src/logsqueak/wizard/providers.py (generate unique key for llm_providers dict)
@@ -89,7 +89,7 @@ Using single project structure (from plan.md):
 - [X] T027 [US1] Implement configure_graph_path() in src/logsqueak/wizard/wizard.py (prompt, validate, retry loop, update WizardState)
 - [X] T028 [US1] Implement configure_ollama() in src/logsqueak/wizard/wizard.py (try existing endpoint, try localhost, prompt for custom, fetch models, select model, update WizardState)
 - [X] T029 [US1] Implement configure_provider() in src/logsqueak/wizard/wizard.py (prompt provider choice, branch to configure_ollama, optionally prompt advanced settings)
-- [X] T030 [US1] Implement validate_llm_connection() in src/logsqueak/wizard/wizard.py (call test_ollama_connection with timeout handling, retry logic)
+- [X] T030 [US1] Implement validate_llm_connection() in src/logsqueak/wizard/wizard.py (call validate_ollama_connection with timeout handling, retry logic)
 - [X] T031 [US1] Implement validate_embedding() in src/logsqueak/wizard/wizard.py (check disk space, check cache, download with progress if needed, timeout handling)
 - [X] T032 [US1] Implement assemble_config() in src/logsqueak/wizard/wizard.py (create LLMConfig from WizardState, merge llm_providers, return Config)
 - [X] T033 [US1] Implement write_config() in src/logsqueak/wizard/wizard.py (create directory, atomic temp file write, chmod 600, rename)
@@ -146,7 +146,7 @@ Using single project structure (from plan.md):
 
 ### Validation Functions for User Story 3
 
-- [ ] T051 [P] [US3] Implement test_openai_connection() in src/logsqueak/wizard/validators.py (async HTTP POST to /chat/completions, minimal test request, return ValidationResult)
+- [ ] T051 [P] [US3] Implement validate_openai_connection() in src/logsqueak/wizard/validators.py (async HTTP POST to /chat/completions, minimal test request, return ValidationResult)
 
 ### Provider Helpers for User Story 3
 
@@ -165,12 +165,12 @@ Using single project structure (from plan.md):
 - [ ] T058 [US3] Implement configure_openai() in src/logsqueak/wizard/wizard.py (prompt for API key, prompt for model, update WizardState)
 - [ ] T059 [US3] Implement configure_custom() in src/logsqueak/wizard/wizard.py (prompt for endpoint, API key, model, update WizardState)
 - [ ] T060 [US3] Enhance configure_provider() in src/logsqueak/wizard/wizard.py to branch to configure_openai and configure_custom
-- [ ] T061 [US3] Enhance validate_llm_connection() in src/logsqueak/wizard/wizard.py to call test_openai_connection for openai and custom providers
+- [ ] T061 [US3] Enhance validate_llm_connection() in src/logsqueak/wizard/wizard.py to call validate_openai_connection for openai and custom providers
 - [ ] T062 [US3] Enhance assemble_config() in src/logsqueak/wizard/wizard.py to handle openai and custom provider types
 
 ### Tests for User Story 3
 
-- [ ] T063 [P] [US3] Unit tests for test_openai_connection in tests/unit/wizard/test_validators.py (mock httpx, test success and various errors)
+- [ ] T063 [P] [US3] Unit tests for validate_openai_connection in tests/unit/wizard/test_validators.py (mock httpx, test success and various errors)
 - [ ] T064 [P] [US3] Unit tests for mask_api_key in tests/unit/wizard/test_providers.py (various key formats)
 - [ ] T065 [P] [US3] Integration test for remote Ollama setup in tests/integration/test_wizard.py (mock remote endpoint, verify connection and model retrieval)
 - [ ] T066 [P] [US3] Integration test for OpenAI provider setup in tests/integration/test_wizard.py (mock API key validation, verify config created)
@@ -313,7 +313,7 @@ Using single project structure (from plan.md):
 # Launch all validators for User Story 1 together:
 Task T010: "Implement validate_graph_path() in src/logsqueak/wizard/validators.py"
 Task T011: "Implement check_disk_space() in src/logsqueak/wizard/validators.py"
-Task T012: "Implement test_ollama_connection() in src/logsqueak/wizard/validators.py"
+Task T012: "Implement validate_ollama_connection() in src/logsqueak/wizard/validators.py"
 Task T013: "Implement check_embedding_model_cached() in src/logsqueak/wizard/validators.py"
 Task T014: "Implement validate_embedding_model() in src/logsqueak/wizard/validators.py"
 

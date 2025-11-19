@@ -27,11 +27,11 @@
   - Use `shutil.disk_usage()`
   - Calculate available MB
   - Compare to threshold (1024 MB)
-- [ ] Implement `test_ollama_connection()`
+- [ ] Implement `validate_ollama_connection()`
   - HTTP GET to `/api/tags`
   - Parse JSON response
   - Convert to `OllamaModel` instances
-- [ ] Implement `test_openai_connection()`
+- [ ] Implement `validate_openai_connection()`
   - HTTP POST to `/chat/completions`
   - Minimal test request
   - Handle 401, 404, 429 errors
@@ -48,7 +48,7 @@
 
 - [ ] Implement `OllamaModel` dataclass
 - [ ] Implement `fetch_ollama_models()`
-  - Call `test_ollama_connection()`
+  - Call `validate_ollama_connection()`
   - Extract models from ValidationResult
 - [ ] Implement `get_recommended_ollama_model()`
   - Search for "mistral" and "7b" and "instruct" in model name
@@ -478,7 +478,7 @@ def test_validate_graph_path_missing_journals(tmp_path):
     assert "journals/" in result.error_message
 
 @pytest.mark.asyncio
-async def test_ollama_connection_success():
+async def validate_ollama_connection_success():
     """Test successful Ollama connection returns models."""
     mock_response = AsyncMock()
     mock_response.json.return_value = {
@@ -491,8 +491,8 @@ async def test_ollama_connection_success():
     with patch("httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
 
-        from logsqueak.wizard.validators import test_ollama_connection
-        result = await test_ollama_connection("http://localhost:11434")
+        from logsqueak.wizard.validators import validate_ollama_connection
+        result = await validate_ollama_connection("http://localhost:11434")
 
         assert result.success is True
         assert len(result.data["models"]) == 1
@@ -521,7 +521,7 @@ async def test_wizard_first_time_setup(tmp_path, monkeypatch):
 
     # Mock validations
     monkeypatch.setattr(
-        "logsqueak.wizard.validators.test_ollama_connection",
+        "logsqueak.wizard.validators.validate_ollama_connection",
         AsyncMock(return_value=ValidationResult(
             success=True,
             data={"models": [{"name": "mistral:7b-instruct", "size": 4109733376}]}

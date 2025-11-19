@@ -184,8 +184,8 @@ def check_disk_space(required_mb: int = 1024) -> tuple[bool, int]:
 ```python
 import httpx
 
-async def test_ollama_connection(endpoint: str, timeout: int = 30) -> tuple[bool, list[dict] | str]:
-    """Test Ollama connection and retrieve models.
+async def validate_ollama_connection(endpoint: str, timeout: int = 30) -> tuple[bool, list[dict] | str]:
+    """Validate Ollama connection and retrieve models.
 
     Returns:
         (success, models_or_error)
@@ -202,7 +202,7 @@ async def test_ollama_connection(endpoint: str, timeout: int = 30) -> tuple[bool
     except Exception as e:
         return False, str(e)
 
-async def test_openai_connection(endpoint: str, api_key: str, model: str, timeout: int = 30) -> tuple[bool, str]:
+async def validate_openai_connection(endpoint: str, api_key: str, model: str, timeout: int = 30) -> tuple[bool, str]:
     """Test OpenAI API connection.
 
     Returns:
