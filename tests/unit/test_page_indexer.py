@@ -4,6 +4,7 @@ import pytest
 from pathlib import Path
 import tempfile
 import shutil
+from unittest.mock import MagicMock, patch
 from logsqueak.services.page_indexer import PageIndexer, generate_graph_db_name
 from logseq_outline.graph import GraphPaths
 from logseq_outline.parser import LogseqOutline
@@ -614,5 +615,93 @@ async def test_schema_version_mismatch_triggers_rebuild(temp_graph, temp_db, sha
 
     # Verify index was built successfully
     assert indexer.collection.count() > 0, "Index should have data after rebuild"
+
+    await indexer.close()
+
+
+@pytest.mark.asyncio
+async def test_large_batch_upsert_handles_chromadb_limit(tmp_path, shared_sentence_transformer):
+    """Test that large batch upsert respects ChromaDB's batch size limit.
+
+    ChromaDB has a maximum batch size limit (~5461 documents). When indexing
+    large graphs with many blocks, we need to batch the upsert operations
+    to avoid "Batch size X is greater than max batch size Y" errors.
+
+    This test mocks a collection that enforces the batch limit to verify
+    the PageIndexer properly batches large upserts.
+    """
+    # Create a small graph (we'll mock the large batch scenario)
+    graph_path = tmp_path / "test-graph"
+    graph_path.mkdir()
+    pages_dir = graph_path / "pages"
+    pages_dir.mkdir()
+
+    # Create just a few pages to keep the test fast
+    # Each page gets: 1 page-level chunk + 2 block chunks = 3 chunks
+    # Total: 3 pages × 3 chunks = 9 chunks
+    for i in range(3):
+        page_file = pages_dir / f"Page {i}.md"
+        page_file.write_text("- Test block\n- Another block\n")
+
+    graph_paths = GraphPaths(graph_path)
+    db_path = tmp_path / "chromadb"
+
+    # Use a small batch size (3) to force multiple batches with our 9 chunks
+    # This simulates what would happen with a large graph and the default batch size of 256
+    INDEXER_BATCH_SIZE = 3
+    indexer = PageIndexer(
+        graph_paths,
+        db_path,
+        encoder=shared_sentence_transformer,
+        batch_size=INDEXER_BATCH_SIZE
+    )
+
+    # Mock the collection to simulate ChromaDB's batch size limit
+    # (No need to clean the index since we're mocking upsert - it never reaches ChromaDB)
+    original_upsert = indexer.collection.upsert
+    SIMULATED_MAX_BATCH_SIZE = 5  # Simulate ChromaDB's limit (higher than our batch size)
+    upsert_calls = []
+
+    def mock_upsert(documents, embeddings, ids, metadatas):
+        """Mock upsert that enforces batch size limit like ChromaDB."""
+        batch_size = len(ids)
+        upsert_calls.append(batch_size)
+        if batch_size > SIMULATED_MAX_BATCH_SIZE:
+            raise ValueError(
+                f"Batch size of {batch_size} is greater than max batch size of {SIMULATED_MAX_BATCH_SIZE}"
+            )
+        # Call original upsert if batch is within limit
+        return original_upsert(
+            documents=documents,
+            embeddings=embeddings,
+            ids=ids,
+            metadatas=metadatas
+        )
+
+    indexer.collection.upsert = mock_upsert
+
+    # This should succeed because we're batching upserts to respect the limit
+    # (3 pages with 2 blocks each = 9 chunks total, batch size of 3 = 3 batches)
+    await indexer.build_index()
+
+    # Verify the mock was called multiple times (3 batches expected)
+    assert len(upsert_calls) == 3, \
+        f"Expected 3 batched upsert calls (9 chunks / batch_size 3), got {len(upsert_calls)}: {upsert_calls}"
+
+    # Verify each batch size matches our batch_size setting and respects the mock limit
+    for i, batch_size in enumerate(upsert_calls):
+        assert batch_size == INDEXER_BATCH_SIZE, \
+            f"Batch {i} has size {batch_size}, expected {INDEXER_BATCH_SIZE}"
+        assert batch_size <= SIMULATED_MAX_BATCH_SIZE, \
+            f"Batch {i} has size {batch_size}, exceeds ChromaDB limit {SIMULATED_MAX_BATCH_SIZE}"
+
+    # Verify all chunks were upserted (sum of all batches = total chunks)
+    total_upserted = sum(upsert_calls)
+    assert total_upserted == 9, \
+        f"Expected 9 total chunks upserted, got {total_upserted} from batches: {upsert_calls}"
+
+    # Verify chunks are actually in the collection
+    assert indexer.collection.count() == 9, \
+        f"Expected 9 chunks in collection, got {indexer.collection.count()}"
 
     await indexer.close()

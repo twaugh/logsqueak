@@ -111,7 +111,8 @@ class PageIndexer:
         graph_paths: GraphPaths,
         db_path: Optional[Path] = None,
         embedding_model: str = "all-mpnet-base-v2",
-        encoder: Optional[Any] = None
+        encoder: Optional[Any] = None,
+        batch_size: int = 256
     ):
         """
         Initialize page indexer.
@@ -122,10 +123,12 @@ class PageIndexer:
                      A per-graph subdirectory will be created under this path.
             embedding_model: SentenceTransformer model name (loaded lazily if encoder not provided)
             encoder: Optional pre-loaded SentenceTransformer encoder (for testing/performance)
+            batch_size: Number of chunks to encode/upsert per batch (default: 256, must be <= ChromaDB's limit)
         """
         self.graph_paths = graph_paths
         self.embedding_model = embedding_model
         self._encoder: Optional[Any] = encoder  # Pre-loaded or lazy-loaded SentenceTransformer
+        self.batch_size = batch_size
 
         # Compute per-graph database path
         if db_path is None:
@@ -306,10 +309,11 @@ class PageIndexer:
                 all_chunks.update(page_chunks)  # Merge with deduplication
                 logger.debug("page_chunks_prepared", page_name=page_name, chunk_count=len(page_chunks))
 
-            # Phase 5: Batch encode all chunks
-            logger.info("batch_encoding", total_chunks=len(all_chunks))
+            # Phase 5: Batch encode and upsert chunks
+            logger.info("batch_encoding_and_upserting", total_chunks=len(all_chunks))
             chunk_ids = list(all_chunks.keys())
             documents = [chunk["document"] for chunk in all_chunks.values()]
+            metadatas = [chunk["metadata"] for chunk in all_chunks.values()]
 
             # Signal model loading phase (before first encoder access)
             if progress_callback:
@@ -319,46 +323,36 @@ class PageIndexer:
             # Access encoder (triggers lazy loading on first use)
             encoder = self.encoder
 
-            # Encode in batches with progress reporting
-            # Encoding is the slowest phase (85-95% of total time), so we report incremental progress
-            import numpy as np
+            # Encode and upsert in batches
+            # - Encoding is the slowest phase (85-95% of total time)
+            # - Upserting immediately after each batch avoids ChromaDB's batch size limit (~5461)
+            # - Reduces memory usage (don't hold all embeddings in memory)
+            # - Default batch_size of 256 balances progress granularity and overhead
 
-            batch_size = 256  # Balance between progress granularity and overhead
-            embeddings_list = []
-
-            for batch_start in range(0, len(documents), batch_size):
-                batch_end = min(batch_start + batch_size, len(documents))
-                batch_docs = documents[batch_start:batch_end]
+            for batch_start in range(0, len(documents), self.batch_size):
+                batch_end = min(batch_start + self.batch_size, len(documents))
 
                 # Encode batch
                 batch_embeddings = encoder.encode(
-                    batch_docs,
+                    documents[batch_start:batch_end],
                     convert_to_numpy=True,
                     show_progress_bar=False
                 )
-                embeddings_list.append(batch_embeddings)
 
-                # Report progress (chunks encoded so far, total chunks)
+                # Immediately upsert this batch to ChromaDB
+                self.collection.upsert(
+                    documents=documents[batch_start:batch_end],
+                    embeddings=batch_embeddings.tolist(),
+                    ids=chunk_ids[batch_start:batch_end],
+                    metadatas=metadatas[batch_start:batch_end]
+                )
+
+                # Report progress (chunks encoded and upserted so far, total chunks)
                 if progress_callback:
                     progress_callback(batch_end, len(documents))
 
-            # Concatenate all batch embeddings
-            embeddings = np.vstack(embeddings_list) if embeddings_list else np.array([])
-
-            # Phase 6: Prepare data for bulk upsert
-            metadatas = [chunk["metadata"] for chunk in all_chunks.values()]
-
-            # Phase 7: Bulk upsert to ChromaDB
-            logger.info("bulk_upserting", total_chunks=len(chunk_ids))
-            self.collection.upsert(
-                documents=documents,
-                embeddings=embeddings.tolist(),
-                ids=chunk_ids,
-                metadatas=metadatas
-            )
-
-            # Phase 8: Compact database to reclaim fragmented space
-            # Bulk upserts can leave ~70% wasted space due to SQLite fragmentation
+            # Phase 6: Compact database to reclaim fragmented space
+            # Multiple batch upserts can leave ~70% wasted space due to SQLite fragmentation
             self._vacuum_database()
 
             logger.info("page_indexing_completed", total_pages=len(page_files), chunks_indexed=len(all_chunks))
