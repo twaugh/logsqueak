@@ -687,6 +687,7 @@ Logseq uses indented bullets (2 spaces per level) with special features:
 GPLv3 - All code is licensed under GPLv3 regardless of authorship method (including AI-assisted development).
 
 ## Recent Changes
+- 003-setup-wizard: Added Python 3.11+ + Click (CLI framework), Rich (formatted CLI output), httpx (HTTP client for API testing), PyYAML (config serialization), sentence-transformers (embedding model), existing Pydantic models (Config validation)
 
 - 2025-11-17: **Specification Complete** - All phases implemented, 280+ tests passing
   - Completed all 8 phases of the interactive TUI feature spec (002-logsqueak-spec)
@@ -717,7 +718,6 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
     - Added `strip_page_properties()` to prevent duplicate frontmatter
   - **Impact**: Fixes 400 Bad Request errors from Mistral-7B context window limits
   - **Result**: 90%+ prompt size reduction enables faster responses and more reliable LLM calls
-- 2025-11-12: **LLM Request Queue** - Implemented request serialization with priority and cancellation (T108r, T108s)
   - Added priority queue to serialize LLM requests (prevents concurrent prompts)
   - Priority order: Classification (1) > Rewording (2) > Integration (3)
   - Workers use `acquire_llm_slot()` / `release_llm_slot()` for coordination
@@ -727,7 +727,6 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
   - Graceful handling of `asyncio.CancelledError` in all workers
   - Test suite with 5 tests for sequential execution, priority ordering, error handling
   - Rationale: Prevents resource contention with high-latency reasoning models
-- 2025-11-11: **Parser Refactoring** - Added strict_indent_preservation parameter
   - Parser now defaults to normalized indentation (no outdent markers)
   - Added strict_indent_preservation parameter for write operations only
   - Normalized content hashing for stable IDs across parsing modes
@@ -735,7 +734,6 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
   - Simplifies application code by handling markers at parser level
   - All 87 parser tests passing, 7 new tests for indent preservation and hash stability
   - Prevents implementation details from leaking into LLM prompts and UI
-- 2025-11-10: **Phase 5 Complete** - Integration Review TUI implemented and tested (T071-T096)
   - TargetPagePreview and DecisionList widgets complete
   - Phase3Screen with decision navigation, batch acceptance, target preview
   - File operations service with atomic two-phase writes and provenance markers
@@ -743,7 +741,6 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
   - Idempotent retry detection and concurrent modification handling
   - 38 UI tests passing, 37 file operations tests passing
   - All three core user stories (US1, US2, US3) now complete
-- 2025-11-06: **Phase 4 Complete** - Content Editing TUI implemented and tested (T050-T070)
   - RAG services (PageIndexer, RAGSearch) with lazy SentenceTransformer loading
   - Fixed PageIndexer to use `generate_chunks()` for proper semantic chunking
   - ContentEditor widget and Phase2Screen with vertical three-panel layout
@@ -751,16 +748,14 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
   - Auto-save on navigation, RAG search blocking implemented
   - Comprehensive UI test suite with snapshot testing
   - All async fixtures properly use `@pytest_asyncio.fixture`
-- 2025-11-06: **Phase 3 Complete** - Block Selection TUI implemented and tested (T032-T049)
   - BlockTree, StatusPanel, MarkdownViewer widgets complete
   - Phase1Screen with LLM streaming, keyboard navigation, manual selection
   - Journal loader service with date/range parsing
   - CLI integration launching Phase 1 TUI
-- 2025-11-06: **Phase 1-2 Complete** - Foundational infrastructure implemented and tested (T001-T031)
   - All data models, services, CLI, config, and utilities complete
   - Fixed FileMonitor to use `!=` comparison (git-friendly)
   - Generated Logsqueak-specific UUID namespace
 
 ## Active Technologies
-- Python 3.11+ (002-logsqueak-spec)
-- File-based (Logseq markdown files) + ChromaDB (vector embeddings) (002-logsqueak-spec)
+- Python 3.11+ + Click (CLI framework), Rich (formatted CLI output), httpx (HTTP client for API testing), PyYAML (config serialization), sentence-transformers (embedding model), existing Pydantic models (Config validation) (003-setup-wizard)
+- File-based YAML config at `~/.config/logsqueak/config.yaml` with mode 600 permissions (003-setup-wizard)
