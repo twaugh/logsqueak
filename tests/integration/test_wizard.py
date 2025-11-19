@@ -1034,3 +1034,83 @@ class TestEdgeCases:
                 captured = capsys.readouterr()
                 assert "No models found in Ollama instance" in captured.out
                 assert "ollama pull mistral:7b-instruct" in captured.out
+
+    @pytest.mark.asyncio
+    async def test_wizard_abort_no_config_written(self, tmp_path, temp_graph_dir, monkeypatch):
+        """Test that aborting wizard at various stages doesn't write config."""
+        from logsqueak.wizard.wizard import run_setup_wizard
+        import asyncio
+
+        # Set config path to temp directory
+        config_path = tmp_path / "config.yaml"
+        monkeypatch.setenv("HOME", str(tmp_path))
+
+        # Mock KeyboardInterrupt during provider configuration
+        prompt_count = {"value": 0}
+
+        def mock_prompt_interrupt(*args, **kwargs):
+            prompt_count["value"] += 1
+            # Interrupt on second prompt (provider choice)
+            if prompt_count["value"] == 2:
+                raise KeyboardInterrupt()
+            # First prompt (graph path) returns valid path
+            return str(temp_graph_dir)
+
+        with patch("logsqueak.wizard.prompts.Prompt.ask", mock_prompt_interrupt):
+            result = await run_setup_wizard()
+
+            # Should return False (aborted)
+            assert result is False
+            # Config file should NOT be written
+            assert not (tmp_path / ".config" / "logsqueak" / "config.yaml").exists()
+
+    @pytest.mark.asyncio
+    async def test_invalid_yaml_config_treated_as_fresh_setup(self, tmp_path, temp_graph_dir):
+        """Test that malformed YAML config is treated as fresh setup."""
+        from logsqueak.wizard.wizard import load_existing_config
+
+        # Create config directory and write invalid YAML
+        config_dir = tmp_path / ".config" / "logsqueak"
+        config_dir.mkdir(parents=True)
+        config_path = config_dir / "config.yaml"
+
+        # Write malformed YAML (invalid syntax)
+        config_path.write_text("""
+llm:
+  endpoint: http://localhost:11434/v1
+  api_key: test-key
+  model: test-model
+logseq:
+  graph_path: {invalid syntax here
+  missing: closing brace
+""")
+
+        # Mock HOME to use temp directory
+        import os
+        original_home = os.environ.get("HOME")
+        os.environ["HOME"] = str(tmp_path)
+
+        try:
+            # Should return None (treat as no config)
+            config = load_existing_config()
+            assert config is None
+        finally:
+            # Restore original HOME
+            if original_home:
+                os.environ["HOME"] = original_home
+
+    @pytest.mark.asyncio
+    async def test_path_with_spaces_validates_correctly(self, tmp_path):
+        """Test that graph path with spaces is handled correctly."""
+        from logsqueak.wizard.validators import validate_graph_path
+
+        # Create graph directory with spaces in name
+        graph_dir = tmp_path / "My Logseq Graph"
+        graph_dir.mkdir()
+        (graph_dir / "journals").mkdir()
+        (graph_dir / "logseq").mkdir()
+
+        # Should validate successfully
+        result = validate_graph_path(str(graph_dir))
+        assert result.success is True
+        assert result.data["path"] == str(graph_dir.resolve())

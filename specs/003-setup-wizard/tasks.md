@@ -226,9 +226,9 @@ Using single project structure (from plan.md):
 - [X] T088 [P] Integration test for embedding download timeout in tests/integration/test_wizard.py (mock timeout, verify user prompted)
 - [X] T089 [P] Integration test for low disk space warning in tests/integration/test_wizard.py (mock disk_usage, verify warning shown)
 - [X] T090 [P] Integration test for Ollama with no models in tests/integration/test_wizard.py (empty models list, verify suggestion shown)
-- [ ] T091 [P] Integration test for wizard abort in tests/integration/test_wizard.py (abort at various stages, verify no config written)
-- [ ] T092 [P] Integration test for invalid YAML config in tests/integration/test_wizard.py (malformed YAML, verify treated as fresh setup)
-- [ ] T093 [P] Integration test for path with spaces in tests/integration/test_wizard.py (verify path validation handles correctly)
+- [X] T091 [P] Integration test for wizard abort in tests/integration/test_wizard.py (abort at various stages, verify no config written)
+- [X] T092 [P] Integration test for invalid YAML config in tests/integration/test_wizard.py (malformed YAML, verify treated as fresh setup)
+- [X] T093 [P] Integration test for path with spaces in tests/integration/test_wizard.py (verify path validation handles correctly)
 
 ---
 
