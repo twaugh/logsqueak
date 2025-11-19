@@ -207,25 +207,25 @@ Using single project structure (from plan.md):
 **Purpose**: Handle all edge cases and failure scenarios from spec
 
 - [X] T074 [P] Add timeout handling wrapper in src/logsqueak/wizard/wizard.py for LLM connection (30s timeout, prompt user: continue/retry/skip)
-- [ ] T075 [P] Add timeout handling wrapper in src/logsqueak/wizard/wizard.py for embedding download (5min timeout, prompt user: continue/retry/skip)
-- [ ] T076 [P] Add disk space warning logic in src/logsqueak/wizard/wizard.py (warn if <1GB, allow proceeding if user confirms)
+- [X] T075 [P] Add timeout handling wrapper in src/logsqueak/wizard/wizard.py for embedding download (5min timeout, prompt user: continue/retry/skip)
+- [X] T076 [P] Add disk space warning logic in src/logsqueak/wizard/wizard.py (warn if <1GB, allow proceeding if user confirms)
 - [ ] T077 [P] Add error handling for missing journals/ subdirectory in src/logsqueak/wizard/validators.py (clear error message stating which directory missing)
 - [ ] T078 [P] Add error handling for missing logseq/ subdirectory in src/logsqueak/wizard/validators.py (clear error message stating which directory missing)
-- [ ] T079 [P] Add error handling for Ollama with no models in src/logsqueak/wizard/wizard.py (suggest installing Mistral 7B Instruct)
+- [X] T079 [P] Add error handling for Ollama with no models in src/logsqueak/wizard/wizard.py (suggest installing Mistral 7B Instruct)
 - [ ] T080 [P] Add error handling for empty/whitespace config file in src/logsqueak/wizard/wizard.py (treat as no config, start fresh)
 - [ ] T081 [P] Add error handling for invalid YAML syntax in src/logsqueak/wizard/wizard.py (log error, treat as no config, start fresh)
 - [ ] T082 [P] Add error handling for config directory creation failure in src/logsqueak/wizard/wizard.py (permission denied, show helpful error with suggestions)
 - [ ] T083 [P] Add error handling for corrupted embedding model download in src/logsqueak/wizard/validators.py (detect via load failure, prompt retry)
-- [ ] T084 [P] Add error handling for disk space running out during download in src/logsqueak/wizard/validators.py (clear error message with disk space info)
+- [X] T084 [P] Add error handling for disk space running out during download in src/logsqueak/wizard/validators.py (clear error message with disk space info)
 - [ ] T085 Add KeyboardInterrupt handling in src/logsqueak/wizard/wizard.py (catch Ctrl+C, show abort message, return False)
 - [ ] T086 Add validation for graph path with spaces/special characters in src/logsqueak/wizard/validators.py (ensure Path handles correctly)
 
 ### Edge Case Tests
 
 - [X] T087 [P] Integration test for LLM connection timeout in tests/integration/test_wizard.py (mock timeout, verify user prompted)
-- [ ] T088 [P] Integration test for embedding download timeout in tests/integration/test_wizard.py (mock timeout, verify user prompted)
-- [ ] T089 [P] Integration test for low disk space warning in tests/integration/test_wizard.py (mock disk_usage, verify warning shown)
-- [ ] T090 [P] Integration test for Ollama with no models in tests/integration/test_wizard.py (empty models list, verify suggestion shown)
+- [X] T088 [P] Integration test for embedding download timeout in tests/integration/test_wizard.py (mock timeout, verify user prompted)
+- [X] T089 [P] Integration test for low disk space warning in tests/integration/test_wizard.py (mock disk_usage, verify warning shown)
+- [X] T090 [P] Integration test for Ollama with no models in tests/integration/test_wizard.py (empty models list, verify suggestion shown)
 - [ ] T091 [P] Integration test for wizard abort in tests/integration/test_wizard.py (abort at various stages, verify no config written)
 - [ ] T092 [P] Integration test for invalid YAML config in tests/integration/test_wizard.py (malformed YAML, verify treated as fresh setup)
 - [ ] T093 [P] Integration test for path with spaces in tests/integration/test_wizard.py (verify path validation handles correctly)

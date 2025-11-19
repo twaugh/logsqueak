@@ -992,3 +992,45 @@ class TestEdgeCases:
 
                         # Should return True (skip validation after disk error)
                         assert result is True
+
+    @pytest.mark.asyncio
+    async def test_ollama_with_no_models_shows_helpful_message(self, temp_graph_dir, capsys):
+        """Test that Ollama with no models shows installation suggestion."""
+        from logsqueak.wizard.wizard import configure_ollama, WizardState
+
+        state = WizardState(graph_path=str(temp_graph_dir))
+
+        call_count = {"value": 0}
+
+        # Mock Ollama connection succeeding but returning empty models list
+        async def mock_ollama_no_models(endpoint, timeout=30):
+            call_count["value"] += 1
+            # First call (automatic test): connection succeeds but no models
+            # This will trigger the manual endpoint prompt
+            if call_count["value"] == 1:
+                return ValidationResult(
+                    success=True,
+                    data={"models": []}  # Empty models list - triggers line 219 else
+                )
+            else:
+                # Subsequent prompts would happen, but we'll mock the prompt too
+                return ValidationResult(
+                    success=True,
+                    data={"models": []}  # Still empty
+                )
+
+        # Mock the prompt to avoid EOF error - return same endpoint
+        def mock_prompt(default):
+            return default
+
+        with patch("logsqueak.wizard.wizard.validate_ollama_connection", mock_ollama_no_models):
+            with patch("logsqueak.wizard.wizard.prompt_ollama_endpoint", mock_prompt):
+                result = await configure_ollama(state)
+
+                # Should return False (abort due to no models)
+                assert result is False
+
+                # Verify helpful message was shown
+                captured = capsys.readouterr()
+                assert "No models found in Ollama instance" in captured.out
+                assert "ollama pull mistral:7b-instruct" in captured.out
