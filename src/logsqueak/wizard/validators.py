@@ -114,7 +114,9 @@ async def validate_ollama_connection(endpoint: str, timeout: int = 30) -> Valida
     api_url = f"{base_endpoint}/api/tags"
 
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        # Disable SSL verification to support self-signed certificates
+        # (common for local/development LLM servers)
+        async with httpx.AsyncClient(timeout=timeout, verify=False) as client:
             response = await client.get(api_url)
             response.raise_for_status()
             data = response.json()
@@ -210,4 +212,122 @@ async def validate_embedding_model(
         return ValidationResult(
             success=False,
             error_message=f"Failed to load embedding model: {str(e)}"
+        )
+
+
+async def validate_openai_connection(
+    endpoint: str, api_key: str, model: str, timeout: int = 30
+) -> ValidationResult:
+    """Test OpenAI API connection with minimal request.
+
+    Args:
+        endpoint: OpenAI API endpoint URL
+        api_key: API key for authentication
+        model: Model name to test
+        timeout: Request timeout in seconds
+
+    Returns:
+        ValidationResult with success=True if connection succeeds
+
+    Raises:
+        asyncio.TimeoutError: If request exceeds timeout
+    """
+    # Normalize endpoint
+    base_endpoint = endpoint.rstrip("/")
+
+    # Use /v1/models endpoint for lightweight test
+    api_url = f"{base_endpoint}/models"
+
+    try:
+        # Disable SSL verification to support self-signed certificates
+        # (common for local/development LLM servers)
+        async with httpx.AsyncClient(timeout=timeout, verify=False) as client:
+            response = await client.get(
+                api_url,
+                headers={"Authorization": f"Bearer {api_key}"}
+            )
+            response.raise_for_status()
+
+            return ValidationResult(success=True)
+
+    except httpx.ConnectError as e:
+        # More detailed connection error message
+        return ValidationResult(
+            success=False,
+            error_message=(
+                f"Could not connect to API at {endpoint}\n"
+                f"  Error: {str(e)}\n"
+                f"  Check that the endpoint URL is correct and the service is running"
+            )
+        )
+    except httpx.TimeoutException:
+        return ValidationResult(
+            success=False,
+            error_message=(
+                f"Connection to {endpoint} timed out after {timeout} seconds\n"
+                f"  The API may be slow to respond or unreachable"
+            )
+        )
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 401:
+            return ValidationResult(
+                success=False,
+                error_message=(
+                    "Invalid API key (401 Unauthorized)\n"
+                    f"  The API at {endpoint} rejected your API key\n"
+                    f"  Please check that your API key is correct"
+                )
+            )
+        elif e.response.status_code == 403:
+            return ValidationResult(
+                success=False,
+                error_message=(
+                    "API key does not have permission (403 Forbidden)\n"
+                    f"  Your API key is valid but lacks necessary permissions\n"
+                    f"  Check your account settings at the provider"
+                )
+            )
+        elif e.response.status_code == 404:
+            return ValidationResult(
+                success=False,
+                error_message=(
+                    f"API endpoint not found (404 Not Found)\n"
+                    f"  The URL {api_url} does not exist\n"
+                    f"  Check that your endpoint URL is correct\n"
+                    f"  Expected format: https://api.example.com/v1"
+                )
+            )
+        else:
+            # Try to get response body for more context
+            try:
+                error_body = e.response.text
+                return ValidationResult(
+                    success=False,
+                    error_message=(
+                        f"API error {e.response.status_code}\n"
+                        f"  Endpoint: {endpoint}\n"
+                        f"  Response: {error_body[:200]}"
+                    )
+                )
+            except Exception:
+                return ValidationResult(
+                    success=False,
+                    error_message=f"API error: {e.response.status_code}"
+                )
+    except httpx.InvalidURL:
+        return ValidationResult(
+            success=False,
+            error_message=(
+                f"Invalid endpoint URL: {endpoint}\n"
+                f"  Expected format: https://api.example.com/v1"
+            )
+        )
+    except Exception as e:
+        return ValidationResult(
+            success=False,
+            error_message=(
+                f"Unexpected error while connecting to {endpoint}\n"
+                f"  Error type: {type(e).__name__}\n"
+                f"  Details: {str(e)}"
+            )
         )

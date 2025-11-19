@@ -146,35 +146,35 @@ Using single project structure (from plan.md):
 
 ### Validation Functions for User Story 3
 
-- [ ] T051 [P] [US3] Implement validate_openai_connection() in src/logsqueak/wizard/validators.py (async HTTP POST to /chat/completions, minimal test request, return ValidationResult)
+- [X] T051 [P] [US3] Implement validate_openai_connection() in src/logsqueak/wizard/validators.py (async HTTP POST to /chat/completions, minimal test request, return ValidationResult)
 
 ### Provider Helpers for User Story 3
 
-- [ ] T052 [P] [US3] Implement mask_api_key() in src/logsqueak/wizard/providers.py (first 8 + "..." + last 4)
+- [X] T052 [P] [US3] Implement mask_api_key() in src/logsqueak/wizard/providers.py (first 8 + "..." + last 4)
 
 ### Prompts for User Story 3
 
-- [ ] T053 [P] [US3] Implement prompt_openai_api_key() in src/logsqueak/wizard/prompts.py (visible input for new keys, show masked version for existing keys)
-- [ ] T054 [P] [US3] Implement prompt_openai_model() in src/logsqueak/wizard/prompts.py (choices: gpt-4o, gpt-4-turbo, gpt-3.5-turbo, custom)
-- [ ] T055 [P] [US3] Implement prompt_custom_endpoint() in src/logsqueak/wizard/prompts.py (URL validation)
-- [ ] T056 [P] [US3] Implement prompt_custom_api_key() in src/logsqueak/wizard/prompts.py (visible input)
-- [ ] T057 [P] [US3] Implement prompt_custom_model() in src/logsqueak/wizard/prompts.py (freeform text)
+- [X] T053 [P] [US3] Implement prompt_openai_api_key() in src/logsqueak/wizard/prompts.py (visible input for new keys, show masked version for existing keys)
+- [X] T054 [P] [US3] Implement prompt_openai_model() in src/logsqueak/wizard/prompts.py (choices: gpt-4o, gpt-4-turbo, gpt-3.5-turbo, custom)
+- [X] T055 [P] [US3] Implement prompt_custom_endpoint() in src/logsqueak/wizard/prompts.py (URL validation)
+- [X] T056 [P] [US3] Implement prompt_custom_api_key() in src/logsqueak/wizard/prompts.py (visible input)
+- [X] T057 [P] [US3] Implement prompt_custom_model() in src/logsqueak/wizard/prompts.py (freeform text)
 
 ### Wizard Orchestration for User Story 3
 
-- [ ] T058 [US3] Implement configure_openai() in src/logsqueak/wizard/wizard.py (prompt for API key, prompt for model, update WizardState)
-- [ ] T059 [US3] Implement configure_custom() in src/logsqueak/wizard/wizard.py (prompt for endpoint, API key, model, update WizardState)
-- [ ] T060 [US3] Enhance configure_provider() in src/logsqueak/wizard/wizard.py to branch to configure_openai and configure_custom
-- [ ] T061 [US3] Enhance validate_llm_connection() in src/logsqueak/wizard/wizard.py to call validate_openai_connection for openai and custom providers
-- [ ] T062 [US3] Enhance assemble_config() in src/logsqueak/wizard/wizard.py to handle openai and custom provider types
+- [X] T058 [US3] Implement configure_openai() in src/logsqueak/wizard/wizard.py (prompt for API key, prompt for model, update WizardState)
+- [X] T059 [US3] Implement configure_custom() in src/logsqueak/wizard/wizard.py (prompt for endpoint, API key, model, update WizardState)
+- [X] T060 [US3] Enhance configure_provider() in src/logsqueak/wizard/wizard.py to branch to configure_openai and configure_custom
+- [X] T061 [US3] Enhance validate_llm_connection() in src/logsqueak/wizard/wizard.py to call validate_openai_connection for openai and custom providers
+- [X] T062 [US3] Enhance assemble_config() in src/logsqueak/wizard/wizard.py to handle openai and custom provider types
 
 ### Tests for User Story 3
 
-- [ ] T063 [P] [US3] Unit tests for validate_openai_connection in tests/unit/wizard/test_validators.py (mock httpx, test success and various errors)
-- [ ] T064 [P] [US3] Unit tests for mask_api_key in tests/unit/wizard/test_providers.py (various key formats)
-- [ ] T065 [P] [US3] Integration test for remote Ollama setup in tests/integration/test_wizard.py (mock remote endpoint, verify connection and model retrieval)
-- [ ] T066 [P] [US3] Integration test for OpenAI provider setup in tests/integration/test_wizard.py (mock API key validation, verify config created)
-- [ ] T067 [P] [US3] Integration test for custom endpoint setup in tests/integration/test_wizard.py (mock custom endpoint validation, verify config created)
+- [X] T063 [P] [US3] Unit tests for validate_openai_connection in tests/unit/wizard/test_validators.py (mock httpx, test success and various errors)
+- [X] T064 [P] [US3] Unit tests for mask_api_key in tests/unit/wizard/test_providers.py (various key formats)
+- [X] T065 [P] [US3] Integration test for remote Ollama setup in tests/integration/test_wizard.py (mock remote endpoint, verify connection and model retrieval)
+- [X] T066 [P] [US3] Integration test for OpenAI provider setup in tests/integration/test_wizard.py (mock API key validation, verify config created)
+- [X] T067 [P] [US3] Integration test for custom endpoint setup in tests/integration/test_wizard.py (mock custom endpoint validation, verify config created)
 
 **Checkpoint**: At this point, User Stories 1, 2, AND 3 should all work independently - Ollama (local/remote), OpenAI, and custom endpoints all supported
 

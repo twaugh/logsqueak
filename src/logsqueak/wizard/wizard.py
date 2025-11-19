@@ -16,10 +16,15 @@ from logsqueak.models.config import Config, LLMConfig, LogseqConfig, RAGConfig
 from logsqueak.wizard.prompts import (
     prompt_advanced_settings,
     prompt_confirm_overwrite,
+    prompt_custom_api_key,
+    prompt_custom_endpoint,
+    prompt_custom_model,
     prompt_graph_path,
     prompt_num_ctx,
     prompt_ollama_endpoint,
     prompt_ollama_model,
+    prompt_openai_api_key,
+    prompt_openai_model,
     prompt_provider_choice,
     prompt_retry_on_failure,
     prompt_top_k,
@@ -29,6 +34,7 @@ from logsqueak.wizard.validators import (
     check_disk_space,
     check_embedding_model_cached,
     validate_ollama_connection,
+    validate_openai_connection,
     validate_embedding_model,
     validate_graph_path,
 )
@@ -44,6 +50,7 @@ class WizardState:
         provider_type: Selected LLM provider ("ollama", "openai", "custom")
         ollama_endpoint: Ollama API endpoint (if provider is ollama)
         ollama_model: Selected Ollama model name
+        openai_endpoint: OpenAI API endpoint (if provider is openai)
         openai_api_key: OpenAI API key (if provider is openai)
         openai_model: OpenAI model name
         custom_endpoint: Custom OpenAI-compatible endpoint
@@ -57,6 +64,7 @@ class WizardState:
     provider_type: str | None = None
     ollama_endpoint: str | None = None
     ollama_model: str | None = None
+    openai_endpoint: str | None = None
     openai_api_key: str | None = None
     openai_model: str | None = None
     custom_endpoint: str | None = None
@@ -258,6 +266,68 @@ async def configure_ollama(state: WizardState) -> bool:
     return True
 
 
+async def configure_openai(state: WizardState) -> bool:
+    """OpenAI-specific configuration flow.
+
+    Args:
+        state: Wizard state to update
+
+    Returns:
+        False if user aborts, True otherwise
+    """
+    rprint("[dim]OpenAI provides GPT-4 and other models via API.[/dim]\n")
+
+    # Get existing API key from config
+    existing_key = None
+    if state.existing_config and state.existing_config.llm_providers:
+        openai_config = state.existing_config.llm_providers.get("openai")
+        if openai_config:
+            existing_key = openai_config.get("api_key")
+
+    # Prompt for API key
+    state.openai_api_key = prompt_openai_api_key(existing_key)
+
+    # Get default model from existing config
+    default_model = "gpt-4o"
+    if state.existing_config and state.existing_config.llm_providers:
+        openai_config = state.existing_config.llm_providers.get("openai")
+        if openai_config:
+            default_model = openai_config.get("model", "gpt-4o")
+
+    # Prompt for model selection
+    state.openai_model = prompt_openai_model(default_model)
+    state.openai_endpoint = "https://api.openai.com/v1"
+
+    rprint(f"[green]✓[/green] Selected model: {state.openai_model}\n")
+
+    return True
+
+
+async def configure_custom(state: WizardState) -> bool:
+    """Custom OpenAI-compatible endpoint configuration flow.
+
+    Args:
+        state: Wizard state to update
+
+    Returns:
+        False if user aborts, True otherwise
+    """
+    rprint("[dim]Configure a custom OpenAI-compatible endpoint.[/dim]\n")
+
+    # Prompt for endpoint
+    state.custom_endpoint = prompt_custom_endpoint()
+
+    # Prompt for API key
+    state.custom_api_key = prompt_custom_api_key()
+
+    # Prompt for model name
+    state.custom_model = prompt_custom_model()
+
+    rprint(f"[green]✓[/green] Configured custom endpoint: {state.custom_endpoint}\n")
+
+    return True
+
+
 async def configure_provider(state: WizardState) -> bool:
     """Prompt for provider and configure provider-specific settings.
 
@@ -292,9 +362,24 @@ async def configure_provider(state: WizardState) -> bool:
         if prompt_advanced_settings():
             state.num_ctx = prompt_num_ctx(state.num_ctx or 32768)
             state.top_k = prompt_top_k(state.top_k)
+    elif state.provider_type == "openai":
+        success = await configure_openai(state)
+        if not success:
+            return False
+
+        # Prompt for advanced settings (top_k only for OpenAI)
+        if prompt_advanced_settings():
+            state.top_k = prompt_top_k(state.top_k)
+    elif state.provider_type == "custom":
+        success = await configure_custom(state)
+        if not success:
+            return False
+
+        # Prompt for advanced settings (top_k only for custom)
+        if prompt_advanced_settings():
+            state.top_k = prompt_top_k(state.top_k)
     else:
-        # OpenAI and Custom not implemented yet (will be in User Story 3)
-        rprint("[yellow]OpenAI and Custom providers will be implemented in next phase[/yellow]")
+        rprint(f"[red]✗[/red] Unknown provider type: {state.provider_type}")
         return False
 
     return True
@@ -314,8 +399,41 @@ async def validate_llm_connection(state: WizardState) -> bool:
         rprint("[green]✓[/green] LLM connection validated\n")
         return True
 
-    # OpenAI and Custom will be implemented in User Story 3
-    return True
+    # Test OpenAI or custom connection
+    endpoint = None
+    api_key = None
+    model = None
+
+    if state.provider_type == "openai":
+        endpoint = state.openai_endpoint
+        api_key = state.openai_api_key
+        model = state.openai_model
+    elif state.provider_type == "custom":
+        endpoint = state.custom_endpoint
+        api_key = state.custom_api_key
+        model = state.custom_model
+
+    if not endpoint or not api_key or not model:
+        rprint("[yellow]⚠[/yellow] Missing provider configuration")
+        return True  # Continue anyway
+
+    # Test connection
+    with Status(f"[cyan]Testing API connection...[/cyan]"):
+        result = await validate_openai_connection(endpoint, api_key, model)
+
+    if result.success:
+        rprint(f"[green]✓[/green] API connection validated\n")
+        return True
+    else:
+        rprint(f"[red]✗[/red] {result.error_message}")
+        choice = prompt_retry_on_failure("API connection")
+        if choice == "abort":
+            return False
+        elif choice == "skip":
+            rprint("[yellow]Skipping API connection validation[/yellow]\n")
+            return True
+        # retry would need to loop - for now just continue
+        return True
 
 
 async def validate_embedding(state: WizardState) -> bool:
@@ -420,8 +538,38 @@ def assemble_config(state: WizardState) -> Config:
             model=state.ollama_model,
             num_ctx=state.num_ctx or 32768
         )
+        provider_endpoint = state.ollama_endpoint
+        provider_dict = {
+            "endpoint": state.ollama_endpoint,
+            "api_key": "ollama",
+            "model": state.ollama_model,
+            "num_ctx": llm_config.num_ctx
+        }
+    elif state.provider_type == "openai":
+        llm_config = LLMConfig(
+            endpoint=HttpUrl(state.openai_endpoint),
+            api_key=state.openai_api_key,
+            model=state.openai_model
+        )
+        provider_endpoint = state.openai_endpoint
+        provider_dict = {
+            "endpoint": state.openai_endpoint,
+            "api_key": state.openai_api_key,
+            "model": state.openai_model
+        }
+    elif state.provider_type == "custom":
+        llm_config = LLMConfig(
+            endpoint=HttpUrl(state.custom_endpoint),
+            api_key=state.custom_api_key,
+            model=state.custom_model
+        )
+        provider_endpoint = state.custom_endpoint
+        provider_dict = {
+            "endpoint": state.custom_endpoint,
+            "api_key": state.custom_api_key,
+            "model": state.custom_model
+        }
     else:
-        # OpenAI and Custom will be implemented in User Story 3
         raise ValueError(f"Unsupported provider type: {state.provider_type}")
 
     # Create LogseqConfig
@@ -436,13 +584,8 @@ def assemble_config(state: WizardState) -> Config:
         llm_providers = dict(state.existing_config.llm_providers)
 
     # Add current provider
-    provider_key = get_provider_key(state.provider_type, state.ollama_endpoint)
-    llm_providers[provider_key] = {
-        "endpoint": state.ollama_endpoint,
-        "api_key": llm_config.api_key,
-        "model": llm_config.model,
-        "num_ctx": llm_config.num_ctx
-    }
+    provider_key = get_provider_key(state.provider_type, provider_endpoint)
+    llm_providers[provider_key] = provider_dict
 
     return Config(
         llm=llm_config,

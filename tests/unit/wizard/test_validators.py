@@ -10,6 +10,7 @@ from logsqueak.wizard.validators import (
     validate_graph_path,
     check_disk_space,
     validate_ollama_connection,
+    validate_openai_connection,
     check_embedding_model_cached,
     validate_embedding_model,
 )
@@ -316,3 +317,233 @@ class TestValidateEmbeddingModel:
 
         assert result.success is True
         # Note: Progress callback not implemented yet, but should not cause errors
+
+
+@pytest.mark.asyncio
+class TestValidateOpenAIConnection:
+    """Tests for validate_openai_connection function."""
+
+    async def test_successful_connection(self):
+        """Test successful OpenAI API connection."""
+        mock_response = Mock()
+        mock_response.json.return_value = {"data": []}
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_get = AsyncMock(return_value=mock_response)
+            mock_client.return_value.__aenter__.return_value.get = mock_get
+
+            result = await validate_openai_connection(
+                "https://api.openai.com/v1",
+                "sk-test-key",
+                "gpt-4o"
+            )
+
+        assert result.success is True
+        assert result.error_message is None
+
+    async def test_connection_error(self):
+        """Test connection error to OpenAI API."""
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+                side_effect=httpx.ConnectError("Connection failed")
+            )
+
+            result = await validate_openai_connection(
+                "https://api.openai.com/v1",
+                "sk-test-key",
+                "gpt-4o"
+            )
+
+        assert result.success is False
+        assert "Could not connect to API" in result.error_message
+        assert "https://api.openai.com/v1" in result.error_message
+        assert "service is running" in result.error_message
+
+    async def test_invalid_api_key(self):
+        """Test 401 Unauthorized error (invalid API key)."""
+        mock_response = Mock()
+        mock_response.status_code = 401
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_get = AsyncMock(side_effect=httpx.HTTPStatusError(
+                "401 Unauthorized",
+                request=Mock(),
+                response=mock_response
+            ))
+            mock_client.return_value.__aenter__.return_value.get = mock_get
+
+            result = await validate_openai_connection(
+                "https://api.openai.com/v1",
+                "sk-invalid-key",
+                "gpt-4o"
+            )
+
+        assert result.success is False
+        assert "Invalid API key" in result.error_message
+        assert "401 Unauthorized" in result.error_message
+        assert "check that your api key is correct" in result.error_message.lower()
+
+    async def test_forbidden_error(self):
+        """Test 403 Forbidden error (no permission)."""
+        mock_response = Mock()
+        mock_response.status_code = 403
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_get = AsyncMock(side_effect=httpx.HTTPStatusError(
+                "403 Forbidden",
+                request=Mock(),
+                response=mock_response
+            ))
+            mock_client.return_value.__aenter__.return_value.get = mock_get
+
+            result = await validate_openai_connection(
+                "https://api.openai.com/v1",
+                "sk-test-key",
+                "gpt-4o"
+            )
+
+        assert result.success is False
+        assert "does not have permission" in result.error_message
+        assert "403 Forbidden" in result.error_message
+        assert "account settings" in result.error_message.lower()
+
+    async def test_not_found_error(self):
+        """Test 404 Not Found error (endpoint doesn't exist)."""
+        mock_response = Mock()
+        mock_response.status_code = 404
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_get = AsyncMock(side_effect=httpx.HTTPStatusError(
+                "404 Not Found",
+                request=Mock(),
+                response=mock_response
+            ))
+            mock_client.return_value.__aenter__.return_value.get = mock_get
+
+            result = await validate_openai_connection(
+                "https://api.openai.com/v1",
+                "sk-test-key",
+                "gpt-4o"
+            )
+
+        assert result.success is False
+        assert "endpoint not found" in result.error_message.lower()
+        assert "404" in result.error_message
+        assert "https://api.openai.com/v1/models" in result.error_message
+
+    async def test_other_http_error(self):
+        """Test other HTTP errors (e.g., 500)."""
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_get = AsyncMock(side_effect=httpx.HTTPStatusError(
+                "500 Internal Server Error",
+                request=Mock(),
+                response=mock_response
+            ))
+            mock_client.return_value.__aenter__.return_value.get = mock_get
+
+            result = await validate_openai_connection(
+                "https://api.openai.com/v1",
+                "sk-test-key",
+                "gpt-4o"
+            )
+
+        assert result.success is False
+        assert "API error 500" in result.error_message
+        assert "Internal Server Error" in result.error_message
+
+    async def test_endpoint_normalization(self):
+        """Test that endpoint URL is normalized correctly."""
+        mock_response = Mock()
+        mock_response.json.return_value = {"data": []}
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_get = AsyncMock(return_value=mock_response)
+            mock_client.return_value.__aenter__.return_value.get = mock_get
+
+            await validate_openai_connection(
+                "https://api.openai.com/v1/",
+                "sk-test-key",
+                "gpt-4o"
+            )
+
+            # Verify called with normalized URL
+            mock_get.assert_called_once()
+            called_url = mock_get.call_args[0][0]
+            assert called_url == "https://api.openai.com/v1/models"
+
+    async def test_custom_timeout(self):
+        """Test that custom timeout is respected."""
+        mock_response = Mock()
+        mock_response.json.return_value = {"data": []}
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_get = AsyncMock(return_value=mock_response)
+            mock_client.return_value.__aenter__.return_value.get = mock_get
+
+            await validate_openai_connection(
+                "https://api.openai.com/v1",
+                "sk-test-key",
+                "gpt-4o",
+                timeout=60
+            )
+
+            # Verify AsyncClient was created with correct timeout and verify=False
+            mock_client.assert_called_once_with(timeout=60, verify=False)
+
+    async def test_timeout_error(self):
+        """Test timeout error handling."""
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+                side_effect=httpx.TimeoutException("Request timed out")
+            )
+
+            result = await validate_openai_connection(
+                "https://api.openai.com/v1",
+                "sk-test-key",
+                "gpt-4o",
+                timeout=30
+            )
+
+        assert result.success is False
+        assert "timed out" in result.error_message.lower()
+        assert "30 seconds" in result.error_message
+        assert "slow to respond" in result.error_message.lower()
+
+    async def test_invalid_url_error(self):
+        """Test invalid URL error handling."""
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+                side_effect=httpx.InvalidURL("Invalid URL")
+            )
+
+            result = await validate_openai_connection(
+                "not-a-valid-url",
+                "sk-test-key",
+                "gpt-4o"
+            )
+
+        assert result.success is False
+        assert "Invalid endpoint URL" in result.error_message
+        assert "not-a-valid-url" in result.error_message
+
+    async def test_unexpected_error(self):
+        """Test handling of unexpected errors."""
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+                side_effect=ValueError("Unexpected error")
+            )
+
+            result = await validate_openai_connection(
+                "https://api.openai.com/v1",
+                "sk-test-key",
+                "gpt-4o"
+            )
+
+        assert result.success is False
+        assert "Unexpected error" in result.error_message
+        assert "ValueError" in result.error_message
+        assert "https://api.openai.com/v1" in result.error_message

@@ -375,3 +375,176 @@ class TestUserStory2FixingBrokenConfig:
                 result = await validate_embedding(state)
                 assert result is True
                 mock_validate.assert_not_called()
+
+
+class TestUserStory3RemoteAndCustomEndpoints:
+    """Integration tests for User Story 3 - Remote Ollama and Custom Endpoints."""
+
+    @pytest.mark.asyncio
+    async def test_assemble_config_for_openai(self, temp_graph_dir):
+        """Test assembling config from wizard state for OpenAI provider."""
+        state = WizardState(
+            graph_path=str(temp_graph_dir),
+            provider_type="openai",
+            openai_endpoint="https://api.openai.com/v1",
+            openai_api_key="sk-test-key-123",
+            openai_model="gpt-4o",
+        )
+
+        config = assemble_config(state)
+
+        assert str(config.llm.endpoint) == "https://api.openai.com/v1"
+        assert config.llm.api_key == "sk-test-key-123"
+        assert config.llm.model == "gpt-4o"
+        assert config.logseq.graph_path == str(temp_graph_dir)
+
+        # Verify llm_providers field preserves OpenAI credentials
+        assert config.llm_providers is not None
+        assert "openai" in config.llm_providers
+        assert config.llm_providers["openai"]["api_key"] == "sk-test-key-123"
+
+    @pytest.mark.asyncio
+    async def test_assemble_config_for_custom_endpoint(self, temp_graph_dir):
+        """Test assembling config from wizard state for custom provider."""
+        state = WizardState(
+            graph_path=str(temp_graph_dir),
+            provider_type="custom",
+            custom_endpoint="https://custom-llm.example.com/v1",
+            custom_api_key="custom-key-456",
+            custom_model="custom-model-7b",
+        )
+
+        config = assemble_config(state)
+
+        assert str(config.llm.endpoint) == "https://custom-llm.example.com/v1"
+        assert config.llm.api_key == "custom-key-456"
+        assert config.llm.model == "custom-model-7b"
+        assert config.logseq.graph_path == str(temp_graph_dir)
+
+        # Verify llm_providers field preserves custom credentials
+        assert config.llm_providers is not None
+        assert "custom" in config.llm_providers
+        assert config.llm_providers["custom"]["endpoint"] == "https://custom-llm.example.com/v1"
+
+    @pytest.mark.asyncio
+    async def test_assemble_config_for_remote_ollama(self, temp_graph_dir):
+        """Test assembling config for remote Ollama instance."""
+        state = WizardState(
+            graph_path=str(temp_graph_dir),
+            provider_type="ollama",
+            ollama_endpoint="http://192.168.1.100:11434/v1",
+            ollama_model="mistral:7b-instruct",
+        )
+
+        config = assemble_config(state)
+
+        assert str(config.llm.endpoint) == "http://192.168.1.100:11434/v1"
+        assert config.llm.model == "mistral:7b-instruct"
+
+        # Verify provider key distinguishes remote from local
+        assert config.llm_providers is not None
+        assert "ollama_remote" in config.llm_providers
+        assert "ollama_local" not in config.llm_providers
+
+    @pytest.mark.asyncio
+    async def test_provider_switching_preserves_all_credentials(self, temp_graph_dir):
+        """Test that switching providers preserves all previous provider credentials."""
+        # Start with Ollama
+        ollama_state = WizardState(
+            graph_path=str(temp_graph_dir),
+            provider_type="ollama",
+            ollama_endpoint="http://localhost:11434/v1",
+            ollama_model="mistral:7b-instruct",
+        )
+        ollama_config = assemble_config(ollama_state)
+
+        # Switch to OpenAI
+        openai_state = WizardState(
+            existing_config=ollama_config,
+            graph_path=str(temp_graph_dir),
+            provider_type="openai",
+            openai_endpoint="https://api.openai.com/v1",
+            openai_api_key="sk-openai-key",
+            openai_model="gpt-4o",
+        )
+        openai_config = assemble_config(openai_state)
+
+        # Verify both providers are preserved
+        assert "ollama_local" in openai_config.llm_providers
+        assert "openai" in openai_config.llm_providers
+        assert openai_config.llm_providers["ollama_local"]["model"] == "mistral:7b-instruct"
+        assert openai_config.llm_providers["openai"]["api_key"] == "sk-openai-key"
+
+        # Active config should be OpenAI
+        assert str(openai_config.llm.endpoint) == "https://api.openai.com/v1"
+        assert openai_config.llm.model == "gpt-4o"
+
+    @pytest.mark.asyncio
+    async def test_write_config_with_multiple_providers(self, temp_graph_dir, tmp_path):
+        """Test writing config file with multiple provider credentials."""
+        config_file = tmp_path / "config.yaml"
+
+        config = Config(
+            llm={
+                "endpoint": "https://api.openai.com/v1",
+                "model": "gpt-4o",
+                "api_key": "sk-openai",
+            },
+            logseq={"graph_path": str(temp_graph_dir)},
+            llm_providers={
+                "ollama_local": {
+                    "endpoint": "http://localhost:11434/v1",
+                    "model": "mistral:7b-instruct",
+                    "api_key": "ollama",
+                    "num_ctx": 32768,
+                },
+                "openai": {
+                    "endpoint": "https://api.openai.com/v1",
+                    "model": "gpt-4o",
+                    "api_key": "sk-openai",
+                },
+                "custom": {
+                    "endpoint": "https://custom.ai/v1",
+                    "model": "custom-7b",
+                    "api_key": "custom-key",
+                },
+            },
+        )
+
+        await write_config(config, config_file)
+
+        # Load and verify all providers are preserved
+        loaded_config = Config.load(config_file)
+        assert len(loaded_config.llm_providers) == 3
+        assert "ollama_local" in loaded_config.llm_providers
+        assert "openai" in loaded_config.llm_providers
+        assert "custom" in loaded_config.llm_providers
+
+    @pytest.mark.asyncio
+    async def test_openai_config_roundtrip(self, temp_graph_dir, tmp_path):
+        """Test that OpenAI config can be written and loaded correctly."""
+        config_file = tmp_path / "config.yaml"
+
+        original_config = Config(
+            llm={
+                "endpoint": "https://api.openai.com/v1",
+                "model": "gpt-4o",
+                "api_key": "sk-test-key",
+            },
+            logseq={"graph_path": str(temp_graph_dir)},
+            llm_providers={
+                "openai": {
+                    "endpoint": "https://api.openai.com/v1",
+                    "model": "gpt-4o",
+                    "api_key": "sk-test-key",
+                }
+            },
+        )
+
+        await write_config(original_config, config_file)
+
+        # Load and verify
+        loaded_config = Config.load(config_file)
+        assert loaded_config.llm.endpoint == original_config.llm.endpoint
+        assert loaded_config.llm.api_key == original_config.llm.api_key
+        assert loaded_config.llm.model == original_config.llm.model
