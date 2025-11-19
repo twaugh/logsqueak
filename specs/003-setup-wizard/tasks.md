@@ -237,10 +237,10 @@ Using single project structure (from plan.md):
 **Purpose**: Logging, progress indicators, and final validation
 
 - [X] T094 [P] Add structured logging for all wizard actions in src/logsqueak/wizard/wizard.py (config loaded, prompts shown, validations, errors)
-- [ ] T095 [P] Add Rich Status spinner for network operations in src/logsqueak/wizard/wizard.py (LLM connection test, model fetching)
-- [ ] T096 [P] Add Rich Progress bar for embedding model download in src/logsqueak/wizard/validators.py (show download progress)
-- [ ] T097 [P] Verify all error messages follow contract format in src/logsqueak/wizard/ ([ERROR TYPE] + description + actionable guidance)
-- [ ] T098 [P] Add success message with Rich Panel in src/logsqueak/wizard/wizard.py (show next steps, config file path)
+- [X] T095 [P] Add Rich Status spinner for network operations in src/logsqueak/wizard/wizard.py (LLM connection test, model fetching)
+- [X] T096 [P] Add Rich Progress bar for embedding model download in src/logsqueak/wizard/validators.py (show download progress)
+- [X] T097 [P] Verify all error messages follow contract format in src/logsqueak/wizard/ ([ERROR TYPE] + description + actionable guidance)
+- [X] T098 [P] Add success message with Rich Panel in src/logsqueak/wizard/wizard.py (show next steps, config file path)
 - [ ] T099 Run manual testing scenarios from quickstart.md (all provider types, all error cases, all edge cases)
 - [ ] T100 Verify all success criteria from spec.md (setup time <3 minutes, config updates <30 seconds, mode 600 permissions, etc.)
 

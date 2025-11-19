@@ -862,16 +862,21 @@ async def write_config(config: Config, config_path: Path) -> None:
     except PermissionError as e:
         logger.error("config_directory_permission_denied", directory=str(config_path.parent), error=str(e))
         raise PermissionError(
-            f"[PERMISSION DENIED] Cannot create config directory: {config_path.parent}\n"
-            f"Please ensure you have write permissions to ~/.config/\n"
-            f"You may need to run: chmod u+w ~/.config"
+            f"[PERMISSION DENIED] Cannot create config directory\n\n"
+            f"Unable to create directory: {config_path.parent}\n\n"
+            f"→ Ensure you have write permissions to ~/.config/\n"
+            f"→ Run: chmod u+w ~/.config\n"
+            f"→ Or choose a different config location"
         ) from e
     except OSError as e:
         logger.error("config_directory_creation_failed", directory=str(config_path.parent), error=str(e))
         raise OSError(
-            f"[FILESYSTEM ERROR] Failed to create config directory: {config_path.parent}\n"
-            f"Error: {e}\n"
-            f"Please check disk space and filesystem health."
+            f"[FILESYSTEM ERROR] Failed to create config directory\n\n"
+            f"Unable to create directory: {config_path.parent}\n"
+            f"Error: {e}\n\n"
+            f"→ Check available disk space\n"
+            f"→ Verify filesystem is healthy\n"
+            f"→ Check filesystem permissions"
         ) from e
 
     # Convert config to dict for YAML serialization

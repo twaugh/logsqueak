@@ -131,8 +131,8 @@ class TestCheckDiskSpace:
             result = check_disk_space(required_mb=1024)
 
         assert result.success is False
-        assert "Low disk space" in result.error_message
-        assert "500 MB available" in result.error_message
+        assert "[DISK SPACE WARNING]" in result.error_message
+        assert "Available: 500 MB" in result.error_message
         assert result.data["available_mb"] == 500
 
 
@@ -199,7 +199,7 @@ class TestOllamaConnection:
             result = await validate_ollama_connection("http://localhost:11434")
 
         assert result.success is False
-        assert "Ollama API error" in result.error_message
+        assert "[API ERROR]" in result.error_message
         assert "404" in result.error_message
 
     async def test_endpoint_normalization(self):

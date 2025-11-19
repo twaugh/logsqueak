@@ -39,29 +39,38 @@ def validate_graph_path(path: str) -> ValidationResult:
     if not expanded.exists():
         return ValidationResult(
             success=False,
-            error_message=f"Path does not exist: {expanded}"
+            error_message=f"[PATH ERROR] Path does not exist\n\n"
+                         f"The path {expanded} was not found on your system.\n\n"
+                         f"→ Check the path is correct\n"
+                         f"→ Or navigate to an existing Logseq graph directory"
         )
 
     if not expanded.is_dir():
         return ValidationResult(
             success=False,
-            error_message=f"Path is not a directory: {expanded}"
+            error_message=f"[PATH ERROR] Path is not a directory\n\n"
+                         f"The path {expanded} exists but is a file, not a directory.\n\n"
+                         f"→ Provide the path to your Logseq graph directory instead"
         )
 
     if not (expanded / "journals").exists():
         return ValidationResult(
             success=False,
-            error_message=f"[INVALID GRAPH] Missing journals/ subdirectory in {expanded}\n"
-                         f"A valid Logseq graph must contain a 'journals/' directory.\n"
-                         f"Please verify you've selected the correct Logseq graph directory."
+            error_message=f"[INVALID GRAPH] Missing journals/ subdirectory\n\n"
+                         f"The path {expanded} exists but does not contain a 'journals/' directory.\n"
+                         f"A valid Logseq graph must contain this directory.\n\n"
+                         f"→ Verify you've selected the correct Logseq graph directory\n"
+                         f"→ Check that Logseq has been initialized in this location"
         )
 
     if not (expanded / "logseq").exists():
         return ValidationResult(
             success=False,
-            error_message=f"[INVALID GRAPH] Missing logseq/ subdirectory in {expanded}\n"
-                         f"A valid Logseq graph must contain a 'logseq/' directory.\n"
-                         f"Please verify you've selected the correct Logseq graph directory."
+            error_message=f"[INVALID GRAPH] Missing logseq/ subdirectory\n\n"
+                         f"The path {expanded} exists but does not contain a 'logseq/' directory.\n"
+                         f"A valid Logseq graph must contain this directory.\n\n"
+                         f"→ Verify you've selected the correct Logseq graph directory\n"
+                         f"→ Check that Logseq has been initialized in this location"
         )
 
     return ValidationResult(success=True, data={"path": str(expanded)})
@@ -87,7 +96,11 @@ def check_disk_space(required_mb: int = 1024) -> ValidationResult:
     if available_mb < required_mb:
         return ValidationResult(
             success=False,
-            error_message=f"Low disk space: {available_mb} MB available ({required_mb} MB recommended)",
+            error_message=f"[DISK SPACE WARNING] Insufficient disk space\n\n"
+                         f"Available: {available_mb} MB\n"
+                         f"Recommended: {required_mb} MB\n\n"
+                         f"→ Free up disk space before continuing\n"
+                         f"→ Or proceed with caution (may fail during download)",
             data={"available_mb": available_mb}
         )
 
@@ -141,17 +154,26 @@ async def validate_ollama_connection(endpoint: str, timeout: int = 30) -> Valida
     except httpx.ConnectError:
         return ValidationResult(
             success=False,
-            error_message=f"Could not connect to Ollama at {endpoint}"
+            error_message=f"[CONNECTION ERROR] Could not connect to Ollama\n\n"
+                         f"Unable to reach Ollama at {endpoint}\n\n"
+                         f"→ Start Ollama: ollama serve\n"
+                         f"→ Or provide a different Ollama endpoint URL"
         )
     except httpx.HTTPStatusError as e:
         return ValidationResult(
             success=False,
-            error_message=f"Ollama API error: {e.response.status_code}"
+            error_message=f"[API ERROR] Ollama API returned error {e.response.status_code}\n\n"
+                         f"The Ollama server responded with an error.\n\n"
+                         f"→ Check that Ollama is running correctly\n"
+                         f"→ Try restarting Ollama: ollama serve"
         )
     except Exception as e:
         return ValidationResult(
             success=False,
-            error_message=f"Unexpected error: {str(e)}"
+            error_message=f"[UNEXPECTED ERROR] Failed to validate Ollama connection\n\n"
+                         f"Error: {str(e)}\n\n"
+                         f"→ Check network connectivity\n"
+                         f"→ Verify the endpoint URL is correct"
         )
 
 
@@ -220,12 +242,19 @@ async def validate_embedding_model(
             available_mb = disk_result.data.get("available_mb", 0) if disk_result.data else 0
             return ValidationResult(
                 success=False,
-                error_message=f"Disk space exhausted during download ({available_mb} MB available). Free up space and try again."
+                error_message=f"[DISK SPACE ERROR] Not enough space for download\n\n"
+                             f"Disk space exhausted during model download.\n"
+                             f"Available: {available_mb} MB\n\n"
+                             f"→ Free up at least 500 MB of disk space\n"
+                             f"→ Then retry the setup wizard"
             )
         else:
             return ValidationResult(
                 success=False,
-                error_message=f"File system error: {str(e)}"
+                error_message=f"[FILESYSTEM ERROR] File system error during download\n\n"
+                             f"Error: {str(e)}\n\n"
+                             f"→ Check filesystem permissions\n"
+                             f"→ Ensure ~/.cache is writable"
             )
 
     except Exception as e:
@@ -234,14 +263,19 @@ async def validate_embedding_model(
         if "pickle" in error_msg.lower() or "corrupt" in error_msg.lower() or "EOF" in error_msg:
             return ValidationResult(
                 success=False,
-                error_message=f"[CORRUPTED MODEL] Embedding model appears corrupted or incomplete.\n"
-                             f"The cached model may be damaged. Retry to re-download.\n"
-                             f"Error: {error_msg}"
+                error_message=f"[CORRUPTED MODEL] Embedding model is corrupted\n\n"
+                             f"The cached model appears to be damaged or incomplete.\n"
+                             f"Error: {error_msg}\n\n"
+                             f"→ Retry to re-download the model\n"
+                             f"→ Or manually clear cache: rm -rf ~/.cache/torch/sentence_transformers"
             )
         return ValidationResult(
             success=False,
-            error_message=f"Failed to load embedding model: {error_msg}\n"
-                         f"Try retrying to re-download the model."
+            error_message=f"[DOWNLOAD ERROR] Failed to load embedding model\n\n"
+                         f"Error: {error_msg}\n\n"
+                         f"→ Retry to re-download the model\n"
+                         f"→ Check your internet connection\n"
+                         f"→ Verify firewall allows downloads from huggingface.co"
         )
 
 
