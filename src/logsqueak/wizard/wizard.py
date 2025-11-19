@@ -523,26 +523,64 @@ async def validate_embedding(state: WizardState) -> bool:
             rprint("[yellow]Skipping embedding model validation[/yellow]")
             return True
 
-    # Download and validate model
+    # Download and validate model with timeout handling
     rprint("\n[cyan]Downloading embedding model (all-mpnet-base-v2, ~420MB)...[/cyan]")
     rprint("[dim]This will be cached for future use. May take a few minutes...[/dim]\n")
 
-    with Status("[cyan]Loading embedding model...[/cyan]"):
-        result = await validate_embedding_model()
+    timeout_seconds = 300  # 5 minutes default timeout
+    retry_count = 0
+    max_retries = 3
 
-    if result.success:
-        rprint("[green]✓[/green] Embedding model loaded successfully\n")
-        return True
-    else:
-        rprint(f"[red]✗[/red] {result.error_message}")
-        choice = prompt_retry_on_failure("Embedding model validation")
-        if choice == "abort":
-            return False
-        elif choice == "skip":
-            rprint("[yellow]Skipping embedding model validation[/yellow]")
-            return True
-        # retry would need to loop - for now just continue
-        return True
+    while retry_count < max_retries:
+        try:
+            with Status("[cyan]Loading embedding model...[/cyan]"):
+                result = await asyncio.wait_for(
+                    validate_embedding_model(),
+                    timeout=timeout_seconds
+                )
+
+            if result.success:
+                rprint("[green]✓[/green] Embedding model loaded successfully\n")
+                return True
+            else:
+                rprint(f"[red]✗[/red] {result.error_message}")
+                choice = prompt_retry_on_failure("Embedding model validation")
+                if choice == "abort":
+                    return False
+                elif choice == "skip":
+                    rprint("[yellow]Skipping embedding model validation[/yellow]")
+                    return True
+                elif choice == "retry":
+                    retry_count += 1
+                    continue
+                return True
+
+        except asyncio.TimeoutError:
+            # Download timed out
+            choice = prompt_continue_on_timeout("Embedding model download", timeout_seconds)
+
+            if choice == "continue":
+                # User wants to keep waiting - increase timeout and retry
+                timeout_seconds = timeout_seconds * 2
+                retry_count += 1
+                rprint(f"[cyan]Retrying with {timeout_seconds}s timeout...[/cyan]\n")
+                continue
+            elif choice == "retry":
+                # User wants to retry with same timeout
+                retry_count += 1
+                continue
+            elif choice == "skip":
+                # User wants to skip validation
+                rprint("[yellow]Skipping embedding model validation[/yellow]\n")
+                return True
+            else:
+                # Unknown choice, treat as skip
+                return True
+
+    # Max retries reached
+    rprint("[yellow]⚠[/yellow] Maximum retry attempts reached")
+    rprint("[yellow]Skipping embedding model validation[/yellow]\n")
+    return True
 
 
 def has_config_changed(new_config: Config, old_config: Config | None) -> bool:

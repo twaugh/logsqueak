@@ -788,3 +788,111 @@ class TestEdgeCases:
                 assert result is True
                 # Should have hit max retries (3 attempts)
                 assert call_count["value"] == 3
+
+    @pytest.mark.asyncio
+    async def test_embedding_download_timeout_prompts_user(self, temp_graph_dir):
+        """Test that embedding download timeout prompts user for action.
+
+        When the embedding model download times out, the wizard should prompt
+        the user with options: continue, retry, or skip.
+        """
+        from logsqueak.wizard.wizard import validate_embedding, WizardState
+        import asyncio
+
+        state = WizardState(graph_path=str(temp_graph_dir))
+
+        # Mock check_embedding_model_cached to return False (not cached)
+        def mock_not_cached():
+            return False
+
+        # Mock validate_embedding_model to simulate timeout
+        async def mock_timeout_download(*args, **kwargs):
+            raise asyncio.TimeoutError()
+
+        # Mock prompt to auto-skip after timeout
+        prompted = {"value": False}
+        def mock_prompt_timeout(operation, timeout):
+            # Verify we're being prompted about timeout
+            prompted["value"] = True
+            assert "Embedding model download" in operation
+            assert timeout == 300  # 5 minute default
+            return "skip"
+
+        with patch("logsqueak.wizard.wizard.check_embedding_model_cached", mock_not_cached):
+            with patch("logsqueak.wizard.validators.check_disk_space", return_value=ValidationResult(success=True)):
+                with patch("logsqueak.wizard.wizard.validate_embedding_model", mock_timeout_download):
+                    with patch("logsqueak.wizard.wizard.prompt_continue_on_timeout", mock_prompt_timeout):
+                        result = await validate_embedding(state)
+
+                        # Should return True (skip validation)
+                        assert result is True
+                        # Verify prompt was called
+                        assert prompted["value"] is True
+
+    @pytest.mark.asyncio
+    async def test_embedding_download_timeout_retry_with_longer_timeout(self, temp_graph_dir):
+        """Test that choosing 'continue' increases timeout and retries embedding download."""
+        from logsqueak.wizard.wizard import validate_embedding, WizardState
+        import asyncio
+
+        state = WizardState(graph_path=str(temp_graph_dir))
+
+        call_count = {"value": 0}
+        timeout_used = {"value": 0}
+
+        async def mock_timeout_once(*args, **kwargs):
+            call_count["value"] += 1
+            if call_count["value"] == 1:
+                # First call times out
+                timeout_used["value"] = 300
+                raise asyncio.TimeoutError()
+            else:
+                # Second call succeeds
+                timeout_used["value"] = 600
+                return ValidationResult(success=True)
+
+        prompt_count = {"value": 0}
+        def mock_prompt_continue(operation, timeout):
+            prompt_count["value"] += 1
+            return "continue"
+
+        with patch("logsqueak.wizard.wizard.check_embedding_model_cached", return_value=False):
+            with patch("logsqueak.wizard.validators.check_disk_space", return_value=ValidationResult(success=True)):
+                with patch("logsqueak.wizard.wizard.validate_embedding_model", mock_timeout_once):
+                    with patch("logsqueak.wizard.wizard.prompt_continue_on_timeout", mock_prompt_continue):
+                        result = await validate_embedding(state)
+
+                        # Should succeed after retry
+                        assert result is True
+                        # Verify retry happened
+                        assert call_count["value"] == 2
+                        # Verify user was prompted once
+                        assert prompt_count["value"] == 1
+
+    @pytest.mark.asyncio
+    async def test_embedding_download_max_retries_reached(self, temp_graph_dir):
+        """Test that max retries limit prevents infinite loops for embedding download."""
+        from logsqueak.wizard.wizard import validate_embedding, WizardState
+        import asyncio
+
+        state = WizardState(graph_path=str(temp_graph_dir))
+
+        call_count = {"value": 0}
+
+        async def mock_always_timeout(*args, **kwargs):
+            call_count["value"] += 1
+            raise asyncio.TimeoutError()
+
+        def mock_prompt_always_retry(operation, timeout):
+            return "retry"
+
+        with patch("logsqueak.wizard.wizard.check_embedding_model_cached", return_value=False):
+            with patch("logsqueak.wizard.validators.check_disk_space", return_value=ValidationResult(success=True)):
+                with patch("logsqueak.wizard.wizard.validate_embedding_model", mock_always_timeout):
+                    with patch("logsqueak.wizard.wizard.prompt_continue_on_timeout", mock_prompt_always_retry):
+                        result = await validate_embedding(state)
+
+                        # Should eventually give up and skip
+                        assert result is True
+                        # Should have hit max retries (3 attempts)
+                        assert call_count["value"] == 3
