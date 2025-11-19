@@ -333,8 +333,8 @@ async def validate_embedding(state: WizardState) -> bool:
     rprint("[dim]not just keywords. It converts text into numerical representations.[/dim]\n")
 
     # Check if already cached
+    rprint("[dim]Checking embedding model cache...[/dim]")
     if check_embedding_model_cached():
-        rprint("[dim]Checking embedding model cache...[/dim]")
         rprint("[green]✓[/green] Embedding model already cached (skipping download)\n")
         return True
 
