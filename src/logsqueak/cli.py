@@ -308,59 +308,17 @@ def search(query: str, reindex: bool):
 
     # Build/update index with progress indicator
     async def build_index_with_progress():
-        total_pages = 0
-        status_context = None
-        page_count = None
-        showed_initial_message = False
+        from logsqueak.utils.index_progress import create_index_progress_callback
 
-        def progress_callback(current, total):
-            nonlocal total_pages, status_context, page_count, showed_initial_message
-
-            # Negative current signals model loading phase
-            if current < 0:
-                # Show initial message only when actual work starts
-                if not showed_initial_message:
-                    if reindex:
-                        click.echo("Rebuilding search index...")
-                    elif not has_data:
-                        click.echo("Building search index...")
-                    else:
-                        click.echo("Updating search index...")
-                    showed_initial_message = True
-
-                # Capture page count for completion message and phase detection
-                total_pages = total
-                page_count = total
-                # Start spinner for model loading
-                if status_context:
-                    status_context.__exit__(None, None, None)
-                status_context = console.status("[bold green]Loading embedding model...")
-                status_context.__enter__()
-                return
-
-            # Detect encoding phase: total has changed from page count to chunk count
-            if page_count is not None and total != page_count:
-                # Encoding phase - show spinner with progress percentage
-                percent = int((current / total) * 100) if total > 0 else 0
-
-                # Start encoding spinner if not already running
-                if not status_context:
-                    status_context = console.status(f"[bold green]Building page index: {percent}%")
-                    status_context.__enter__()
-                else:
-                    # Update spinner message with current percentage
-                    status_context.update(f"[bold green]Building page index: {percent}%")
-            else:
-                # Parsing phase - stop spinner but don't show progress
-                if status_context:
-                    status_context.__exit__(None, None, None)
-                    status_context = None
+        progress_callback, cleanup = create_index_progress_callback(
+            console=console,
+            reindex=reindex,
+            has_data=has_data,
+            use_echo=True  # Use click.echo style output
+        )
 
         try:
             pages_indexed = await page_indexer.build_index(progress_callback=progress_callback)
-            # Stop spinner if it was started
-            if status_context:
-                status_context.__exit__(None, None, None)
 
             # Only show completion message if we did work
             if pages_indexed > 0:
@@ -372,12 +330,11 @@ def search(query: str, reindex: bool):
                 else:
                     click.echo("Index updated successfully")
         except Exception as e:
-            # Stop spinner on error
-            if status_context:
-                status_context.__exit__(None, None, None)
             click.echo()  # Newline after progress
             logger.error("index_build_failed", error=str(e))
             raise click.ClickException(f"Failed to build search index: {e}")
+        finally:
+            cleanup()
 
     asyncio.run(build_index_with_progress())
 

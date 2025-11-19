@@ -24,6 +24,7 @@ from logsqueak.wizard.prompts import (
     prompt_custom_endpoint,
     prompt_custom_model,
     prompt_graph_path,
+    prompt_index_graph,
     prompt_num_ctx,
     prompt_ollama_endpoint,
     prompt_ollama_model,
@@ -696,6 +697,76 @@ async def validate_embedding(state: WizardState) -> bool:
     return True
 
 
+async def index_graph_after_setup(graph_path: str) -> bool:
+    """Build initial search index for the graph with progress feedback.
+
+    Args:
+        graph_path: Path to Logseq graph directory
+
+    Returns:
+        True if indexing succeeded, False if user skipped or error occurred
+    """
+    from logseq_outline.graph import GraphPaths
+    from logsqueak.services.page_indexer import PageIndexer
+    from logsqueak.services.rag_search import RAGSearch
+    from logsqueak.utils.index_progress import create_index_progress_callback
+    from rich.console import Console
+
+    logger.info("index_graph_started", graph_path=graph_path)
+
+    try:
+        # Initialize services
+        graph_paths = GraphPaths(Path(graph_path))
+        page_indexer = PageIndexer(graph_paths=graph_paths)
+        rag_search = RAGSearch(db_path=page_indexer.db_path)
+
+        # Check if already indexed
+        has_data = rag_search.has_indexed_data()
+
+        # Create console for Rich output
+        console = Console()
+
+        # Create progress callback with wizard-appropriate settings
+        progress_callback, cleanup = create_index_progress_callback(
+            console=console,
+            reindex=False,  # Wizard never forces reindex
+            has_data=has_data,
+            use_echo=False  # Use Rich rprint style
+        )
+
+        try:
+            pages_indexed = await page_indexer.build_index(progress_callback=progress_callback)
+
+            # Only show completion message if we did work
+            if pages_indexed > 0:
+                rprint()  # Newline after progress
+                if not has_data:
+                    rprint("[green]✓[/green] Index built successfully")
+                else:
+                    rprint("[green]✓[/green] Index updated successfully")
+                logger.info("index_graph_completed", pages_indexed=pages_indexed)
+            else:
+                # No pages needed indexing (all up-to-date)
+                logger.info("index_graph_skipped", reason="all_up_to_date")
+
+            return True
+
+        except Exception as e:
+            rprint()  # Newline after progress
+            logger.error("index_graph_failed", error=str(e))
+            rprint(f"[red]✗[/red] Failed to build search index: {e}")
+            rprint("[yellow]You can run 'logsqueak search' later to build the index[/yellow]\n")
+            return False
+        finally:
+            cleanup()
+
+    except Exception as e:
+        logger.error("index_graph_initialization_failed", error=str(e))
+        rprint(f"[red]✗[/red] Failed to initialize indexing: {e}")
+        rprint("[yellow]You can run 'logsqueak search' later to build the index[/yellow]\n")
+        return False
+
+
 def has_config_changed(new_config: Config, old_config: Config | None) -> bool:
     """Check if the new config differs from the old config.
 
@@ -913,6 +984,42 @@ async def write_config(config: Config, config_path: Path) -> None:
         raise
 
 
+async def offer_graph_indexing(graph_path: str) -> None:
+    """Offer to index the graph and execute if user accepts.
+
+    Only prompts if the index doesn't already exist.
+
+    Args:
+        graph_path: Path to Logseq graph directory
+    """
+    from logseq_outline.graph import GraphPaths
+    from logsqueak.services.page_indexer import PageIndexer
+    from logsqueak.services.rag_search import RAGSearch
+
+    # Check if index already exists
+    try:
+        graph_paths = GraphPaths(Path(graph_path))
+        page_indexer = PageIndexer(graph_paths=graph_paths)
+        rag_search = RAGSearch(db_path=page_indexer.db_path)
+
+        if rag_search.has_indexed_data():
+            logger.info("graph_index_already_exists", skipping_prompt=True)
+            return  # Index exists, no need to prompt
+    except Exception as e:
+        # If we can't check, log and skip prompting (safe default)
+        logger.warning("index_check_failed", error=str(e))
+        return
+
+    # Index doesn't exist, prompt user
+    if prompt_index_graph():
+        logger.info("user_accepted_graph_indexing")
+        await index_graph_after_setup(graph_path)
+    else:
+        logger.info("user_declined_graph_indexing")
+        rprint("[dim]You can index your knowledge base later with:[/dim]")
+        rprint("[dim]  logsqueak search \"test query\"[/dim]\n")
+
+
 def show_success_message(config_path: Path) -> None:
     """Display success message with next steps.
 
@@ -1004,6 +1111,9 @@ async def run_setup_wizard() -> bool:
             logger.info("no_config_changes_detected")
             rprint("[bold cyan]═══ No Changes Detected ═══[/bold cyan]")
             rprint("[dim]Your configuration is already up to date. Nothing to save.[/dim]\n")
+
+            # Still offer to index the graph even when config unchanged
+            await offer_graph_indexing(state.graph_path)
             return True
 
         logger.info("config_changes_detected", has_permission_issue=has_permission_issue)
@@ -1024,6 +1134,9 @@ async def run_setup_wizard() -> bool:
         # Show success message
         show_success_message(config_path)
         logger.info("setup_wizard_completed_successfully")
+
+        # Offer to index the graph now
+        await offer_graph_indexing(state.graph_path)
 
         return True
 

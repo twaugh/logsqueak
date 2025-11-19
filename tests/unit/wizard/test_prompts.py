@@ -13,6 +13,7 @@ from logsqueak.wizard.prompts import (
     prompt_custom_endpoint,
     prompt_custom_model,
     prompt_graph_path,
+    prompt_index_graph,
     prompt_num_ctx,
     prompt_ollama_endpoint,
     prompt_ollama_model,
@@ -642,3 +643,45 @@ class TestPromptTopK:
         result = prompt_top_k()
 
         assert result == 100
+
+
+class TestPromptIndexGraph:
+    """Tests for prompt_index_graph function."""
+
+    @patch("logsqueak.wizard.prompts.Confirm.ask")
+    def test_returns_true_when_user_accepts(self, mock_ask):
+        """Test that function returns True when user accepts indexing."""
+        mock_ask.return_value = True
+
+        result = prompt_index_graph()
+
+        assert result is True
+        mock_ask.assert_called_once()
+        call_args = mock_ask.call_args
+        # Verify default is True (recommended action)
+        assert call_args[1]["default"] is True
+
+    @patch("logsqueak.wizard.prompts.Confirm.ask")
+    def test_returns_false_when_user_declines(self, mock_ask):
+        """Test that function returns False when user declines indexing."""
+        mock_ask.return_value = False
+
+        result = prompt_index_graph()
+
+        assert result is False
+        mock_ask.assert_called_once()
+
+    @patch("logsqueak.wizard.prompts.Confirm.ask")
+    def test_displays_helpful_context(self, mock_ask):
+        """Test that function displays helpful context about indexing."""
+        mock_ask.return_value = True
+
+        with patch("logsqueak.wizard.prompts.rprint") as mock_rprint:
+            prompt_index_graph()
+
+        # Verify informative messages are displayed
+        assert mock_rprint.call_count >= 3
+        # Check that key concepts are mentioned
+        calls_text = " ".join(str(call) for call in mock_rprint.call_args_list)
+        assert "index" in calls_text.lower()
+        assert "search" in calls_text.lower()

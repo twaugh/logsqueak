@@ -1114,3 +1114,146 @@ logseq:
         result = validate_graph_path(str(graph_dir))
         assert result.success is True
         assert result.data["path"] == str(graph_dir.resolve())
+
+
+class TestWizardIndexingIntegration:
+    """Integration tests for wizard indexing flow."""
+
+    @pytest.mark.asyncio
+    async def test_wizard_offers_indexing_after_config_write(self, temp_graph_dir, tmp_path):
+        """Test that wizard offers to index graph after writing config."""
+        from logsqueak.wizard.wizard import run_setup_wizard
+
+        # Create a test page to index
+        pages_dir = temp_graph_dir / "pages"
+        test_page = pages_dir / "Test Page.md"
+        test_page.write_text("- This is a test block\n")
+
+        config_path = tmp_path / "config.yaml"
+
+        # Mock all prompts to accept defaults and accept indexing
+        with patch("logsqueak.wizard.wizard.load_existing_config", return_value=None), \
+             patch("logsqueak.wizard.wizard.configure_graph_path") as mock_graph, \
+             patch("logsqueak.wizard.wizard.configure_provider") as mock_provider, \
+             patch("logsqueak.wizard.wizard.validate_llm_connection", return_value=True), \
+             patch("logsqueak.wizard.wizard.validate_embedding", return_value=True), \
+             patch("logsqueak.wizard.wizard.prompt_index_graph", return_value=True), \
+             patch("logsqueak.wizard.wizard.index_graph_after_setup") as mock_index:
+
+            # Setup wizard state
+            async def setup_graph_path(state):
+                state.graph_path = str(temp_graph_dir)
+                return True
+
+            async def setup_provider(state):
+                state.provider_type = "ollama"
+                state.ollama_endpoint = "http://localhost:11434/v1"
+                state.ollama_model = "mistral:7b-instruct"
+                return True
+
+            mock_graph.side_effect = setup_graph_path
+            mock_provider.side_effect = setup_provider
+
+            # Override config path
+            with patch.object(Path, "home", return_value=tmp_path):
+                result = await run_setup_wizard()
+
+        # Verify wizard completed successfully
+        assert result is True
+
+        # Verify indexing was offered and accepted
+        mock_index.assert_called_once_with(str(temp_graph_dir))
+
+    @pytest.mark.asyncio
+    async def test_wizard_skips_indexing_when_declined(self, temp_graph_dir, tmp_path):
+        """Test that wizard skips indexing when user declines."""
+        from logsqueak.wizard.wizard import run_setup_wizard
+
+        config_path = tmp_path / "config.yaml"
+
+        # Mock all prompts to decline indexing
+        with patch("logsqueak.wizard.wizard.load_existing_config", return_value=None), \
+             patch("logsqueak.wizard.wizard.configure_graph_path") as mock_graph, \
+             patch("logsqueak.wizard.wizard.configure_provider") as mock_provider, \
+             patch("logsqueak.wizard.wizard.validate_llm_connection", return_value=True), \
+             patch("logsqueak.wizard.wizard.validate_embedding", return_value=True), \
+             patch("logsqueak.wizard.wizard.prompt_index_graph", return_value=False), \
+             patch("logsqueak.wizard.wizard.index_graph_after_setup") as mock_index:
+
+            # Setup wizard state
+            async def setup_graph_path(state):
+                state.graph_path = str(temp_graph_dir)
+                return True
+
+            async def setup_provider(state):
+                state.provider_type = "ollama"
+                state.ollama_endpoint = "http://localhost:11434/v1"
+                state.ollama_model = "mistral:7b-instruct"
+                return True
+
+            mock_graph.side_effect = setup_graph_path
+            mock_provider.side_effect = setup_provider
+
+            # Override config path
+            with patch.object(Path, "home", return_value=tmp_path):
+                result = await run_setup_wizard()
+
+        # Verify wizard completed successfully
+        assert result is True
+
+        # Verify indexing was NOT triggered
+        mock_index.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_wizard_offers_indexing_even_when_no_config_changes(self, temp_graph_dir, tmp_path):
+        """Test that wizard still offers indexing when config unchanged."""
+        from logsqueak.wizard.wizard import run_setup_wizard, assemble_config, WizardState
+
+        # Create existing config
+        existing_state = WizardState(
+            graph_path=str(temp_graph_dir),
+            provider_type="ollama",
+            ollama_endpoint="http://localhost:11434/v1",
+            ollama_model="mistral:7b-instruct",
+        )
+        existing_config = assemble_config(existing_state)
+
+        # Write existing config
+        config_path = tmp_path / "config.yaml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_path, "w") as f:
+            yaml.dump(existing_config.model_dump(mode='json'), f)
+        os.chmod(config_path, 0o600)
+
+        # Mock all prompts - user accepts all defaults (no changes)
+        with patch("logsqueak.wizard.wizard.load_existing_config", return_value=existing_config), \
+             patch("logsqueak.wizard.wizard.configure_graph_path") as mock_graph, \
+             patch("logsqueak.wizard.wizard.configure_provider") as mock_provider, \
+             patch("logsqueak.wizard.wizard.validate_llm_connection", return_value=True), \
+             patch("logsqueak.wizard.wizard.validate_embedding", return_value=True), \
+             patch("logsqueak.wizard.wizard.prompt_index_graph", return_value=True), \
+             patch("logsqueak.wizard.wizard.index_graph_after_setup") as mock_index:
+
+            # Setup wizard state (same as existing)
+            async def setup_graph_path(state):
+                state.graph_path = str(temp_graph_dir)
+                return True
+
+            async def setup_provider(state):
+                state.provider_type = "ollama"
+                state.ollama_endpoint = "http://localhost:11434/v1"
+                state.ollama_model = "mistral:7b-instruct"
+                return True
+
+            mock_graph.side_effect = setup_graph_path
+            mock_provider.side_effect = setup_provider
+
+            # Override config path
+            with patch.object(Path, "home", return_value=tmp_path):
+                result = await run_setup_wizard()
+
+        # Verify wizard completed successfully
+        assert result is True
+
+        # Verify indexing was STILL offered even though config didn't change
+        mock_index.assert_called_once_with(str(temp_graph_dir))

@@ -404,3 +404,19 @@ def prompt_top_k(default: int = 10) -> int:
     except ValueError:
         rprint("[yellow]Invalid number, using default[/yellow]")
         return default
+
+
+def prompt_index_graph() -> bool:
+    """Prompt user whether to index the graph now.
+
+    Returns:
+        True if user wants to index, False otherwise
+    """
+    rprint("\n[bold]Would you like to index your knowledge base now?[/bold]")
+    rprint("[dim]Indexing enables semantic search with the 'logsqueak search' command.[/dim]")
+    rprint("[dim]This may take a few minutes depending on the size of your graph.[/dim]")
+
+    return Confirm.ask(
+        "[cyan]Index knowledge base?[/cyan]",
+        default=True
+    )
