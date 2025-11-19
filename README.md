@@ -3,566 +3,558 @@
 [![Tests](https://github.com/twaugh/logsqueak/actions/workflows/test.yml/badge.svg)](https://github.com/twaugh/logsqueak/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/twaugh/logsqueak/branch/main/graph/badge.svg)](https://codecov.io/gh/twaugh/logsqueak)
 
-Turn your Logseq journal chaos into organized knowledge. Interactive TUI (Text User Interface) for extracting lasting insights from journal entries using LLM-powered analysis.
+**Turn your Logseq journal chaos into organized knowledge.**
+
+Logsqueak helps you extract lasting insights from daily journal entries using AI. Review what the AI finds, refine the content, and integrate it into your knowledge base—all through an interactive keyboard-driven interface.
 
 ![Logsqueak Demo](demo/demo.gif)
 
-## Overview
+---
 
-Logsqueak provides an **interactive 3-phase workflow** for knowledge extraction:
+## Quick Start
 
-**Phase 1 - Block Selection**:
-- View journal blocks in hierarchical tree
-- LLM streams classification results (knowledge vs. activity)
-- Manually select/deselect blocks with keyboard controls
-- Background: Page indexing for semantic search
+**Get running in 5 minutes:**
 
-**Phase 2 - Content Editing**:
-- Review selected blocks with full context
-- LLM generates reworded versions (removes temporal context)
-- Accept LLM suggestions or edit manually
-- Background: RAG search finds candidate target pages
+```bash
+# 1. Clone and install
+git clone https://github.com/twaugh/logsqueak.git
+cd logsqueak
+./setup-dev.sh
 
-**Phase 3 - Integration Review**:
-- LLM suggests where to integrate each knowledge block
-- Preview target pages with insertion points
-- Accept/skip decisions (writes immediately on accept)
-- Atomic consistency: Journal marked only when page write succeeds
+# 2. Try it with the included test graph
+source venv/bin/activate
+logsqueak init  # Follow the interactive setup wizard
 
-All operations are **keyboard-driven** with vim-style navigation and **streaming LLM results** for responsive feedback.
+# 3. Extract knowledge from a sample journal
+logsqueak extract 2025-01-15
+```
 
-## Features
+**What happens next:**
+- **Phase 1**: AI identifies knowledge blocks (you can select/deselect)
+- **Phase 2**: AI suggests better wording (you can edit or accept)
+- **Phase 3**: AI suggests where to save it (you approve each one)
 
-### Core Functionality
-- **Logseq Parser**: Production-ready markdown parser with property order preservation
-- **Interactive TUI**: Three-phase workflow (Block Selection → Content Editing → Integration Review)
-- **LLM Integration**: Async NDJSON streaming with retry logic, request queue with priority
-- **LLM Prompt Optimization**: Hierarchical chunks reduce prompts from 62KB to 2-4KB per block (90% reduction)
-- **RAG Semantic Search**: PageIndexer and RAGSearch with hierarchical chunks and link boosting
-- **File Operations**: Atomic two-phase writes with provenance markers and concurrent modification detection
-- **CLI Commands**:
-  - `logsqueak extract` - Interactive knowledge extraction workflow with date/range parsing
-  - `logsqueak search` - Semantic search of knowledge base with clickable logseq:// links
-- **Background Workers**: Full dependency coordination across all three phases
-- **Edge Case Handling**: Config errors, network errors, file modifications, malformed JSON
-- **Test Coverage**: 280+ tests passing (173 unit, 69 integration, 38 UI)
+That's it! Your knowledge is now organized in your Logseq graph.
 
-### Key Design Principles
-- **Non-Destructive**: All integrations traceable via `extracted-to::` markers
-- **Property Order Preservation**: NEVER reorder (insertion order sacred)
-- **Keyboard-Driven**: Vim-style navigation (j/k), no mouse required
-- **Streaming LLM**: Real-time updates as results arrive
-- **Explicit Control**: Users approve all integrations (no auto-write)
+---
+
+## What is Logsqueak?
+
+If you use Logseq journals to capture ideas during your day, you've probably noticed:
+- Great insights get buried in daily logs
+- Finding that one useful tip from last month is hard
+- Your knowledge base stays empty while journals pile up
+
+**Logsqueak solves this** by:
+
+1. **Finding knowledge** - AI reads your journals and identifies valuable content (technical tips, lessons learned, insights)
+2. **Cleaning it up** - AI removes temporal context ("today I learned...") and improves clarity
+3. **Organizing it** - AI suggests where to save it in your knowledge base (you review and approve)
+
+All through a keyboard-driven terminal interface—no mouse needed.
+
+---
+
+## Before You Start
+
+**You'll need:**
+
+- ✓ **Python 3.11 or later**
+- ✓ **A Logseq graph** with journal entries
+  - *Don't have one?* Use the included `test-graph/` directory to try it out
+- ✓ **Access to an AI assistant** (choose one):
+  - **Free**: [Ollama](https://ollama.com/) running locally (recommended for beginners)
+  - **Paid**: OpenAI API key
+- ✓ **~500MB disk space** for dependencies
+
+**New to Ollama?** It's free software that runs AI models on your computer. [Install guide →](https://ollama.com/download)
+
+---
 
 ## Installation
 
-### Requirements
+### Step 1: Install Logsqueak
 
-- Python 3.11 or later
-- A Logseq graph with journal entries
-- Access to an LLM API (OpenAI compatible, or local Ollama)
-- ~500MB disk space for dependencies (includes sentence-transformers for semantic search)
-
-### Setup
-
-**IMPORTANT**: The following steps install all runtime and development dependencies, including large packages like sentence-transformers (~500MB) and ChromaDB.
-
-**Option 1: Automated Setup (Recommended)**
+**Recommended: Automated setup**
 
 ```bash
-# Clone repository
+# Clone the repository
 git clone https://github.com/twaugh/logsqueak.git
 cd logsqueak
 
-# Run setup script (creates venv, installs dependencies)
+# Run setup script (creates virtual environment and installs everything)
 ./setup-dev.sh
 ```
 
-**Option 2: Manual Setup**
+**Manual setup** (if you prefer):
+
+<details>
+<summary>Click to expand manual installation steps</summary>
 
 ```bash
-# Clone repository
+# Clone the repository
 git clone https://github.com/twaugh/logsqueak.git
 cd logsqueak
 
-# Create virtual environment (REQUIRED - do not skip this step!)
+# Create virtual environment
 python3.11 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Upgrade pip in the venv
+# Install dependencies
 pip install --upgrade pip
-
-# Install logsqueak in editable mode with all dependencies
-# This installs: textual, httpx, pydantic, click, structlog, chromadb,
-# sentence-transformers (~500MB), and all dev dependencies
 pip install -e .
-
-# Also install the parser library in editable mode
 pip install -e src/logseq-outline-parser/
 
 # Verify installation
 pytest -v
 ```
 
-**What gets installed:**
-- Runtime dependencies: textual, httpx, pydantic, click, pyyaml, structlog, chromadb, sentence-transformers, markdown-it-py
-- Dev dependencies: pytest, pytest-asyncio, pytest-textual-snapshot, pytest-cov, black, ruff, mypy
-
-### Configuration
-
-Create `~/.config/logsqueak/config.yaml` with mode 600 permissions:
-
-```yaml
-llm:
-  endpoint: https://api.openai.com/v1  # Or http://localhost:11434/v1 for Ollama
-  api_key: sk-your-api-key-here       # Required for OpenAI; can be any string for Ollama
-  model: gpt-4-turbo-preview          # Or mistral:latest, qwen2.5:latest, etc. for Ollama
-
-logseq:
-  graph_path: ~/Documents/logseq-graph  # Path to your Logseq graph directory
-
-rag:
-  top_k: 10  # Number of similar blocks to retrieve per search (default: 10)
-```
-
-**Optional settings:**
-```yaml
-llm:
-  num_ctx: 32768  # Ollama context window size (controls VRAM usage)
-                  # Automatically sent to Ollama when detected
-                  # Ignored for OpenAI endpoints
-```
-
-**Example configurations:**
-
-<details>
-<summary>OpenAI / ChatGPT</summary>
-
-```yaml
-llm:
-  endpoint: https://api.openai.com/v1
-  api_key: sk-proj-xxxxxxxxxxxxx  # Your OpenAI API key
-  model: gpt-4o                    # Or gpt-4-turbo-preview, gpt-3.5-turbo
-
-logseq:
-  graph_path: ~/Documents/my-graph
-```
 </details>
 
-<details>
-<summary>Ollama (Local)</summary>
+### Step 2: Set Up Your AI Assistant
 
+**Option A: Ollama (Free, runs locally)**
+
+```bash
+# 1. Install Ollama from https://ollama.com/download
+
+# 2. Pull the recommended model:
+ollama pull mistral:7b-instruct
+
+# 3. Make sure Ollama is running
+ollama serve
+```
+
+**Option B: OpenAI (Paid, cloud-based)**
+
+Requires an API key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+
+Or: use any service provide an OpenAI-compatible API.
+
+### Step 3: Configure Logsqueak
+
+**Interactive setup wizard** (recommended):
+
+```bash
+source venv/bin/activate
+logsqueak init
+```
+
+The wizard will guide you through:
+1. Selecting your Logseq graph location
+2. Configuring your AI assistant (Ollama or OpenAI-compatible)
+3. Setting up semantic search
+
+**Manual configuration** (advanced):
+
+<details>
+<summary>Click to expand manual config instructions</summary>
+
+Create `~/.config/logsqueak/config.yaml`:
+
+```bash
+mkdir -p ~/.config/logsqueak
+nano ~/.config/logsqueak/config.yaml
+```
+
+**For Ollama (local AI):**
 ```yaml
 llm:
   endpoint: http://localhost:11434/v1
   api_key: ollama  # Any string works for local Ollama
-  model: qwen2.5:latest  # Or mistral:latest, llama3.2:latest
-  num_ctx: 32768         # Optional: adjust based on VRAM
+  model: mistral:7b-instruct
+  num_ctx: 32768  # Optional: controls VRAM usage
 
 logseq:
-  graph_path: ~/Documents/my-graph
+  graph_path: ~/Documents/logseq-graph  # Path to your graph
 ```
 
-**Recommended Ollama models:**
-- `qwen2.5:latest` - Fast, good quality (4GB VRAM)
-- `mistral:latest` - Balanced performance (4GB VRAM)
-- `llama3.2:latest` - Meta's latest (4GB VRAM)
+**For OpenAI:**
+```yaml
+llm:
+  endpoint: https://api.openai.com/v1
+  api_key: sk-proj-xxxxxxxxxxxxx  # Your API key
+  model: your-chosen-model
 
-**Install Ollama models:**
-```bash
-ollama pull qwen2.5:latest
+logseq:
+  graph_path: ~/Documents/logseq-graph
 ```
-</details>
-
-**Configuration behavior:**
-- File must exist before first run (not auto-created)
-- File permissions must be mode 600 (checked on load)
-- Lazy validation: Settings validated only when first accessed
-- Helpful error messages with example YAML for missing/invalid config
 
 Set correct permissions:
 ```bash
-# Create config directory if it doesn't exist
-mkdir -p ~/.config/logsqueak
-
-# Create config file (edit with your settings)
-nano ~/.config/logsqueak/config.yaml
-
-# Set correct permissions (REQUIRED)
 chmod 600 ~/.config/logsqueak/config.yaml
 ```
 
+</details>
+
+---
+
 ## Usage
 
-**Quick Start:**
+### Try It with the Test Graph
 
-1. Install Logsqueak (see [Installation](#installation))
-2. Create config file at `~/.config/logsqueak/config.yaml` (see [Configuration](#configuration))
-3. Run `logsqueak extract` to start extracting from today's journal
-4. Navigate with `j`/`k`, select blocks with `Space`, press `n` to continue through phases
-5. Accept or skip integration decisions in Phase 3
-6. Your knowledge is now integrated into your Logseq graph!
+The repository includes a sample Logseq graph with realistic journal entries:
 
-### Interactive Knowledge Extraction
+```bash
+source venv/bin/activate
 
-Launch the interactive knowledge extraction workflow:
+# Configure to use test-graph (if not already done)
+logsqueak init  # Point to /path/to/logsqueak/test-graph
+
+# Extract knowledge from a sample journal entry
+logsqueak extract 2025-01-15
+```
+
+**What you'll see:**
+
+**Phase 1 - Block Selection**
+```
+The AI reads the journal and highlights blocks like:
+✓ "Python 3.12 type hints improvements..." (knowledge)
+✗ "Morning standup at 9am" (activity log)
+
+Navigate with j/k, press Space to select/deselect, then 'n' to continue.
+```
+
+**Phase 2 - Content Editing**
+```
+Original: "Learned about TDD best practices..."
+AI suggests: "Test-Driven Development (TDD) best practices include..."
+
+Press 'a' to accept AI version, 'r' to revert, or Tab to edit manually.
+```
+
+**Phase 3 - Integration Review**
+```
+AI suggests: Add to "TDD" page under "Best Practices" section
+
+You'll see a preview with the insertion point marked in green.
+Press 'y' to accept, 's' to skip.
+```
+
+### Use with Your Own Graph
 
 ```bash
 # Extract from today's journal
 logsqueak extract
 
 # Extract from specific date
-logsqueak extract 2025-01-15
+logsqueak extract 2025-01-20
 
 # Extract from date range
-logsqueak extract 2025-01-10..2025-01-15
+logsqueak extract 2025-01-15..2025-01-20
 ```
 
-### Semantic Search
-
-Search your Logseq knowledge base from the terminal:
+### Search Your Knowledge Base
 
 ```bash
-# Search for content
-logsqueak search "machine learning best practices"
+# Semantic search (finds similar content by meaning)
+logsqueak search "python testing tips"
 
 # Force rebuild search index
-logsqueak search "python tips" --reindex
+logsqueak search "docker best practices" --reindex
 ```
 
-**Search features:**
-- Semantic similarity search using same RAG infrastructure as main app
-- Automatic index building on first run (incremental updates)
-- Results show relevance percentage and hierarchical context
-- Clickable `logseq://` links (modern terminals)
-- Respects `rag.top_k` from config (default: 10 results)
+Results show clickable `logseq://` links (works in modern terminals).
 
-**Phase 1 - Block Selection**:
-- Navigate blocks with `j`/`k` (vim-style) or arrow keys
-- Watch LLM classification stream in real-time (knowledge vs. activity)
-- Select/deselect blocks with `Space`
-- Accept all LLM suggestions with `a`
-- Clear all selections with `c`, reset to LLM suggestions with `r`
-- Jump to next/prev knowledge block with `Shift+j`/`Shift+k`
-- View block content with full context in bottom panel
-- Background: Page indexing for semantic search
-- Press `n` to proceed to Phase 2, `q` to quit
+---
 
-**Phase 2 - Content Editing**:
-- Navigate blocks with `j`/`k` (auto-saves on navigation)
-- Three panels: Original, LLM Reworded, Current (editable)
-- Accept LLM reworded version with `a`
-- Revert to original with `r`
-- Tab to focus/unfocus editor for manual editing
-- Background: RAG search finds candidate pages, LLM plans integrations
-- Press `n` to proceed to Phase 3 (waits for RAG), `q` to go back
+## Understanding the 3 Phases
 
-**Phase 3 - Integration Review**:
-- Navigate decisions with `j`/`k`
-- Preview target page with green bar showing insertion point
-- Accept decision with `y` (writes immediately)
-- Skip decision with `s`
-- Accept all decisions for current block with `a`
-- Press `n` to move to next knowledge block
-- Press `q` to go back to Phase 2
-- Journal marked with `extracted-to::` markers after successful writes
+### Phase 1: Block Selection
 
-All keyboard-driven, no mouse required. LLM results stream in real-time across all phases.
+**What's happening:** AI reads your journal and classifies each block as "knowledge" (worth saving) or "activity log" (daily noise).
 
-### Common Issues
+**Your job:** Review the selections. The AI is pretty good, but you know best.
 
-<details>
-<summary>Config file permission error</summary>
+**Keyboard shortcuts:**
+- `j`/`k` or arrows: Navigate blocks
+- `Space`: Select/deselect current block
+- `a`: Accept all AI suggestions
+- `c`: Clear all selections
+- `Shift+j`/`Shift+k`: Jump to next/previous knowledge block
+- `n`: Proceed to Phase 2
+- `q`: Quit
 
-**Error:** `Configuration file has insecure permissions`
+### Phase 2: Content Editing
 
-**Solution:**
-```bash
-chmod 600 ~/.config/logsqueak/config.yaml
+**What's happening:** AI rewrites selected blocks to remove temporal context ("today I learned...") and improve clarity.
+
+**Your job:** Accept AI suggestions, edit them, or keep the original.
+
+**Keyboard shortcuts:**
+- `j`/`k`: Navigate blocks (auto-saves changes)
+- `a`: Accept AI reworded version
+- `r`: Revert to original
+- `Tab`: Focus/unfocus editor for manual editing
+- `n`: Proceed to Phase 3 (waits for semantic search to complete)
+- `q`: Go back to Phase 1
+
+**Three panels:**
+- Left: Original journal content
+- Middle: AI's suggested rewrite
+- Right: Current version (editable)
+
+### Phase 3: Integration Review
+
+**What's happening:** AI suggests where to save each knowledge block in your graph (which page, which section).
+
+**Your job:** Review each suggestion and approve or skip.
+
+**Keyboard shortcuts:**
+- `j`/`k`: Navigate decisions
+- `y`: Accept decision (writes to file immediately)
+- `s`: Skip this decision
+- `a`: Accept all decisions for current block
+- `n`: Move to next knowledge block
+- `q`: Go back to Phase 2
+
+**What you see:**
+- Target page preview with green bar showing insertion point
+- Integration action (add new section, add under existing, etc.)
+- Provenance: Journal gets `extracted-to::` markers after successful writes
+
+---
+
+## Keyboard Shortcuts Cheat Sheet
+
+All phases use vim-style navigation:
+
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Navigate down/up |
+| `Space` | Select/deselect (Phase 1) |
+| `a` | Accept AI suggestion / Accept all |
+| `r` | Revert to original (Phase 2) |
+| `y` | Yes, accept decision (Phase 3) |
+| `s` | Skip decision (Phase 3) |
+| `Tab` | Focus/unfocus editor (Phase 2) |
+| `n` | Next phase / Next block |
+| `q` | Quit / Go back |
+
+**No mouse needed!** Everything is keyboard-driven.
+
+---
+
+## How It Works (Under the Hood)
+
+**For the curious:**
+
+1. **Parsing**: Logsqueak uses a custom Logseq markdown parser that preserves exact structure (round-trip tested)
+
+2. **Classification**: AI analyzes each journal block to identify knowledge vs. activity logs
+
+3. **Rewording**: AI removes temporal context and improves clarity while preserving meaning
+
+4. **Semantic Search (RAG)**:
+   - Builds a searchable index of your entire graph
+   - Finds similar content by *meaning*, not just keywords
+   - Uses hierarchical chunks for context-aware search
+
+5. **Integration Planning**:
+   - AI searches for relevant pages in your graph
+   - Analyzes page structure to suggest insertion points
+   - Optimized prompts
+
+6. **Atomic Writes**:
+   - Writes to target pages happen immediately on approval
+   - Journal gets `extracted-to::` markers only after successful write
+   - Every integrated block gets a unique `id::` property for traceability
+
+**Non-destructive guarantee:** All operations are traceable. Nothing gets deleted. You can always find where content came from.
+
+---
+
+## Configuration Reference
+
+### Complete Config File
+
+```yaml
+llm:
+  # LLM API endpoint
+  endpoint: http://localhost:11434/v1  # Ollama local
+  # endpoint: https://api.openai.com/v1  # OpenAI cloud
+
+  # API key (any string for Ollama, real key for OpenAI)
+  api_key: ollama
+
+  # Model name
+  model: mistral:7b-instruct  # Ollama model (recommended)
+  # model: your-chosen-model  # OpenAI model
+
+  # Context window size (Ollama only, optional)
+  # Controls VRAM usage - smaller = less memory, smaller context
+  num_ctx: 32768
+
+logseq:
+  # Path to your Logseq graph directory
+  # Must contain journals/ and logseq/ subdirectories
+  graph_path: ~/Documents/logseq-graph
+
+rag:
+  # Number of similar blocks to retrieve per search
+  # Higher = more context but slower (default: 20)
+  top_k: 20
 ```
 
-Config file must be mode 600 (read/write for owner only) for security.
-</details>
+**Note on semantic search:** Logsqueak uses the `all-mpnet-base-v2` embedding model for semantic search. This is not currently configurable but provides excellent quality for finding similar content in your knowledge base.
 
-<details>
-<summary>LLM connection errors</summary>
+---
 
-**For Ollama:**
-- Check Ollama is running: `ollama list`
-- Start Ollama if needed: `ollama serve`
-- Verify model is installed: `ollama pull qwen2.5:latest`
+## Advanced Topics
 
-**For OpenAI:**
-- Verify API key is correct in config.yaml
-- Check API key has credits/quota remaining
-- Ensure endpoint is `https://api.openai.com/v1`
-</details>
+### Understanding Semantic Search
 
-<details>
-<summary>ChromaDB / Embedding errors</summary>
+Logsqueak builds a searchable index of your entire Logseq graph:
 
-**Error:** Model download fails or embeddings error
-
-**Solution:**
 ```bash
-# Force rebuild search index
+# First run: Builds index (takes a minute)
+logsqueak search "python tips"
+
+# Subsequent runs: Uses cached index (instant)
+logsqueak search "docker containers"
+
+# Force rebuild (if you've added lots of new pages)
 logsqueak search "test" --reindex
-
-# Or delete index and let it rebuild
-rm -rf ~/.cache/logsqueak/chromadb/
 ```
 
-The first run downloads sentence-transformers model (~500MB). This is cached for future runs.
-</details>
+**How it works:**
+- Converts your pages into "embeddings" (AI representations of meaning)
+- Searches by semantic similarity, not just keyword matching
+- Boosts results that have explicit links to relevant pages
+- Shows hierarchical context (parent blocks) for better understanding
 
-<details>
-<summary>Journal not found</summary>
+**When to rebuild:**
+- After adding many new pages manually
+- If search results seem stale
+- If you changed your graph structure significantly
 
-**Error:** `Journal file not found`
+### Provenance Tracking
 
-**Solution:**
-- Verify `graph_path` in config.yaml points to your Logseq graph directory
-- Check journal files exist in `<graph_path>/journals/`
-- Logseq journal files use format `YYYY_MM_DD.md` (e.g., `2025_01_15.md`)
-</details>
+Every integration is traceable:
 
-## Project Structure
+**In your journal:**
+```markdown
+- Learned about TDD best practices
+  extracted-to:: [[TDD]]#65b1c1f0-1234-5678-89ab-cdef01234567
+```
+
+**In the target page:**
+```markdown
+## Best Practices
+- Test-Driven Development emphasizes writing tests first
+  id:: 65b1c1f0-1234-5678-89ab-cdef01234567
+```
+
+The `id::` property links back to the journal entry. The `extracted-to::` marker shows where it went.
+
+### File Safety
+
+Logsqueak uses "atomic two-phase writes":
+
+1. **Read target page** and verify it hasn't changed
+2. **Write new content** to a temporary file
+3. **Move temp file** to final location (atomic operation)
+4. **Mark journal** with `extracted-to::` marker
+
+If any step fails, the operation is rolled back. You never get partial writes or corrupted files.
+
+**Concurrent modification detection:** If you edit a target page in Logseq while Logsqueak is running, the write will fail with an error instead of overwriting your changes.
+
+### Worker Dependencies
+
+Background tasks run in a specific order:
+
+```
+Phase 1:
+  - LLM Classification (immediate)
+  - Embedding Model Loading (immediate)
+    └─→ Page Indexing (waits for model)
+
+Phase 2:
+  - LLM Rewording (immediate)
+  - RAG Search (waits for indexing)
+    └─→ Integration Planning (waits for RAG)
+
+Phase 3:
+  - Decision Review (uses results from Phase 2)
+```
+
+The UI shows progress for all background tasks. You can navigate while workers run in the background.
+
+---
+
+## Development
+
+Want to contribute or customize Logsqueak? See [CLAUDE.md](CLAUDE.md) for developer documentation.
+
+### Quick Dev Commands
+
+```bash
+# Activate virtual environment (REQUIRED for all commands below)
+source venv/bin/activate
+
+# Run tests
+pytest -v
+
+# Run specific test suite
+pytest tests/unit/ -v           # Unit tests only
+pytest tests/integration/ -v    # Integration tests only
+pytest tests/ui/ -v             # UI tests only
+
+# Code quality
+black src/ tests/               # Format code
+ruff check src/ tests/          # Lint code
+mypy src/                       # Type checking
+
+# Coverage report
+pytest --cov=logsqueak --cov=logseq_outline --cov-report=html -v
+```
+
+### Project Structure
 
 ```
 logsqueak/
 ├── src/
-│   ├── logsqueak/                 # Main application
-│   │   ├── models/                # Pydantic data models ✅
-│   │   ├── services/              # LLMClient, LLM helpers/wrappers, FileOps, RAG ✅
-│   │   ├── tui/                   # TUI screens & widgets (All 3 phases ✅)
-│   │   ├── utils/                 # Logging, UUID generation ✅
-│   │   ├── cli.py                 # CLI entry point ✅
-│   │   └── config.py              # ConfigManager ✅
-│   └── logseq-outline-parser/     # Parser library ✅
-├── tests/                         # Test suite
-│   ├── unit/                      # Unit tests (all services, models, utils) ✅
-│   ├── integration/               # Integration tests (workflow, transitions) ✅
-│   └── ui/                        # UI tests (all 3 phases with snapshots) ✅
-├── specs/
-│   ├── 001-logsqueak/             # Original 5-phase pipeline spec
-│   └── 002-logsqueak-spec/        # Interactive TUI spec (CURRENT)
-│       ├── spec.md                # Feature specification
-│       ├── tasks.md               # Phase 1-6.5 complete ✅ (T001-T108s)
-│       └── contracts/             # Service interfaces, data models
-└── pyproject.toml                 # Dependencies and config
+│   ├── logsqueak/              # Main application
+│   │   ├── models/             # Data models (Pydantic)
+│   │   ├── services/           # LLM, RAG, file operations
+│   │   ├── tui/                # Interactive UI (Textual)
+│   │   ├── wizard/             # Setup wizard
+│   │   ├── cli.py              # CLI commands
+│   │   └── config.py           # Configuration management
+│   └── logseq-outline-parser/  # Logseq markdown parser library
+├── tests/                      # Test suite (376 tests)
+│   ├── unit/                   # Unit tests (241 tests)
+│   ├── integration/            # Integration tests (97 tests)
+│   └── ui/                     # UI tests (38 tests)
+├── specs/                      # Feature specifications
+│   ├── 002-logsqueak-spec/     # Interactive TUI spec (complete)
+│   └── 003-setup-wizard/       # Setup wizard spec (complete)
+├── test-graph/                 # Sample Logseq graph for testing
+└── pyproject.toml              # Dependencies and configuration
 ```
 
-## Development
+### Key Resources
 
-### Running Tests
+- **[CLAUDE.md](CLAUDE.md)** - Developer guide, architecture, API docs
 
-**IMPORTANT**: Always activate the virtual environment first!
+---
 
-```bash
-# Activate venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+## Getting Help
 
-# Run all tests
-pytest -v
+- **Bugs**: [GitHub Issues](https://github.com/twaugh/logsqueak/issues)
+- **Questions**: [GitHub Discussions](https://github.com/twaugh/logsqueak/discussions)
+- **Documentation**: See [CLAUDE.md](CLAUDE.md) for developer docs
 
-# Run only parser tests
-pytest src/logseq-outline-parser/tests/ -v
+---
 
-# Run only main app tests
-pytest tests/unit/ tests/integration/ -v
+## Acknowledgments
 
-# Run with coverage
-pytest --cov=logsqueak --cov=logseq_outline --cov-report=html -v
+Built with:
+- [Textual](https://textual.textualize.io/) - Modern TUI framework
+- [Ollama](https://ollama.com/) - Local LLM runtime
+- [ChromaDB](https://www.trychroma.com/) - Vector database for semantic search
+- [sentence-transformers](https://www.sbert.net/) - Embedding models
 
-# Verify foundational tests (Phase 2 checkpoint)
-pytest tests/unit/ tests/integration/test_config*.py tests/integration/test_llm*.py -v
-```
-
-### Code Quality
-
-**IMPORTANT**: Always activate the virtual environment first!
-
-```bash
-# Activate venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Format code
-black src/ tests/
-
-# Lint code
-ruff check src/ tests/
-
-# Type checking
-mypy src/
-```
-
-## Implementation Status
-
-**✅ Phase 1-6.5 Complete (Tasks T001-T108s)**
-
-All three phases working end-to-end with optimized LLM prompts:
-
-- ✅ **Logseq Outline Parser** (Production-ready library)
-  - Non-destructive parsing & rendering with property order preservation
-  - Hybrid ID system (explicit `id::` OR content hash)
-  - Full-context generation for semantic search
-  - Frontmatter support, round-trip safety tests
-
-- ✅ **Data Models** (Pydantic validation)
-  - Config models (LLMConfig, LogseqConfig, RAGConfig, Config)
-  - Block state models (BlockState, EditedContent, IntegrationDecision)
-  - LLM chunk models (KnowledgeClassificationChunk, ContentRewordingChunk, IntegrationDecisionChunk)
-  - Background task state enum
-
-- ✅ **Services Layer**
-  - LLMClient: Async NDJSON streaming, retry logic, request queue with priority
-  - LLM Wrappers: Prompt templates for classification, rewording, integration
-  - LLM Helpers: Decision batching, filtering, hierarchical chunk formatting (90% prompt reduction)
-  - FileMonitor: Mtime tracking with `!=` comparison (git-friendly)
-  - FileOperations: Atomic two-phase writes with provenance markers
-  - PageIndexer: ChromaDB vector indexing with lazy-loaded SentenceTransformer
-  - RAGSearch: Semantic search returning hierarchical chunks with link boosting
-
-- ✅ **Configuration & CLI**
-  - ConfigManager with lazy validation
-  - Mode 600 permission checking
-  - Helpful error messages with example YAML
-  - Click-based CLI with date/range parsing
-  - Main TUI app with screen management and worker coordination
-
-- ✅ **Utilities**
-  - Structured logging (structlog) to `~/.cache/logsqueak/logs/logsqueak.log`
-  - Deterministic UUID v5 with Logsqueak-specific namespace
-
-- ✅ **Test Coverage**
-  - Comprehensive test suite (all tests passing)
-  - Unit tests: All models, services, utilities, RAG, LLM helpers/wrappers, request queue
-  - Integration tests: Config loading, LLM NDJSON streaming, RAG pipeline, phase transitions, end-to-end workflow
-  - UI tests: All three phases with snapshot testing (Textual pilot)
-  - Proper async fixtures with `@pytest_asyncio.fixture`
-
-- ✅ **Phase 1 Block Selection TUI**
-  - BlockTree widget: Hierarchical block display with expand/collapse
-  - StatusPanel widget: Background task progress tracking
-  - MarkdownViewer widget: Block preview with full context
-  - Keyboard navigation: j/k, Space, Shift+j/k, a/c/r keys
-  - LLM streaming: Real-time classification updates
-  - Journal loader: Date/range parsing and multi-file support
-  - CLI integration: `logsqueak extract` command
-
-- ✅ **Phase 2 Content Editing TUI**
-  - ContentEditor widget: Multi-line text editor with focus/unfocus visual indication
-  - Phase2Screen: Vertical three-panel layout (original, LLM reworded, current editable)
-  - Keyboard controls: j/k navigation with auto-save, Tab focus, 'a' accept, 'r' revert
-  - RAG search blocking on 'n' key (waits for completion)
-  - Background workers: LLM rewording, RAG search, integration decision planning
-
-- ✅ **Phase 3 Integration Review TUI**
-  - DecisionList widget: Batched decisions per knowledge block with filtering
-  - TargetPagePreview widget: Live preview with green insertion point bar
-  - Phase3Screen: Decision navigation and acceptance workflow
-  - File operations: Atomic two-phase writes with provenance markers
-  - Background worker: Decision polling or LLM decision generation
-
-- ✅ **Phase 6 Application Integration**
-  - End-to-end workflow: All three phases wired together
-  - Screen transitions with proper state passing
-  - Background worker dependency coordination
-  - Worker cancellation during phase transitions
-
-- ✅ **Phase 6.5 LLM Prompt Optimization**
-  - Hierarchical chunk formatting for RAG results
-  - Per-block integration planning (one block at a time)
-  - ChromaDB document reuse (eliminates redundant parsing)
-  - LLM request queue with priority and cancellation
-  - **Result**: 90%+ prompt reduction (62KB → 2-4KB per block)
-  - **Impact**: Works with smaller models (Mistral-7B), faster responses
-
-**⏳ Next Steps**
-
-- Phase 7: Edge case handling and error recovery
-- Phase 8: Final documentation and validation
-
-## Architecture
-
-### Interactive 3-Phase TUI Workflow
-
-**Phase 1 - Block Selection Screen** (T032-T049):
-- BlockTree widget: Hierarchical display of journal blocks
-- LLM worker: Streams classification results (knowledge vs. activity)
-- StatusPanel widget: Shows background task progress (LLM classification, page indexing)
-- User actions: Navigate (j/k), select/deselect (Space), accept all (a), proceed (n)
-
-**Phase 2 - Content Editing Screen** (T050-T070):
-- ContentEditor widget: Three-panel view (original, LLM reworded, current editable)
-- LLM rewording worker: Streams rewording suggestions
-- RAG search worker: Finds candidate target pages in background
-- Integration decision worker: Plans integrations (opportunistic - starts when RAG completes)
-- User actions: Navigate (j/k with auto-save), accept LLM (a), revert (r), Tab to focus editor, proceed (n) when RAG complete
-
-**Phase 3 - Integration Review Screen** (T071-T096):
-- DecisionList widget: Batched decisions per knowledge block with skip_exists filtering
-- TargetPagePreview widget: Shows target page with green bar at insertion point
-- Decision worker: Polls for new decisions OR starts worker if not already running
-- File operations: Atomic two-phase writes with provenance markers
-- User actions: Navigate decisions (j/k), accept (y), skip (s), next block (n), batch accept (a)
-
-### Key Design Principles
-
-1. **Property Order Preservation**: NEVER reorder (insertion order sacred)
-2. **Non-Destructive Operations**: All integrations traceable via `extracted-to::` markers
-3. **Atomic Consistency**: Journal marked only when page write succeeds
-4. **Keyboard-Driven**: Vim-style navigation (j/k), context-sensitive shortcuts
-5. **Streaming LLM**: Real-time UI updates as results arrive
-6. **Explicit Control**: Users approve all integrations (no auto-write)
-7. **Test-Driven Development**: Write failing tests → Implement → Tests pass → Manual verify
-
-## License
-
-GPLv3 - See [LICENSE](LICENSE) file.
-
-This project uses AI assistance (Claude Code) in development. All code is licensed under GPLv3 regardless of authorship method.
-
-## Contributing
-
-See [CLAUDE.md](CLAUDE.md) for developer documentation, architecture details, and implementation guidance.
-
-Key resources:
-- **specs/002-logsqueak-spec/spec.md** - Complete interactive TUI feature specification
-- **specs/002-logsqueak-spec/tasks.md** - Implementation tasks (Phase 1-6.5 complete ✅)
-- **specs/002-logsqueak-spec/contracts/** - Service interfaces and data models
-- **CLAUDE.md** - Developer guide with parser API, RAG pipeline, testing, and architecture
-
-## Development Workflow
-
-**Test-Driven Development** (Phase 3+ approach):
-1. Write UI tests FIRST using Textual pilot - tests should FAIL
-2. Verify tests fail: `pytest tests/ui/test_phase1_*.py -v`
-3. Implement widgets and screens
-4. Run tests again - should NOW PASS
-5. Manual verification in TUI before proceeding
-
-**Current Status**: Phase 6.5 complete - All three phases working end-to-end with optimized LLM prompts
-
-## Roadmap
-
-**Completed** (Phase 1-6.5):
-- ✅ Project structure and dependencies
-- ✅ All data models with Pydantic validation
-- ✅ LLM client with NDJSON streaming and request queue
-- ✅ Configuration management with lazy validation
-- ✅ File monitoring for concurrent edits
-- ✅ Journal loading with date/range parsing
-- ✅ RAG services with hierarchical chunks (90% prompt reduction)
-- ✅ File operations with atomic two-phase writes
-- ✅ Comprehensive test suite (unit, integration, UI)
-- ✅ User Story 1: Block Selection TUI
-- ✅ User Story 2: Content Editing TUI
-- ✅ User Story 3: Integration Review TUI
-- ✅ Application Integration: All 3 phases wired together
-- ✅ Background worker coordination with dependency management
-- ✅ LLM prompt optimization (hierarchical chunks)
-
-**Next** (Phase 7-8):
-- ⏳ Edge case handling and error recovery
-- ⏳ Final documentation and validation
+Developed with assistance from [Claude Code](https://claude.com/claude-code).

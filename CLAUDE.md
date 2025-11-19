@@ -17,13 +17,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - ✅ **RAG Search**: PageIndexer and RAGSearch with hierarchical chunks and explicit link boosting
 - ✅ **File Operations**: Atomic two-phase writes with provenance markers and concurrent modification detection
 - ✅ **LLM Queue**: Priority-based request serialization with cancellation support
-- ✅ **CLI Commands**: `extract` (with date/range parsing), `search` (with clickable logseq:// links)
+- ✅ **CLI Commands**: `extract` (with date/range parsing), `search` (with clickable logseq:// links), `init` (interactive setup wizard)
 - ✅ **Per-Graph Indexing**: ChromaDB with deterministic directory naming
 - ✅ **Logging**: Structured logging for all LLM requests/responses and user actions
 - ✅ **Edge Cases**: Config errors, network errors, file modifications, malformed JSON handling
 - ✅ **UX Polish**: Skip_exists decisions with clickable links, quiet indexing when no updates needed
 - ✅ **Performance**: EditedContent references eliminate sync loops, pre-cleaned contexts in RAG index
-- ✅ **Test Coverage**: 280+ tests passing (173 unit, 69 integration, 38 UI)
+- ✅ **Test Coverage**: 376 tests passing (241 unit, 97 integration, 38 UI)
 
 ## Project Structure
 
@@ -34,6 +34,7 @@ logsqueak/
 │   │   ├── models/                # Pydantic data models (config, block state, LLM chunks)
 │   │   ├── services/              # LLMClient, FileMonitor, PageIndexer, RAGSearch
 │   │   ├── tui/                   # TUI screens & widgets (Phase 1, Phase 2 complete)
+│   │   ├── wizard/                # Interactive setup wizard (validators, prompts, orchestration)
 │   │   ├── utils/                 # Logging, UUID generation
 │   │   ├── cli.py                 # Click-based CLI entry point
 │   │   └── config.py              # ConfigManager with lazy validation
@@ -48,10 +49,15 @@ logsqueak/
 │   └── ui/                        # UI tests for Phase 1 and Phase 2 (Textual pilot)
 ├── specs/
 │   ├── 001-logsqueak/             # Original knowledge extraction spec
-│   └── 002-logsqueak-spec/        # Interactive TUI feature spec (CURRENT)
-│       ├── spec.md                # Complete feature specification
-│       ├── tasks.md               # Phase 1-6.5 complete (T001-T108s ✅)
-│       └── contracts/             # Service interfaces, data models
+│   ├── 002-logsqueak-spec/        # Interactive TUI feature spec (COMPLETE)
+│   │   ├── spec.md                # Complete feature specification
+│   │   ├── tasks.md               # Phase 1-8 complete (T001-T147 ✅)
+│   │   └── contracts/             # Service interfaces, data models
+│   └── 003-setup-wizard/          # Interactive setup wizard spec (CURRENT)
+│       ├── spec.md                # Setup wizard specification
+│       ├── tasks.md               # Phase 1-3 complete (T001-T037 ✅)
+│       ├── plan.md                # Implementation planning
+│       └── contracts/             # Validation interfaces, data models
 ├── pyproject.toml                 # Project dependencies and config
 └── CLAUDE.md                      # This file
 ```
@@ -208,7 +214,7 @@ The foundational infrastructure is **complete and tested** (Phase 1-2 in tasks.m
 ### Data Models (Pydantic)
 
 All models in `src/logsqueak/models/`:
-- **config.py**: LLMConfig, LogseqConfig, RAGConfig, Config (with YAML loading and permission validation)
+- **config.py**: LLMConfig, LogseqConfig, RAGConfig, Config (with YAML loading, permission validation, and llm_providers field for multi-provider support)
 - **block_state.py**: BlockState (Phase 1 selection tracking)
 - **edited_content.py**: EditedContent (Phase 2 editing state)
 - **integration_decision.py**: IntegrationDecision (Phase 3 write decisions)
@@ -258,9 +264,33 @@ The RAG (Retrieval-Augmented Generation) pipeline uses semantic search to find r
 - **cli.py**: Click-based CLI with commands:
   - `extract` - Interactive knowledge extraction workflow (date/range parsing, journal loading, TUI launcher)
   - `search` - Semantic search of knowledge base (uses RAG infrastructure, clickable logseq:// links)
+  - `init` - Interactive setup wizard for first-time configuration
 - **config.py**: ConfigManager with lazy validation, helpful error messages, permission checks (mode 600)
 - **app.py**: Main TUI application with screen management, phase transitions, worker coordination
-- Config file: `~/.config/logsqueak/config.yaml` (user must create before first run)
+- Config file: `~/.config/logsqueak/config.yaml` (created by `logsqueak init` wizard)
+
+### Setup Wizard (IMPLEMENTED)
+
+The interactive setup wizard (`logsqueak init`) guides users through first-time configuration:
+
+**Three-step flow:**
+1. **Logseq Graph Location** - Validates directory structure (requires `journals/` and `logseq/` subdirectories)
+2. **AI Assistant Configuration** - Provider selection with runtime detection (Ollama local/remote, OpenAI, custom endpoints)
+3. **Semantic Search Setup** - Embedding model validation with smart cache detection
+
+**Key features:**
+- **Runtime provider detection**: Tests endpoints to classify as Ollama vs OpenAI vs custom
+- **Smart cache detection**: Loads embedding model in offline mode to verify it's cached
+- **Change detection**: Skips config write if no changes made
+- **Model selection**: Shows both recommended (⭐) and current (✓) models in table
+- **Atomic writes**: Config files written with mode 600 permissions
+- **Multi-provider support**: Preserves credentials for all configured providers in `llm_providers` field
+
+**Wizard modules** (`src/logsqueak/wizard/`):
+- **validators.py**: Graph path, disk space, Ollama/OpenAI connection, embedding model validation
+- **providers.py**: Model fetching, recommendation logic, API key masking
+- **prompts.py**: Rich-based interactive prompts with helpful defaults
+- **wizard.py**: Orchestration logic, config assembly, file operations
 
 ### Utilities
 
@@ -361,12 +391,13 @@ llm:
                   # Ignored for OpenAI endpoints (use model's default context window)
 ```
 
-**Configuration behavior** (from spec clarifications):
-- User must create config file before first run (not auto-created)
-- Missing config shows helpful error with example YAML
+**Configuration behavior**:
+- First-time users: Run `logsqueak init` to create configuration interactively
+- Missing config: Shows helpful error suggesting to run `logsqueak init`
 - Lazy validation: Settings validated only when first accessed
-- Validation failures: Show error and exit immediately (user must edit and restart)
-- File permissions: Must be mode 600 (checked on load)
+- Validation failures: Show error and exit immediately (user must fix and restart)
+- File permissions: Must be mode 600 (enforced by wizard, checked on load)
+- Updates: Run `logsqueak init` again to modify existing configuration
 
 ### Key Design Principles
 
@@ -541,6 +572,9 @@ mypy src/
 ### Running the CLI
 
 ```bash
+# First-time setup: Interactive configuration wizard
+logsqueak init
+
 # Launch end-to-end knowledge extraction workflow
 logsqueak extract                         # Today's journal entry
 logsqueak extract 2025-01-15              # Specific date
@@ -569,6 +603,7 @@ logsqueak search "python debugging tips" --reindex  # Force rebuild index
   - `chromadb>=0.4.0` - Vector store for RAG
   - `sentence-transformers>=2.2.0` - Embeddings (lazy-loaded to prevent UI blocking)
   - `markdown-it-py>=3.0.0` - Markdown rendering (Textual dependency for Markdown widget)
+  - `rich>=13.0.0` - Rich text formatting for CLI wizard
 - **Dev dependencies** (installed):
   - `pytest>=7.4.0` - Test framework
   - `pytest-asyncio>=0.21.0` - Async test support
@@ -660,21 +695,21 @@ Logseq uses indented bullets (2 spaces per level) with special features:
 
 ## Feature Implementation Status
 
-**Current branch**: `002-logsqueak-spec`
+**Current branch**: `003-setup-wizard`
 
-**Spec location**: `specs/002-logsqueak-spec/spec.md`
+**Active spec**: `specs/003-setup-wizard/spec.md`
 
-**Implementation status**: ✅ **COMPLETE** - All phases implemented and tested
+**Implementation status**:
+- ✅ **002-logsqueak-spec**: COMPLETE - All 8 phases implemented and tested (T001-T147)
+  - Interactive TUI application with knowledge extraction workflow
+  - Full test coverage (280+ tests passing)
 
-- ✅ **Phase 1: Setup** (T001-T009)
-- ✅ **Phase 2: Foundational** (T010-T031)
-- ✅ **Phase 3: User Story 1** (T032-T049) - Block Selection TUI
-- ✅ **Phase 4: User Story 2** (T050-T070) - Content Editing TUI
-- ✅ **Phase 5: User Story 3** (T071-T096) - Integration Review TUI
-- ✅ **Phase 6: Application Integration** (T097-T108g) - End-to-end workflow
-- ✅ **Phase 6.5: Prompt Optimization** (T108i-T108s) - 90% prompt reduction, LLM request queue
-- ✅ **Phase 7: Edge Cases** (T110-T120) - Error handling and robustness
-- ✅ **Phase 8: Polish** (T121-T147) - UX improvements, CLI search, performance optimizations
+- 🔄 **003-setup-wizard**: IN PROGRESS - Phase 1-3 complete (T001-T037 ✅)
+  - ✅ **Phase 1: Setup** (T001-T004) - Wizard module structure
+  - ✅ **Phase 2: Foundational** (T005-T009) - Data models and Config extension
+  - ✅ **Phase 3: User Story 1** (T010-T037) - First-time setup for Ollama provider
+    - Validation functions, provider helpers, prompts, wizard orchestration, CLI integration
+  - ⏳ **Phase 4-8**: Pending - Additional providers, edge cases, comprehensive tests
 
 **Development guidelines**:
 - Follow TDD: Write failing tests → Implement → Tests pass → Manual verify
@@ -687,6 +722,16 @@ Logseq uses indented bullets (2 spaces per level) with special features:
 GPLv3 - All code is licensed under GPLv3 regardless of authorship method (including AI-assisted development).
 
 ## Recent Changes
+- 2025-11-19: **Setup Wizard Implementation (Phase 1-3)** - Interactive `logsqueak init` command
+  - Three-step guided configuration: graph location, AI assistant, semantic search
+  - Runtime provider detection (Ollama vs OpenAI vs custom endpoints)
+  - Smart embedding model cache detection via offline mode loading
+  - Model table shows both recommended (⭐) and current (✓) models
+  - Change detection to skip unnecessary config writes
+  - Consistent spacing throughout wizard output
+  - Extended Config model with llm_providers field for multi-provider support
+  - Wizard modules: validators, providers, prompts, orchestration
+  - Dependencies: Rich (CLI formatting), httpx (API testing), existing Pydantic/PyYAML
 
 - 2025-11-17: **Specification Complete** - All phases implemented, 280+ tests passing
   - Completed all 8 phases of the interactive TUI feature spec (002-logsqueak-spec)
@@ -717,7 +762,6 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
     - Added `strip_page_properties()` to prevent duplicate frontmatter
   - **Impact**: Fixes 400 Bad Request errors from Mistral-7B context window limits
   - **Result**: 90%+ prompt size reduction enables faster responses and more reliable LLM calls
-- 2025-11-12: **LLM Request Queue** - Implemented request serialization with priority and cancellation (T108r, T108s)
   - Added priority queue to serialize LLM requests (prevents concurrent prompts)
   - Priority order: Classification (1) > Rewording (2) > Integration (3)
   - Workers use `acquire_llm_slot()` / `release_llm_slot()` for coordination
@@ -727,7 +771,6 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
   - Graceful handling of `asyncio.CancelledError` in all workers
   - Test suite with 5 tests for sequential execution, priority ordering, error handling
   - Rationale: Prevents resource contention with high-latency reasoning models
-- 2025-11-11: **Parser Refactoring** - Added strict_indent_preservation parameter
   - Parser now defaults to normalized indentation (no outdent markers)
   - Added strict_indent_preservation parameter for write operations only
   - Normalized content hashing for stable IDs across parsing modes
@@ -735,7 +778,6 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
   - Simplifies application code by handling markers at parser level
   - All 87 parser tests passing, 7 new tests for indent preservation and hash stability
   - Prevents implementation details from leaking into LLM prompts and UI
-- 2025-11-10: **Phase 5 Complete** - Integration Review TUI implemented and tested (T071-T096)
   - TargetPagePreview and DecisionList widgets complete
   - Phase3Screen with decision navigation, batch acceptance, target preview
   - File operations service with atomic two-phase writes and provenance markers
@@ -743,7 +785,6 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
   - Idempotent retry detection and concurrent modification handling
   - 38 UI tests passing, 37 file operations tests passing
   - All three core user stories (US1, US2, US3) now complete
-- 2025-11-06: **Phase 4 Complete** - Content Editing TUI implemented and tested (T050-T070)
   - RAG services (PageIndexer, RAGSearch) with lazy SentenceTransformer loading
   - Fixed PageIndexer to use `generate_chunks()` for proper semantic chunking
   - ContentEditor widget and Phase2Screen with vertical three-panel layout
@@ -751,16 +792,14 @@ GPLv3 - All code is licensed under GPLv3 regardless of authorship method (includ
   - Auto-save on navigation, RAG search blocking implemented
   - Comprehensive UI test suite with snapshot testing
   - All async fixtures properly use `@pytest_asyncio.fixture`
-- 2025-11-06: **Phase 3 Complete** - Block Selection TUI implemented and tested (T032-T049)
   - BlockTree, StatusPanel, MarkdownViewer widgets complete
   - Phase1Screen with LLM streaming, keyboard navigation, manual selection
   - Journal loader service with date/range parsing
   - CLI integration launching Phase 1 TUI
-- 2025-11-06: **Phase 1-2 Complete** - Foundational infrastructure implemented and tested (T001-T031)
   - All data models, services, CLI, config, and utilities complete
   - Fixed FileMonitor to use `!=` comparison (git-friendly)
   - Generated Logsqueak-specific UUID namespace
 
 ## Active Technologies
-- Python 3.11+ (002-logsqueak-spec)
-- File-based (Logseq markdown files) + ChromaDB (vector embeddings) (002-logsqueak-spec)
+- Python 3.11+ + Click (CLI framework), Rich (formatted CLI output), httpx (HTTP client for API testing), PyYAML (config serialization), sentence-transformers (embedding model), existing Pydantic models (Config validation) (003-setup-wizard)
+- File-based YAML config at `~/.config/logsqueak/config.yaml` with mode 600 permissions (003-setup-wizard)

@@ -81,6 +81,10 @@ class Config(BaseModel):
     llm: LLMConfig = Field(..., description="LLM API settings")
     logseq: LogseqConfig = Field(..., description="Logseq graph settings")
     rag: RAGConfig = Field(default_factory=RAGConfig, description="RAG search settings")
+    llm_providers: dict[str, dict] | None = Field(
+        default=None,
+        description="Preserved provider configurations (managed by wizard)"
+    )
 
     @classmethod
     def load(cls, path: Path) -> "Config":
