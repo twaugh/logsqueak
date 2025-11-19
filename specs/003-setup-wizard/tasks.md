@@ -236,7 +236,7 @@ Using single project structure (from plan.md):
 
 **Purpose**: Logging, progress indicators, and final validation
 
-- [ ] T094 [P] Add structured logging for all wizard actions in src/logsqueak/wizard/wizard.py (config loaded, prompts shown, validations, errors)
+- [X] T094 [P] Add structured logging for all wizard actions in src/logsqueak/wizard/wizard.py (config loaded, prompts shown, validations, errors)
 - [ ] T095 [P] Add Rich Status spinner for network operations in src/logsqueak/wizard/wizard.py (LLM connection test, model fetching)
 - [ ] T096 [P] Add Rich Progress bar for embedding model download in src/logsqueak/wizard/validators.py (show download progress)
 - [ ] T097 [P] Verify all error messages follow contract format in src/logsqueak/wizard/ ([ERROR TYPE] + description + actionable guidance)
