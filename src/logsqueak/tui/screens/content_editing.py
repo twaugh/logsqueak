@@ -707,6 +707,32 @@ class Phase2Screen(Screen):
                         )
                         yield decision
 
+                def deduplicate_decisions(new_decisions: list, existing_decisions: list) -> list:
+                    """Remove duplicate decisions based on target_page, action, and target_block_id.
+
+                    Args:
+                        new_decisions: New decisions to add
+                        existing_decisions: Existing decisions in the shared list
+
+                    Returns:
+                        De-duplicated list of new decisions
+                    """
+                    # Build set of (target_page, action, target_block_id) tuples from existing
+                    existing_keys = set()
+                    for decision in existing_decisions:
+                        key = (decision.target_page, decision.action, decision.target_block_id)
+                        existing_keys.add(key)
+
+                    # Filter new decisions
+                    deduplicated = []
+                    for decision in new_decisions:
+                        key = (decision.target_page, decision.action, decision.target_block_id)
+                        if key not in existing_keys:
+                            deduplicated.append(decision)
+                            existing_keys.add(key)  # Prevent duplicates within new_decisions too
+
+                    return deduplicated
+
                 converted_stream = convert_chunks()
 
                 # Collect all decisions (already grouped by block via per-block LLM calls)
@@ -718,17 +744,24 @@ class Phase2Screen(Screen):
                 async for decision in converted_stream:
                     # Track when we move to a new block
                     if current_block_id is not None and decision.knowledge_block_id != current_block_id:
-                        # Finished a block - store its decisions
+                        # Finished a block - store its decisions (after deduplication)
                         from logsqueak.tui.app import LogsqueakApp
                         if isinstance(self.app, LogsqueakApp):
                             before_count = len(self.app.integration_decisions)
-                            self.app.integration_decisions.extend(decisions_in_current_block)
+                            # De-duplicate before extending
+                            unique_decisions = deduplicate_decisions(
+                                decisions_in_current_block,
+                                self.app.integration_decisions
+                            )
+                            self.app.integration_decisions.extend(unique_decisions)
                             after_count = len(self.app.integration_decisions)
                             logger.info(
                                 "decisions_added_to_shared_list",
                                 before=before_count,
                                 after=after_count,
-                                batch_size=len(decisions_in_current_block)
+                                batch_size=len(decisions_in_current_block),
+                                unique_added=len(unique_decisions),
+                                duplicates_filtered=len(decisions_in_current_block) - len(unique_decisions)
                             )
 
                         block_count += 1
@@ -743,13 +776,20 @@ class Phase2Screen(Screen):
                     from logsqueak.tui.app import LogsqueakApp
                     if isinstance(self.app, LogsqueakApp):
                         before_count = len(self.app.integration_decisions)
-                        self.app.integration_decisions.extend(decisions_in_current_block)
+                        # De-duplicate before extending
+                        unique_decisions = deduplicate_decisions(
+                            decisions_in_current_block,
+                            self.app.integration_decisions
+                        )
+                        self.app.integration_decisions.extend(unique_decisions)
                         after_count = len(self.app.integration_decisions)
                         logger.info(
                             "decisions_added_to_shared_list",
                             before=before_count,
                             after=after_count,
-                            batch_size=len(decisions_in_current_block)
+                            batch_size=len(decisions_in_current_block),
+                            unique_added=len(unique_decisions),
+                            duplicates_filtered=len(decisions_in_current_block) - len(unique_decisions)
                         )
 
                     block_count += 1
