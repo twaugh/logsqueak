@@ -469,6 +469,21 @@ class Phase3Screen(Screen):
                 block_id=new_block_id
             )
             outline.blocks.append(new_root)
+        elif action == "replace" and target_block_id:
+            # Replace the target block's content
+            target_found = self._replace_block_content(
+                outline, target_block_id, new_block_content, new_block_id, decision.target_page
+            )
+            if not target_found:
+                logger.warning(
+                    "target_block_not_found_for_replace",
+                    target_id=target_block_id,
+                    target_page=decision.target_page,
+                    knowledge_block_id=decision.knowledge_block_id,
+                    reason="Block may have been modified/deleted since RAG indexing, cannot replace"
+                )
+                # No fallback for replace - just show original content without modification
+                # The preview will show the page as-is without the replacement
 
         # Render the modified outline
         preview_content = outline.render()
@@ -529,6 +544,53 @@ class Phase3Screen(Screen):
             return False
 
         return search_and_add(outline.blocks, [])
+
+    def _replace_block_content(
+        self, outline: LogseqOutline, target_id: str, content: str, block_id: str, page_name: str
+    ) -> bool:
+        """Replace a target block's content with new content.
+
+        Args:
+            outline: Outline to modify
+            target_id: ID of target block to replace
+            content: New content for block
+            block_id: ID for replaced block
+            page_name: Page name (for content hash matching)
+
+        Returns:
+            True if target was found and content replaced
+        """
+        # Get frontmatter and indent_str from outline (needed for hash matching)
+        frontmatter = outline.frontmatter if outline.frontmatter else None
+        indent_str = outline.indent_str
+
+        def search_and_replace(blocks: list[LogseqBlock], parents: list[LogseqBlock]) -> bool:
+            for target_block in blocks:
+                # Check if this is the target (by explicit ID or content hash)
+                block_matches = False
+                if target_block.block_id == target_id:
+                    block_matches = True
+                else:
+                    # Try content hash (MUST include page_name, frontmatter, and indent_str to match RAG indexing)
+                    full_context = generate_full_context(target_block, parents, indent_str, frontmatter)
+                    content_hash = generate_content_hash(full_context, page_name)
+                    if content_hash == target_id:
+                        block_matches = True
+
+                if block_matches:
+                    # Found the target - replace its content
+                    # Preserve the block's children and indent level, but replace first line content
+                    target_block.content = [content]
+                    # Update block ID to the preview ID so we can highlight it
+                    target_block.block_id = block_id
+                    return True
+
+                # Recursively search children
+                if search_and_replace(target_block.children, parents + [target_block]):
+                    return True
+            return False
+
+        return search_and_replace(outline.blocks, [])
 
     def _find_block_by_content(
         self, blocks: list[LogseqBlock], content: str, parents: list[LogseqBlock] = None
