@@ -425,6 +425,7 @@ async def plan_integration_for_block(
     """
     from logsqueak.services.llm_helpers import format_chunks_for_llm
     from logsqueak.utils.llm_id_mapper import LLMIDMapper
+    from logsqueak.utils.context_cleaning import strip_id_property
     import structlog
 
     logger = structlog.get_logger()
@@ -440,10 +441,12 @@ async def plan_integration_for_block(
         id_mapper.add(block_id)
 
     # Generate XML for single block with short ID
+    # CRITICAL: Strip id:: property to avoid conflict with XML attribute
     knowledge_short_id = id_mapper.to_short(edited_content.block_id)
+    cleaned_context = strip_id_property(edited_content.hierarchical_context)
     knowledge_block_xml = (
         f"<block id=\"{knowledge_short_id}\">\n"
-        f"{edited_content.hierarchical_context}\n"
+        f"{cleaned_context}\n"
         f"</block>"
     )
 
