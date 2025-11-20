@@ -222,6 +222,7 @@ def render_block_content(
     block: LogseqBlock,
     max_width: int,
     indent_str: str = "  ",
+    strikethrough: bool = False,
 ) -> list[Text]:
     """Render a block's content into styled Text lines with word wrapping.
 
@@ -229,6 +230,7 @@ def render_block_content(
         block: LogseqBlock to render
         max_width: Maximum width before wrapping
         indent_str: Indentation string per level (default: 2 spaces)
+        strikethrough: If True, apply strikethrough style to content (for replaced blocks)
 
     Returns:
         List of Rich Text objects (one per rendered line)
@@ -259,6 +261,12 @@ def render_block_content(
             # For first line (block content), just render inline syntax
             # For continuation lines, they're already part of block content
             rendered = render_inline_syntax(content_line.strip() if is_first_line else content_line.lstrip())
+
+        # Apply strikethrough if requested (for replaced blocks)
+        if strikethrough:
+            # Apply strikethrough style to the entire rendered text
+            # Rich Text objects support stylize() method which applies a style to a range
+            rendered.stylize("strike", 0, len(rendered))
 
         # Build the full line with indentation
         if is_first_line:
@@ -298,6 +306,7 @@ def render_outline_with_tracking(
     max_width: int,
     indent_str: str = "  ",
     skip_hashes: bool = False,
+    old_block_id: Optional[str] = None,
 ) -> tuple[list[Text], dict[str, list[int]]]:
     """Render full outline and track which lines belong to which blocks.
 
@@ -306,6 +315,7 @@ def render_outline_with_tracking(
         max_width: Maximum width before wrapping
         indent_str: Indentation string per level
         skip_hashes: If True, only track blocks with explicit IDs (optimization)
+        old_block_id: Block ID to render with strikethrough (for replace actions)
 
     Returns:
         Tuple of:
@@ -329,9 +339,12 @@ def render_outline_with_tracking(
             full_context = generate_full_context(block, parent_blocks)
             block_id = generate_content_hash(full_context)
 
+        # Determine if this block should have strikethrough (old block being replaced)
+        apply_strikethrough = (old_block_id is not None and block_id == old_block_id)
+
         # Render this block's content
         start_line = len(all_lines)
-        block_lines = render_block_content(block, max_width, indent_str)
+        block_lines = render_block_content(block, max_width, indent_str, strikethrough=apply_strikethrough)
         all_lines.extend(block_lines)
         end_line = len(all_lines)
 
@@ -353,7 +366,8 @@ def render_outline_with_tracking(
 class _LineGutter(Widget):
     """Gutter widget showing line indicators."""
 
-    marked_lines: reactive[set[int]] = reactive(set())
+    marked_lines: reactive[set[int]] = reactive(set())  # Green bars for new/added content
+    old_marked_lines: reactive[set[int]] = reactive(set())  # Red bars for replaced content
     total_lines: reactive[int] = reactive(0)
 
     DEFAULT_CSS = """
@@ -364,10 +378,12 @@ class _LineGutter(Widget):
     """
 
     def render(self) -> str:
-        """Render the gutter with line markers."""
+        """Render the gutter with line markers (green for new, red for old)."""
         lines = []
         for i in range(self.total_lines):
-            if i in self.marked_lines:
+            if i in self.old_marked_lines:
+                lines.append("[red]▌[/red]")
+            elif i in self.marked_lines:
                 lines.append("[green]▌[/green]")
             else:
                 lines.append(" ")
@@ -422,6 +438,7 @@ class TargetPagePreview(Widget):
         self.can_focus = True
         self._content = ""
         self._highlight_block_id: Optional[str] = None
+        self._old_block_id: Optional[str] = None  # For replace actions
         self._gutter: Optional[_LineGutter] = None
         self._content_widget: Optional[Static] = None
         self._block_map: dict[str, list[int]] = {}  # Track block ID -> line numbers for scrolling
@@ -449,16 +466,18 @@ class TargetPagePreview(Widget):
                 await self._render_preview()
 
     async def load_preview(
-        self, content: str, highlight_block_id: Optional[str] = None
+        self, content: str, highlight_block_id: Optional[str] = None, old_block_id: Optional[str] = None
     ) -> None:
-        """Load preview content and highlight specified block.
+        """Load preview content and highlight specified blocks.
 
         Args:
             content: Full Logseq page content (markdown)
-            highlight_block_id: Block ID to highlight (explicit id:: or content hash)
+            highlight_block_id: Block ID to highlight with green bar (explicit id:: or content hash)
+            old_block_id: Block ID to highlight with red bar (for replace actions)
         """
         self._content = content
         self._highlight_block_id = highlight_block_id
+        self._old_block_id = old_block_id
 
         # Only update if widgets are available
         if not self._content_widget or not self._gutter:
@@ -467,7 +486,7 @@ class TargetPagePreview(Widget):
 
         await self._render_preview()
 
-        # Auto-scroll to highlighted block
+        # Auto-scroll to highlighted block (prioritize new block for replace actions)
         # Use call_after_refresh to ensure DOM is updated before scrolling
         if highlight_block_id:
             self.call_after_refresh(self._scroll_to_highlighted_block)
@@ -476,6 +495,7 @@ class TargetPagePreview(Widget):
         """Internal method to render the current content."""
         content = self._content
         highlight_block_id = self._highlight_block_id
+        old_block_id = self._old_block_id
 
         # Widget needs to have a width before we can render (height can be auto)
         if self.size.width == 0:
@@ -506,7 +526,7 @@ class TargetPagePreview(Widget):
         max_width = max(widget_width - gutter_width, 40) if widget_width > 0 else 80
 
         rendered_lines, block_map = render_outline_with_tracking(
-            outline, max_width=max_width, skip_hashes=has_explicit_highlight_id
+            outline, max_width=max_width, skip_hashes=has_explicit_highlight_id, old_block_id=old_block_id
         )
 
         # Join lines into single rich text
@@ -522,11 +542,17 @@ class TargetPagePreview(Widget):
         # Update gutter
         self._gutter.total_lines = len(rendered_lines)
 
-        # Mark lines for highlighted block
+        # Mark lines for highlighted block (green bar for new content)
         if highlight_block_id and highlight_block_id in block_map:
             self._gutter.marked_lines = set(block_map[highlight_block_id])
         else:
             self._gutter.marked_lines = set()
+
+        # Mark lines for old block (red bar for replaced content)
+        if old_block_id and old_block_id in block_map:
+            self._gutter.old_marked_lines = set(block_map[old_block_id])
+        else:
+            self._gutter.old_marked_lines = set()
 
         # Store block map for scrolling
         self._block_map = block_map
@@ -566,9 +592,11 @@ class TargetPagePreview(Widget):
         """Clear preview content."""
         self._content = ""
         self._highlight_block_id = None
+        self._old_block_id = None
         self._block_map = {}
         if self._content_widget:
             self._content_widget.update("*No preview available*")
         if self._gutter:
             self._gutter.total_lines = 0
             self._gutter.marked_lines = set()
+            self._gutter.old_marked_lines = set()

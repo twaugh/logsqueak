@@ -399,24 +399,26 @@ class Phase3Screen(Screen):
         preview.border_title = f"Target Page Preview: {decision.target_page}"
 
         # Generate preview content with integrated block
-        preview_text, highlight_block_id = self._generate_preview_with_integration(decision)
+        preview_text, highlight_block_id, old_block_id = self._generate_preview_with_integration(decision)
 
-        await preview.load_preview(preview_text, highlight_block_id)
+        await preview.load_preview(preview_text, highlight_block_id, old_block_id)
 
     def _generate_preview_with_integration(
         self, decision: IntegrationDecision
-    ) -> tuple[str, str | None]:
+    ) -> tuple[str, str | None, str | None]:
         """Generate preview with integrated content.
 
         Args:
             decision: Integration decision to preview
 
         Returns:
-            Tuple of (preview_text, highlight_block_id)
+            Tuple of (preview_text, highlight_block_id, old_block_id)
+            - highlight_block_id: New/added block to highlight with green bar
+            - old_block_id: Old block to highlight with red bar (only for 'replace' action)
         """
         if not self.graph_paths:
             # No graph paths - return placeholder
-            return self._generate_placeholder_preview(decision), None
+            return self._generate_placeholder_preview(decision), None, None
 
         # Try to load the target page
         try:
@@ -428,7 +430,7 @@ class Phase3Screen(Screen):
                 page_content = f"- {decision.target_page}"
         except Exception as e:
             logger.error("failed_to_load_page", error=str(e), page=decision.target_page)
-            return self._generate_placeholder_preview(decision), None
+            return self._generate_placeholder_preview(decision), None, None
 
         # Parse the target page
         outline = LogseqOutline.parse(page_content)
@@ -436,6 +438,7 @@ class Phase3Screen(Screen):
         # Create a new block for the knowledge content
         new_block_content = decision.refined_text
         new_block_id = f"preview-{decision.knowledge_block_id}"
+        old_block_id = None  # Will be set for 'replace' action
 
         # Find where to insert based on action
         action = decision.action
@@ -471,7 +474,7 @@ class Phase3Screen(Screen):
             outline.blocks.append(new_root)
         elif action == "replace" and target_block_id:
             # Replace the target block's content
-            target_found = self._replace_block_content(
+            target_found, old_block_id = self._replace_block_content(
                 outline, target_block_id, new_block_content, new_block_id, decision.target_page
             )
             if not target_found:
@@ -494,7 +497,15 @@ class Phase3Screen(Screen):
         # Find the block with our new content to get its hash
         highlight_block_id = self._find_block_by_content(reparsed.blocks, new_block_content)
 
-        return preview_content, highlight_block_id
+        # For replace actions, find the old block by searching for the old_block_id marker
+        # (We need to find it by content since IDs don't persist through render/re-parse)
+        old_block_hash = None
+        if old_block_id and action == "replace":
+            # The old block ID was set in _replace_block_content but won't survive re-parse
+            # We need to find it differently - it will be the block immediately before the new block
+            old_block_hash = self._find_old_block_for_replace(reparsed.blocks, highlight_block_id)
+
+        return preview_content, highlight_block_id, old_block_hash
 
     def _add_block_under(
         self, outline: LogseqOutline, target_id: str, content: str, block_id: str, page_name: str
@@ -547,25 +558,30 @@ class Phase3Screen(Screen):
 
     def _replace_block_content(
         self, outline: LogseqOutline, target_id: str, content: str, block_id: str, page_name: str
-    ) -> bool:
+    ) -> tuple[bool, str | None]:
         """Replace a target block's content with new content.
+
+        For preview purposes, keeps the old block and adds the new block after it,
+        so both can be highlighted differently (old with red bar, new with green bar).
 
         Args:
             outline: Outline to modify
             target_id: ID of target block to replace
             content: New content for block
-            block_id: ID for replaced block
+            block_id: ID for new block
             page_name: Page name (for content hash matching)
 
         Returns:
-            True if target was found and content replaced
+            Tuple of (target_found, old_block_id)
         """
         # Get frontmatter and indent_str from outline (needed for hash matching)
         frontmatter = outline.frontmatter if outline.frontmatter else None
         indent_str = outline.indent_str
+        old_block_id = None
 
-        def search_and_replace(blocks: list[LogseqBlock], parents: list[LogseqBlock]) -> bool:
-            for target_block in blocks:
+        def search_and_replace(blocks: list[LogseqBlock], parents: list[LogseqBlock], parent_children_list: list[LogseqBlock]) -> bool:
+            nonlocal old_block_id
+            for i, target_block in enumerate(blocks):
                 # Check if this is the target (by explicit ID or content hash)
                 block_matches = False
                 if target_block.block_id == target_id:
@@ -578,19 +594,33 @@ class Phase3Screen(Screen):
                         block_matches = True
 
                 if block_matches:
-                    # Found the target - replace its content
-                    # Preserve the block's children and indent level, but replace first line content
-                    target_block.content = [content]
-                    # Update block ID to the preview ID so we can highlight it
-                    target_block.block_id = block_id
+                    # Found the target - mark old block and insert new block after it
+                    # Mark old block with special ID for red bar highlighting
+                    old_block_id = f"preview-old-{block_id}"
+                    target_block.block_id = old_block_id
+
+                    # Create new block with new content
+                    new_block = LogseqBlock(
+                        content=[content],
+                        indent_level=target_block.indent_level,
+                        block_id=block_id,
+                        children=target_block.children  # Move children to new block
+                    )
+
+                    # Clear children from old block (they're now under new block)
+                    target_block.children = []
+
+                    # Insert new block after old block in parent's children list
+                    parent_children_list.insert(i + 1, new_block)
                     return True
 
                 # Recursively search children
-                if search_and_replace(target_block.children, parents + [target_block]):
+                if search_and_replace(target_block.children, parents + [target_block], target_block.children):
                     return True
             return False
 
-        return search_and_replace(outline.blocks, [])
+        found = search_and_replace(outline.blocks, [], outline.blocks)
+        return found, old_block_id
 
     def _find_block_by_content(
         self, blocks: list[LogseqBlock], content: str, parents: list[LogseqBlock] = None
@@ -617,6 +647,47 @@ class Phase3Screen(Screen):
 
             # Search children
             result = self._find_block_by_content(block.children, content, parents + [block])
+            if result:
+                return result
+
+        return None
+
+    def _find_old_block_for_replace(
+        self, blocks: list[LogseqBlock], new_block_hash: str | None, parents: list[LogseqBlock] = None
+    ) -> str | None:
+        """Find the old block (immediately before the new block) for replace actions.
+
+        Args:
+            blocks: Blocks to search
+            new_block_hash: Hash of the new replacement block
+            parents: Parent blocks for context
+
+        Returns:
+            Content hash of old block (predecessor of new block), or None
+        """
+        if parents is None:
+            parents = []
+
+        if not new_block_hash:
+            return None
+
+        for i, block in enumerate(blocks):
+            # Generate hash for this block
+            full_context = generate_full_context(block, parents)
+            block_hash = generate_content_hash(full_context)
+
+            # Check if this is the new block
+            if block_hash == new_block_hash:
+                # Found the new block - check if there's a previous sibling
+                if i > 0:
+                    # Get the previous block at this level
+                    prev_block = blocks[i - 1]
+                    prev_context = generate_full_context(prev_block, parents)
+                    return generate_content_hash(prev_context)
+                return None
+
+            # Search children recursively
+            result = self._find_old_block_for_replace(block.children, new_block_hash, parents + [block])
             if result:
                 return result
 
