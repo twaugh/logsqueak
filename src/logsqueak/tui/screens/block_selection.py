@@ -529,7 +529,7 @@ class Phase1Screen(Screen):
                 # Mark as knowledge and store LLM-provided reworded content
                 state.llm_classification = "knowledge"
                 state.llm_confidence = result["confidence"]
-                state.reason = f"Insight: {reworded_insight[:100]}"
+                state.reason = f"Insight: {reworded_insight}"  # Full insight text (panel handles wrapping)
                 state.llm_reworded_content = reworded_insight
 
                 # Update visual (shows robot emoji but block not selected yet)
@@ -592,7 +592,7 @@ class Phase1Screen(Screen):
                             # Mark as knowledge and store LLM-provided reworded content
                             state.llm_classification = "knowledge"
                             state.llm_confidence = chunk.confidence
-                            state.reason = f"Insight: {reworded_insight[:100]}"  # Truncate for display
+                            state.reason = f"Insight: {reworded_insight}"  # Full insight text (panel handles wrapping)
                             state.llm_reworded_content = reworded_insight  # Full reworded text
 
                             # Update visual (shows robot emoji but block not selected yet)
