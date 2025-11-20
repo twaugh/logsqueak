@@ -467,18 +467,15 @@ class LogsqueakApp(App):
                 # Get user-facing content (excludes id:: property)
                 user_content = block.get_user_content()
 
-                # Check if LLM provided reworded content in Phase 1
-                llm_reworded = block_state.llm_reworded_content
-                rewording_complete = llm_reworded is not None
-
                 # Create EditedContent
+                # Phase 1 only classifies - rewording happens in Phase 2 for all blocks
                 edited = EditedContent(
                     block_id=block_state.block_id,
                     original_content=user_content,
                     hierarchical_context=hierarchical_context,
-                    reworded_content=llm_reworded,  # Use Phase 1 reworded content if available
+                    reworded_content=None,  # Will be filled by Phase 2 rewording worker
                     current_content=user_content,
-                    rewording_complete=rewording_complete,  # Mark as complete if LLM provided it
+                    rewording_complete=False,  # All blocks need rewording in Phase 2
                 )
                 self.edited_content.append(edited)
 
