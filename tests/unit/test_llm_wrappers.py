@@ -28,9 +28,11 @@ async def test_classify_blocks_calls_llm_client_correctly():
     )
 
     # Mock the stream_ndjson method to be an async generator
+    # NOTE: The wrapper now uses short IDs (1, 2, 3...) in prompts and translates back
+    # Block "123" will be mapped to "1", block "abc" will be mapped to "2"
     async def mock_stream(*args, **kwargs):
         yield KnowledgeClassificationChunk(
-            block_id="abc",
+            block_id="2",  # Short ID for block "abc"
             insight="Python asyncio.Queue is thread-safe for concurrent access",
             confidence=0.85
         )
@@ -44,7 +46,7 @@ async def test_classify_blocks_calls_llm_client_correctly():
 
     # Assert
     assert len(results) == 1
-    assert results[0].block_id == "abc"
+    assert results[0].block_id == "abc"  # Translated back to hybrid ID
     assert results[0].insight == "Python asyncio.Queue is thread-safe for concurrent access"
     assert results[0].confidence == 0.85
 
@@ -145,9 +147,10 @@ async def test_reword_content_calls_llm_client_correctly():
     )
 
     # Mock the stream_ndjson method
+    # NOTE: The wrapper uses short IDs - block "abc" will be mapped to "1"
     async def mock_stream(*args, **kwargs):
         yield ContentRewordingChunk(
-            block_id="abc",
+            block_id="1",  # Short ID
             reworded_content="Python asyncio enables concurrent operations"
         )
 
@@ -160,7 +163,7 @@ async def test_reword_content_calls_llm_client_correctly():
 
     # Assert
     assert len(results) == 1
-    assert results[0].block_id == "abc"
+    assert results[0].block_id == "abc"  # Translated back to hybrid ID
     assert "asyncio" in results[0].reworded_content
 
 
@@ -187,9 +190,10 @@ async def test_reword_content_handles_multiple_blocks():
     ]
 
     # Mock stream with multiple results
+    # NOTE: Block "abc" → "1", block "def" → "2"
     async def mock_stream(*args, **kwargs):
-        yield ContentRewordingChunk(block_id="abc", reworded_content="Reworded 1")
-        yield ContentRewordingChunk(block_id="def", reworded_content="Reworded 2")
+        yield ContentRewordingChunk(block_id="1", reworded_content="Reworded 1")
+        yield ContentRewordingChunk(block_id="2", reworded_content="Reworded 2")
 
     mock_client.stream_ndjson = mock_stream
 
@@ -230,12 +234,14 @@ async def test_plan_integrations_calls_llm_client_correctly():
     }
 
     # Mock the stream_ndjson method
+    # NOTE: The wrapper uses short IDs
+    # Block "abc" (knowledge) → "1", block "section1" (target) → "2"
     async def mock_stream(*args, **kwargs):
         yield IntegrationDecisionChunk(
-            knowledge_block_id="abc",
+            knowledge_block_id="1",  # Short ID for "abc"
             target_page="Programming Notes",
             action="add_under",
-            target_block_id="section1",
+            target_block_id="2",  # Short ID for "section1"
             target_block_title="Python section",
             confidence=0.87,
             reasoning="Fits under Python section"
@@ -250,7 +256,8 @@ async def test_plan_integrations_calls_llm_client_correctly():
 
     # Assert
     assert len(results) == 1
-    assert results[0].knowledge_block_id == "abc"
+    assert results[0].knowledge_block_id == "abc"  # Translated back to hybrid ID
+    assert results[0].target_block_id == "section1"  # Translated back to hybrid ID
     assert results[0].target_page == "Programming Notes"
     assert results[0].action == "add_under"
 
@@ -279,18 +286,19 @@ async def test_plan_integrations_returns_raw_stream():
     }
 
     # Mock stream with skip_exists action
+    # NOTE: Block "abc" → "1", block "s1" → "2"
     async def mock_stream(*args, **kwargs):
         yield IntegrationDecisionChunk(
-            knowledge_block_id="abc",
+            knowledge_block_id="1",
             target_page="Page1",
             action="skip_exists",
-            target_block_id="s1",
+            target_block_id="2",
             target_block_title="Already exists",
             confidence=0.95,
             reasoning="Duplicate"
         )
         yield IntegrationDecisionChunk(
-            knowledge_block_id="abc",
+            knowledge_block_id="1",
             target_page="Page2",
             action="add_section",
             confidence=0.80,
@@ -367,12 +375,13 @@ async def test_plan_integration_for_block_produces_correct_decisions():
     }
 
     # Mock the stream_ndjson method
+    # NOTE: Block "abc123" → "1", block "section1" → "2"
     async def mock_stream(*args, **kwargs):
         yield IntegrationDecisionChunk(
-            knowledge_block_id="abc123",
+            knowledge_block_id="1",
             target_page="Programming Notes",
             action="add_under",
-            target_block_id="section1",
+            target_block_id="2",
             target_block_title="Python section",
             confidence=0.87,
             reasoning="Fits under Python concurrency section"

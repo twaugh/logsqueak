@@ -323,35 +323,39 @@ async def test_plan_integrations_multiple_blocks_separate_llm_calls():
         llm_call_count += 1
 
         # Extract knowledge_block_id from prompt
+        # NOTE: The wrapper uses short IDs, and EACH CALL gets its own mapper
+        # Call 1: block_1 → "1", section1 → "2"
+        # Call 2: block_2 → "1", overview → "2"
+        # Call 3: block_3 → "1", section2 → "2"
         prompt = kwargs.get('prompt', '')
-        # Simple extraction - look for block id in XML
-        if 'block_1' in prompt:
+        # Look for short IDs in XML (knowledge block is always ID "1" per call)
+        if '<block id="1">' in prompt and 'Page1' in prompt and 'Section 1' in prompt:
             processed_blocks.append('block_1')
             yield IntegrationDecisionChunk(
-                knowledge_block_id="block_1",
+                knowledge_block_id="1",  # Short ID for block_1
                 target_page="Page1",
                 action="add_under",
-                target_block_id="section1",
+                target_block_id="2",  # Short ID for section1
                 target_block_title="Section 1",
                 confidence=0.85,
                 reasoning="Fits well"
             )
-        elif 'block_2' in prompt:
+        elif '<block id="1">' in prompt and 'Page2' in prompt:
             processed_blocks.append('block_2')
             yield IntegrationDecisionChunk(
-                knowledge_block_id="block_2",
+                knowledge_block_id="1",  # Short ID for block_2
                 target_page="Page2",
                 action="add_section",
                 confidence=0.75,
                 reasoning="New section needed"
             )
-        elif 'block_3' in prompt:
+        elif '<block id="1">' in prompt and 'Section 2' in prompt:
             processed_blocks.append('block_3')
             yield IntegrationDecisionChunk(
-                knowledge_block_id="block_3",
+                knowledge_block_id="1",  # Short ID for block_3
                 target_page="Page1",
                 action="add_under",
-                target_block_id="section2",
+                target_block_id="2",  # Short ID for section2
                 target_block_title="Section 2",
                 confidence=0.90,
                 reasoning="Related content"
@@ -425,30 +429,36 @@ async def test_integration_decisions_batched_by_knowledge_block():
     async def mock_stream(*args, **kwargs):
         prompt = kwargs.get('prompt', '')
 
+        # NOTE: The wrapper uses short IDs, and EACH CALL gets its own mapper
+        # Call 1 (block_alpha): block_alpha → "1", sectionA → "2", root → "3"
+        # Call 2 (block_beta): block_beta → "1", sectionC → "2"
+
         # Each block can have multiple decisions (different target pages)
-        if 'block_alpha' in prompt:
+        if '<block id="1">' in prompt and 'PageA' in prompt:
+            # First call: block_alpha
             yield IntegrationDecisionChunk(
-                knowledge_block_id="block_alpha",
+                knowledge_block_id="1",  # Short ID for block_alpha
                 target_page="PageA",
                 action="add_under",
-                target_block_id="sectionA",
+                target_block_id="2",  # Short ID for sectionA
                 target_block_title="Section A",
                 confidence=0.85,
                 reasoning="Primary location"
             )
             yield IntegrationDecisionChunk(
-                knowledge_block_id="block_alpha",
+                knowledge_block_id="1",  # Short ID for block_alpha
                 target_page="PageB",
                 action="add_section",
                 confidence=0.65,
                 reasoning="Alternative location"
             )
-        elif 'block_beta' in prompt:
+        elif '<block id="1">' in prompt and 'PageC' in prompt:
+            # Second call: block_beta
             yield IntegrationDecisionChunk(
-                knowledge_block_id="block_beta",
+                knowledge_block_id="1",  # Short ID for block_beta
                 target_page="PageC",
                 action="add_under",
-                target_block_id="sectionC",
+                target_block_id="2",  # Short ID for sectionC
                 target_block_title="Section C",
                 confidence=0.90,
                 reasoning="Best fit"

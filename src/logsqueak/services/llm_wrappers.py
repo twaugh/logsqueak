@@ -87,7 +87,8 @@ def _augment_outline_with_ids(outline: LogseqOutline) -> LogseqOutline:
 
 def _generate_xml_blocks_for_rewording(
     edited_contents: list[EditedContent],
-    outline: LogseqOutline
+    outline: LogseqOutline,
+    id_mapper
 ) -> str:
     """
     Generate XML-formatted blocks with hierarchical context for rewording.
@@ -95,6 +96,7 @@ def _generate_xml_blocks_for_rewording(
     Args:
         edited_contents: List of knowledge blocks to reword
         outline: Original journal outline for looking up page properties
+        id_mapper: LLMIDMapper for translating hybrid IDs to short IDs
 
     Returns:
         XML string with <blocks> containing each block with full context
@@ -102,8 +104,11 @@ def _generate_xml_blocks_for_rewording(
     xml_lines = ["<blocks>"]
 
     for edited in edited_contents:
-        # Add block with the target block ID in XML attribute
-        xml_lines.append(f'  <block id="{edited.block_id}">')
+        # Get short ID for this block
+        short_id = id_mapper.to_short(edited.block_id)
+
+        # Add block with the short ID in XML attribute
+        xml_lines.append(f'  <block id="{short_id}">')
 
         # Clean hierarchical context to avoid confusing the LLM
         # The LLM should use the XML attribute, not id:: properties in content
@@ -142,15 +147,46 @@ async def classify_blocks(
         >>> async for chunk in classify_blocks(client, outline):
         ...     print(f"Block {chunk.block_id}: {chunk.confidence}")
     """
+    from logsqueak.utils.llm_id_mapper import LLMIDMapper
+    import structlog
+    import copy
+
+    logger = structlog.get_logger()
     indent_style = _detect_indent_style(journal_outline)
 
-    # Render the outline (expecting it to already have IDs from _augment_outline_with_ids)
+    # Build ID mapper for all blocks (hybrid ID → short ID)
+    id_mapper = LLMIDMapper()
+
+    def collect_block_ids(blocks: list[LogseqBlock]) -> None:
+        """Recursively collect all block IDs for mapping."""
+        for block in blocks:
+            if block.block_id:
+                id_mapper.add(block.block_id)
+            collect_block_ids(block.children)
+
+    collect_block_ids(journal_outline.blocks)
+
+    # IMPORTANT: Deep copy the outline to avoid mutating the original
+    outline_copy = copy.deepcopy(journal_outline)
+
+    # Replace hybrid IDs with short IDs in the COPY
+    def replace_ids_in_blocks(blocks: list[LogseqBlock]) -> None:
+        """Recursively replace id:: properties with short IDs."""
+        for block in blocks:
+            if block.block_id:
+                short_id = id_mapper.to_short(block.block_id)
+                block.set_property("id", short_id)
+            replace_ids_in_blocks(block.children)
+
+    replace_ids_in_blocks(outline_copy.blocks)
+
+    # Render the outline copy (expecting it to already have IDs from _augment_outline_with_ids)
     # IMPORTANT: Exclude frontmatter from LLM prompt (it's page-level metadata, not knowledge)
     # Temporarily clear frontmatter, render, then restore it
-    original_frontmatter = journal_outline.frontmatter
-    journal_outline.frontmatter = []
-    journal_content = journal_outline.render()
-    journal_outline.frontmatter = original_frontmatter
+    original_frontmatter = outline_copy.frontmatter
+    outline_copy.frontmatter = []
+    journal_content = outline_copy.render()
+    outline_copy.frontmatter = original_frontmatter
 
     system_prompt = (
         f"You are a JSON-only knowledge extractor. Output ONLY valid JSON lines (NDJSON format).\n"
@@ -192,8 +228,8 @@ async def classify_blocks(
         f"   - Code snippets, commands, file paths unchanged\n"
         f"   - Specific names, IDs, version numbers preserved\n\n"
         f"Output format (STRICT NDJSON - one JSON object per line):\n"
-        f'{{"block_id": "abc123", "insight": "PyTest supports fixture dependency injection", "confidence": 0.85}}\n'
-        f'{{"block_id": "def456", "insight": "The Textual framework uses CSS for styling", "confidence": 0.70}}\n\n'
+        f'{{"block_id": "1", "insight": "PyTest supports fixture dependency injection", "confidence": 0.85}}\n'
+        f'{{"block_id": "2", "insight": "The Textual framework uses CSS for styling", "confidence": 0.70}}\n\n'
         f"FIELD DEFINITIONS:\n"
         f"- block_id: String containing the journal block ID for this insight\n"
         f"- insight: The reworded insight suitable for knowledge base (timeless, no temporal context)\n"
@@ -212,13 +248,13 @@ async def classify_blocks(
         f"EXAMPLE (shows how to find the id:: property):\n"
         f"Input:\n"
         f"- tags::\n"
-        f"  id:: abc123\n"
+        f"  id:: 1\n"
         f"- Learned that Python type hints improve code quality\n"
-        f"  id:: def456\n\n"
+        f"  id:: 2\n\n"
         f"Output:\n"
-        f'{{\"block_id\": \"def456\", \"insight\": \"Python type hints improve code quality\", \"confidence\": 0.85}}\n\n'
-        f"Note: Block 1 (\"tags::\") has id:: abc123 but no insight.\n"
-        f"Block 2 (\"Learned that...\") has id:: def456 - the id:: is on the indented line below.\n\n"
+        f'{{\"block_id\": \"2\", \"insight\": \"Python type hints improve code quality\", \"confidence\": 0.85}}\n\n'
+        f"Note: Block 1 (\"tags::\") has id:: 1 but no insight.\n"
+        f"Block 2 (\"Learned that...\") has id:: 2 - the id:: is on the indented line below.\n\n"
         f"Now extract from the following journal entries:\n\n"
         f"{journal_content}"
     )
@@ -230,6 +266,18 @@ async def classify_blocks(
         temperature=0.3,  # Low temperature for deterministic classification
         request_id="classify_blocks",
     ):
+        # Translate short ID back to hybrid ID
+        hybrid_id = id_mapper.try_to_hybrid(chunk.block_id)
+        if hybrid_id is None:
+            logger.warning(
+                "llm_invalid_block_id",
+                short_id=chunk.block_id,
+                phase="classification"
+            )
+            continue  # Skip this chunk
+
+        # Return chunk with hybrid ID
+        chunk.block_id = hybrid_id
         yield chunk
 
 
@@ -255,8 +303,18 @@ async def reword_content(
         >>> async for chunk in reword_content(client, edited_contents, outline):
         ...     print(f"Block {chunk.block_id}: {chunk.reworded_content}")
     """
+    from logsqueak.utils.llm_id_mapper import LLMIDMapper
+    import structlog
+
+    logger = structlog.get_logger()
     indent_style = _detect_indent_style(journal_outline)
-    xml_blocks = _generate_xml_blocks_for_rewording(edited_contents, journal_outline)
+
+    # Build ID mapper for edited content blocks
+    id_mapper = LLMIDMapper()
+    for edited in edited_contents:
+        id_mapper.add(edited.block_id)
+
+    xml_blocks = _generate_xml_blocks_for_rewording(edited_contents, journal_outline, id_mapper)
 
     system_prompt = (
         f"You are a JSON-only content rewriter. Output ONLY valid NDJSON (newline-delimited JSON).\n"
@@ -301,8 +359,8 @@ async def reword_content(
         f'→ Reword child to: "Database query performance improved via [PERF-1234|query performance](https://tickets.example.com/PERF-1234)"\n'
         f'(NOT: "Applied fix from PERF-1234" - URL must be preserved exactly)\n\n'
         f"Output format (STRICT NDJSON - one JSON object per line, NO arrays):\n"
-        f'{{"block_id": "abc123", "reworded_content": "PyTest supports fixture dependency injection"}}\n'
-        f'{{"block_id": "def456", "reworded_content": "The Textual framework is Python-specific"}}\n\n'
+        f'{{"block_id": "1", "reworded_content": "PyTest supports fixture dependency injection"}}\n'
+        f'{{"block_id": "2", "reworded_content": "The Textual framework is Python-specific"}}\n\n'
         f"CRITICAL:\n"
         f"- Output ONLY JSON objects, one per line\n"
         f"- NO array brackets [ ]\n"
@@ -324,6 +382,18 @@ async def reword_content(
         temperature=0.5,  # Moderate temperature for creative rewording
         request_id="reword_content",
     ):
+        # Translate short ID back to hybrid ID
+        hybrid_id = id_mapper.try_to_hybrid(chunk.block_id)
+        if hybrid_id is None:
+            logger.warning(
+                "llm_invalid_block_id",
+                short_id=chunk.block_id,
+                phase="rewording"
+            )
+            continue  # Skip this chunk
+
+        # Return chunk with hybrid ID
+        chunk.block_id = hybrid_id
         yield chunk
 
 
@@ -354,16 +424,31 @@ async def plan_integration_for_block(
         ...     print(f"Decision: {chunk.target_page}")
     """
     from logsqueak.services.llm_helpers import format_chunks_for_llm
+    from logsqueak.utils.llm_id_mapper import LLMIDMapper
+    import structlog
 
-    # Generate XML for single block
+    logger = structlog.get_logger()
+
+    # Build ID mapper for both knowledge blocks and RAG target blocks
+    id_mapper = LLMIDMapper()
+
+    # Map the knowledge block
+    id_mapper.add(edited_content.block_id)
+
+    # Map all RAG candidate blocks
+    for page_name, block_id, context in candidate_chunks:
+        id_mapper.add(block_id)
+
+    # Generate XML for single block with short ID
+    knowledge_short_id = id_mapper.to_short(edited_content.block_id)
     knowledge_block_xml = (
-        f"<block id=\"{edited_content.block_id}\">\n"
+        f"<block id=\"{knowledge_short_id}\">\n"
         f"{edited_content.hierarchical_context}\n"
         f"</block>"
     )
 
     # Format hierarchical chunks using helper function
-    pages_xml = format_chunks_for_llm(candidate_chunks, page_contents)
+    pages_xml = format_chunks_for_llm(candidate_chunks, page_contents, id_mapper)
 
     xml_formatted_content = (
         f"<knowledge_blocks>\n"
@@ -398,8 +483,8 @@ async def plan_integration_for_block(
         "- skip_exists: Knowledge already exists here (duplicate)\n"
         "- replace: Update existing block with new knowledge\n\n"
         "OUTPUT SCHEMA (one object per line):\n"
-        '{"knowledge_block_id": "abc123", "target_page": "PageName", "action": "add_under", '
-        '"target_block_id": "def456", "target_block_title": "Section title", '
+        '{"knowledge_block_id": "1", "target_page": "PageName", "action": "add_under", '
+        '"target_block_id": "2", "target_block_title": "Section title", '
         '"confidence": 0.85, "reasoning": "Why this location fits"}'
     )
 
@@ -410,14 +495,14 @@ async def plan_integration_for_block(
         f"Example 1 - skip_exists (duplicate already exists):\n"
         f"Knowledge: \"Python type hints improve code quality\"\n"
         f"Candidate: \"- Type hints are essential for maintainable Python code\"\n"
-        f"Decision: {{\"knowledge_block_id\": \"k123\", \"target_page\": \"Python\", \"action\": \"skip_exists\", "
-        f"\"target_block_id\": \"b456\", \"target_block_title\": \"Type hints\", \"confidence\": 0.95, "
+        f"Decision: {{\"knowledge_block_id\": \"1\", \"target_page\": \"Python\", \"action\": \"skip_exists\", "
+        f"\"target_block_id\": \"2\", \"target_block_title\": \"Type hints\", \"confidence\": 0.95, "
         f"\"reasoning\": \"Duplicate content already exists\"}}\n\n"
         f"Example 2 - add_under (good semantic match):\n"
         f"Knowledge: \"Redis supports pub/sub messaging patterns\"\n"
         f"Candidate: \"- Database systems (parent block)\"\n"
-        f"Decision: {{\"knowledge_block_id\": \"k789\", \"target_page\": \"Databases\", \"action\": \"add_under\", "
-        f"\"target_block_id\": \"b123\", \"target_block_title\": \"Database systems\", \"confidence\": 0.80, "
+        f"Decision: {{\"knowledge_block_id\": \"1\", \"target_page\": \"Databases\", \"action\": \"add_under\", "
+        f"\"target_block_id\": \"3\", \"target_block_title\": \"Database systems\", \"confidence\": 0.80, "
         f"\"reasoning\": \"Redis is a database system\"}}\n\n"
         f"Example 3 - omit (not semantically related):\n"
         f"Knowledge: \"Kubernetes uses YAML for configuration\"\n"
@@ -437,6 +522,31 @@ async def plan_integration_for_block(
         temperature=0.2,
         request_id=f"plan_integration_{block_id_short}",
     ):
+        # Translate short IDs back to hybrid IDs
+        knowledge_hybrid_id = id_mapper.try_to_hybrid(chunk.knowledge_block_id)
+        if knowledge_hybrid_id is None:
+            logger.warning(
+                "llm_invalid_knowledge_block_id",
+                short_id=chunk.knowledge_block_id,
+                phase="integration"
+            )
+            continue  # Skip this chunk
+
+        # Translate target_block_id if present
+        target_hybrid_id = None
+        if chunk.target_block_id:
+            target_hybrid_id = id_mapper.try_to_hybrid(chunk.target_block_id)
+            if target_hybrid_id is None:
+                logger.warning(
+                    "llm_invalid_target_block_id",
+                    short_id=chunk.target_block_id,
+                    phase="integration"
+                )
+                continue  # Skip this chunk
+
+        # Return chunk with hybrid IDs
+        chunk.knowledge_block_id = knowledge_hybrid_id
+        chunk.target_block_id = target_hybrid_id
         yield chunk
 
 

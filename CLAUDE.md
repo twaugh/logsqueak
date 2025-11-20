@@ -36,7 +36,7 @@ logsqueak/
 │   │   ├── services/              # LLMClient, FileMonitor, PageIndexer, RAGSearch
 │   │   ├── tui/                   # TUI screens & widgets (Phase 1, Phase 2 complete)
 │   │   ├── wizard/                # Interactive setup wizard (validators, prompts, orchestration)
-│   │   ├── utils/                 # Logging, UUID generation
+│   │   ├── utils/                 # Logging, UUID generation, LLM ID mapping
 │   │   ├── cli.py                 # Click-based CLI entry point
 │   │   └── config.py              # ConfigManager with lazy validation
 │   └── logseq-outline-parser/     # Logseq markdown parser library (COMPLETE)
@@ -76,13 +76,13 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 ### Running Tests
 
 ```bash
-# Run all tests (376 tests)
+# Run all tests
 pytest -v
 
 # Run specific test suite
-pytest tests/unit/ -v           # Unit tests only (241 tests)
-pytest tests/integration/ -v    # Integration tests only (97 tests)
-pytest tests/ui/ -v             # UI tests only (38 tests)
+pytest tests/unit/ -v           # Unit tests only
+pytest tests/integration/ -v    # Integration tests only
+pytest tests/ui/ -v             # UI tests only
 
 # Run parser tests only
 pytest src/logseq-outline-parser/tests/ -v
@@ -595,6 +595,48 @@ if edited_content.current_content:
 - Meaningful confidence scores help prioritize insights
 - Cleaner semantic field names (`insight` vs `reasoning` in classification)
 
+**Short ID Optimization:**
+
+All three phases use compact sequential IDs (1, 2, 3...) in LLM prompts instead of long hybrid IDs (UUIDs/content hashes), reducing token usage by ~600 tokens per extraction run.
+
+**Implementation:**
+
+```python
+from logsqueak.utils.llm_id_mapper import LLMIDMapper
+
+# Create mapper scoped to this LLM request
+id_mapper = LLMIDMapper()
+
+# Register all block IDs that will appear in the prompt
+for block in blocks:
+    id_mapper.add(block.block_id)  # Returns short ID ("1", "2", etc.)
+
+# Replace hybrid IDs with short IDs in prompt
+short_id = id_mapper.to_short(block.block_id)
+
+# Translate LLM response back to hybrid IDs
+async for chunk in llm_client.stream_ndjson(...):
+    hybrid_id = id_mapper.try_to_hybrid(chunk.block_id)
+    if hybrid_id is None:
+        logger.warning("llm_invalid_block_id", short_id=chunk.block_id)
+        continue  # Skip invalid chunks
+    chunk.block_id = hybrid_id
+    yield chunk
+```
+
+**Phase-Specific Behavior:**
+
+- **Phase 1 (Classification)**: Maps all journal blocks, deep copies outline before replacing IDs to avoid mutation
+- **Phase 2 (Rewording)**: Maps edited content blocks
+- **Phase 3 (Integration)**: Creates per-call mapper (knowledge block always ID "1", RAG targets get "2", "3", etc.), translates both `knowledge_block_id` and `target_block_id`
+
+**Why it's useful:**
+
+- Reduces prompt size by ~2,400 characters (36-char UUIDs → 1-2 char numbers)
+- Scoped per-request ensures no ID conflicts across phases
+- Graceful degradation (invalid IDs logged and skipped, not crashed)
+- Transparent to application logic (translation happens at LLM boundary)
+
 ### 5. Interactive UX Features
 
 #### Clickable Logseq Links
@@ -909,6 +951,36 @@ if file_monitor.is_modified(path):
 # ❌ WRONG: Don't use > comparison
 if new_mtime > old_mtime:
     # Breaks on git revert (older mtime)
+```
+
+### LLM ID Mapping
+
+**ALWAYS use LLMIDMapper for LLM prompts.** Never send raw hybrid IDs to the LLM.
+
+```python
+# ✅ CORRECT: Create mapper, register IDs, translate responses
+id_mapper = LLMIDMapper()
+for block in blocks:
+    id_mapper.add(block.block_id)
+
+# Replace IDs in prompt copy (don't mutate original)
+outline_copy = copy.deepcopy(outline)
+replace_ids_in_blocks(outline_copy.blocks, id_mapper)
+
+# Translate responses back
+async for chunk in llm_client.stream_ndjson(...):
+    hybrid_id = id_mapper.try_to_hybrid(chunk.block_id)
+    if hybrid_id is None:
+        logger.warning("llm_invalid_block_id", ...)
+        continue
+    chunk.block_id = hybrid_id
+    yield chunk
+
+# ❌ WRONG: Sending raw hybrid IDs to LLM
+prompt = f"Block {block.block_id}: {block.content}"  # Wastes ~35 chars per ID
+
+# ❌ WRONG: Mutating original outline
+block.set_property("id", short_id)  # Application state corrupted
 ```
 
 ## License
