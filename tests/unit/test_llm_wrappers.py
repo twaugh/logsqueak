@@ -234,14 +234,13 @@ async def test_plan_integrations_calls_llm_client_correctly():
     }
 
     # Mock the stream_ndjson method
-    # NOTE: The wrapper uses short IDs
-    # Block "abc" (knowledge) → "1", block "section1" (target) → "2"
+    # NOTE: LLM no longer returns knowledge_block_id (set by handler)
+    # Only RAG candidate blocks get short IDs: "section1" → "1"
     async def mock_stream(*args, **kwargs):
         yield IntegrationDecisionChunk(
-            knowledge_block_id="1",  # Short ID for "abc"
             target_page="Programming Notes",
             action="add_under",
-            target_block_id="2",  # Short ID for "section1"
+            target_block_id="1",  # Short ID for "section1"
             target_block_title="Python section",
             confidence=0.87,
             reasoning="Fits under Python section"
@@ -286,19 +285,18 @@ async def test_plan_integrations_returns_raw_stream():
     }
 
     # Mock stream with skip_exists action
-    # NOTE: Block "abc" → "1", block "s1" → "2"
+    # NOTE: LLM no longer returns knowledge_block_id
+    # Only RAG candidate blocks get short IDs: "s1" → "1"
     async def mock_stream(*args, **kwargs):
         yield IntegrationDecisionChunk(
-            knowledge_block_id="1",
             target_page="Page1",
             action="skip_exists",
-            target_block_id="2",
+            target_block_id="1",  # Short ID for "s1"
             target_block_title="Already exists",
             confidence=0.95,
             reasoning="Duplicate"
         )
         yield IntegrationDecisionChunk(
-            knowledge_block_id="1",
             target_page="Page2",
             action="add_section",
             confidence=0.80,
@@ -375,13 +373,13 @@ async def test_plan_integration_for_block_produces_correct_decisions():
     }
 
     # Mock the stream_ndjson method
-    # NOTE: Block "abc123" → "1", block "section1" → "2"
+    # NOTE: LLM no longer returns knowledge_block_id
+    # Only RAG candidate blocks get short IDs: "section1" → "1"
     async def mock_stream(*args, **kwargs):
         yield IntegrationDecisionChunk(
-            knowledge_block_id="1",
             target_page="Programming Notes",
             action="add_under",
-            target_block_id="2",
+            target_block_id="1",  # Short ID for "section1"
             target_block_title="Python section",
             confidence=0.87,
             reasoning="Fits under Python concurrency section"
@@ -436,10 +434,9 @@ async def test_plan_integration_for_block_strips_id_from_knowledge_block():
         nonlocal captured_prompt
         captured_prompt = kwargs.get('prompt', args[0] if args else None)
         yield IntegrationDecisionChunk(
-            knowledge_block_id="1",  # Short ID
             target_page="Python",
             action="add_under",
-            target_block_id="2",
+            target_block_id="1",  # Short ID for "target1"
             target_block_title="Best practices",
             confidence=0.95,
             reasoning="Related to type hints"
@@ -454,18 +451,17 @@ async def test_plan_integration_for_block_strips_id_from_knowledge_block():
 
     # Assert - prompt should NOT contain id:: properties in knowledge block
     assert captured_prompt is not None
-    assert "<knowledge_blocks>" in captured_prompt
-    assert '<block id="1">' in captured_prompt  # Short ID in XML attribute
+    assert "<knowledge_block>" in captured_prompt  # Singular tag (one block per call)
 
     # CRITICAL: id:: properties should be stripped from knowledge block content
     # The prompt should not show "id:: abc123" or "id:: parent-id-456"
-    knowledge_blocks_section = captured_prompt.split("<knowledge_blocks>")[1].split("</knowledge_blocks>")[0]
-    assert "id:: abc123" not in knowledge_blocks_section
-    assert "id:: parent-id-456" not in knowledge_blocks_section
+    knowledge_block_section = captured_prompt.split("<knowledge_block>")[1].split("</knowledge_block>")[0]
+    assert "id:: abc123" not in knowledge_block_section
+    assert "id:: parent-id-456" not in knowledge_block_section
 
     # But the actual content should still be there
-    assert "Python type hints are powerful" in knowledge_blocks_section
-    assert "DONE Review [[Python]] docs" in knowledge_blocks_section
+    assert "Python type hints are powerful" in knowledge_block_section
+    assert "DONE Review [[Python]] docs" in knowledge_block_section
 
 
 @pytest.mark.asyncio

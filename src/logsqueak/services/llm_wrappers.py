@@ -422,88 +422,91 @@ async def plan_integration_for_block(
 
     logger = structlog.get_logger()
 
-    # Build ID mapper for both knowledge blocks and RAG target blocks
+    # Build ID mapper for RAG candidate blocks only
+    # (knowledge block ID is not sent to LLM - it's set in the handler)
     id_mapper = LLMIDMapper()
-
-    # Map the knowledge block
-    id_mapper.add(edited_content.block_id)
 
     # Map all RAG candidate blocks
     for page_name, block_id, context in candidate_chunks:
         id_mapper.add(block_id)
 
-    # Generate XML for single block with short ID
-    # CRITICAL: Strip id:: property to avoid conflict with XML attribute
-    knowledge_short_id = id_mapper.to_short(edited_content.block_id)
+    # Generate XML for single block (no ID needed - not asked from LLM)
+    # CRITICAL: Strip id:: property to keep prompt clean
     cleaned_context = strip_id_property(edited_content.hierarchical_context)
-    knowledge_block_xml = (
-        f"<block id=\"{knowledge_short_id}\">\n"
-        f"{cleaned_context}\n"
-        f"</block>"
-    )
 
     # Format hierarchical chunks using helper function
     pages_xml = format_chunks_for_llm(candidate_chunks, page_contents, id_mapper)
 
     xml_formatted_content = (
-        f"<knowledge_blocks>\n"
-        f"{knowledge_block_xml}\n"
-        f"</knowledge_blocks>\n"
+        f"<knowledge_block>\n"
+        f"{cleaned_context}\n"
+        f"</knowledge_block>\n\n"
         f"{pages_xml}"
     )
 
     system_prompt = (
-        "You are a JSON-only integration planner. Output ONLY valid NDJSON (one JSON object per line).\n"
-        "Start output immediately with first JSON object (first character: '{').\n\n"
-        "TASK: Find where knowledge blocks belong in existing pages.\n\n"
+        "You are a JSON-only integration planner. Output ONLY NDJSON (one JSON object per line).\n"
+        "First character must be '{'.\n\n"
+        "TASK: Decide where a knowledge block belongs in existing pages.\n\n"
         "INPUT:\n"
-        "- <knowledge_blocks>: Content to integrate (block id in XML attribute)\n"
-        "- <pages>: Existing page structure\n"
-        "  - Each <page name=\"PageName\"> contains blocks\n"
-        "  - Blocks have id attributes\n"
-        "  - Use page NAME (e.g. \"TDD\") as target_page, NOT block id\n\n"
-        "DECISION TREE (follow in order):\n"
-        "1. Is the candidate block semantically related to the knowledge?\n"
-        "   NO → Skip this candidate (create no decision for it)\n"
-        "   YES → Continue to step 2\n\n"
-        "2. Does this block already contain this exact knowledge?\n"
-        "   YES → action: skip_exists\n"
-        "   NO → Continue to step 3\n\n"
-        "3. Is confidence ≥ 0.30?\n"
-        "   NO → Skip this candidate (create no decision for it)\n"
-        "   YES → action: add_under (or add_section if no good parent)\n\n"
+        "- <knowledge_block>: Single block to integrate\n"
+        "- <pages>: Existing page structure (each <page name=\"PageName\"> contains blocks with id attributes)\n"
+        "- Use page NAME as target_page, NOT block id\n\n"
         "ACTIONS:\n"
-        "- add_under: Add knowledge as child of this block\n"
-        "- add_section: Add as new top-level section\n"
-        "- skip_exists: Knowledge already exists here (duplicate)\n"
-        "- replace: Update existing block with new knowledge\n\n"
-        "OUTPUT SCHEMA (one object per line):\n"
-        '{"knowledge_block_id": "1", "target_page": "PageName", "action": "add_under", '
+        "- add_under: Add as child of existing block (requires target_block_id)\n"
+        "- add_section: Add as new top-level section (no target_block_id)\n"
+        "- skip_exists: Existing block has SAME OR MORE information (requires target_block_id)\n"
+        "- replace: New knowledge has MORE information than existing (requires target_block_id)\n\n"
+        "CONFIDENCE SCORING (0.0-1.0):\n"
+        "- 0.85-1.0: Perfect semantic match (same topic/subtopic)\n"
+        "- 0.60-0.84: Strong thematic fit (related concepts)\n"
+        "- 0.30-0.59: Weak but valid connection\n"
+        "- Below 0.30: Not related enough (skip this candidate)\n\n"
+        "OUTPUT (one JSON object per candidate):\n"
+        '{"target_page": "PageName", "action": "add_under", '
         '"target_block_id": "2", "target_block_title": "Section title", '
-        '"confidence": 0.85, "reasoning": "Why this location fits"}'
+        '"confidence": 0.85, "reasoning": "Brief explanation"}'
     )
 
     # User prompt with few-shot examples (leverages recency bias for Mistral-7B)
     prompt = (
-        f"Generate integration decisions as NDJSON (one JSON object per line).\n\n"
+        f"Decide where to integrate this knowledge block.\n\n"
+        f"DECISION STEPS:\n"
+        f"1. Is candidate semantically related? NO → skip it | YES → step 2\n"
+        f"2. Compare information content:\n"
+        f"   - Existing has SAME OR MORE info → skip_exists\n"
+        f"   - New has MORE info than existing → replace\n"
+        f"   - Different aspects of same topic → add_under\n"
+        f"3. Is confidence ≥ 0.30? NO → skip it | YES → output decision\n\n"
         f"EXAMPLES:\n\n"
-        f"Example 1 - skip_exists (duplicate already exists):\n"
-        f"Knowledge: \"Python type hints improve code quality\"\n"
-        f"Candidate: \"- Type hints are essential for maintainable Python code\"\n"
-        f"Decision: {{\"knowledge_block_id\": \"1\", \"target_page\": \"Python\", \"action\": \"skip_exists\", "
-        f"\"target_block_id\": \"2\", \"target_block_title\": \"Type hints\", \"confidence\": 0.95, "
-        f"\"reasoning\": \"Duplicate content already exists\"}}\n\n"
-        f"Example 2 - add_under (good semantic match):\n"
-        f"Knowledge: \"Redis supports pub/sub messaging patterns\"\n"
-        f"Candidate: \"- Database systems (parent block)\"\n"
-        f"Decision: {{\"knowledge_block_id\": \"1\", \"target_page\": \"Databases\", \"action\": \"add_under\", "
-        f"\"target_block_id\": \"3\", \"target_block_title\": \"Database systems\", \"confidence\": 0.80, "
-        f"\"reasoning\": \"Redis is a database system\"}}\n\n"
-        f"Example 3 - omit (not semantically related):\n"
-        f"Knowledge: \"Kubernetes uses YAML for configuration\"\n"
-        f"Candidate: \"- Python testing frameworks\"\n"
-        f"Decision: (NO DECISION - candidate not related to Kubernetes)\n\n"
-        f"Now generate decisions for the following:\n\n"
+        f"Example 1 (skip_exists - existing has same info):\n"
+        f"Knowledge: Python type hints improve code quality\n"
+        f"Existing: Type hints are essential for maintainable Python code\n"
+        f'→ {{"target_page": "Python", "action": "skip_exists", "target_block_id": "2", '
+        f'"target_block_title": "Type hints", "confidence": 0.95, '
+        f'"reasoning": "Existing has equivalent information"}}\n\n'
+        f"Example 2 (replace - new has MORE info):\n"
+        f"Knowledge: Redis supports pub/sub messaging with channel patterns and wildcards\n"
+        f"Existing: Redis has pub/sub support\n"
+        f'→ {{"target_page": "Databases", "action": "replace", "target_block_id": "3", '
+        f'"target_block_title": "Redis features", "confidence": 0.90, '
+        f'"reasoning": "New has more detail (patterns and wildcards)"}}\n\n'
+        f"Example 3 (add_under - related but different):\n"
+        f"Knowledge: Redis sorted sets enable leaderboard implementations\n"
+        f"Existing: Redis data structures\n"
+        f'→ {{"target_page": "Databases", "action": "add_under", "target_block_id": "4", '
+        f'"target_block_title": "Redis data structures", "confidence": 0.85, '
+        f'"reasoning": "Sorted sets are a specific data structure"}}\n\n'
+        f"Example 4 (skip - not related):\n"
+        f"Knowledge: Kubernetes uses YAML for configuration\n"
+        f"Existing: Python testing frameworks\n"
+        f"→ (no output - not semantically related)\n\n"
+        f"Example 5 (skip - confidence too low):\n"
+        f"Knowledge: Docker containers are lightweight\n"
+        f"Existing: General software architecture principles\n"
+        f"→ (no output - weak connection, confidence < 0.30)\n\n"
+        f"CRITICAL: Output NDJSON only. Start with '{{'. No markdown, no explanations.\n\n"
+        f"Now decide:\n\n"
         f"{xml_formatted_content}"
     )
 
@@ -517,15 +520,8 @@ async def plan_integration_for_block(
         temperature=0.2,
         request_id=f"plan_integration_{block_id_short}",
     ):
-        # Translate short IDs back to hybrid IDs
-        knowledge_hybrid_id = id_mapper.try_to_hybrid(chunk.knowledge_block_id)
-        if knowledge_hybrid_id is None:
-            logger.warning(
-                "llm_invalid_knowledge_block_id",
-                short_id=chunk.knowledge_block_id,
-                phase="integration"
-            )
-            continue  # Skip this chunk
+        # Set knowledge_block_id from context (not from LLM output)
+        chunk.knowledge_block_id = edited_content.block_id
 
         # Translate target_block_id if present
         target_hybrid_id = None
@@ -539,8 +535,7 @@ async def plan_integration_for_block(
                 )
                 continue  # Skip this chunk
 
-        # Return chunk with hybrid IDs
-        chunk.knowledge_block_id = knowledge_hybrid_id
+        # Return chunk with hybrid ID
         chunk.target_block_id = target_hybrid_id
         yield chunk
 

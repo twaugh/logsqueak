@@ -73,6 +73,9 @@ class IntegrationDecisionChunk(BaseModel):
 
     Each line represents one integration decision for a knowledge block.
     A single knowledge block may have multiple decisions (different target pages).
+
+    Note: knowledge_block_id is optional in LLM output (one block per call).
+    It's set by the streaming handler using the block_id from the request context.
     """
 
     type: Literal["decision"] = Field(
@@ -80,9 +83,9 @@ class IntegrationDecisionChunk(BaseModel):
         description="Chunk type identifier"
     )
 
-    knowledge_block_id: str = Field(
-        ...,
-        description="Block ID of the knowledge being integrated"
+    knowledge_block_id: Optional[str] = Field(
+        default=None,
+        description="Block ID of the knowledge being integrated (set by handler, not LLM)"
     )
 
     target_page: str = Field(
