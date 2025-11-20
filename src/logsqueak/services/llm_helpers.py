@@ -6,18 +6,20 @@ from logseq_outline.parser import LogseqOutline
 
 def format_chunks_for_llm(
     chunks: list[tuple[str, str, str]],
-    page_contents: dict[str, LogseqOutline]
+    page_contents: dict[str, LogseqOutline],
+    id_mapper
 ) -> str:
     """
     Format RAG search result chunks into XML for LLM prompt.
 
     This function takes hierarchical chunks from RAG search (pre-cleaned during
     indexing to remove id:: and page properties) and formats them as XML with
-    page properties and block IDs.
+    page properties and short block IDs.
 
     Args:
         chunks: List of (page_name, block_id, hierarchical_context) tuples from RAG search
         page_contents: Mapping of page_name to LogseqOutline (for page properties)
+        id_mapper: LLMIDMapper for translating hybrid IDs to short IDs
 
     Returns:
         XML string in format:
@@ -87,9 +89,10 @@ def format_chunks_for_llm(
                 xml_parts.extend(non_blank_properties)
                 xml_parts.append("</properties>")
 
-        # Add blocks
+        # Add blocks with short IDs
         for block_id, context in chunks_by_page[page_name]:
-            xml_parts.append(f'<block id="{xml_escape(block_id)}">')
+            short_id = id_mapper.to_short(block_id)
+            xml_parts.append(f'<block id="{xml_escape(short_id)}">')
             xml_parts.append(context)
             xml_parts.append("</block>")
 
