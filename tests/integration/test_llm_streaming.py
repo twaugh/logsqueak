@@ -61,10 +61,10 @@ class TestLLMStreamingIntegration:
     @pytest.mark.asyncio
     async def test_classification_streaming_workflow(self, llm_client):
         """Test complete classification streaming workflow."""
-        # Simulate realistic NDJSON response (insight-based format)
+        # Simulate realistic NDJSON response (reasoning-based format)
         mock_lines = [
-            '{"block_id": "block-1", "insight": "Contains reusable programming insight", "confidence": 0.92}',
-            '{"block_id": "block-3", "insight": "Explains important concept", "confidence": 0.85}',
+            '{"block_id": "block-1", "reasoning": "Contains reusable programming insight", "confidence": 0.92}',
+            '{"block_id": "block-3", "reasoning": "Explains important concept", "confidence": 0.85}',
         ]
 
         mock_client = create_mock_streaming_client(mock_lines)
@@ -81,12 +81,12 @@ class TestLLMStreamingIntegration:
             # Verify all chunks received
             assert len(results) == 2
 
-            # Verify insights
+            # Verify reasoning
             assert results[0].block_id == "block-1"
-            assert results[0].insight == "Contains reusable programming insight"
+            assert results[0].reasoning == "Contains reusable programming insight"
             assert results[0].confidence == 0.92
             assert results[1].block_id == "block-3"
-            assert results[1].insight == "Explains important concept"
+            assert results[1].reasoning == "Explains important concept"
             assert results[1].confidence == 0.85
 
     @pytest.mark.asyncio
@@ -141,12 +141,12 @@ class TestLLMStreamingIntegration:
     async def test_malformed_json_recovery(self, llm_client):
         """Test streaming recovers from malformed JSON lines."""
         mock_lines = [
-            '{"block_id": "block-1", "insight": "Test insight 1", "confidence": 0.92}',
+            '{"block_id": "block-1", "reasoning": "Test reasoning 1", "confidence": 0.92}',
             '{malformed json here}',
             'not json at all',
-            '{"block_id": "block-2", "insight": "Test insight 2", "confidence": 0.85}',
+            '{"block_id": "block-2", "reasoning": "Test reasoning 2", "confidence": 0.85}',
             '',  # Empty line
-            '{"block_id": "block-3", "insight": "Test insight 3", "confidence": 0.88}',
+            '{"block_id": "block-3", "reasoning": "Test reasoning 3", "confidence": 0.88}',
         ]
 
         mock_client = create_mock_streaming_client(mock_lines)
@@ -172,7 +172,7 @@ class TestLLMStreamingIntegration:
         import httpx
 
         mock_lines = [
-            '{"block_id": "block-1", "insight": "Test insight", "confidence": 0.92}',
+            '{"block_id": "block-1", "reasoning": "Test reasoning", "confidence": 0.92}',
         ]
 
         attempts = [0]
@@ -314,7 +314,7 @@ class TestLLMStreamingIntegration:
 
         # Mock the streaming response
         mock_lines = [
-            '{"block_id": "block-1", "insight": "Test insight", "confidence": 0.92}',
+            '{"block_id": "block-1", "reasoning": "Test reasoning", "confidence": 0.92}',
         ]
         mock_stream_response = create_mock_streaming_client(mock_lines)
 

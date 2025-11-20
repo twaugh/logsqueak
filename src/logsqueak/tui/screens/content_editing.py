@@ -538,37 +538,19 @@ class Phase2Screen(Screen):
             await self.app.acquire_llm_slot(request_id, LLMRequestPriority.REWORDING)
 
             try:
-                # Filter out blocks that already have LLM reworded content from Phase 1
-                blocks_needing_rewording = [
-                    ec for ec in self.edited_content
-                    if not ec.rewording_complete  # Skip if Phase 1 already provided rewording
-                ]
-
+                # Phase 2 rewords ALL selected blocks (Phase 1 only classifies)
                 logger.info(
-                    "llm_rewording_filtered",
-                    total_blocks=len(self.edited_content),
-                    blocks_needing_rewording=len(blocks_needing_rewording),
-                    blocks_skipped=len(self.edited_content) - len(blocks_needing_rewording)
+                    "llm_rewording_starting",
+                    total_blocks=len(self.edited_content)
                 )
 
-                # If all blocks already have reworded content, skip rewording worker
-                if not blocks_needing_rewording:
-                    logger.info("llm_rewording_skipped_all_blocks_complete")
-                    del self._background_tasks["llm_rewording"]
-                    status_panel.update_status()
-                    return
-
-                # Update progress total to reflect actual blocks needing rewording
-                self._background_tasks["llm_rewording"].progress_total = len(blocks_needing_rewording)
-                status_panel.update_status()
-
-                # Stream reworded content from LLM (only for blocks without Phase 1 rewording)
+                # Stream reworded content from LLM for all blocks
                 count = 0
                 # Get first journal for indent detection (all should have same indent)
                 first_journal = next(iter(self.journals.values()))
                 async for chunk in reword_content(
                     self.llm_client,
-                    blocks_needing_rewording,  # Only send blocks that need rewording
+                    self.edited_content,  # Reword all blocks
                     first_journal
                 ):
                     block_id = chunk.block_id

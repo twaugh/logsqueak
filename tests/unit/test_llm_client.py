@@ -62,11 +62,11 @@ class TestLLMClient:
 
     @pytest.mark.asyncio
     async def test_stream_ndjson_success(self, llm_client):
-        """Test successful NDJSON streaming with new insight-based format."""
-        # Mock response data (insights with reworded content, 1:1 block mapping)
+        """Test successful NDJSON streaming with new reasoning-based format."""
+        # Mock response data (reasoning with reworded content, 1:1 block mapping)
         mock_lines = [
-            '{"block_id": "abc123", "insight": "Test insight 1", "confidence": 0.92}',
-            '{"block_id": "def456", "insight": "Test insight 2", "confidence": 0.85}',
+            '{"block_id": "abc123", "reasoning": "Test insight 1", "confidence": 0.92}',
+            '{"block_id": "def456", "reasoning": "Test insight 2", "confidence": 0.85}',
         ]
 
         # Mock httpx response
@@ -89,17 +89,17 @@ class TestLLMClient:
 
             assert len(chunks) == 2
             assert chunks[0].block_id == "abc123"
-            assert chunks[0].insight == "Test insight 1"
+            assert chunks[0].reasoning == "Test insight 1"
             assert chunks[1].block_id == "def456"
-            assert chunks[1].insight == "Test insight 2"
+            assert chunks[1].reasoning == "Test insight 2"
 
     @pytest.mark.asyncio
     async def test_stream_ndjson_skips_malformed_json(self, llm_client):
         """Test streaming skips malformed JSON lines."""
         mock_lines = [
-            '{"block_id": "abc123", "insight": "Test", "confidence": 0.92}',
+            '{"block_id": "abc123", "reasoning": "Test", "confidence": 0.92}',
             '{invalid json}',  # Malformed
-            '{"block_id": "def456", "insight": "Test2", "confidence": 0.85}',
+            '{"block_id": "def456", "reasoning": "Test2", "confidence": 0.85}',
         ]
 
         # Mock httpx response
@@ -129,10 +129,10 @@ class TestLLMClient:
     async def test_stream_ndjson_skips_empty_lines(self, llm_client):
         """Test streaming skips empty lines."""
         mock_lines = [
-            '{"block_id": "abc123", "insight": "Test insight", "confidence": 0.92}',
+            '{"block_id": "abc123", "reasoning": "Test insight", "confidence": 0.92}',
             '',  # Empty line
             '   ',  # Whitespace only
-            '{"block_id": "def456", "insight": "Another insight", "confidence": 0.85}',
+            '{"block_id": "def456", "reasoning": "Another insight", "confidence": 0.85}',
         ]
 
         # Mock httpx response
@@ -163,7 +163,7 @@ class TestLLMClient:
         """Test automatic retry on timeout errors."""
         # First attempt: timeout, second attempt: success
         mock_lines = [
-            '{"block_id": "abc123", "insight": "Test insight", "confidence": 0.92}',
+            '{"block_id": "abc123", "reasoning": "Test insight", "confidence": 0.92}',
         ]
 
         attempts = [0]
@@ -246,7 +246,7 @@ class TestLLMClient:
         """Test automatic retry on 429 rate limit errors with exponential backoff."""
         # First attempt: 429, second attempt: success
         mock_lines = [
-            '{"block_id": "abc123", "insight": "Test insight", "confidence": 0.92}',
+            '{"block_id": "abc123", "reasoning": "Test insight", "confidence": 0.92}',
         ]
 
         attempts = [0]
@@ -288,7 +288,7 @@ class TestLLMClient:
     async def test_stream_ndjson_429_respects_retry_after_header(self, llm_client):
         """Test that 429 retry respects Retry-After header from API."""
         mock_lines = [
-            '{"block_id": "abc123", "insight": "Test insight", "confidence": 0.92}',
+            '{"block_id": "abc123", "reasoning": "Test insight", "confidence": 0.92}',
         ]
 
         attempts = [0]
@@ -358,8 +358,8 @@ class TestLLMClient:
         """Test SSE format (Server-Sent Events) with 'data: ' prefix."""
         # Mock SSE response data (Ollama/OpenAI format with data: prefix)
         mock_lines = [
-            'data: {"block_id": "abc123", "insight": "SSE test insight", "confidence": 0.92}',
-            'data: {"block_id": "def456", "insight": "Another SSE insight", "confidence": 0.85}',
+            'data: {"block_id": "abc123", "reasoning": "SSE test insight", "confidence": 0.92}',
+            'data: {"block_id": "def456", "reasoning": "Another SSE insight", "confidence": 0.85}',
             'data: [DONE]',  # SSE termination message
         ]
 
@@ -386,10 +386,10 @@ class TestLLMClient:
             # Should parse 2 chunks (skip [DONE] message)
             assert len(chunks) == 2
             assert chunks[0].block_id == "abc123"
-            assert chunks[0].insight == "SSE test insight"
+            assert chunks[0].reasoning == "SSE test insight"
             assert chunks[0].confidence == 0.92
             assert chunks[1].block_id == "def456"
-            assert chunks[1].insight == "Another SSE insight"
+            assert chunks[1].reasoning == "Another SSE insight"
             assert chunks[1].confidence == 0.85
 
     @pytest.mark.asyncio
@@ -399,9 +399,9 @@ class TestLLMClient:
         # The LLM streams the JSON response token-by-token
         mock_lines = [
             'data: {"choices":[{"delta":{"content":"{\\"block"}}]}',
-            'data: {"choices":[{"delta":{"content":"_id\\": \\"abc123\\", \\"insight\\": \\"Test"}}]}',
+            'data: {"choices":[{"delta":{"content":"_id\\": \\"abc123\\", \\"reasoning\\": \\"Test"}}]}',
             'data: {"choices":[{"delta":{"content":" insight\\", \\"confidence\\": 0.92}\\n"}}]}',
-            'data: {"choices":[{"delta":{"content":"{\\"block_id\\": \\"def456\\", \\"insight\\": \\"Another insight\\", \\"confidence\\": 0.85}"}}]}',
+            'data: {"choices":[{"delta":{"content":"{\\"block_id\\": \\"def456\\", \\"reasoning\\": \\"Another insight\\", \\"confidence\\": 0.85}"}}]}',
             'data: [DONE]',
         ]
 
@@ -429,10 +429,10 @@ class TestLLMClient:
             # Should accumulate fragments and parse 2 complete JSON objects
             assert len(chunks) == 2
             assert chunks[0].block_id == "abc123"
-            assert chunks[0].insight == "Test insight"
+            assert chunks[0].reasoning == "Test insight"
             assert chunks[0].confidence == 0.92
             assert chunks[1].block_id == "def456"
-            assert chunks[1].insight == "Another insight"
+            assert chunks[1].reasoning == "Another insight"
             assert chunks[1].confidence == 0.85
 
     @pytest.mark.asyncio
@@ -440,7 +440,7 @@ class TestLLMClient:
         """Test that JSON array fallback works when NDJSON parsing fails."""
         # Simulate LLM returning JSON array instead of NDJSON
         mock_lines = [
-            'data: {"choices":[{"delta":{"content":"[{\\"block_id\\": \\"abc123\\", \\"insight\\": \\"Test\\", \\"confidence\\": 0.92}, {\\"block_id\\": \\"def456\\", \\"insight\\": \\"Test2\\", \\"confidence\\": 0.85}]"}}]}',
+            'data: {"choices":[{"delta":{"content":"[{\\"block_id\\": \\"abc123\\", \\"reasoning\\": \\"Test\\", \\"confidence\\": 0.92}, {\\"block_id\\": \\"def456\\", \\"reasoning\\": \\"Test2\\", \\"confidence\\": 0.85}]"}}]}',
             'data: [DONE]',
         ]
 
@@ -466,10 +466,10 @@ class TestLLMClient:
             # Should fallback to parsing as JSON array and yield 2 chunks
             assert len(chunks) == 2
             assert chunks[0].block_id == "abc123"
-            assert chunks[0].insight == "Test"
+            assert chunks[0].reasoning == "Test"
             assert chunks[0].confidence == 0.92
             assert chunks[1].block_id == "def456"
-            assert chunks[1].insight == "Test2"
+            assert chunks[1].reasoning == "Test2"
             assert chunks[1].confidence == 0.85
 
     @pytest.mark.asyncio
@@ -477,7 +477,7 @@ class TestLLMClient:
         """Test that fallback is NOT triggered when some NDJSON lines parse successfully."""
         # Mix of valid NDJSON and invalid lines
         mock_lines = [
-            'data: {"choices":[{"delta":{"content":"{\\"block_id\\": \\"abc123\\", \\"insight\\": \\"Test insight\\", \\"confidence\\": 0.92}\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"{\\"block_id\\": \\"abc123\\", \\"reasoning\\": \\"Test insight\\", \\"confidence\\": 0.92}\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"invalid line\\n"}}]}',
             'data: [DONE]',
         ]
@@ -575,7 +575,7 @@ class TestLLMClient:
         mock_lines = [
             'data: {"choices":[{"delta":{"content":" {\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"  \\"block_id\\": \\"abc123\\",\\n"}}]}',
-            'data: {"choices":[{"delta":{"content":"  \\"insight\\": \\"Test insight\\",\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"  \\"reasoning\\": \\"Test insight\\",\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"  \\"confidence\\": 0.92\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"}"}}]}',
             'data: [DONE]',
@@ -615,7 +615,7 @@ class TestLLMClient:
             'data: {"choices":[{"delta":{"content":"\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"  \\"block_id\\": \\"abc123\\","}}]}',
             'data: {"choices":[{"delta":{"content":"\\n"}}]}',
-            'data: {"choices":[{"delta":{"content":"  \\"insight\\": \\"First insight\\","}}]}',
+            'data: {"choices":[{"delta":{"content":"  \\"reasoning\\": \\"First insight\\","}}]}',
             'data: {"choices":[{"delta":{"content":"\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"  \\"confidence\\": 0.92"}}]}',
             'data: {"choices":[{"delta":{"content":"\\n"}}]}',
@@ -625,7 +625,7 @@ class TestLLMClient:
             'data: {"choices":[{"delta":{"content":"\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"  \\"block_id\\": \\"def456\\","}}]}',
             'data: {"choices":[{"delta":{"content":"\\n"}}]}',
-            'data: {"choices":[{"delta":{"content":"  \\"insight\\": \\"Second insight\\","}}]}',
+            'data: {"choices":[{"delta":{"content":"  \\"reasoning\\": \\"Second insight\\","}}]}',
             'data: {"choices":[{"delta":{"content":"\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"  \\"confidence\\": 0.85"}}]}',
             'data: {"choices":[{"delta":{"content":"\\n"}}]}',
@@ -655,10 +655,10 @@ class TestLLMClient:
             # Should parse both objects incrementally during streaming
             assert len(chunks) == 2
             assert chunks[0].block_id == "abc123"
-            assert chunks[0].insight == "First insight"
+            assert chunks[0].reasoning == "First insight"
             assert chunks[0].confidence == 0.92
             assert chunks[1].block_id == "def456"
-            assert chunks[1].insight == "Second insight"
+            assert chunks[1].reasoning == "Second insight"
             assert chunks[1].confidence == 0.85
 
     @pytest.mark.asyncio
@@ -668,12 +668,12 @@ class TestLLMClient:
         mock_lines = [
             'data: {"choices":[{"delta":{"content":" {\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"\\"block_id\\": \\"abc123\\",\\n"}}]}',
-            'data: {"choices":[{"delta":{"content":"\\"insight\\": \\"Test insight\\",\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"\\"reasoning\\": \\"Test insight\\",\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"\\"confidence\\": 0.92\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"}\\n\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"{\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"\\"block_id\\": \\"def456\\",\\n"}}]}',
-            'data: {"choices":[{"delta":{"content":"\\"insight\\": \\"Another insight\\",\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"\\"reasoning\\": \\"Another insight\\",\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"\\"confidence\\": 0.85\\n"}}]}',
             'data: {"choices":[{"delta":{"content":"}"}}]}',
             'data: [DONE]',

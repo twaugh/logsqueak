@@ -189,21 +189,24 @@ async def classify_blocks(
     outline_copy.frontmatter = original_frontmatter
 
     system_prompt = (
-        f"You are a knowledge extractor. Output ONLY NDJSON (one JSON object per line).\n"
+        f"You are a knowledge classifier. Output ONLY NDJSON (one JSON object per line).\n"
         f"NO markdown code blocks. NO explanations. First character must be '{{'.\n\n"
-        f"TASK: Extract insights from journal entries and reword them to be timeless.\n\n"
-        f"OUTPUT FORMAT:\n"
-        f'{{"block_id": "ID", "insight": "reworded content", "confidence": 0.85}}\n\n'
-        f"CRITICAL RULES (in priority order):\n"
-        f"1. Resolve ALL pronouns (it/this/that) using parent block context\n"
-        f"2. Add missing subjects to sentence fragments\n"
-        f"3. Remove temporal words (today, learned, discovered, tested, reviewing)\n"
-        f"4. Each insight must be self-contained and understandable alone\n"
-        f"5. Preserve technical details EXACTLY (links, code, commands)\n"
-        f"6. Output each block_id at most once\n\n"
-        f"INSIGHT DEFINITION:\n"
-        f"Content valuable long-term: learnings, best practices, solutions, patterns.\n"
-        f"NOT insights: meetings, tasks, status updates, activity logs.\n\n"
+        f"TASK: Classify journal blocks as knowledge (valuable long-term) or not.\n\n"
+        f"OUTPUT FORMAT (reasoning BEFORE confidence):\n"
+        f'{{"block_id": "ID", "reasoning": "explanation here", "confidence": 0.85}}\n\n'
+        f"CRITICAL RULES:\n"
+        f"1. Provide reasoning FIRST (chain-of-thought), confidence second\n"
+        f"2. Output each block_id at most once\n"
+        f"3. Only output blocks containing lasting knowledge\n"
+        f"4. Skip blocks that are just activities, meetings, or status updates\n\n"
+        f"KNOWLEDGE DEFINITION:\n"
+        f"Content valuable long-term: learnings, best practices, solutions, patterns, insights.\n"
+        f"NOT knowledge: meetings, tasks, status updates, activity logs, temporary notes.\n\n"
+        f"REASONING GUIDELINES:\n"
+        f"Explain WHY the block contains lasting knowledge:\n"
+        f"- What makes this valuable beyond today?\n"
+        f"- What fundamental concept or pattern does it capture?\n"
+        f"- How does it connect to broader understanding?\n\n"
         f"INPUT FORMAT:\n"
         f"Markdown bullets with {indent_style}. The id:: property appears indented below each block.\n"
         f"Example:\n"
@@ -216,23 +219,23 @@ async def classify_blocks(
     # User prompt: Instruction BEFORE data (critical for attention)
     # Structural markup helps Mistral's attention mechanism
     prompt = (
-        f"Extract insights and output as NDJSON (one JSON object per line).\n\n"
+        f"Classify journal blocks as knowledge and output as NDJSON (one JSON object per line).\n\n"
         f"<examples>\n\n"
-        f"Example 1 - Basic extraction:\n"
+        f"Example 1 - Basic classification:\n"
         f"Input:\n"
         f"- Learned that Python type hints improve code quality\n"
         f"  id:: 1\n\n"
         f"Output:\n"
-        f'{{\"block_id\": \"1\", \"insight\": \"Python type hints improve code quality\", \"confidence\": 0.85}}\n\n'
-        f"Example 2 - Pronoun resolution:\n"
+        f'{{\"block_id\": \"1\", \"reasoning\": \"Captures a fundamental Python best practice with long-term value for code maintainability\", \"confidence\": 0.85}}\n\n'
+        f"Example 2 - Technical insight:\n"
         f"Input:\n"
         f"- Tested asyncio.gather() behavior\n"
         f"  id:: 2\n"
         f"  - It preserves execution order\n"
         f"    id:: 3\n\n"
         f"Output:\n"
-        f'{{\"block_id\": \"3\", \"insight\": \"asyncio.gather() preserves execution order\", \"confidence\": 0.90}}\n\n'
-        f"Example 3 - Missing subjects and pronouns:\n"
+        f'{{\"block_id\": \"3\", \"reasoning\": \"Documents specific asyncio behavior that is fundamental to concurrent programming patterns\", \"confidence\": 0.90}}\n\n'
+        f"Example 3 - Multiple knowledge blocks:\n"
         f"Input:\n"
         f"- Docker containers should be stateless\n"
         f"  id:: 4\n"
@@ -241,10 +244,17 @@ async def classify_blocks(
         f"  - Enables rolling updates\n"
         f"    id:: 6\n\n"
         f"Output:\n"
-        f'{{\"block_id\": \"5\", \"insight\": \"Stateless Docker containers make scaling easier\", \"confidence\": 0.90}}\n'
-        f'{{\"block_id\": \"6\", \"insight\": \"Stateless Docker containers enable rolling updates\", \"confidence\": 0.90}}\n\n'
+        f'{{\"block_id\": \"4\", \"reasoning\": \"Core architectural principle for container design with lasting relevance\", \"confidence\": 0.95}}\n'
+        f'{{\"block_id\": \"5\", \"reasoning\": \"Explains the scaling benefit of stateless containers - a key DevOps concept\", \"confidence\": 0.90}}\n'
+        f'{{\"block_id\": \"6\", \"reasoning\": \"Connects stateless design to deployment patterns - operationally valuable knowledge\", \"confidence\": 0.90}}\n\n'
+        f"Example 4 - Not knowledge (skip):\n"
+        f"Input:\n"
+        f"- DONE Review meeting notes from standup\n"
+        f"  id:: 7\n\n"
+        f"Output:\n"
+        f"(no output - activity log, not lasting knowledge)\n\n"
         f"</examples>\n\n"
-        f"CRITICAL: Resolve pronouns. Add subjects. Output NDJSON only.\n\n"
+        f"CRITICAL: Reasoning first, then confidence. Output NDJSON only.\n\n"
         f"<task>\n"
         f"{journal_content}\n"
         f"</task>\n\n"

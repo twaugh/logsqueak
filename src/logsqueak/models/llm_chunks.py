@@ -8,17 +8,16 @@ class KnowledgeClassificationChunk(BaseModel):
     """
     NDJSON chunk for knowledge extraction streaming (Phase 1).
 
-    Each line represents ONE INSIGHT extracted from ONE journal block.
+    Each line represents classification of ONE journal block as knowledge or not.
 
-    Insight-first approach:
-    - LLM identifies valuable insights/knowledge in journal blocks
-    - Each insight is already reworded (timeless, no temporal context)
-    - One insight = One block (1:1 mapping)
-    - One block can have at most one insight
-    - The 'reasoning' field contains the reworded insight text
+    Classification approach:
+    - LLM identifies valuable knowledge in journal blocks
+    - Provides reasoning for why the block contains lasting knowledge
+    - Assigns confidence score based on temporal durability
+    - One classification per block (1:1 mapping)
+    - Reasoning is provided BEFORE confidence (chain-of-thought prompting)
 
-    This approach combines classification and rewording in a single pass,
-    focusing on the insight first rather than mechanically classifying blocks.
+    Note: This phase only classifies blocks. Rewording happens in Phase 2.
     """
 
     type: Literal["classification"] = Field(
@@ -28,19 +27,19 @@ class KnowledgeClassificationChunk(BaseModel):
 
     block_id: str = Field(
         ...,
-        description="Single journal block ID containing this insight"
+        description="Journal block ID being classified"
     )
 
-    insight: str = Field(
+    reasoning: str = Field(
         ...,
-        description="The reworded insight suitable for knowledge base integration (timeless, no temporal context)"
+        description="Explanation for why this block contains (or lacks) lasting knowledge value"
     )
 
     confidence: float = Field(
         default=0.8,
         ge=0.0,
         le=1.0,
-        description="Confidence score for this insight (0.0-1.0)"
+        description="Confidence score for this classification (0.0-1.0)"
     )
 
 
