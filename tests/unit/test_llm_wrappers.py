@@ -403,6 +403,72 @@ async def test_plan_integration_for_block_produces_correct_decisions():
 
 
 @pytest.mark.asyncio
+async def test_plan_integration_for_block_strips_id_from_knowledge_block():
+    """Test that plan_integration_for_block() strips id:: from knowledge block context."""
+    # Arrange
+    mock_client = Mock(spec=LLMClient)
+
+    # EditedContent with id:: property in hierarchical_context
+    edited_content = EditedContent(
+        block_id="abc123",
+        original_content="Python type hints are powerful",
+        hierarchical_context=(
+            "- DONE Review [[Python]] docs\n"
+            "  id:: parent-id-456\n"
+            "  - Python type hints are powerful\n"
+            "    id:: abc123"
+        ),
+        current_content="Python type hints are powerful for catching bugs"
+    )
+
+    candidate_chunks = [
+        ("Python", "target1", "- Best practices\n  - Use type hints")
+    ]
+
+    page_contents = {
+        "Python": LogseqOutline.parse("- Best practices\n  id:: target1")
+    }
+
+    # Track the prompt
+    captured_prompt = None
+
+    async def mock_stream(*args, **kwargs):
+        nonlocal captured_prompt
+        captured_prompt = kwargs.get('prompt', args[0] if args else None)
+        yield IntegrationDecisionChunk(
+            knowledge_block_id="1",  # Short ID
+            target_page="Python",
+            action="add_under",
+            target_block_id="2",
+            target_block_title="Best practices",
+            confidence=0.95,
+            reasoning="Related to type hints"
+        )
+
+    mock_client.stream_ndjson = mock_stream
+
+    # Act
+    results = []
+    async for chunk in plan_integration_for_block(mock_client, edited_content, candidate_chunks, page_contents):
+        results.append(chunk)
+
+    # Assert - prompt should NOT contain id:: properties in knowledge block
+    assert captured_prompt is not None
+    assert "<knowledge_blocks>" in captured_prompt
+    assert '<block id="1">' in captured_prompt  # Short ID in XML attribute
+
+    # CRITICAL: id:: properties should be stripped from knowledge block content
+    # The prompt should not show "id:: abc123" or "id:: parent-id-456"
+    knowledge_blocks_section = captured_prompt.split("<knowledge_blocks>")[1].split("</knowledge_blocks>")[0]
+    assert "id:: abc123" not in knowledge_blocks_section
+    assert "id:: parent-id-456" not in knowledge_blocks_section
+
+    # But the actual content should still be there
+    assert "Python type hints are powerful" in knowledge_blocks_section
+    assert "DONE Review [[Python]] docs" in knowledge_blocks_section
+
+
+@pytest.mark.asyncio
 async def test_plan_integration_for_block_formats_chunks_correctly():
     """Test plan_integration_for_block() formats RAG chunks correctly (hierarchical, id stripped)."""
     # Arrange
