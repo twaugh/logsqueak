@@ -155,11 +155,16 @@ class Phase3Screen(Screen):
         self._test_background_tasks: Dict[str, BackgroundTask] = {}
 
         # Track which blocks have decisions ready (for navigation blocking)
-        # If decisions are pre-generated, mark all blocks as ready
+        # If decisions are pre-generated, mark all blocks as ready (including those with no decisions)
         self.decisions_ready: Dict[str, bool] = {}
         if decisions:
+            # Mark blocks with decisions as ready
             for block_id in self.decisions_by_block.keys():
                 self.decisions_ready[block_id] = True
+            # Mark blocks without decisions as ready too (allows navigation through empty blocks)
+            for ec in edited_content:
+                if ec.block_id not in self.decisions_ready:
+                    self.decisions_ready[ec.block_id] = True
 
         # Track decision count for polling updates (when using shared list from Phase 2)
         self._last_known_decision_count = len(self.decisions)
@@ -183,6 +188,26 @@ class Phase3Screen(Screen):
                 grouped[block_id] = []
             grouped[block_id].append(decision)
         return grouped
+
+    def _mark_all_blocks_ready(self) -> None:
+        """Mark all knowledge blocks as ready for navigation.
+
+        This is called when the LLM decision worker completes, to ensure
+        blocks with zero decisions (due to LLM errors or no matches) can
+        still be navigated through.
+        """
+        newly_ready = []
+        for ec in self.edited_content:
+            if ec.block_id not in self.decisions_ready:
+                self.decisions_ready[ec.block_id] = True
+                newly_ready.append(ec.block_id)
+
+        if newly_ready:
+            logger.info(
+                "marked_remaining_blocks_ready",
+                count=len(newly_ready),
+                reason="worker_completed"
+            )
 
     def compose(self) -> ComposeResult:
         """Compose the Phase 3 screen layout."""
@@ -282,10 +307,11 @@ class Phase3Screen(Screen):
                 else:
                     logger.info("phase3_all_decisions_ready", blocks_ready=blocks_ready)
             elif task and task.status == "completed":
-                # Already done
+                # Already done - mark all blocks ready (even those with no decisions)
+                self._mark_all_blocks_ready()
                 logger.info(
                     "llm_decisions_already_complete_phase3",
-                    total_blocks=blocks_ready,
+                    total_blocks=len(self.decisions_ready),
                     total_decisions=len(self.decisions)
                 )
             elif task and task.status == "failed":
@@ -763,9 +789,11 @@ Confidence: {decision.confidence:.0%}
                         logger.info("phase3_stopped_polling", reason=f"task {task.status}")
 
                     if task.status == "completed":
+                        # Mark all blocks ready (even those with no decisions)
+                        self._mark_all_blocks_ready()
                         logger.info(
                             "llm_decisions_complete_phase3_polling",
-                            total_blocks=blocks_ready,
+                            total_blocks=len(self.decisions_ready),
                             total_decisions=current_count
                         )
 

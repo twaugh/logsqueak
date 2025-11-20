@@ -5,11 +5,12 @@ skipping any remaining pending decisions for the current block.
 """
 
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from textual.app import App
 from logsqueak.tui.screens.integration_review import Phase3Screen
 from logsqueak.models.integration_decision import IntegrationDecision
 from logsqueak.models.edited_content import EditedContent
+from logsqueak.models.background_task import BackgroundTask
 from logseq_outline.parser import LogseqBlock, LogseqOutline
 
 
@@ -336,6 +337,80 @@ async def test_n_key_at_last_block_shows_completion_summary(
         from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
         journal_preview = screen.query_one("#journal-preview", TargetPagePreview)
         assert journal_preview.border_title == "Extraction Complete"
+
+
+@pytest.mark.asyncio
+async def test_navigate_to_block_with_no_decisions_after_worker_completes(
+    sample_journal_blocks, sample_edited_content, sample_page_contents, sample_journal_content, sample_journals
+):
+    """Test navigation to block with no decisions works after LLM worker completes.
+
+    Regression test for bug where blocks with zero decisions (due to LLM errors
+    or no matches) would permanently block navigation.
+    """
+    # Create decisions for block 1 only (block 2 has none)
+    decisions = [
+        IntegrationDecision(
+            knowledge_block_id="journal-block-1",
+            target_page="Python/Concurrency",
+            action="add_section",
+            confidence=0.85,
+            edited_content=sample_edited_content[0],
+            reasoning="Relevant to async programming concepts"
+        ),
+    ]
+
+    # Create a mock app with completed worker task
+    class MockApp(App):
+        def __init__(self, screen):
+            super().__init__()
+            self.test_screen = screen
+            self.background_tasks = {
+                "llm_decisions": BackgroundTask(
+                    task_type="llm_decisions",
+                    status="completed",  # Worker finished
+                    progress_current=1,
+                    progress_total=1
+                )
+            }
+            self.integration_decisions = decisions
+
+        def on_mount(self):
+            self.push_screen(self.test_screen)
+
+    screen = Phase3Screen(
+        journal_blocks=sample_journal_blocks,
+        edited_content=sample_edited_content,
+        page_contents=sample_page_contents,
+        decisions=decisions,  # Only block 1 has decisions
+        journals=sample_journals,
+        journal_content=sample_journal_content,
+        auto_start_workers=False
+    )
+
+    app = MockApp(screen)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        # Block 1 should be ready (has decisions)
+        assert "journal-block-1" in screen.decisions_ready
+        assert screen.decisions_ready["journal-block-1"] is True
+
+        # Block 2 should ALSO be marked ready after _mark_all_blocks_ready() call in on_mount
+        assert "journal-block-2" in screen.decisions_ready
+        assert screen.decisions_ready["journal-block-2"] is True
+
+        # Should be able to navigate to block 2 even though it has no decisions
+        await pilot.press("n")
+        await pilot.pause()
+
+        assert screen.current_block_index == 1  # Successfully advanced
+
+        # Block 2 should show "No relevant pages found" message
+        from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
+        preview = screen.query_one("#target-page-preview", TargetPagePreview)
+        # The preview will have updated to show the "no decisions" message
 
 
 @pytest.mark.asyncio
