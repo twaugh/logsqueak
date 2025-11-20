@@ -20,7 +20,7 @@ import structlog
 from logseq_outline.parser import LogseqBlock, LogseqOutline
 from logsqueak.models.block_state import BlockState
 from logsqueak.models.background_task import BackgroundTask
-from logsqueak.tui.widgets import BlockTree, StatusPanel, BlockDetailPanel
+from logsqueak.tui.widgets import BlockTree, StatusPanel, BlockDetailPanel, ConfidenceSlider
 from logsqueak.services.llm_client import LLMClient
 from logsqueak.services.llm_wrappers import classify_blocks
 
@@ -63,6 +63,7 @@ class Phase1Screen(Screen):
     # Reactive attributes for state management
     selected_count: reactive[int] = reactive(0)
     current_block_id: reactive[Optional[str]] = reactive(None)
+    confidence_threshold: reactive[float] = reactive(0.8)
 
     def __init__(
         self,
@@ -156,6 +157,7 @@ class Phase1Screen(Screen):
 
         Layout:
         - Header
+        - Confidence slider
         - Main container (vertical split):
           - BlockTree (top 60%)
           - BlockDetailPanel (bottom 40%)
@@ -163,6 +165,9 @@ class Phase1Screen(Screen):
         - Footer
         """
         yield Header()
+
+        # Confidence threshold slider
+        yield ConfidenceSlider()
 
         with Container(id="main-container"):
             with Vertical():
@@ -178,6 +183,7 @@ class Phase1Screen(Screen):
                     label=tree_label,
                     journals=self.journals,
                     block_states=self.block_states,
+                    confidence_threshold=self.confidence_threshold,
                 )
 
                 # Selected block details (bottom panel)
@@ -216,6 +222,22 @@ class Phase1Screen(Screen):
         except NoActiveAppError:
             # App not created yet (common in tests)
             self._test_background_tasks = value
+
+    @property
+    def llm_confidence_range(self) -> tuple[float, float]:
+        """Get min and max confidence from LLM results.
+
+        Returns:
+            Tuple of (min_confidence, max_confidence)
+        """
+        confidences = [
+            state.llm_confidence
+            for state in self.block_states.values()
+            if state.llm_confidence is not None
+        ]
+        if not confidences:
+            return (0.0, 1.0)
+        return (min(confidences), max(confidences))
 
     def on_mount(self) -> None:
         """Called when screen is mounted."""
@@ -400,6 +422,28 @@ class Phase1Screen(Screen):
         logger.info("user_action_quit_phase1")
         self.app.exit()
 
+    # Event handlers
+
+    def on_confidence_slider_threshold_changed(
+        self,
+        message: ConfidenceSlider.ThresholdChanged
+    ) -> None:
+        """Handle threshold changes from slider.
+
+        Args:
+            message: Message containing new threshold value
+        """
+        self.confidence_threshold = message.threshold
+
+        # Update tree highlighting
+        tree = self.query_one(BlockTree)
+        tree.set_confidence_threshold(message.threshold)
+
+        logger.info(
+            "user_action_confidence_threshold_changed",
+            threshold=message.threshold
+        )
+
     # Helper methods
 
     def _update_current_block(self) -> None:
@@ -536,6 +580,12 @@ class Phase1Screen(Screen):
                 tree = self.query_one(BlockTree)
                 tree.update_block_label(block_id)
 
+                # Update slider min/max markers
+                slider = self.query_one(ConfidenceSlider)
+                min_conf, max_conf = self.llm_confidence_range
+                slider.min_confidence = min_conf
+                slider.max_confidence = max_conf
+
                 # Update bottom panel if this is the currently selected block
                 if block_id == self.current_block_id:
                     self._update_current_block()
@@ -598,6 +648,12 @@ class Phase1Screen(Screen):
                             # Update visual (shows robot emoji but block not selected yet)
                             tree = self.query_one(BlockTree)
                             tree.update_block_label(block_id)
+
+                            # Update slider min/max markers
+                            slider = self.query_one(ConfidenceSlider)
+                            min_conf, max_conf = self.llm_confidence_range
+                            slider.min_confidence = min_conf
+                            slider.max_confidence = max_conf
 
                             # Update bottom panel if this is the currently selected block
                             if block_id == self.current_block_id:

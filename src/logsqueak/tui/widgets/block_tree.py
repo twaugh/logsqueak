@@ -21,6 +21,7 @@ class BlockTree(Tree):
         label: str,
         journals: Dict[str, 'LogseqOutline'],
         block_states: Dict[str, BlockState],
+        confidence_threshold: float = 0.8,
         *args,
         **kwargs
     ):
@@ -30,10 +31,12 @@ class BlockTree(Tree):
             label: Root label for the tree
             journals: Dictionary mapping date string (YYYY-MM-DD) to LogseqOutline
             block_states: Dictionary mapping block_id to BlockState
+            confidence_threshold: Confidence threshold for highlighting LLM suggestions
         """
         super().__init__(label, *args, id="block-tree", **kwargs)
         self.journals = journals
         self.block_states = block_states
+        self.confidence_threshold = confidence_threshold
 
     def on_mount(self) -> None:
         """Build tree structure when widget is mounted."""
@@ -102,9 +105,9 @@ class BlockTree(Tree):
         Uses emoji indicators to show selection and processing state:
         Priority order (first match wins):
         1. ✅ = User selected this session (green background)
-        2. 📌 = Previously processed (blue if LLM suggested, default if not)
-        3. 🤖 = LLM suggested (blue background)
-        4. Invisible padding = Not selected
+        2. 📌 = Previously processed (blue if LLM suggested above threshold, default if not)
+        3. 🤖 = LLM suggested above threshold (blue background)
+        4. Invisible padding = Not selected (includes below-threshold LLM suggestions)
 
         Uses invisible Braille Pattern Blank characters (U+2800) to ensure
         consistent alignment when no emoji is shown.
@@ -123,6 +126,14 @@ class BlockTree(Tree):
         block = self._find_block_in_journals(block_id)
         is_processed = block and block.get_property("extracted-to") is not None
 
+        # Check if LLM suggestion is above threshold
+        is_above_threshold = (
+            state and
+            state.llm_classification == "knowledge" and
+            state.llm_confidence is not None and
+            state.llm_confidence >= self.confidence_threshold
+        )
+
         label = Text()
 
         # Strategy: Emoji OR invisible characters, then content
@@ -136,18 +147,18 @@ class BlockTree(Tree):
             label.append(content, style="on dark_green")
         elif is_processed:
             # Priority 2: Previously processed - pushpin
-            # Blue background if LLM suggested, default if not
+            # Blue background if LLM suggested above threshold, default if not
             label.append("📌", style="")
-            if state and state.llm_classification == "knowledge":
+            if is_above_threshold:
                 label.append(content, style="on dark_blue")
             else:
                 label.append(content, style="")
-        elif state and state.llm_classification == "knowledge":
-            # Priority 3: LLM suggested (not selected, not processed) - robot + blue
+        elif is_above_threshold:
+            # Priority 3: LLM suggested above threshold (not selected, not processed) - robot + blue
             label.append("🤖", style="")
             label.append(content, style="on dark_blue")
         else:
-            # Priority 4: No special state - invisible padding
+            # Priority 4: No special state (includes below-threshold LLM suggestions)
             label.append(invisible_padding + content, style="")
 
         return label
@@ -167,6 +178,36 @@ class BlockTree(Tree):
                 content = block.get_full_content(normalize_whitespace=True)
                 first_line = content.split('\n')[0] if content else ""
                 node.label = self._create_block_label(block_id, first_line)
+
+    def set_confidence_threshold(self, threshold: float) -> None:
+        """Update confidence threshold and refresh all labels.
+
+        Args:
+            threshold: New confidence threshold value
+        """
+        self.confidence_threshold = threshold
+        self._refresh_all_labels()
+
+    def _refresh_all_labels(self) -> None:
+        """Refresh labels for all nodes to reflect new threshold."""
+        self._refresh_labels_recursive(self.root)
+
+    def _refresh_labels_recursive(self, node: TreeNode) -> None:
+        """Recursively refresh labels for a node and its children.
+
+        Args:
+            node: Tree node to refresh
+        """
+        if node.data:  # Has block_id
+            block = self._find_block_in_journals(node.data)
+            if block:
+                content = block.get_full_content(normalize_whitespace=True)
+                first_line = content.split('\n')[0] if content else ""
+                node.label = self._create_block_label(node.data, first_line)
+
+        # Recursively refresh children
+        for child in node.children:
+            self._refresh_labels_recursive(child)
 
     def _find_node_by_block_id(
         self,
@@ -242,13 +283,13 @@ class BlockTree(Tree):
         return None
 
     def find_next_knowledge_block(self, from_line: int) -> Optional[int]:
-        """Find next LLM-suggested knowledge block (wraps around to start).
+        """Find next LLM-suggested knowledge block above threshold (wraps around to start).
 
         Args:
             from_line: Start searching from this line
 
         Returns:
-            Line number of next knowledge block, or None if no knowledge blocks exist
+            Line number of next knowledge block above threshold, or None if none exist
         """
         # Try to search forward through reasonable number of lines
         # (tree doesn't expose total line count directly)
@@ -264,7 +305,10 @@ class BlockTree(Tree):
                     break
                 if node.data:
                     state = self.block_states.get(node.data)
-                    if state and state.llm_classification == "knowledge":
+                    if (state and
+                        state.llm_classification == "knowledge" and
+                        state.llm_confidence is not None and
+                        state.llm_confidence >= self.confidence_threshold):
                         return current_line
                 current_line += 1
             except Exception:
@@ -279,7 +323,10 @@ class BlockTree(Tree):
                     node = self.get_node_at_line(current_line)
                     if node and node.data:
                         state = self.block_states.get(node.data)
-                        if state and state.llm_classification == "knowledge":
+                        if (state and
+                            state.llm_classification == "knowledge" and
+                            state.llm_confidence is not None and
+                            state.llm_confidence >= self.confidence_threshold):
                             return current_line
                     current_line += 1
                 except Exception:
@@ -288,13 +335,13 @@ class BlockTree(Tree):
         return None
 
     def find_previous_knowledge_block(self, from_line: int) -> Optional[int]:
-        """Find previous LLM-suggested knowledge block (wraps around to end).
+        """Find previous LLM-suggested knowledge block above threshold (wraps around to end).
 
         Args:
             from_line: Start searching from this line
 
         Returns:
-            Line number of previous knowledge block, or None if no knowledge blocks exist
+            Line number of previous knowledge block above threshold, or None if none exist
         """
         # Iterate backwards through lines
         current_line = from_line - 1
@@ -304,7 +351,10 @@ class BlockTree(Tree):
                 node = self.get_node_at_line(current_line)
                 if node and node.data:
                     state = self.block_states.get(node.data)
-                    if state and state.llm_classification == "knowledge":
+                    if (state and
+                        state.llm_classification == "knowledge" and
+                        state.llm_confidence is not None and
+                        state.llm_confidence >= self.confidence_threshold):
                         return current_line
                 current_line -= 1
             except Exception:
@@ -333,7 +383,10 @@ class BlockTree(Tree):
                 node = self.get_node_at_line(current_line)
                 if node and node.data:
                     state = self.block_states.get(node.data)
-                    if state and state.llm_classification == "knowledge":
+                    if (state and
+                        state.llm_classification == "knowledge" and
+                        state.llm_confidence is not None and
+                        state.llm_confidence >= self.confidence_threshold):
                         return current_line
                 current_line -= 1
             except Exception:
