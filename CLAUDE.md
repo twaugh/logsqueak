@@ -7,13 +7,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Logsqueak** is a TUI (Text User Interface) application for extracting lasting knowledge from Logseq journal entries using LLM-powered analysis. Users interactively review, refine, and integrate knowledge blocks into their Logseq knowledge base.
 
 **Current Status**: ✅ **COMPLETE** - Full interactive workflow with all features implemented
+
 - ✅ **Core Parser**: `logseq-outline-parser` library (robust Logseq markdown parsing with property order preservation)
 - ✅ **Infrastructure**: Models, services, CLI, config with lazy validation
 - ✅ **Phase 1 - Block Selection TUI**: Tree navigation, LLM streaming classification, manual selection, multi-journal support
 - ✅ **Phase 2 - Content Editing TUI**: Three-panel layout, LLM rewording, manual editing, RAG search
 - ✅ **Phase 3 - Integration Review TUI**: Decision batching, target preview, atomic writes, completion summary
 - ✅ **Application Integration**: End-to-end workflow, background workers with dependency coordination
-- ✅ **LLM Optimization**: Hierarchical chunks reduce prompts from 62KB → 2-4KB (90% reduction)
+- ✅ **LLM Optimization**: Hierarchical chunks keep prompts compact (~6-12KB per block)
 - ✅ **RAG Search**: PageIndexer and RAGSearch with hierarchical chunks and explicit link boosting
 - ✅ **File Operations**: Atomic two-phase writes with provenance markers and concurrent modification detection
 - ✅ **LLM Queue**: Priority-based request serialization with cancellation support
@@ -23,7 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - ✅ **Edge Cases**: Config errors, network errors, file modifications, malformed JSON handling
 - ✅ **UX Polish**: Skip_exists decisions with clickable links, quiet indexing when no updates needed
 - ✅ **Performance**: EditedContent references eliminate sync loops, pre-cleaned contexts in RAG index
-- ✅ **Test Coverage**: 376 tests passing (241 unit, 97 integration, 38 UI)
+- ✅ **Test Coverage**: Comprehensive test suite with unit, integration, and UI tests
 
 ## Project Structure
 
@@ -62,471 +63,6 @@ logsqueak/
 └── CLAUDE.md                      # This file
 ```
 
-## Currently Implemented: Logseq Outline Parser
-
-The `logseq-outline-parser` library is a **production-ready** Logseq markdown parser with precise structure preservation.
-
-### Key Features
-
-#### 1. Non-Destructive Parsing & Rendering
-
-The parser preserves **exact structure and order** from source files:
-
-- **Property order preservation** (NON-NEGOTIABLE): Property insertion order is sacred in Logseq
-- **Indentation detection**: Auto-detects 2-space indentation
-- **Content structure**: All block lines (first line, continuation lines, properties) stored in unified list
-- **Round-trip guarantee**: Parse → Modify → Render produces identical output (except intentional changes)
-
-```python
-from logseq_outline.parser import LogseqOutline
-
-# Parse Logseq markdown (default mode - for read operations)
-outline = LogseqOutline.parse(markdown_text)
-
-# Parse with strict indent preservation (for write operations only)
-outline = LogseqOutline.parse(markdown_text, strict_indent_preservation=True)
-
-# Access blocks
-for block in outline.blocks:
-    print(block.get_full_content())
-    print(f"ID: {block.block_id}")  # From id:: property or None
-
-# Render back to markdown
-output = outline.render()  # Preserves exact formatting
-```
-
-**Indent Preservation Modes:**
-
-The parser supports two modes for handling continuation line indentation:
-
-- **Default mode** (`strict_indent_preservation=False`): Continuation line indentation is normalized during parsing. No internal outdent markers are created. **Use this for all read-only operations** including LLM prompts, UI display, semantic search, and analysis. This is the recommended mode for application-layer code.
-
-- **Strict mode** (`strict_indent_preservation=True`): Exact indentation is preserved using internal outdent markers (`\x00N\x00`) for continuation lines with non-standard indentation. **Only use this when re-parsing content for modification and writing back to files.** This mode is necessary for file operations that require perfect round-trip fidelity.
-
-**Why this matters:** Outdent markers are an implementation detail for preserving formatting during write operations. By defaulting to normalized mode, the parser prevents these markers from leaking into application code, simplifying LLM prompts and UI rendering.
-
-#### 2. Hybrid ID System
-
-Every block has a stable identifier for targeting and tracking:
-
-- **Explicit IDs**: `id::` property (UUID format) if present in source
-- **Implicit IDs**: Content hash (MD5 of full context) for blocks without explicit IDs
-- **Reproducible hashing**: Same content + hierarchy = same hash (deterministic)
-
-```python
-from logseq_outline.context import generate_content_hash
-
-# Get block's stable ID
-block_id = block.block_id  # From id:: property if present
-
-# Or generate content-based hash
-content_hash = generate_content_hash(block, parent_blocks)
-```
-
-**Design rationale**: Blocks with truly identical content and context get the same hash. This is intentional - such blocks are semantically equivalent for RAG purposes. Use explicit `id::` properties if you need to distinguish identical blocks.
-
-#### 3. Full-Context Generation
-
-The context module generates hierarchical context strings for blocks:
-
-```python
-from logseq_outline.context import generate_full_context
-
-# Generate full context (includes all parent blocks)
-context = generate_full_context(block, parent_list)
-# Example output:
-# "- Parent content\n  - Child content\n    - Current block content"
-```
-
-**Important:** When using the default parsing mode (`strict_indent_preservation=False`), the generated context strings contain clean, normalized indentation without internal markers. This makes them safe to use directly in LLM prompts, UI display, and semantic search.
-
-This is used for:
-- Content-based hashing (hybrid ID system)
-- Semantic search embeddings (via RAG pipeline)
-- LLM context windows (hierarchical_context in EditedContent)
-
-### Parser API Reference
-
-#### LogseqBlock
-
-```python
-@dataclass
-class LogseqBlock:
-    content: list[str]           # All block lines (first line, continuation, properties)
-    indent_level: int            # Indentation level (0 = root)
-    block_id: Optional[str]      # From id:: property or None
-    children: list[LogseqBlock]  # Child blocks
-
-    def get_full_content(self, normalize_whitespace: bool = False) -> str:
-        """Get full block content as single string."""
-
-    def add_child(self, content: str, position: Optional[int] = None) -> LogseqBlock:
-        """Add child bullet with proper indentation."""
-
-    def get_property(self, key: str) -> Optional[str]:
-        """Get property value by key."""
-
-    def set_property(self, key: str, value: str) -> None:
-        """Set property value (preserves order if exists, appends if new)."""
-```
-
-#### LogseqOutline
-
-```python
-@dataclass
-class LogseqOutline:
-    blocks: list[LogseqBlock]    # Root-level blocks
-    frontmatter: str             # Text before first bullet
-
-    @classmethod
-    def parse(cls, text: str, strict_indent_preservation: bool = False) -> LogseqOutline:
-        """Parse Logseq markdown into outline tree.
-
-        Args:
-            text: Logseq markdown content
-            strict_indent_preservation: If True, preserve exact indentation with
-                outdent markers. If False (default), normalize indentation.
-                Only use True for write operations.
-        """
-
-    def render(self, indent_str: str = "  ") -> str:
-        """Render outline back to markdown."""
-
-    def find_block_by_id(self, block_id: str) -> Optional[tuple[LogseqBlock, list[LogseqBlock]]]:
-        """Find block by ID (explicit or hash), return (block, parents)."""
-```
-
-### Testing the Parser
-
-```bash
-# Run parser tests
-pytest src/logseq-outline-parser/tests/ -v
-
-# Key test areas
-pytest src/logseq-outline-parser/tests/test_parser.py      # Parsing/rendering
-pytest src/logseq-outline-parser/tests/test_context.py     # Context generation & hashing
-```
-
-## Foundational Infrastructure (IMPLEMENTED)
-
-The foundational infrastructure is **complete and tested** (Phase 1-2 in tasks.md):
-
-### Data Models (Pydantic)
-
-All models in `src/logsqueak/models/`:
-- **config.py**: LLMConfig, LogseqConfig, RAGConfig, Config (with YAML loading, permission validation, and llm_providers field for multi-provider support)
-- **block_state.py**: BlockState (Phase 1 selection tracking)
-- **edited_content.py**: EditedContent (Phase 2 editing state)
-- **integration_decision.py**: IntegrationDecision (Phase 3 write decisions)
-- **background_task.py**: BackgroundTaskState enum (async task status)
-- **llm_chunks.py**: NDJSON streaming chunk models (KnowledgeClassificationChunk, ContentRewordingChunk, IntegrationDecisionChunk)
-
-### Services Layer
-
-Implemented services in `src/logsqueak/services/`:
-- **llm_client.py**: LLMClient with async NDJSON streaming, retry logic, request queue with priority
-- **llm_wrappers.py**: LLM-specific prompt wrappers for knowledge classification, content rewording, and integration decisions
-- **llm_helpers.py**: Decision batching, filtering, and hierarchical chunk formatting for RAG results
-- **file_monitor.py**: FileMonitor with mtime tracking using `!=` comparison (git-friendly)
-- **page_indexer.py**: ChromaDB vector indexing with lazy-loaded SentenceTransformer, uses `generate_chunks()`
-- **rag_search.py**: Semantic search returning hierarchical chunks with explicit link boosting
-- **file_operations.py**: Atomic two-phase writes with provenance markers (uses strict mode for write operations)
-
-### RAG Pipeline & Hierarchical Chunks
-
-The RAG (Retrieval-Augmented Generation) pipeline uses semantic search to find relevant existing knowledge:
-
-**Indexing (Phase 1):**
-- PageIndexer loads all non-journal pages from the Logseq graph
-- Uses `generate_chunks()` to create semantic chunks (blocks with hierarchical context)
-- Embeds chunks using lazy-loaded SentenceTransformer model
-- Stores embeddings in ChromaDB with full hierarchical context as document text
-
-**Search (Phase 2):**
-- RAGSearch finds similar blocks for each knowledge block being integrated
-- Returns hierarchical chunks: `(page_name, block_id, hierarchical_context)` tuples
-- Hierarchical context includes parent blocks for full understanding
-- Applies explicit link boosting (blocks that link to target pages rank higher)
-
-**LLM Integration (Phase 2 → Phase 3):**
-- `format_chunks_for_llm()` formats chunks as XML with page grouping
-- Only sends relevant block hierarchies (not full pages) to LLM
-- Strips duplicate page properties and id:: properties from content
-- **Result**: 90%+ prompt reduction (62KB → 2-4KB per knowledge block)
-
-**Why this matters:**
-- Enables smaller/faster models (Mistral-7B works without context window errors)
-- Reduces LLM latency and cost
-- Focuses LLM attention on semantically relevant content only
-
-### Configuration & CLI
-
-- **cli.py**: Click-based CLI with commands:
-  - `extract` - Interactive knowledge extraction workflow (date/range parsing, journal loading, TUI launcher)
-  - `search` - Semantic search of knowledge base (uses RAG infrastructure, clickable logseq:// links)
-  - `init` - Interactive setup wizard for first-time configuration
-- **config.py**: ConfigManager with lazy validation, helpful error messages, permission checks (mode 600)
-- **app.py**: Main TUI application with screen management, phase transitions, worker coordination
-- Config file: `~/.config/logsqueak/config.yaml` (created by `logsqueak init` wizard)
-
-### Setup Wizard (IMPLEMENTED)
-
-The interactive setup wizard (`logsqueak init`) guides users through first-time configuration:
-
-**Three-step flow:**
-1. **Logseq Graph Location** - Validates directory structure (requires `journals/` and `logseq/` subdirectories)
-2. **AI Assistant Configuration** - Provider selection with runtime detection (Ollama local/remote, OpenAI, custom endpoints)
-3. **Semantic Search Setup** - Embedding model validation with smart cache detection
-
-**Key features:**
-- **Runtime provider detection**: Tests endpoints to classify as Ollama vs OpenAI vs custom
-- **Smart cache detection**: Loads embedding model in offline mode to verify it's cached
-- **Change detection**: Skips config write if no changes made
-- **Model selection**: Shows both recommended (⭐) and current (✓) models in table
-- **Atomic writes**: Config files written with mode 600 permissions
-- **Multi-provider support**: Preserves credentials for all configured providers in `llm_providers` field
-
-**Wizard modules** (`src/logsqueak/wizard/`):
-- **validators.py**: Graph path, disk space, Ollama/OpenAI connection, embedding model validation
-- **providers.py**: Model fetching, recommendation logic, API key masking
-- **prompts.py**: Rich-based interactive prompts with helpful defaults
-- **wizard.py**: Orchestration logic, config assembly, file operations
-
-### Utilities
-
-- **logging.py**: Structured logging (structlog) to `~/.cache/logsqueak/logs/logsqueak.log`
-- **ids.py**: Deterministic UUID v5 generation with Logsqueak-specific namespace (`32e497fc-abf0-4d71-8cff-e302eb3e2bb0`)
-
-### TUI Components
-
-Screens in `src/logsqueak/tui/screens/`:
-- **block_selection.py**: Phase 1 - Tree navigation, LLM classification worker, block selection
-- **content_editing.py**: Phase 2 - Three-panel layout, LLM rewording, RAG search, manual editing
-- **integration_review.py**: Phase 3 - Decision review, target preview, acceptance workflow
-
-Widgets in `src/logsqueak/tui/widgets/`:
-- **block_tree.py**: Hierarchical tree view for journal blocks with selection state
-- **status_panel.py**: Real-time background task status display
-- **block_detail_panel.py**: Markdown rendering of selected block with context
-- **content_editor.py**: Three-panel editor (original, reworded, edited) with auto-save
-- **decision_list.py**: Batched integration decisions with filtering and navigation
-- **target_page_preview.py**: Live preview of target page with insertion point indicator
-
-### Test Coverage
-
-Comprehensive test suite with **280 tests passing**:
-- **173 unit tests** (`tests/unit/`): Models, config, LLM client/helpers/wrappers, file monitor, utilities, RAG services, request queue
-  - Includes per-block integration planning validation (T108o)
-- **69 integration tests** (`tests/integration/`): Config loading, LLM NDJSON streaming, RAG pipeline, phase transitions, end-to-end workflow
-  - Includes multi-block workflow and decision batching tests (T108p)
-- **38 UI tests** (`tests/ui/`): All three phases (block selection, content editing, integration review) with snapshot testing
-
-All async fixtures use `@pytest_asyncio.fixture`. FileMonitor uses `!=` for mtime comparison to handle git reverts.
-
-**Phase 6 Validation Complete** (all success criteria met):
-- ✅ All unit tests pass (173 passed in 25.40s)
-- ✅ All integration tests pass (69 passed in 18.65s)
-- ✅ Manual end-to-end tests complete without errors
-- ✅ Files written have correct structure and provenance
-- ✅ Worker dependencies execute in correct order
-
-## Interactive TUI Application (IMPLEMENTED)
-
-See `specs/002-logsqueak-spec/spec.md` for the complete feature specification.
-
-### High-Level Architecture
-
-The TUI application has **3 interactive phases**:
-
-**Phase 1: Block Selection**
-- Display journal blocks in hierarchical tree view
-- LLM classifies blocks as "knowledge" vs "activity logs" (streaming results)
-- User manually selects/deselects blocks for extraction
-- Background workers:
-  - LLM Classification Worker (immediate, independent)
-  - SentenceTransformer Loading (immediate, app-level)
-  - Page Indexing Worker (waits for SentenceTransformer, then indexes pages)
-
-**Phase 2: Content Editing**
-- Display selected knowledge blocks with full context
-- LLM generates reworded versions (removes temporal context)
-- User can accept LLM version, edit manually, or revert to original
-- Background workers:
-  - LLM Rewording Worker (immediate, independent)
-  - RAG Search Worker (waits for PageIndexer from Phase 1)
-  - Integration Decision Worker (opportunistic - starts when RAG completes)
-
-**Phase 3: Integration Decisions**
-- LLM suggests where to integrate each knowledge block (streaming decisions)
-- User reviews preview showing new content in target page context
-- Accept/skip each decision (writes immediately on accept)
-- Atomic provenance: Add `extracted-to::` marker to journal only after successful write
-- Workers:
-  - Polls for new decisions if Phase 2 worker still streaming
-  - Starts Integration Decision Worker if no decisions exist yet
-
-### Configuration
-
-Configuration file: `~/.config/logsqueak/config.yaml`
-
-**Required fields:**
-```yaml
-llm:
-  endpoint: https://api.openai.com/v1  # Or Ollama: http://localhost:11434/v1
-  api_key: sk-your-api-key-here
-  model: gpt-4-turbo-preview
-
-logseq:
-  graph_path: ~/Documents/logseq-graph
-
-rag:
-  top_k: 10  # Optional: Number of similar blocks to retrieve per search (default: 10)
-```
-
-**Optional fields:**
-```yaml
-llm:
-  num_ctx: 32768  # Ollama context window size (controls VRAM usage)
-                  # Automatically sent via native Ollama API when Ollama is detected
-                  # Ignored for OpenAI endpoints (use model's default context window)
-```
-
-**Configuration behavior**:
-- First-time users: Run `logsqueak init` to create configuration interactively
-- Missing config: Shows helpful error suggesting to run `logsqueak init`
-- Lazy validation: Settings validated only when first accessed
-- Validation failures: Show error and exit immediately (user must fix and restart)
-- File permissions: Must be mode 600 (enforced by wizard, checked on load)
-- Updates: Run `logsqueak init` again to modify existing configuration
-
-### Key Design Principles
-
-From `specs/002-logsqueak-spec/spec.md` and project constitution:
-
-#### 1. Non-Destructive Operations (NON-NEGOTIABLE)
-
-- All integrations are traceable via `extracted-to::` markers in journal entries
-- APPEND operations add new blocks without modifying existing content
-- Every integrated block gets a unique `id::` property (UUID)
-- Atomic consistency: Journal marked only when page write succeeds
-
-#### 2. Property Order Preservation (NON-NEGOTIABLE)
-
-**NEVER reorder block properties**. Insertion order is sacred in Logseq.
-
-- Parser preserves exact property order from source
-- `set_property()` preserves location if property exists, appends if new
-- Round-trip tests verify no reordering occurs
-
-#### 3. Keyboard-Driven Interface
-
-- All actions via keyboard (no mouse support)
-- Vim-style navigation (`j`/`k`) + arrow keys
-- Consistent key bindings across phases
-- Context-sensitive footer shows available actions
-
-#### 4. Streaming LLM Results
-
-- LLM results arrive incrementally (not batch)
-- UI updates in real-time as results stream in
-- Background tasks don't block UI interaction
-- Partial results preserved on errors
-
-#### 5. Explicit User Control
-
-- Users must explicitly approve all integrations (no auto-write)
-- Can override any LLM suggestion at any phase
-- Can skip/cancel operations without side effects
-
-### Worker Dependencies & Lifecycle
-
-Background workers execute in a specific dependency order to ensure correct operation:
-
-#### Dependency Chain
-
-```
-Phase 1:
-  LLM Classification (immediate) ─┐
-                                   ├─ Independent workers
-  SentenceTransformer Loading     ─┤
-    └─ [BLOCKS] → PageIndexer     ─┘
-
-Phase 2:
-  LLM Rewording (immediate) ───────┐
-                                    ├─ Independent workers
-  RAG Search                        │
-    └─ [WAITS FOR] PageIndexer ────┤
-      └─ [TRIGGERS] Integration    │
-         Decision Worker            ─┘
-         (opportunistic)
-
-Phase 3:
-  Integration Decision Worker (if not started in Phase 2)
-  OR polls for decisions from Phase 2 worker
-```
-
-#### Worker Details
-
-**Phase 1 Workers:**
-1. **LLM Classification** - Streams block classifications immediately
-2. **SentenceTransformer Loading** (app-level) - Lazy-loads embedding model in thread pool
-3. **PageIndexer** - Waits for SentenceTransformer, then builds ChromaDB vector index
-
-**Phase 2 Workers:**
-1. **LLM Rewording** - Streams reworded content immediately (independent)
-2. **RAG Search** - Waits for PageIndexer completion, then searches for candidate pages
-   - **Blocks Phase 2 → 3 transition** until complete
-3. **Integration Decision** (opportunistic) - Starts when RAG completes
-   - If user waits in Phase 2: Worker starts there, decisions ready for Phase 3
-   - If user presses 'n' quickly: Worker starts in Phase 3 instead
-
-**Phase 3 Workers:**
-- If decisions already streaming from Phase 2: Polls for new decisions
-- If no decisions exist: Starts Integration Decision Worker
-- **Placeholder task edge case**: If Phase 2 worker completed before Phase 3 mounts:
-  - If `blocks_ready > 0`: Creates placeholder task to show "Processing blocks X/Y"
-  - If `blocks_ready == 0`: No placeholder (worker finished with no valid decisions)
-
-#### Key Constraints
-
-1. **PageIndexer cannot start** until SentenceTransformer loads
-2. **RAG search cannot start** until PageIndexer completes
-3. **Integration decisions cannot start** until RAG search completes
-4. **Phase 2 → 3 transition is blocked** until RAG search completes
-5. **Integration Decision Worker is opportunistic** (starts whenever RAG completes)
-6. **LLM requests are serialized** via priority queue (prevents concurrent prompts):
-   - Priority order: Classification (1) > Rewording (2) > Integration (3)
-   - Workers use `acquire_llm_slot()` / `release_llm_slot()` for coordination
-   - Prevents resource contention with high-latency reasoning models
-
-#### Background Task Lifecycle
-
-Background tasks are tracked in `app.background_tasks` dictionary and displayed in the StatusPanel.
-
-**Task Lifecycle:**
-1. Worker creates task entry: `app.background_tasks["task_name"] = BackgroundTask(...)`
-2. Worker updates progress: `app.background_tasks["task_name"].progress_current = X`
-3. **Worker marks task as "completed"**: `app.background_tasks["task_name"].status = "completed"`
-
-**Polling for Completion:**
-- Workers check `task.status == "completed"` OR `task is None` to detect completion
-- Completed tasks stay in the dictionary (same as failed tasks), not deleted
-- Exception: Some screen-level tasks (e.g., `llm_classification`, `llm_rewording`) are deleted on screen transition for cleanup
-
-**Example:**
-```python
-# Worker polls for dependency completion
-while True:
-    dependency_task = self.app.background_tasks.get("dependency_name")
-    if dependency_task is None or dependency_task.status == "completed":
-        # Task deleted or completed - dependency ready
-        break
-    elif dependency_task.status == "failed":
-        # Dependency failed
-        raise RuntimeError(f"Dependency failed: {dependency_task.error_message}")
-    await asyncio.sleep(0.1)
-```
-
 ## Development Commands
 
 ### Environment Setup
@@ -540,32 +76,38 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 ### Running Tests
 
 ```bash
-# Run all tests (148 passed)
+# Run all tests (376 tests)
 pytest -v
+
+# Run specific test suite
+pytest tests/unit/ -v           # Unit tests only (241 tests)
+pytest tests/integration/ -v    # Integration tests only (97 tests)
+pytest tests/ui/ -v             # UI tests only (38 tests)
 
 # Run parser tests only
 pytest src/logseq-outline-parser/tests/ -v
 
-# Run main app tests only
-pytest tests/unit/ tests/integration/ -v
+# Run single test file
+pytest tests/unit/test_config.py -v
+
+# Run single test function
+pytest tests/unit/test_config.py::test_load_config_success -v
 
 # Run with coverage
 pytest --cov=logsqueak --cov=logseq_outline --cov-report=html -v
-
-# Verify foundational tests (Phase 2 checkpoint)
-pytest tests/unit/ tests/integration/test_config*.py tests/integration/test_llm*.py -v
+# Open htmlcov/index.html to view coverage report
 ```
 
 ### Code Quality
 
 ```bash
-# Format code
+# Format code (auto-fixes)
 black src/ tests/
 
-# Lint code
+# Lint code (shows issues)
 ruff check src/ tests/
 
-# Type checking
+# Type checking (strict mode)
 mypy src/
 ```
 
@@ -580,36 +122,688 @@ logsqueak extract                         # Today's journal entry
 logsqueak extract 2025-01-15              # Specific date
 logsqueak extract 2025-01-10..2025-01-15  # Date range
 
-# Phase 1: Select knowledge blocks (j/k navigation, Space to select, 'a' accept all)
-# Phase 2: Edit/refine content (Tab to focus editor, 'a' accept LLM version, 'r' revert)
-# Phase 3: Review integrations (j/k through decisions, 'y' accept, 'a' batch accept)
-# All phases complete - writes to pages with provenance markers in journal
-
 # Search your knowledge base
 logsqueak search "machine learning best practices"
 logsqueak search "python debugging tips" --reindex  # Force rebuild index
 ```
 
-## Python Version & Dependencies
+## Key Architecture Components
 
-- **Python**: 3.11+ (required)
-- **Runtime dependencies** (installed):
-  - `textual>=0.47.0` - TUI framework
-  - `httpx>=0.27.0` - Async HTTP client for LLM API
-  - `pydantic>=2.0.0` - Data validation and models
-  - `click>=8.1.0` - CLI framework
-  - `pyyaml>=6.0.0` - YAML config parsing
-  - `structlog>=23.0.0` - Structured logging
-  - `chromadb>=0.4.0` - Vector store for RAG
-  - `sentence-transformers>=2.2.0` - Embeddings (lazy-loaded to prevent UI blocking)
-  - `markdown-it-py>=3.0.0` - Markdown rendering (Textual dependency for Markdown widget)
-  - `rich>=13.0.0` - Rich text formatting for CLI wizard
-- **Dev dependencies** (installed):
-  - `pytest>=7.4.0` - Test framework
-  - `pytest-asyncio>=0.21.0` - Async test support
-  - `pytest-textual-snapshot>=0.4.0` - TUI snapshot testing
-  - `pytest-cov>=4.1.0` - Coverage reporting
-  - `black>=23.0.0`, `ruff>=0.1.0`, `mypy>=1.7.0` - Code quality
+### 1. Logseq Outline Parser - Hybrid ID System
+
+The parser implements a **dual-mode parsing strategy** with a sophisticated hybrid ID system.
+
+#### Parsing Modes
+
+- **Default mode** (`strict_indent_preservation=False`): Normalizes continuation line indentation, no internal markers. **Use this for all read-only operations** including LLM prompts, UI display, semantic search, and analysis.
+- **Strict mode** (`strict_indent_preservation=True`): Preserves exact indentation using internal `\x00N\x00` outdent markers for write operations. **Only use this when re-parsing content for modification and writing back to files.**
+
+```python
+from logseq_outline.parser import LogseqOutline
+
+# Parse for reading (recommended for application code)
+outline = LogseqOutline.parse(markdown_text)
+
+# Parse for writing back to files (strict mode)
+outline = LogseqOutline.parse(markdown_text, strict_indent_preservation=True)
+```
+
+**Design rationale:** Outdent markers are an implementation detail confined to the write path, preventing them from leaking into LLM prompts and UI rendering.
+
+#### Hybrid ID System
+
+Every block has a stable identifier for targeting and tracking:
+
+**Two-Tier Identification:**
+
+1. **Explicit IDs** - `id::` property (UUID format) if present in source
+
+   ```python
+   block.block_id = block.get_property("id")  # "65f3a8e0-1234-5678-9abc-def012345678"
+   ```
+
+2. **Implicit IDs** - MD5 content hash when no `id::` exists
+
+   ```python
+   from logseq_outline.context import generate_content_hash
+
+   # Generate content-based hash (includes hierarchical context)
+   content_hash = generate_content_hash(block, parent_blocks, indent_str, frontmatter)
+   ```
+
+**Why Hierarchical Context?**
+
+- Same content at different hierarchy levels = different hashes (intentional)
+- Blocks with truly identical content + hierarchy = same hash (acceptable for RAG)
+- Deterministic: same input → same hash across runs
+- Page-scoped: includes `page_name` prefix for global uniqueness in RAG index
+
+**Usage Example:**
+
+```python
+# Find block by ID (explicit or hash)
+block, parents = outline.find_block_by_id(block_id)
+
+# Access block's stable ID
+block_id = block.block_id  # From id:: property if present, else None
+```
+
+### 2. Background Task Mechanism - Worker Coordination
+
+The app uses a **shared dictionary pattern** for worker coordination across all screens.
+
+#### Dependency Chain
+
+```
+Phase 1 (App-Level):
+  model_preload (app.py) ──► SentenceTransformer in thread pool
+    └─ [BLOCKS] → page_indexing (Phase1Screen) ──► PageIndexer.build_index()
+
+Phase 2:
+  llm_rewording (Phase2Screen) ──► Independent, starts immediately
+
+  rag_search (Phase2Screen)
+    └─ [WAITS FOR] page_indexing completion
+      └─ [TRIGGERS] llm_decisions (opportunistic)
+
+         - If RAG completes while in Phase 2: Worker starts there
+         - If user presses 'n' quickly: Worker starts in Phase 3
+
+Phase 3:
+  llm_decisions (Phase3Screen or Phase2Screen)
+    └─ Polls for new decisions OR starts worker if none exist
+```
+
+#### Task Lifecycle
+
+**Critical Pattern:** Tasks are **never deleted**, only marked as "completed" or "failed"
+
+```python
+# Worker creates task
+app.background_tasks["task_name"] = BackgroundTask(
+    task_type="page_indexing",
+    status="running",
+    progress_current=0,
+    progress_total=100
+)
+
+# Worker updates progress
+app.background_tasks["task_name"].progress_current = 50
+
+# Worker marks complete (stays in dict)
+app.background_tasks["task_name"].status = "completed"
+
+# Dependent workers check completion
+dependency = app.background_tasks.get("task_name")
+if dependency is None or dependency.status == "completed":
+    # Ready to proceed
+```
+
+**Exception:** Screen-level tasks like `llm_classification` and `llm_rewording` are deleted on screen transitions for cleanup.
+
+#### LLM Request Serialization
+
+**Problem:** Multiple workers trying to stream LLM responses concurrently leads to resource contention with high-latency reasoning models.
+
+**Solution:** Priority-based request queue serializes LLM calls.
+
+```python
+from logsqueak.models.llm_priority import LLMRequestPriority
+
+# Priority levels (lower number = higher priority)
+# CLASSIFICATION = 1 (Phase 1)
+# REWORDING = 2 (Phase 2)
+# INTEGRATION = 3 (Phase 3)
+
+# Workers acquire slot before LLM calls
+await app.acquire_llm_slot("classification_worker", LLMRequestPriority.CLASSIFICATION)
+try:
+    async for chunk in llm_client.stream_ndjson(...):
+        # Process chunks
+finally:
+    app.release_llm_slot("classification_worker")
+```
+
+#### Opportunistic Worker Execution
+
+**Pattern:** The Integration Decision Worker can start in either Phase 2 or Phase 3, depending on when its dependencies complete and user navigation speed.
+
+**How it works:**
+
+- Phase 2 starts the worker opportunistically when RAG search completes
+- If user waits in Phase 2: Worker runs there, decisions ready for Phase 3
+- If user presses 'n' quickly: Worker starts in Phase 3 instead
+- Phase 3 checks if decisions are already streaming and polls for new ones
+
+**Why it's useful:**
+
+- Maximizes background processing time (starts as soon as dependencies ready)
+- Doesn't block user navigation (worker can start after phase transition)
+- Shared `app.integration_decisions` list works across phase boundaries
+- Reduces perceived latency if user reviews content slowly in Phase 2
+
+```python
+# Phase 2 (content_editing.py): Start worker opportunistically
+async def _check_rag_search_complete(self):
+    rag_task = self.app.background_tasks.get("rag_search")
+    if rag_task and rag_task.status == "completed":
+        # RAG done - start integration worker if not already started
+        if "llm_decisions" not in self.app.background_tasks:
+            self.run_worker(self._integration_decision_worker())
+
+# Phase 3 (integration_review.py): Handle both scenarios
+async def on_mount(self):
+    if self.app.integration_decisions:
+        # Worker already running in Phase 2 - poll for new decisions
+        self.run_worker(self._poll_for_decisions())
+    else:
+        # Worker not started yet - start it now
+        self.run_worker(self._integration_decision_worker())
+```
+
+### 3. RAG Chunking Strategy - Hierarchical Context
+
+The RAG (Retrieval-Augmented Generation) pipeline uses semantic search to find relevant existing knowledge.
+
+#### Deterministic Graph Database Naming
+
+**Pattern:** Each Logseq graph gets a unique ChromaDB collection named `{basename}-{16-char-hash}` where the hash is derived from the absolute path.
+
+**How it works:**
+
+```python
+def generate_graph_db_name(graph_path: Path) -> str:
+    basename = graph_path.name
+    abs_path = str(graph_path.resolve())
+    hash_hex = hashlib.sha256(abs_path.encode('utf-8')).hexdigest()[:16]
+    return f"{basename}-{hash_hex}"
+
+# Example: /home/user/Documents/my-graph → my-graph-a1b2c3d4e5f6a7b8
+```
+
+**Why it's useful:**
+
+- Multiple graphs with same name can coexist (different paths = different hashes)
+- Same graph at same path always gets same DB (deterministic hashing)
+- Readable naming includes basename for debugging
+- Collision-resistant (16-char SHA-256 prefix is ~2^64 space)
+- Automatically handles graph renames/moves (new path = new DB, old DB preserved)
+
+#### Schema Version Tracking with Automatic Rebuild
+
+**Pattern:** ChromaDB collections store an `INDEX_SCHEMA_VERSION` in metadata. On init, PageIndexer checks the version and auto-deletes outdated collections.
+
+**How it works:**
+
+```python
+# Constants
+INDEX_SCHEMA_VERSION = 3  # Current schema version
+
+# On collection creation
+collection.modify(metadata={"schema_version": str(INDEX_SCHEMA_VERSION)})
+
+# On PageIndexer initialization
+stored_version = int(collection.metadata.get("schema_version", "1"))
+if stored_version != INDEX_SCHEMA_VERSION:
+    logger.warning("schema_version_mismatch",
+                   stored=stored_version,
+                   current=INDEX_SCHEMA_VERSION)
+    self.client.delete_collection(name=db_name)
+    # Next build_index() call will recreate with current schema
+```
+
+**Version history:** See `INDEX_SCHEMA_VERSION` constant and comments in `src/logsqueak/services/page_indexer.py` for schema evolution details.
+
+**Why it's useful:**
+
+- No user intervention required for schema upgrades
+- Old indexes automatically invalidated when code changes
+- Next `logsqueak extract` or `logsqueak search` rebuilds transparently
+- Prevents subtle bugs from schema mismatches
+- Clean upgrade path as features evolve
+
+#### Indexing Phase (PageIndexer)
+
+**Chunk Generation:**
+
+```python
+from logseq_outline.context import generate_chunks
+
+# Generate semantic chunks with hierarchical context
+chunks = generate_chunks(outline, page_name)
+
+for block, full_context, hybrid_id, parents in chunks:
+    # full_context includes:
+    # - Page frontmatter (title::, tags::, etc.)
+    # - All parent blocks with indentation
+    # - Current block with indentation
+
+    # Pre-clean context during indexing
+    cleaned_context = _clean_context_for_llm(full_context, outline.frontmatter)
+
+    # Store in ChromaDB
+    collection.upsert(
+        documents=[cleaned_context],  # Hierarchical context
+        embeddings=[embedding],
+        ids=[f"{page_name}::{hybrid_id}"],
+        metadatas=[{
+            "page_name": page_name,
+            "block_id": hybrid_id,
+            "page_frontmatter": json.dumps(frontmatter)
+        }]
+    )
+```
+
+**Pre-Cleaning During Indexing:**
+
+```python
+def _clean_context_for_llm(context: str, page_properties: list[str]) -> str:
+    """Strip id:: properties and page-level properties during indexing.
+
+    Why clean during indexing instead of during search?
+
+    - One-time cost vs. repeated cost per LLM call
+    - Prevents duplicate frontmatter in prompts
+    - Keeps prompts compact by removing internal metadata
+    """
+```
+
+**Page-Level Semantic Chunks:**
+
+Every page gets a page-level chunk containing the page name, title, and frontmatter, even if it has no blocks.
+
+```python
+# ALWAYS create page-level chunk (even for empty pages)
+page_title = self._extract_page_title(outline)
+page_context = f"Page: {page_name}\nTitle: {page_title}\n{frontmatter}"
+
+page_chunk_id = f"{page_name}::__PAGE__"
+chunks_by_id[page_chunk_id] = {
+    "document": page_context,
+    "metadata": {"block_id": "__PAGE__", "page_name": page_name, ...}
+}
+```
+
+**Why it's useful:**
+
+- Enables searching by page name alone (finds empty pages)
+- Page title can differ from filename (stored in `title::` property)
+- Frontmatter provides additional search context (tags, properties)
+- Special `__PAGE__` block ID distinguishes from real blocks
+- RAG search can suggest adding content to empty but relevant pages
+
+#### Search Phase (RAGSearch)
+
+**Semantic Search with Explicit Link Boosting:**
+
+```python
+# Extract [[Page Name]] links from query
+explicit_links = re.findall(r'\[\[([^\]]+)\]\]', context)
+
+# Boost similarity scores for mentioned pages
+if page_name in explicit_links:
+    similarity *= 1.5  # 50% boost
+```
+
+Returns hierarchical chunks directly from ChromaDB: `(page_name, block_id, hierarchical_context)` tuples.
+
+### 4. LLM Response Streaming - NDJSON Protocol
+
+**Multi-Format Support:**
+
+- Direct NDJSON (one JSON object per line)
+- SSE (Server-Sent Events) with `data:` prefix
+- Ollama native format (`/api/chat` endpoint)
+- OpenAI-compatible format (`/v1/chat/completions`)
+
+**Provider Detection:**
+
+```python
+async def _detect_ollama() -> bool:
+    """Probe /api/version endpoint to classify provider.
+
+    Cached after first call to avoid repeated network requests.
+    """
+    version_url = f"{base_url}/api/version"
+    response = await client.get(version_url)
+    return response.status_code == 200  # Ollama responds, OpenAI doesn't
+```
+
+**HTTP 429 Retry with Exponential Backoff:**
+
+The LLM client automatically retries rate-limited requests with intelligent backoff.
+
+```python
+# Error handling in stream_ndjson()
+except httpx.HTTPStatusError as e:
+    if e.response.status_code == 429:
+        # Respect Retry-After header if present
+        retry_after = e.response.headers.get("Retry-After")
+        if retry_after:
+            delay = int(retry_after)
+        else:
+            # Exponential backoff: 2s, 4s, 8s, 16s...
+            delay = 2 ** attempt
+
+        logger.warning("llm_rate_limit",
+                      attempt=attempt,
+                      max_retries=max_retries,
+                      delay=delay)
+        await asyncio.sleep(delay)
+        # Retry request
+    else:
+        raise  # Other 4xx/5xx errors fail immediately
+```
+
+**Why it's useful:**
+
+- Transparent retry without failing requests
+- Respects API rate limit guidance (`Retry-After` header)
+- Exponential backoff prevents thundering herd
+- Particularly important during Phase 3 (multiple sequential LLM calls)
+- Configurable max_retries (default: 1 retry = 2 total attempts)
+
+**Streaming Pipeline:**
+
+```python
+async def stream_ndjson(prompt, system_prompt, chunk_model):
+    # Detect format (SSE vs NDJSON, Ollama vs OpenAI)
+    needs_content_extraction = is_ollama or "text/event-stream" in content_type
+
+    accumulated_content = ""
+
+    async for line in response.aiter_lines():
+        if line.startswith("data: "):
+            json_line = line[6:]  # Strip "data: " prefix
+
+        data = json.loads(json_line)
+
+        if needs_content_extraction:
+            # Extract fragment: data["message"]["content"] (Ollama)
+            #               or data["choices"][0]["delta"]["content"] (OpenAI SSE)
+            content_fragment = _extract_content(data)
+            accumulated_content += content_fragment
+
+            # Try parsing complete NDJSON lines
+            for complete_line in accumulated_content.split('\n')[:-1]:
+                chunk_data = json.loads(complete_line)
+                chunk = chunk_model(**chunk_data)
+                yield chunk
+        else:
+            # Direct NDJSON - parse immediately
+            chunk = chunk_model(**data)
+            yield chunk
+```
+
+**Chunk Models** (from `models/llm_chunks.py`):
+
+```python
+class KnowledgeClassificationChunk(BaseModel):
+    type: Literal["classification"] = "classification"
+    block_id: str
+    insight: str  # Reworded content with temporal context removed
+    confidence: float  # Based on temporal durability (0.8-1.0: fundamental, 0.5-0.7: contextual, 0.0-0.4: speculative)
+
+class ContentRewordingChunk(BaseModel):
+    type: Literal["rewording"] = "rewording"
+    block_id: str
+    reworded_content: str
+
+class IntegrationDecisionChunk(BaseModel):
+    type: Literal["decision"] = "decision"
+    knowledge_block_id: str
+    target_page: str
+    action: Literal["add_section", "add_under", "replace", "skip_exists"]
+    target_block_id: Optional[str]
+    confidence: float
+    reasoning: str  # Exposed via tooltip in Phase 3 UI
+```
+
+**Insight-First Extraction Workflow:**
+
+Phase 1 combines classification and rewording in a single LLM call, reducing API usage.
+
+```python
+# Phase 1 prompt extracts insights with integrated rewording
+# Each KnowledgeClassificationChunk contains:
+# - block_id: Which journal block this came from
+# - insight: Already-reworded content (temporal context removed)
+# - confidence: Based on temporal durability
+
+# Phase 1 worker stores insight in BlockState
+block_state.llm_classification = "knowledge"
+block_state.llm_reworded_content = chunk.insight  # Pre-reworded!
+block_state.llm_confidence = chunk.confidence
+
+# Phase 1→2 transition carries over reworded content
+app.edited_content[block_id] = EditedContent(
+    block_id=block_id,
+    current_content=block_state.llm_reworded_content,  # From Phase 1
+    ...
+)
+
+# Phase 2 rewording worker skips blocks with LLM-provided content
+if edited_content.current_content:
+    # Already reworded in Phase 1 - skip LLM call
+    continue
+```
+
+**Why it's useful:**
+
+- Reduces LLM API calls (one pass instead of two for LLM-suggested blocks)
+- User-selected blocks (not LLM-classified) still get separate rewording in Phase 2
+- Meaningful confidence scores help prioritize insights
+- Cleaner semantic field names (`insight` vs `reasoning` in classification)
+
+### 5. Interactive UX Features
+
+#### Clickable Logseq Links
+
+The application generates clickable `logseq://` links in multiple places for seamless navigation to your Logseq graph.
+
+**Link Format:**
+
+```python
+from logsqueak.utils.logseq_urls import create_logseq_url
+
+# Page link
+url = create_logseq_url(graph_name, page_name)
+# → logseq://graph/my-graph?page=Python%20Debugging
+
+# Block reference link
+url = create_logseq_url(graph_name, page_name, block_id)
+# → logseq://graph/my-graph?block-id=65f3a8e0-1234-5678-9abc-def012345678
+```
+
+**Where links appear:**
+
+1. **Phase 1 - Previously Integrated Content:**
+   - Shows "Previously integrated:" section for blocks with `extracted-to::` property
+   - Displays clickable links to each integrated location
+   - Example: `[Python Debugging]((65f3a8e0-...))` → clickable link in terminal
+
+2. **Phase 3 - Integration Decisions List:**
+   - Shows target page links for all decision types (add_section, add_under, replace, skip_exists)
+   - Clickable links displayed in the decision list (left panel)
+
+3. **Search Command Output:**
+   - `logsqueak search "query"` returns results with clickable page links
+   - Each result shows: page name (clickable), similarity score, hierarchical context
+   - Works in modern terminals that support hyperlinks
+
+**Terminal Compatibility:**
+
+- Modern terminals (iTerm2, GNOME Terminal, Windows Terminal) render as clickable links
+- Legacy terminals display as plain text URLs (still usable)
+
+#### Skip_Exists Decision UI
+
+Phase 3 displays all integration decisions transparently, including `skip_exists` for already-integrated content.
+
+**How it works:**
+
+```python
+# Phase 3 decision list shows all decisions
+for decision in decisions:
+    if decision.action == "skip_exists":
+        # Display with "✓ Already Exists" indicator
+        # Preview shows existing block location
+        # y/a keys skip over these (non-actionable)
+    else:
+        # Normal decision (add_section, add_under, replace)
+        # y/a keys accept and write
+```
+
+**Why it's useful:**
+
+- Full transparency - users see all LLM decisions including skips
+- Audit trail - no hidden filtering of decisions
+- Non-disruptive - skip_exists can't be accidentally "accepted"
+- Navigation - clickable links to existing content
+- Completion summary dynamically calculates skip count
+
+#### Integration Reasoning Tooltips
+
+Phase 3 exposes the LLM's reasoning for each integration decision via tooltips.
+
+**Implementation:**
+
+- `IntegrationDecisionChunk.reasoning` field contains LLM explanation
+- Tooltip appears when hovering over decision in the decision list
+- Shows why LLM chose specific target page and action
+
+**Example reasoning:**
+> "This debugging insight is related to the existing 'Python Debugging' page which covers pdb and debugging tools. Adding under the 'Tools' section provides thematic organization."
+
+**Why it's useful:**
+
+- Transparency into LLM decision-making
+- Helps users understand suggested placements
+- Educational - users learn to organize better over time
+- Debugging - reveals when LLM misunderstands content
+
+### 6. Structured Logging - What and Where
+
+**Location:** `~/.cache/logsqueak/logs/logsqueak.log`
+
+**Format:** JSON (one object per line, parseable with `jq`)
+
+**Log Levels:**
+
+```bash
+export LOGSQUEAK_LOG_LEVEL=DEBUG  # DEBUG, INFO, WARNING, ERROR
+```
+
+**What's Logged:**
+
+- **LLM Requests (INFO):** Request ID, model, endpoint, provider, prompt length, timestamp
+- **LLM Request Payloads (DEBUG):** Full JSON payload sent to LLM API
+- **LLM Response Lines (INFO):** Each complete NDJSON line received
+- **LLM Raw Responses (INFO):** Full raw response content
+- **User Actions (INFO):** Block selection, navigation, acceptance decisions
+- **Worker Dependencies (INFO/DEBUG):** Waiting for dependencies, status changes
+- **File Operations (INFO/ERROR):** Page writes, journal updates, errors
+
+**Usage Examples:**
+
+```bash
+# View all logs with pretty-printing
+tail -f ~/.cache/logsqueak/logs/logsqueak.log | jq .
+
+# Filter LLM requests only
+jq 'select(.event | startswith("llm_"))' ~/.cache/logsqueak/logs/logsqueak.log
+
+# Filter errors
+jq 'select(.level == "error")' ~/.cache/logsqueak/logs/logsqueak.log
+
+# Track specific block through workflow
+jq 'select(.block_id == "abc123")' ~/.cache/logsqueak/logs/logsqueak.log
+```
+
+### 7. Provenance Recording - Atomic Two-Phase Writes
+
+**Goal:** Ensure both page write and journal marker succeed atomically, or neither.
+
+**Pattern:** Two-phase commit with idempotency
+
+#### Write Sequence
+
+```python
+async def write_integration_atomic(decision, journal_date, graph_paths, file_monitor):
+    # PHASE 1: Page Write
+    # 1. Check and reload page if modified
+    # 2. Idempotency check - has this integration already happened?
+    # 3. Apply integration (add_section, add_under, replace, skip_exists)
+    # 4. Atomic write to page
+
+    # PHASE 2: Journal Update (only if Phase 1 succeeded)
+    # 5. Reload journal if modified
+    # 6. Add provenance marker
+    # 7. Atomic write to journal
+```
+
+**Atomic Write Implementation:**
+
+```python
+def atomic_write(path: Path, content: str, file_monitor: FileMonitor):
+    """Temp-file-rename pattern with double modification check."""
+
+    # Early check
+    if file_monitor and file_monitor.is_modified(path):
+        raise FileModifiedError("File modified before write")
+
+    # Create temp file in same directory (ensures same filesystem)
+    temp_path = path.parent / f".{path.name}.tmp.{os.getpid()}"
+
+    # Write to temp
+    temp_path.write_text(content)
+
+    # fsync to ensure on disk
+    with open(temp_path, 'r+') as f:
+        f.flush()
+        os.fsync(f.fileno())
+
+    # Late check (before rename)
+    if file_monitor and file_monitor.is_modified(path):
+        temp_path.unlink()
+        raise FileModifiedError("File modified during write")
+
+    # Atomic rename (POSIX guarantee)
+    temp_path.replace(path)
+
+    # Update mtime tracking
+    if file_monitor:
+        file_monitor.refresh(path)
+```
+
+**Provenance Format:**
+
+```markdown
+
+- Today I learned about pdb debugging
+  extracted-to:: [Python Debugging](((65f3a8e0-1234-5678-9abc-def012345678)))
+```
+
+The format is a Markdown link `[text](target)` where:
+
+- Link text: target page name
+- Link target: `((uuid))` - Logseq block reference syntax (two parentheses for the block reference)
+- Total: three sets of parentheses (one from Markdown link syntax + two from block reference)
+
+**Deterministic UUIDs:**
+
+```python
+from logsqueak.utils.ids import generate_integration_id
+
+# Generate UUID v5 from integration parameters
+integration_id = generate_integration_id(
+    knowledge_block_id="abc123",
+    target_page="Python Debugging",
+    action="add_under",
+    target_block_id="def456"
+)
+# Same parameters → same UUID (enables idempotent retries)
+```
 
 ## Project Constitution
 
@@ -629,7 +823,7 @@ Key principles:
 - APPEND operations add new blocks without modifying existing content
 - Every integrated block generates unique `id::` property (UUID)
 - Journal entries atomically marked with block references to integrated knowledge
-- Property order preservation is sacred
+- **Property order preservation is sacred** - NEVER reorder block properties
 
 ### III. Simplicity and Transparency
 
@@ -646,160 +840,78 @@ All AI-assisted commits MUST include:
 Assisted-by: Claude Code
 ```
 
-### Commit Workflow with User Approval
+(instead of 'Generated with' or 'Co-Authored-By')
 
-When the user says **"Add and stage"** or **"Add it and stage for review"**, this means:
+## Python Version & Dependencies
 
-1. Make the requested changes to the codebase
-2. Stage the changes with `git add`
-3. Prepare a commit message following the project's commit message format
-4. Show the user the proposed commit message for review
-5. **Wait for user approval** before running `git commit`
+- **Python**: 3.11+ (required)
+- **Key runtime dependencies:**
+  - `textual>=0.47.0` - TUI framework
+  - `httpx>=0.27.0` - Async HTTP client for LLM API
+  - `pydantic>=2.0.0` - Data validation and models
+  - `click>=8.1.0` - CLI framework
+  - `chromadb>=0.4.0` - Vector store for RAG
+  - `sentence-transformers>=2.2.0` - Embeddings (lazy-loaded)
+  - `structlog>=23.0.0` - Structured logging
 
-The user will either say "Proceed" to commit, or request changes to the commit message.
+- **Dev dependencies:**
+  - `pytest>=7.4.0`, `pytest-asyncio>=0.21.0`, `pytest-textual-snapshot>=0.4.0`
+  - `black>=23.0.0`, `ruff>=0.1.0`, `mypy>=1.7.0`
 
-**Never commit without explicit user approval of the commit message.**
+## Common Pitfalls
 
-## Working with Logseq Outline Format
+### Parser Property Order Preservation
 
-Logseq uses indented bullets (2 spaces per level) with special features:
+**NEVER reorder block properties.** Insertion order is sacred in Logseq.
 
-```markdown
-- Top-level bullet
-  - Child bullet (2 spaces indent)
-    - Grandchild (4 spaces indent)
-- Bullet with properties
-  property:: value
-  another-property:: value
-  - Child comes after properties
-- Multi-line content
-  Continuation line (indented, no bullet)
-  Another continuation
+```python
+# ✅ CORRECT: Preserves existing property order
+block.set_property("extracted-to", value)  # Updates in place if exists, appends if new
+
+# ❌ WRONG: Don't manually rebuild properties list
+block.content = [first_line] + new_properties + rest  # Breaks order preservation
 ```
 
-### Parser Behavior
+### Parser Indent Preservation Modes
 
-- `LogseqOutline.parse()`: Returns tree of LogseqBlock objects
-  - Default mode: Normalizes continuation line indentation (recommended for app code)
-  - Strict mode (`strict_indent_preservation=True`): Preserves exact indentation for writes
-- Properties detected by `key:: value` pattern
-- Continuation lines: Lines at same/deeper indent without bullet
-- Frontmatter: Lines before first bullet (page-level content)
+```python
+# ✅ CORRECT: Default mode for reading
+outline = LogseqOutline.parse(text)  # No outdent markers
 
-### Renderer Behavior
+# ✅ CORRECT: Strict mode only for writes
+outline = LogseqOutline.parse(text, strict_indent_preservation=True)
 
-- `LogseqOutline.render()`: Converts tree back to markdown string
-- Preserves exact property order (NON-NEGOTIABLE)
-- Preserves continuation line formatting
-- Uses detected indentation (default: 2 spaces)
+# ❌ WRONG: Don't use strict mode for LLM prompts
+outline = LogseqOutline.parse(text, strict_indent_preservation=True)
+prompt = block.get_full_content()  # May leak \x00N\x00 markers
+```
 
-## Feature Implementation Status
+### Background Task Completion Checking
 
-**Current branch**: `003-setup-wizard`
+```python
+# ✅ CORRECT: Check for None OR "completed"
+dependency = app.background_tasks.get("task_name")
+if dependency is None or dependency.status == "completed":
+    # Ready to proceed
 
-**Active spec**: `specs/003-setup-wizard/spec.md`
+# ❌ WRONG: Only checking for None
+if app.background_tasks.get("task_name") is None:
+    # Misses completed tasks still in dict
+```
 
-**Implementation status**:
-- ✅ **002-logsqueak-spec**: COMPLETE - All 8 phases implemented and tested (T001-T147)
-  - Interactive TUI application with knowledge extraction workflow
-  - Full test coverage (280+ tests passing)
+### FileMonitor Modification Detection
 
-- 🔄 **003-setup-wizard**: IN PROGRESS - Phase 1-3 complete (T001-T037 ✅)
-  - ✅ **Phase 1: Setup** (T001-T004) - Wizard module structure
-  - ✅ **Phase 2: Foundational** (T005-T009) - Data models and Config extension
-  - ✅ **Phase 3: User Story 1** (T010-T037) - First-time setup for Ollama provider
-    - Validation functions, provider helpers, prompts, wizard orchestration, CLI integration
-  - ⏳ **Phase 4-8**: Pending - Additional providers, edge cases, comprehensive tests
+```python
+# ✅ CORRECT: Uses != comparison (git-friendly)
+if file_monitor.is_modified(path):
+    # File changed (handles git reverts correctly)
 
-**Development guidelines**:
-- Follow TDD: Write failing tests → Implement → Tests pass → Manual verify
-- Use Textual pilot for all UI tests (automated keyboard/mouse simulation)
-- Property order preservation is NON-NEGOTIABLE
-- All file writes must be atomic with provenance markers
+# ❌ WRONG: Don't use > comparison
+if new_mtime > old_mtime:
+    # Breaks on git revert (older mtime)
+```
 
 ## License
 
 GPLv3 - All code is licensed under GPLv3 regardless of authorship method (including AI-assisted development).
 
-## Recent Changes
-- 2025-11-19: **Setup Wizard Implementation (Phase 1-3)** - Interactive `logsqueak init` command
-  - Three-step guided configuration: graph location, AI assistant, semantic search
-  - Runtime provider detection (Ollama vs OpenAI vs custom endpoints)
-  - Smart embedding model cache detection via offline mode loading
-  - Model table shows both recommended (⭐) and current (✓) models
-  - Change detection to skip unnecessary config writes
-  - Consistent spacing throughout wizard output
-  - Extended Config model with llm_providers field for multi-provider support
-  - Wizard modules: validators, providers, prompts, orchestration
-  - Dependencies: Rich (CLI formatting), httpx (API testing), existing Pydantic/PyYAML
-
-- 2025-11-17: **Specification Complete** - All phases implemented, 280+ tests passing
-  - Completed all 8 phases of the interactive TUI feature spec (002-logsqueak-spec)
-  - Key achievements:
-    - Three-phase interactive workflow (Block Selection → Content Editing → Integration Review)
-    - LLM prompt optimization (90% reduction: 62KB → 2-4KB per block)
-    - RAG semantic search with hierarchical chunks
-    - CLI commands: `extract` and `search` with clickable logseq:// links
-    - Edge case handling (config errors, network failures, file modifications)
-    - Performance optimizations (EditedContent references, pre-cleaned RAG contexts, quiet indexing)
-    - Comprehensive test coverage (280+ passing tests)
-- 2025-11-12: **Integration Decisions Prompt Optimization (COMPLETE)** - Reduced prompt size from 62KB to 2-4KB per block (T108i-m)
-  - **Phase 1**: Created `format_chunks_for_llm()` helper in `src/logsqueak/services/llm_helpers.py`
-    - Formats RAG search results as XML with hierarchical block context
-    - Groups chunks by page, includes page properties, strips id:: from content
-  - **Phase 2**: Implemented per-block integration decision planning (T108l, T108m, T108n)
-    - Refactored `plan_integrations()` to process one knowledge block at a time
-    - Added `plan_integration_for_block()` to handle single block with its candidate pages
-    - Reduced initial prompt size from 62KB to ~6-12KB per block
-  - **Phase 3**: Wired up hierarchical chunks in RAG pipeline
-    - Updated `RAGSearch.find_candidates()` to return hierarchical chunks from ChromaDB
-    - Used `generate_chunks()` to find blocks and build parent paths
-    - Further reduced prompt size to ~2-4KB per block
-  - **Phase 4**: Simplified to use ChromaDB documents directly (final refactor)
-    - RAG now returns `(page_name, block_id, hierarchical_context)` tuples
-    - Uses pre-computed context from ChromaDB instead of reconstructing from pages
-    - Removed redundant page loading and tree traversal
-    - Added `strip_page_properties()` to prevent duplicate frontmatter
-  - **Impact**: Fixes 400 Bad Request errors from Mistral-7B context window limits
-  - **Result**: 90%+ prompt size reduction enables faster responses and more reliable LLM calls
-  - Added priority queue to serialize LLM requests (prevents concurrent prompts)
-  - Priority order: Classification (1) > Rewording (2) > Integration (3)
-  - Workers use `acquire_llm_slot()` / `release_llm_slot()` for coordination
-  - Cancellation support: workers cancelled during screen transitions
-    - Phase 1→2: Cancel classification worker
-    - Phase 2→3: Cancel rewording worker
-  - Graceful handling of `asyncio.CancelledError` in all workers
-  - Test suite with 5 tests for sequential execution, priority ordering, error handling
-  - Rationale: Prevents resource contention with high-latency reasoning models
-  - Parser now defaults to normalized indentation (no outdent markers)
-  - Added strict_indent_preservation parameter for write operations only
-  - Normalized content hashing for stable IDs across parsing modes
-  - Removed redundant outdent marker cleaning from llm_wrappers, TUI modules
-  - Simplifies application code by handling markers at parser level
-  - All 87 parser tests passing, 7 new tests for indent preservation and hash stability
-  - Prevents implementation details from leaking into LLM prompts and UI
-  - TargetPagePreview and DecisionList widgets complete
-  - Phase3Screen with decision navigation, batch acceptance, target preview
-  - File operations service with atomic two-phase writes and provenance markers
-  - Integration actions: add_section, add_under, replace, skip_exists
-  - Idempotent retry detection and concurrent modification handling
-  - 38 UI tests passing, 37 file operations tests passing
-  - All three core user stories (US1, US2, US3) now complete
-  - RAG services (PageIndexer, RAGSearch) with lazy SentenceTransformer loading
-  - Fixed PageIndexer to use `generate_chunks()` for proper semantic chunking
-  - ContentEditor widget and Phase2Screen with vertical three-panel layout
-  - Keyboard controls: j/k navigation, Tab focus, 'a' accept, 'r' revert
-  - Auto-save on navigation, RAG search blocking implemented
-  - Comprehensive UI test suite with snapshot testing
-  - All async fixtures properly use `@pytest_asyncio.fixture`
-  - BlockTree, StatusPanel, MarkdownViewer widgets complete
-  - Phase1Screen with LLM streaming, keyboard navigation, manual selection
-  - Journal loader service with date/range parsing
-  - CLI integration launching Phase 1 TUI
-  - All data models, services, CLI, config, and utilities complete
-  - Fixed FileMonitor to use `!=` comparison (git-friendly)
-  - Generated Logsqueak-specific UUID namespace
-
-## Active Technologies
-- Python 3.11+ + Click (CLI framework), Rich (formatted CLI output), httpx (HTTP client for API testing), PyYAML (config serialization), sentence-transformers (embedding model), existing Pydantic models (Config validation) (003-setup-wizard)
-- File-based YAML config at `~/.config/logsqueak/config.yaml` with mode 600 permissions (003-setup-wizard)
