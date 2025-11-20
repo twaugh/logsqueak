@@ -468,8 +468,9 @@ class TargetPagePreview(Widget):
         await self._render_preview()
 
         # Auto-scroll to highlighted block
+        # Use call_after_refresh to ensure DOM is updated before scrolling
         if highlight_block_id:
-            self._scroll_to_highlighted_block()
+            self.call_after_refresh(self._scroll_to_highlighted_block)
 
     async def _render_preview(self) -> None:
         """Internal method to render the current content."""
