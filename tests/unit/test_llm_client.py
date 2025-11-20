@@ -606,6 +606,62 @@ class TestLLMClient:
             assert chunks[0].confidence == 0.92
 
     @pytest.mark.asyncio
+    async def test_stream_ndjson_handles_multiple_multiline_objects_single_newline(self, llm_client):
+        """Test that multiple multi-line JSON objects separated by single newlines are parsed incrementally."""
+        # LLM returns multiple pretty-printed JSON objects separated by single newlines
+        # This tests the incremental multi-line parsing logic
+        mock_lines = [
+            'data: {"choices":[{"delta":{"content":"{"}}]}',
+            'data: {"choices":[{"delta":{"content":"\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"  \\"block_id\\": \\"abc123\\","}}]}',
+            'data: {"choices":[{"delta":{"content":"\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"  \\"insight\\": \\"First insight\\","}}]}',
+            'data: {"choices":[{"delta":{"content":"\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"  \\"confidence\\": 0.92"}}]}',
+            'data: {"choices":[{"delta":{"content":"\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"}"}}]}',
+            'data: {"choices":[{"delta":{"content":"\\n"}}]}',  # End of first object
+            'data: {"choices":[{"delta":{"content":"{"}}]}',     # Start of second object (single newline separator)
+            'data: {"choices":[{"delta":{"content":"\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"  \\"block_id\\": \\"def456\\","}}]}',
+            'data: {"choices":[{"delta":{"content":"\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"  \\"insight\\": \\"Second insight\\","}}]}',
+            'data: {"choices":[{"delta":{"content":"\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"  \\"confidence\\": 0.85"}}]}',
+            'data: {"choices":[{"delta":{"content":"\\n"}}]}',
+            'data: {"choices":[{"delta":{"content":"}"}}]}',
+            'data: [DONE]',
+        ]
+
+        mock_response = create_mock_response(
+            mock_lines,
+            headers={"content-type": "text/event-stream"}
+        )
+
+        mock_client = AsyncMock()
+        mock_client.stream = Mock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('httpx.AsyncClient', return_value=mock_client):
+            chunks = []
+            async for chunk in llm_client.stream_ndjson(
+                prompt="Test multiple multiline single newline",
+                system_prompt="Test system",
+                chunk_model=KnowledgeClassificationChunk
+            ):
+                chunks.append(chunk)
+
+            # Should parse both objects incrementally during streaming
+            assert len(chunks) == 2
+            assert chunks[0].block_id == "abc123"
+            assert chunks[0].insight == "First insight"
+            assert chunks[0].confidence == 0.92
+            assert chunks[1].block_id == "def456"
+            assert chunks[1].insight == "Second insight"
+            assert chunks[1].confidence == 0.85
+
+    @pytest.mark.asyncio
     async def test_stream_ndjson_handles_multiple_multiline_objects(self, llm_client):
         """Test that multiple multi-line JSON objects separated by blank lines are parsed."""
         # LLM returns multiple pretty-printed JSON objects separated by blank lines
