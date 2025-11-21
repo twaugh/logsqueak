@@ -541,7 +541,7 @@ async def stream_ndjson(prompt, system_prompt, chunk_model):
 class KnowledgeClassificationChunk(BaseModel):
     type: Literal["classification"] = "classification"
     block_id: str
-    insight: str  # Reworded content with temporal context removed
+    reasoning: str  # Chain-of-thought explanation of why this block is valuable
     confidence: float  # Based on temporal durability (0.8-1.0: fundamental, 0.5-0.7: contextual, 0.0-0.4: speculative)
 
 class ContentRewordingChunk(BaseModel):
@@ -559,41 +559,42 @@ class IntegrationDecisionChunk(BaseModel):
     reasoning: str  # Exposed via tooltip in Phase 3 UI
 ```
 
-**Insight-First Extraction Workflow:**
+**Separated Classification and Rewording Workflow:**
 
-Phase 1 combines classification and rewording in a single LLM call, reducing API usage.
+Phase 1 classifies blocks with reasoning, Phase 2 rewords all selected blocks independently.
 
 ```python
-# Phase 1 prompt extracts insights with integrated rewording
+# Phase 1 prompt identifies valuable blocks with chain-of-thought reasoning
 # Each KnowledgeClassificationChunk contains:
 # - block_id: Which journal block this came from
-# - insight: Already-reworded content (temporal context removed)
+# - reasoning: Why the LLM considers this block valuable
 # - confidence: Based on temporal durability
 
-# Phase 1 worker stores insight in BlockState
+# Phase 1 worker stores classification in BlockState
 block_state.llm_classification = "knowledge"
-block_state.llm_reworded_content = chunk.insight  # Pre-reworded!
+block_state.llm_reworded_content = None  # No rewording yet
 block_state.llm_confidence = chunk.confidence
 
-# Phase 1→2 transition carries over reworded content
+# Phase 1→2 transition creates empty EditedContent
 app.edited_content[block_id] = EditedContent(
     block_id=block_id,
-    current_content=block_state.llm_reworded_content,  # From Phase 1
+    current_content="",  # Empty - will be reworded in Phase 2
     ...
 )
 
-# Phase 2 rewording worker skips blocks with LLM-provided content
-if edited_content.current_content:
-    # Already reworded in Phase 1 - skip LLM call
-    continue
+# Phase 2 rewording worker processes ALL selected blocks
+for block_id, edited_content in app.edited_content.items():
+    # Reword content, preserving [[Page]] wiki links
+    async for chunk in llm_client.stream_classification_and_rewording(...):
+        edited_content.current_content = chunk.reworded_content
 ```
 
 **Why it's useful:**
 
-- Reduces LLM API calls (one pass instead of two for LLM-suggested blocks)
-- User-selected blocks (not LLM-classified) still get separate rewording in Phase 2
-- Meaningful confidence scores help prioritize insights
-- Cleaner semantic field names (`insight` vs `reasoning` in classification)
+- Separation of concerns: Phase 1 identifies what's valuable, Phase 2 handles rewording
+- Chain-of-thought reasoning improves classification accuracy
+- Consistent rewording quality for all blocks (LLM-classified and user-selected)
+- Simplified prompts with clearer responsibilities per phase
 
 **Short ID Optimization:**
 
