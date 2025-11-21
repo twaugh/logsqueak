@@ -243,6 +243,10 @@ class Phase1Screen(Screen):
         """Called when screen is mounted."""
         logger.info("phase1_on_mount_started")
 
+        # Give focus to the tree for immediate keyboard navigation
+        tree = self.query_one(BlockTree)
+        tree.focus()
+
         # Start background tasks automatically (unless disabled for testing)
         if self.auto_start_workers:
             self.start_llm_classification()
