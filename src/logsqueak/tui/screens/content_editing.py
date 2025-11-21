@@ -749,6 +749,13 @@ class Phase2Screen(Screen):
                         block_count += 1
                         decisions_in_current_block = []
 
+                        # Update progress as we complete each block
+                        from logsqueak.tui.app import LogsqueakApp
+                        if isinstance(self.app, LogsqueakApp):
+                            self.app.background_tasks["llm_decisions"].progress_current = block_count
+                            status_panel = self.query_one(StatusPanel)
+                            status_panel.update_status()
+
                     # Add decision to current block
                     decisions_in_current_block.append(decision)
                     current_block_id = decision.knowledge_block_id
@@ -780,6 +787,13 @@ class Phase2Screen(Screen):
                         block_id=current_block_id,
                         num_decisions=len(decisions_in_current_block)
                     )
+
+                    # Update progress for final block
+                    from logsqueak.tui.app import LogsqueakApp
+                    if isinstance(self.app, LogsqueakApp):
+                        self.app.background_tasks["llm_decisions"].progress_current = block_count
+                        status_panel = self.query_one(StatusPanel)
+                        status_panel.update_status()
 
                 # Mark complete
                 from logsqueak.tui.app import LogsqueakApp
