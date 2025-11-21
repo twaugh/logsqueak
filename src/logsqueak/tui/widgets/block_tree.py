@@ -6,8 +6,10 @@ and user selections.
 """
 
 from typing import Dict, Optional
+from textual import events
 from textual.widgets import Tree
 from textual.widgets.tree import TreeNode
+from textual.message import Message
 from rich.text import Text
 from logseq_outline.parser import LogseqBlock, LogseqOutline
 from logsqueak.models.block_state import BlockState
@@ -15,6 +17,16 @@ from logsqueak.models.block_state import BlockState
 
 class BlockTree(Tree):
     """Tree widget for displaying Logseq blocks with selection state."""
+
+    class BlockClicked(Message):
+        """Message posted when a block is clicked for selection toggle.
+
+        Args:
+            block_id: The ID of the clicked block
+        """
+        def __init__(self, block_id: str) -> None:
+            super().__init__()
+            self.block_id = block_id
 
     def __init__(
         self,
@@ -281,6 +293,29 @@ class BlockTree(Tree):
         if self.cursor_node:
             return self.cursor_node.data
         return None
+
+    async def _on_click(self, event: events.Click) -> None:
+        """Override default click behavior to toggle selection instead of expand/collapse.
+
+        Args:
+            event: Click event
+        """
+        # Prevent default expand/collapse behavior
+        event.prevent_default()
+        event.stop()
+
+        async with self.lock:
+            meta = event.style.meta
+            if "line" in meta:
+                cursor_line = meta["line"]
+                # Move cursor to clicked line
+                self.cursor_line = cursor_line
+
+                # Get the block at this line and trigger selection toggle
+                node = self.get_node_at_line(cursor_line)
+                if node and node.data:
+                    # Post message to parent screen to handle selection toggle
+                    self.post_message(self.BlockClicked(node.data))
 
     def find_next_knowledge_block(self, from_line: int) -> Optional[int]:
         """Find next LLM-suggested knowledge block above threshold (wraps around to start).
