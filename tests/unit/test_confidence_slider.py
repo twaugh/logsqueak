@@ -68,10 +68,10 @@ async def test_slider_render_narrow_widget(slider):
     async with app.run_test():
         # Simulate very narrow widget (width < 11)
         slider._size = Size(8, 3)
-        rendered = slider.render()
+        rendered = str(slider.render())
 
-        # Should show fallback text
-        assert "Threshold: 80%" in str(rendered)
+        # Should show fallback text with percentage
+        assert "80%" in rendered
 
 
 @pytest.mark.asyncio
@@ -90,8 +90,7 @@ async def test_slider_render_normal_width(slider):
         assert "├" in rendered   # Left track boundary
         assert "┤" in rendered   # Right track boundary
         assert "●" in rendered   # Threshold marker
-        assert "Confidence Threshold: 80%" in rendered
-        assert "LLM range: 0%–100%" in rendered
+        assert "80%" in rendered  # Current threshold percentage
 
 
 @pytest.mark.asyncio
@@ -107,8 +106,6 @@ async def test_slider_render_with_llm_range(slider):
 
         rendered = str(slider.render())
 
-        # Should show LLM range in label
-        assert "LLM range: 30%–90%" in rendered
         # Should contain min/max markers (┬)
         assert "┬" in rendered
 
@@ -197,10 +194,10 @@ async def test_update_threshold_from_position_right_edge(slider):
         # Use actual widget size from layout
         size = slider.size
         total_width = size.width - 2
-        slider_width = total_width - 6
+        slider_width = total_width - 10  # Updated for percentage display
 
         # Calculate rightmost position
-        # Layout: border(1) + padding(1) + "💬 "(2) + "├"(1) + slider + "┤"(1)
+        # Layout: border(1) + padding(1) + "💬 "(2) + "├"(1) + slider + "┤"(1) + " 💡 XX%"(7)
         # First slider pos: 5, Last slider pos: 5 + (slider_width-1)
         last_pos = 5 + (slider_width - 1)
         slider._update_threshold_from_position(x=last_pos)
@@ -217,11 +214,11 @@ async def test_update_threshold_from_position_middle(slider):
     async with app.run_test():
         slider._size = Size(80, 3)
 
-        # total_width = 78, slider_width = 72
-        # Middle position: 5 + (72-1)/2 = 5 + 35.5 ≈ 40 or 41
-        # For odd slider_width-1 = 71, middle is at index 35 or 36
-        # Position 40 = adjusted_x 35 = 35/71 = 0.493
-        slider._update_threshold_from_position(x=40)
+        # total_width = 78, slider_width = 68 (78 - 10 for percentage)
+        # Middle position: 5 + (68-1)/2 = 5 + 33.5 ≈ 38 or 39
+        # For odd slider_width-1 = 67, middle is at index 33 or 34
+        # Position 38 = adjusted_x 33 = 33/67 = 0.492
+        slider._update_threshold_from_position(x=38)
 
         # Should be close to 0.5 (allow rounding due to discrete positions)
         assert 0.48 <= slider.threshold <= 0.54
