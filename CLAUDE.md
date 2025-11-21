@@ -79,10 +79,16 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Run all tests
 pytest -v
 
+# Run all tests in parallel (faster, uses all CPU cores)
+pytest -n auto
+
 # Run specific test suite
 pytest tests/unit/ -v           # Unit tests only
 pytest tests/integration/ -v    # Integration tests only
 pytest tests/ui/ -v             # UI tests only
+
+# Run specific test suite in parallel
+pytest tests/unit/ -n auto      # Unit tests with parallelization
 
 # Run parser tests only
 pytest src/logseq-outline-parser/tests/ -v
@@ -96,6 +102,9 @@ pytest tests/unit/test_config.py::test_load_config_success -v
 # Run with coverage
 pytest --cov=logsqueak --cov=logseq_outline --cov-report=html -v
 # Open htmlcov/index.html to view coverage report
+
+# Run with coverage in parallel (fastest)
+pytest -n auto --cov=logsqueak --cov=logseq_outline --cov-report=html
 ```
 
 ### Code Quality

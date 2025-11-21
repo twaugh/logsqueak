@@ -84,10 +84,15 @@ pip install --upgrade pip --quiet
 echo "✓ pip upgraded"
 echo ""
 
-# Install package in editable mode with all dependencies
-echo "Installing logsqueak in editable mode..."
-pip install -e . --quiet
-echo "✓ Dependencies installed"
+# Install packages in editable mode with all dependencies
+echo "Installing logsqueak in editable mode with dev dependencies..."
+pip install -e ".[dev]" --quiet
+echo "✓ logsqueak and dev dependencies installed"
+echo ""
+
+echo "Reinstalling logseq-outline-parser from local source..."
+pip install -e src/logseq-outline-parser/ --force-reinstall --no-deps --quiet
+echo "✓ logseq-outline-parser updated from source"
 echo ""
 
 echo "=== Setup Complete! ==="
@@ -96,7 +101,9 @@ echo "To activate the virtual environment in the future, run:"
 echo "  source venv/bin/activate"
 echo ""
 echo "To run tests:"
-echo "  pytest tests/unit/test_config.py tests/unit/test_journal.py tests/unit/test_knowledge.py tests/unit/test_parser.py tests/unit/test_graph.py tests/unit/test_preview.py tests/integration/"
+echo "  pytest -v                # All tests"
+echo "  pytest -n auto           # All tests in parallel"
+echo "  pytest tests/unit/ -v    # Unit tests only"
 echo ""
 echo "To deactivate the virtual environment:"
 echo "  deactivate"
