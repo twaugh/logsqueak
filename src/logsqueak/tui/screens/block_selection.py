@@ -269,6 +269,36 @@ class Phase1Screen(Screen):
         """Called when tree cursor moves (handles arrow keys and j/k)."""
         self._update_current_block()
 
+    def on_block_tree_block_clicked(self, message: BlockTree.BlockClicked) -> None:
+        """Handle block click event by toggling selection.
+
+        Args:
+            message: BlockClicked message with block_id
+        """
+        block_id = message.block_id
+
+        if block_id and block_id in self.block_states:
+            state = self.block_states[block_id]
+
+            if state.classification == "knowledge":
+                # Already selected (green checkmark) → Deselect
+                state.classification = "pending"
+                state.source = "user"
+                state.confidence = None
+                logger.info("user_action_deselect_block_mouse", block_id=block_id)
+            else:
+                # Not selected → Select as user choice (green checkmark)
+                state.classification = "knowledge"
+                state.source = "user"
+                state.confidence = 1.0
+                logger.info("user_action_select_block_mouse", block_id=block_id)
+
+            # Update visual
+            tree = self.query_one(BlockTree)
+            tree.update_block_label(block_id)
+            self._update_selected_count()
+            self._update_current_block()
+
     # Keyboard actions
 
     def action_cursor_down(self) -> None:
