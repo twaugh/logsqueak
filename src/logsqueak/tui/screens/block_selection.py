@@ -338,12 +338,15 @@ class Phase1Screen(Screen):
             self._update_current_block()
 
     def action_accept_all_suggestions(self) -> None:
-        """Accept all LLM suggestions (keeps existing user selections)."""
+        """Accept all LLM suggestions above the confidence threshold (keeps existing user selections)."""
         tree = self.query_one(BlockTree)
 
         accepted_count = 0
         for block_id, state in self.block_states.items():
-            if state.llm_classification == "knowledge":
+            # Only accept LLM suggestions that meet the confidence threshold
+            if (state.llm_classification == "knowledge" and
+                state.llm_confidence is not None and
+                state.llm_confidence >= self.confidence_threshold):
                 # Accept LLM suggestion (only if not already selected)
                 if state.classification != "knowledge":
                     state.classification = "knowledge"

@@ -400,9 +400,41 @@ async def test_slider_threshold_affects_accept_all_count(
     initial_states_with_llm_suggestions
 ):
     """Test that threshold affects which blocks are accepted by 'Accept All'."""
+    # Start with LLM suggestions not yet accepted (classification != "knowledge")
+    unaccepted_states = {
+        "block-high": BlockState(
+            block_id="block-high",
+            classification="pending",
+            llm_classification="knowledge",
+            llm_confidence=0.95,
+            source="user"
+        ),
+        "block-medium": BlockState(
+            block_id="block-medium",
+            classification="pending",
+            llm_classification="knowledge",
+            llm_confidence=0.75,
+            source="user"
+        ),
+        "block-low": BlockState(
+            block_id="block-low",
+            classification="pending",
+            llm_classification="knowledge",
+            llm_confidence=0.55,
+            source="user"
+        ),
+        "block-very-low": BlockState(
+            block_id="block-very-low",
+            classification="pending",
+            llm_classification="knowledge",
+            llm_confidence=0.35,
+            source="user"
+        ),
+    }
+
     screen = Phase1Screen(
         journals=journals_with_confidence,
-        initial_block_states=initial_states_with_llm_suggestions,
+        initial_block_states=unaccepted_states,
         auto_start_workers=False
     )
     app = Phase1TestApp(screen)
@@ -423,12 +455,17 @@ async def test_slider_threshold_affects_accept_all_count(
         # Check which blocks were accepted
         accepted_blocks = [
             bid for bid, state in screen.block_states.items()
-            if state.classification == "knowledge" and state.source == "llm"
+            if state.classification == "knowledge"
         ]
 
         # Should include high and medium, but not low or very-low
         assert "block-high" in accepted_blocks
         assert "block-medium" in accepted_blocks
+        assert "block-low" not in accepted_blocks
+        assert "block-very-low" not in accepted_blocks
+
+        # Verify exactly 2 blocks were accepted
+        assert len(accepted_blocks) == 2
 
 
 @pytest.mark.asyncio
