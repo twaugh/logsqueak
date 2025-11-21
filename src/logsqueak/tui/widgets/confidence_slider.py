@@ -47,12 +47,12 @@ class ConfidenceSlider(Widget):
             Rendered slider with track, markers, and labels
         """
         # Total width available for content (inside border and padding)
-        # We need to account for: emoji(1) + space(1) + '├'(1) + slider + '┤'(1) + space(1) + emoji(1)
-        # So slider width = total_width - 6
+        # We need to account for: emoji(1) + space(1) + '├'(1) + slider + '┤'(1) + space(1) + emoji(1) + space(1) + "XX%" (3)
+        # So slider width = total_width - 10
         total_width = self.size.width - 2  # Subtract border+padding on each side
 
-        # Reserve space for decorations: "💬 ├" (3) + "┤ 💡" (3) = 6 characters
-        slider_width = total_width - 6
+        # Reserve space for decorations: "💬 ├" (3) + "┤ 💡 " (4) + "XX%" (3) = 10 characters
+        slider_width = total_width - 10
 
         if slider_width < 5:
             return f"Threshold: {self.threshold:.0%}"
@@ -74,13 +74,10 @@ class ConfidenceSlider(Widget):
         # Mark current threshold (overwrites min/max if same position)
         slider[threshold_pos] = '●'
 
-        # Build the track line with emoji indicators
-        track = '💬 ├' + ''.join(slider) + '┤ 💡'
+        # Build the track line with emoji indicators and percentage
+        track = '💬 ├' + ''.join(slider) + f'┤ 💡 {self.threshold:.0%}'
 
-        # Build labels line
-        label = f"Confidence Threshold: {self.threshold:.0%}  (LLM range: {self.min_confidence:.0%}–{self.max_confidence:.0%})"
-
-        return f"{track}\n{label}"
+        return track
 
     def on_mouse_down(self, event: MouseDown) -> None:
         """Handle mouse press to start dragging.
@@ -160,9 +157,9 @@ class ConfidenceSlider(Widget):
         """
         # Calculate slider width (same as in render())
         total_width = self.size.width - 2
-        slider_width = total_width - 6  # Reserve space for "💬 ├" (3) + "┤ 💡" (3)
+        slider_width = total_width - 10  # Reserve space for "💬 ├" (3) + "┤ 💡 XX%" (7)
 
-        # Layout: border(1) + padding(1) + "💬 "(2) + "├"(1) + slider + "┤"(1) + " 💡"(2) + padding(1) + border(1)
+        # Layout: border(1) + padding(1) + "💬 "(2) + "├"(1) + slider + "┤"(1) + " 💡 XX%"(7) + padding(1) + border(1)
         # The first slider position is at: border(1) + padding(1) + "💬 "(2) + "├"(1) = 5
         adjusted_x = x - 5
 
