@@ -346,29 +346,37 @@ async def reword_content(
         f"4. Convert first-person → third-person or neutral voice\n"
         f"5. Resolve pronouns using parent block context\n"
         f"6. Preserve ALL technical details EXACTLY as written:\n"
-        f"   - Copy links character-for-character: [text](url) or [id|text](url)\n"
+        f"   - Wiki links: Keep [[Page]] double-bracket syntax EXACTLY (do NOT convert to plain text)\n"
+        f"   - Markdown links: Copy [text](url) or [id|text](url) character-for-character\n"
         f"   - NEVER drop URLs or convert links to plain text\n"
         f"   - Code snippets, commands, file paths unchanged\n"
         f"   - Specific names, IDs, version numbers preserved\n"
         f"   - Do NOT summarize, paraphrase, or simplify technical content\n"
         f"7. Reword ONLY the deepest block (target), not parent blocks\n\n"
-        f"Example transformations:\n"
-        f'Parent: "DONE Review [[Python]] documentation for new features"\n'
-        f'Child: "Type hints are becoming more powerful"\n'
-        f'Grandchild: "PEP 692 adds TypedDict to function signatures"\n'
-        f'→ Reword grandchild to: "PEP 692 adds TypedDict support to function signatures in Python"\n'
-        f'(NOT: "Reviewing Python documentation reveals that PEP 692...")\n\n'
-        f'Parent: "Tested asyncio.gather() behavior"\n'
-        f'Child: "It preserves execution order"\n'
-        f'→ Reword child to: "asyncio.gather() preserves execution order"\n'
-        f'(NOT: "Testing revealed that it preserves order")\n\n'
-        f'Parent: "Database optimization work"\n'
-        f'Child: "Applied fix from [PERF-1234|query performance](https://tickets.example.com/PERF-1234)"\n'
-        f'→ Reword child to: "Database query performance improved via [PERF-1234|query performance](https://tickets.example.com/PERF-1234)"\n'
-        f'(NOT: "Applied fix from PERF-1234" - URL must be preserved exactly)\n\n'
+        f"Example transformations:\n\n"
+        f"Example 1 - Preserve [[Wiki]] links:\n"
+        f'Parent: "DONE Review [[Elixir]] documentation for new features"\n'
+        f'Child: "[[Elixir]] 1.15 introduced some interesting improvements"\n'
+        f'→ Reword child to: "[[Elixir]] 1.15 introduces several improvements to type system and pattern matching"\n'
+        f'(CRITICAL: Keep [[Elixir]] wiki link exactly as-is, do NOT convert to "Elixir")\n\n'
+        f"Example 2 - Multiple wiki links:\n"
+        f'Parent: "Learned about [[Svelte]] best practices"\n'
+        f'Child: "[[Svelte]] reactive declarations are fundamental"\n'
+        f'→ Reword child to: "[[Svelte]] reactive declarations form the foundation of state management"\n'
+        f'(CRITICAL: Keep [[Svelte]] wiki link intact)\n\n'
+        f"Example 3 - Pronoun resolution:\n"
+        f'Parent: "Tested Array.reduce() behavior"\n'
+        f'Child: "It accumulates values from left to right"\n'
+        f'→ Reword child to: "Array.reduce() accumulates values from left to right in JavaScript"\n'
+        f'(NOT: "Testing revealed that it accumulates values")\n\n'
+        f"Example 4 - Markdown links:\n"
+        f'Parent: "API optimization work"\n'
+        f'Child: "Applied fix from [PERF-5678|response caching](https://issues.example.com/PERF-5678)"\n'
+        f'→ Reword child to: "API response caching improved via [PERF-5678|response caching](https://issues.example.com/PERF-5678)"\n'
+        f'(CRITICAL: Preserve entire [text](URL) exactly)\n\n'
         f"Output format (STRICT NDJSON - one JSON object per line, NO arrays):\n"
-        f'{{"block_id": "1", "reworded_content": "PyTest supports fixture dependency injection"}}\n'
-        f'{{"block_id": "2", "reworded_content": "The Textual framework is Python-specific"}}\n\n'
+        f'{{"block_id": "1", "reworded_content": "[[MongoDB]] supports aggregation pipelines for complex queries"}}\n'
+        f'{{"block_id": "2", "reworded_content": "The [[Terraform]] state file tracks [[Infrastructure]] resources"}}\n\n'
         f"CRITICAL:\n"
         f"- Output ONLY JSON objects, one per line\n"
         f"- NO array brackets [ ]\n"
@@ -378,7 +386,11 @@ async def reword_content(
 
     # User prompt: Instruction BEFORE data (critical for attention)
     prompt = (
-        f"Reword the deepest block in each XML block and output as NDJSON (one JSON object per line).\n"
+        f"Reword the deepest block in each XML block and output as NDJSON (one JSON object per line).\n\n"
+        f"CRITICAL REMINDERS:\n"
+        f"1. Keep ALL [[Page]] wiki links EXACTLY as written - do NOT convert to plain text\n"
+        f"2. Keep ALL [text](url) markdown links character-for-character\n"
+        f"3. Remove temporal words (today, learned, discovered) but keep ALL links intact\n\n"
         f"Output first JSON object now:\n\n"
         f"{xml_blocks}"
     )
