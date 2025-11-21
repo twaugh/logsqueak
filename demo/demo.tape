@@ -27,11 +27,12 @@ Type "J"
 Sleep 1s
 
 Type "n"  # Next phase
-Sleep 10s
 
+Sleep 7s
 Type "a"  # Accept
+Sleep 1s
 Tab
-Sleep 5s
+Sleep 1s
 Type "Important: "
 Sleep 3s
 Tab
