@@ -51,7 +51,7 @@ class ConfidenceSlider(Widget):
         # So slider width = total_width - 6
         total_width = self.size.width - 2  # Subtract border+padding on each side
 
-        # Reserve space for decorations: "? ├" (3) + "┤ ✓" (3) = 6 characters
+        # Reserve space for decorations: "💬 ├" (3) + "┤ 💡" (3) = 6 characters
         slider_width = total_width - 6
 
         if slider_width < 5:
@@ -75,7 +75,7 @@ class ConfidenceSlider(Widget):
         slider[threshold_pos] = '●'
 
         # Build the track line with emoji indicators
-        track = '❓ ├' + ''.join(slider) + '┤ ✅'
+        track = '💬 ├' + ''.join(slider) + '┤ 💡'
 
         # Build labels line
         label = f"Confidence Threshold: {self.threshold:.0%}  (LLM range: {self.min_confidence:.0%}–{self.max_confidence:.0%})"
@@ -160,10 +160,10 @@ class ConfidenceSlider(Widget):
         """
         # Calculate slider width (same as in render())
         total_width = self.size.width - 2
-        slider_width = total_width - 6  # Reserve space for "? ├" (3) + "┤ ✓" (3)
+        slider_width = total_width - 6  # Reserve space for "💬 ├" (3) + "┤ 💡" (3)
 
-        # Layout: border(1) + padding(1) + "? "(2) + "├"(1) + slider + "┤"(1) + " ✓"(2) + padding(1) + border(1)
-        # The first slider position is at: border(1) + padding(1) + "? "(2) + "├"(1) = 5
+        # Layout: border(1) + padding(1) + "💬 "(2) + "├"(1) + slider + "┤"(1) + " 💡"(2) + padding(1) + border(1)
+        # The first slider position is at: border(1) + padding(1) + "💬 "(2) + "├"(1) = 5
         adjusted_x = x - 5
 
         if -1 <= adjusted_x <= slider_width:

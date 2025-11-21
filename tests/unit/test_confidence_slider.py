@@ -36,7 +36,7 @@ async def test_slider_default_values(slider):
         assert slider.min_confidence == 0.0
         assert slider.max_confidence == 1.0
         assert slider._dragging is False
-        assert slider.can_focus is False
+        assert slider.can_focus is True
 
 
 @pytest.mark.asyncio
@@ -85,8 +85,8 @@ async def test_slider_render_normal_width(slider):
         rendered = str(slider.render())
 
         # Should contain track elements
-        assert "❓" in rendered  # Low confidence emoji
-        assert "✅" in rendered  # High confidence emoji
+        assert "💬" in rendered  # Chatter/noise emoji
+        assert "💡" in rendered  # Insight/signal emoji
         assert "├" in rendered   # Left track boundary
         assert "┤" in rendered   # Right track boundary
         assert "●" in rendered   # Threshold marker
@@ -200,7 +200,7 @@ async def test_update_threshold_from_position_right_edge(slider):
         slider_width = total_width - 6
 
         # Calculate rightmost position
-        # Layout: border(1) + padding(1) + "? "(2) + "├"(1) + slider + "┤"(1)
+        # Layout: border(1) + padding(1) + "💬 "(2) + "├"(1) + slider + "┤"(1)
         # First slider pos: 5, Last slider pos: 5 + (slider_width-1)
         last_pos = 5 + (slider_width - 1)
         slider._update_threshold_from_position(x=last_pos)
