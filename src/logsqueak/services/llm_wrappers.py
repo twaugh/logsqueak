@@ -223,36 +223,42 @@ async def classify_blocks(
         f"<examples>\n\n"
         f"Example 1 - Basic classification:\n"
         f"Input:\n"
-        f"- Learned that Python type hints improve code quality\n"
+        f"- Database indexes on foreign keys significantly speed up JOIN queries\n"
         f"  id:: 1\n\n"
         f"Output:\n"
-        f'{{\"block_id\": \"1\", \"reasoning\": \"Captures a fundamental Python best practice with long-term value for code maintainability\", \"confidence\": 0.85}}\n\n'
-        f"Example 2 - Technical insight:\n"
+        f'{{\"block_id\": \"1\", \"reasoning\": \"Captures a fundamental database optimization principle with broad applicability to relational databases. Technical fact with lasting value.\", \"confidence\": 0.85}}\n\n'
+        f"Example 2 - Context from parent block:\n"
         f"Input:\n"
-        f"- Tested asyncio.gather() behavior\n"
+        f"- Explored asyncio.gather() behavior\n"
         f"  id:: 2\n"
         f"  - It preserves execution order\n"
         f"    id:: 3\n\n"
         f"Output:\n"
-        f'{{\"block_id\": \"3\", \"reasoning\": \"Documents specific asyncio behavior that is fundamental to concurrent programming patterns\", \"confidence\": 0.90}}\n\n'
+        f'{{\"block_id\": \"3\", \"reasoning\": \"Documents specific asyncio behavior that is fundamental to concurrent programming patterns. The parent context shows this came from exploration, but the insight itself is durable.\", \"confidence\": 0.90}}\n\n'
         f"Example 3 - Multiple knowledge blocks:\n"
         f"Input:\n"
         f"- Docker containers should be stateless\n"
         f"  id:: 4\n"
-        f"  - This makes scaling easier\n"
+        f"  - This makes horizontal scaling easier\n"
         f"    id:: 5\n"
-        f"  - Enables rolling updates\n"
+        f"  - Enables zero-downtime rolling updates\n"
         f"    id:: 6\n\n"
         f"Output:\n"
-        f'{{\"block_id\": \"4\", \"reasoning\": \"Core architectural principle for container design with lasting relevance\", \"confidence\": 0.95}}\n'
-        f'{{\"block_id\": \"5\", \"reasoning\": \"Explains the scaling benefit of stateless containers - a key DevOps concept\", \"confidence\": 0.90}}\n'
-        f'{{\"block_id\": \"6\", \"reasoning\": \"Connects stateless design to deployment patterns - operationally valuable knowledge\", \"confidence\": 0.90}}\n\n'
-        f"Example 4 - Not knowledge (skip):\n"
+        f'{{\"block_id\": \"4\", \"reasoning\": \"Core architectural principle for container design with lasting relevance across cloud platforms\", \"confidence\": 0.95}}\n'
+        f'{{\"block_id\": \"5\", \"reasoning\": \"Explains a key operational benefit of stateless design - essential DevOps knowledge\", \"confidence\": 0.90}}\n'
+        f'{{\"block_id\": \"6\", \"reasoning\": \"Connects stateless architecture to deployment strategy - practical infrastructure knowledge\", \"confidence\": 0.90}}\n\n'
+        f"Example 4 - TODO/task (not knowledge):\n"
         f"Input:\n"
-        f"- DONE Review meeting notes from standup\n"
+        f"- TODO: Research Git rebase vs merge best practices\n"
         f"  id:: 7\n\n"
         f"Output:\n"
-        f"(no output - activity log, not lasting knowledge)\n\n"
+        f"(no output - future intention, not captured knowledge)\n\n"
+        f"Example 5 - Temporal framing with knowledge:\n"
+        f"Input:\n"
+        f"- Today while debugging a shell script, discovered that set -euo pipefail catches errors early\n"
+        f"  id:: 8\n\n"
+        f"Output:\n"
+        f'{{\"block_id\": \"8\", \"reasoning\": \"Documents a bash best practice for error handling. The temporal framing (\\\"today\\\", \\\"discovered\\\") describes how the knowledge was acquired, but the insight about set -euo pipefail is durable and valuable.\", \"confidence\": 0.78}}\n\n'
         f"</examples>\n\n"
         f"CRITICAL: Reasoning first, then confidence. Output NDJSON only.\n\n"
         f"<task>\n"
