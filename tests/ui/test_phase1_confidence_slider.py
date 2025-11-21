@@ -558,3 +558,75 @@ async def test_slider_updates_dynamically_during_llm_streaming(
         # Slider should now have updated range
         # (In production, this is done by _llm_classification_worker)
         # For testing, we verify the mechanism works
+
+
+@pytest.mark.asyncio
+async def test_slider_keyboard_navigation(journals_with_confidence):
+    """Test that slider can be adjusted with keyboard (left/right arrows)."""
+    screen = Phase1Screen(
+        journals=journals_with_confidence,
+        auto_start_workers=False
+    )
+    app = Phase1TestApp(screen)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        slider = screen.query_one(ConfidenceSlider)
+
+        # Initial threshold is 0.8
+        assert slider.threshold == 0.8
+
+        # Focus the slider
+        slider.focus()
+        await pilot.pause()
+
+        # Press right arrow - should increase by 0.05
+        await pilot.press("right")
+        await pilot.pause()
+        assert abs(slider.threshold - 0.85) < 0.001
+
+        # Press right arrow again
+        await pilot.press("right")
+        await pilot.pause()
+        assert abs(slider.threshold - 0.90) < 0.001
+
+        # Press left arrow - should decrease by 0.05
+        await pilot.press("left")
+        await pilot.pause()
+        assert abs(slider.threshold - 0.85) < 0.001
+
+        # Press home - should go to 0.0
+        await pilot.press("home")
+        await pilot.pause()
+        assert slider.threshold == 0.0
+
+        # Press end - should go to 1.0
+        await pilot.press("end")
+        await pilot.pause()
+        assert slider.threshold == 1.0
+
+
+@pytest.mark.asyncio
+async def test_slider_can_focus(journals_with_confidence):
+    """Test that slider can receive focus (helps prevent text selection)."""
+    screen = Phase1Screen(
+        journals=journals_with_confidence,
+        auto_start_workers=False
+    )
+    app = Phase1TestApp(screen)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        slider = screen.query_one(ConfidenceSlider)
+
+        # Slider should be focusable
+        assert slider.can_focus is True
+
+        # Focus the slider
+        slider.focus()
+        await pilot.pause()
+
+        # Slider should have focus
+        assert slider.has_focus

@@ -7,14 +7,17 @@ with markers showing the actual min/max confidence range from LLM results.
 from textual.widget import Widget
 from textual.reactive import reactive
 from textual.message import Message
-from textual.events import Click, MouseMove, MouseDown, MouseUp, Leave
+from textual.events import Click, MouseMove, MouseDown, MouseUp, Leave, Key
 from rich.console import RenderableType
 
 
 class ConfidenceSlider(Widget):
     """Interactive slider for confidence threshold with min/max markers.
 
-    Mouse-only interaction: click anywhere on the track to set threshold.
+    Interaction:
+    - Mouse: click and drag anywhere on the track to set threshold
+    - Keyboard: left/right arrows to adjust (when focused)
+
     Reactive attributes automatically trigger re-render when changed.
     """
 
@@ -24,9 +27,13 @@ class ConfidenceSlider(Widget):
         border: solid $primary;
         padding: 0 1;
     }
+
+    ConfidenceSlider:focus {
+        border: solid $accent;
+    }
     """
 
-    can_focus = False
+    can_focus = True
 
     threshold = reactive(0.8)
     min_confidence = reactive(0.0)
@@ -119,6 +126,31 @@ class ConfidenceSlider(Widget):
         if self._dragging:
             self._dragging = False
             self.release_mouse()
+
+    def on_key(self, event: Key) -> None:
+        """Handle keyboard input for slider adjustment.
+
+        Args:
+            event: Key event
+        """
+        step = 0.05  # 5% increment per key press
+
+        if event.key == "left":
+            self.threshold = max(0.0, self.threshold - step)
+            event.prevent_default()
+            event.stop()
+        elif event.key == "right":
+            self.threshold = min(1.0, self.threshold + step)
+            event.prevent_default()
+            event.stop()
+        elif event.key in ("home", "0"):
+            self.threshold = 0.0
+            event.prevent_default()
+            event.stop()
+        elif event.key in ("end", "1"):
+            self.threshold = 1.0
+            event.prevent_default()
+            event.stop()
 
     def _update_threshold_from_position(self, x: int) -> None:
         """Update threshold based on x position.
