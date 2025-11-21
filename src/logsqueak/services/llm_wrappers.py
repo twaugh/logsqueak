@@ -417,6 +417,35 @@ async def reword_content(
         yield chunk
 
 
+def _extract_block_title_from_context(hierarchical_context: str) -> str:
+    """
+    Extract a human-readable title from hierarchical context.
+
+    Takes the first line of the context (deepest block's first line).
+
+    Args:
+        hierarchical_context: Full hierarchical context string from RAG
+
+    Returns:
+        First line of content, truncated to 50 chars
+    """
+    # Get first non-empty line
+    lines = [line.strip() for line in hierarchical_context.split('\n') if line.strip()]
+    if not lines:
+        return "Unknown block"
+
+    first_line = lines[0]
+
+    # Strip markdown bullet and whitespace
+    first_line = first_line.lstrip("- \t")
+
+    # Truncate to 50 chars
+    if len(first_line) > 50:
+        return first_line[:47] + "..."
+
+    return first_line
+
+
 async def plan_integration_for_block(
     llm_client: LLMClient,
     edited_content: EditedContent,
@@ -454,9 +483,13 @@ async def plan_integration_for_block(
     # (knowledge block ID is not sent to LLM - it's set in the handler)
     id_mapper = LLMIDMapper()
 
+    # Build lookup: block_id -> hierarchical_context (for title extraction)
+    context_by_block_id: dict[str, str] = {}
+
     # Map all RAG candidate blocks
     for page_name, block_id, context in candidate_chunks:
         id_mapper.add(block_id)
+        context_by_block_id[block_id] = context
 
     # Generate XML for single block (no ID needed - not asked from LLM)
     # CRITICAL: Strip id:: property to keep prompt clean
@@ -492,7 +525,7 @@ async def plan_integration_for_block(
         "- Below 0.30: Not related enough (skip this candidate)\n\n"
         "OUTPUT (one JSON object per candidate):\n"
         '{"target_page": "PageName", "action": "add_under", '
-        '"target_block_id": "2", "target_block_title": "Section title", '
+        '"target_block_id": "2", '
         '"confidence": 0.85, "reasoning": "Brief explanation"}'
     )
 
@@ -511,19 +544,19 @@ async def plan_integration_for_block(
         f"Knowledge: Python type hints improve code quality\n"
         f"Existing: Type hints are essential for maintainable Python code\n"
         f'→ {{"target_page": "Python", "action": "skip_exists", "target_block_id": "2", '
-        f'"target_block_title": "Type hints", "confidence": 0.95, '
+        f'"confidence": 0.95, '
         f'"reasoning": "Existing has equivalent information"}}\n\n'
         f"Example 2 (replace - new has MORE info):\n"
         f"Knowledge: Redis supports pub/sub messaging with channel patterns and wildcards\n"
         f"Existing: Redis has pub/sub support\n"
         f'→ {{"target_page": "Databases", "action": "replace", "target_block_id": "3", '
-        f'"target_block_title": "Redis features", "confidence": 0.90, '
+        f'"confidence": 0.90, '
         f'"reasoning": "New has more detail (patterns and wildcards)"}}\n\n'
         f"Example 3 (add_under - related but different):\n"
         f"Knowledge: Redis sorted sets enable leaderboard implementations\n"
         f"Existing: Redis data structures\n"
         f'→ {{"target_page": "Databases", "action": "add_under", "target_block_id": "4", '
-        f'"target_block_title": "Redis data structures", "confidence": 0.85, '
+        f'"confidence": 0.85, '
         f'"reasoning": "Sorted sets are a specific data structure"}}\n\n'
         f"Example 4 (skip - not related):\n"
         f"Knowledge: Kubernetes uses YAML for configuration\n"
@@ -563,8 +596,15 @@ async def plan_integration_for_block(
                 )
                 continue  # Skip this chunk
 
-        # Return chunk with hybrid ID
+        # Set translated target_block_id
         chunk.target_block_id = target_hybrid_id
+
+        # Derive target_block_title from RAG context (if target_block_id exists)
+        if target_hybrid_id and target_hybrid_id in context_by_block_id:
+            chunk.target_block_title = _extract_block_title_from_context(
+                context_by_block_id[target_hybrid_id]
+            )
+
         yield chunk
 
 
