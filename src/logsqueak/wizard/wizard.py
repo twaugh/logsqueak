@@ -221,17 +221,19 @@ async def configure_ollama(state: WizardState) -> bool:
     logger.info("configure_ollama_started")
     rprint("[dim]Ollama is a local LLM runtime. Logsqueak uses it to analyze your notes.[/dim]\n")
 
-    # Get default endpoint from existing config
+    # Get default endpoint and track which provider it came from
     default_endpoint = "http://localhost:11434"
+    default_provider_key = None  # Track source for endpoint/model pairing
 
     # First, check llm_providers for any Ollama endpoint (handles provider switching)
     if state.existing_config and state.existing_config.llm_providers:
-        # Check for ollama_local or ollama_remote in llm_providers
+        # Check for ollama_remote or ollama_local in llm_providers
         for provider_key in ["ollama_remote", "ollama_local"]:
             if provider_key in state.existing_config.llm_providers:
                 provider_config = state.existing_config.llm_providers[provider_key]
                 if "endpoint" in provider_config:
                     default_endpoint = provider_config["endpoint"]
+                    default_provider_key = provider_key  # Remember which provider this came from
                     logger.debug("ollama_endpoint_from_providers", endpoint=default_endpoint, provider_key=provider_key)
                     break
 
@@ -240,56 +242,65 @@ async def configure_ollama(state: WizardState) -> bool:
         endpoint_str = str(state.existing_config.llm.endpoint)
         if "ollama" in endpoint_str or "11434" in endpoint_str:
             default_endpoint = endpoint_str
+            default_provider_key = "active"  # Mark as coming from active config
             logger.debug("ollama_endpoint_from_active_config", endpoint=default_endpoint)
 
-    # Try existing endpoint first, then localhost, then prompt
-    endpoints_to_try = [default_endpoint]
-    if default_endpoint != "http://localhost:11434":
-        endpoints_to_try.append("http://localhost:11434")
+    # Test default endpoint to show connection status, but always prompt user
+    logger.debug("ollama_testing_default_endpoint", endpoint=default_endpoint)
+    with Status(f"[cyan]Testing connection to {default_endpoint}...[/cyan]") as status:
+        result = await validate_ollama_connection(default_endpoint)
+        if result.success:
+            logger.info("ollama_default_connection_success", endpoint=default_endpoint, model_count=len(result.data["models"]))
+            rprint(f"[green]✓[/green] Connected to Ollama at {default_endpoint}")
+        else:
+            logger.debug("ollama_default_connection_failed", endpoint=default_endpoint, error=result.error_message)
+            rprint(f"[yellow]⚠[/yellow] Could not connect to {default_endpoint}")
 
+    # Always prompt for endpoint (even if auto-test succeeded)
+    # This gives users a chance to change the endpoint if desired
+    logger.debug("ollama_prompting_endpoint")
     models = None
-    successful_endpoint = None
+    while True:
+        endpoint = prompt_ollama_endpoint(default_endpoint)
+        logger.debug("ollama_endpoint_prompted", endpoint=endpoint)
 
-    logger.debug("ollama_testing_endpoints", endpoints=endpoints_to_try)
-    with Status("[cyan]Testing Ollama connection...[/cyan]") as status:
-        for endpoint in endpoints_to_try:
-            result = await validate_ollama_connection(endpoint)
-            if result.success:
-                models = result.data["models"]
-                successful_endpoint = endpoint
-                logger.info("ollama_connection_success", endpoint=endpoint, model_count=len(models))
-                break
-            else:
-                logger.debug("ollama_connection_failed", endpoint=endpoint, error=result.error_message)
-
-    if models and successful_endpoint:
-        state.ollama_endpoint = successful_endpoint
-        rprint(f"[green]✓[/green] Connected to Ollama at {successful_endpoint}")
-    else:
-        # Prompt for custom endpoint
-        logger.debug("ollama_prompting_custom_endpoint")
-        while True:
-            endpoint = prompt_ollama_endpoint(default_endpoint)
-            logger.debug("ollama_custom_endpoint_prompted", endpoint=endpoint)
+        # If user changed the endpoint, test the new one
+        if endpoint != default_endpoint:
+            with Status(f"[cyan]Testing connection to {endpoint}...[/cyan]"):
+                result = await validate_ollama_connection(endpoint)
+        # If user kept the default and it already worked, reuse previous result
+        elif result.success:
+            # Already tested and succeeded above
+            pass
+        else:
+            # User kept default but it failed - retest
             with Status(f"[cyan]Testing connection to {endpoint}...[/cyan]"):
                 result = await validate_ollama_connection(endpoint)
 
-            if result.success:
-                models = result.data["models"]
-                state.ollama_endpoint = endpoint
-                logger.info("ollama_custom_connection_success", endpoint=endpoint, model_count=len(models))
-                rprint(f"[green]✓[/green] Connected to Ollama")
-                break
-            else:
-                logger.warning("ollama_custom_connection_failed", endpoint=endpoint, error=result.error_message)
-                rprint(f"[red]✗[/red] {result.error_message}")
-                choice = prompt_retry_on_failure("Ollama connection")
-                logger.debug("ollama_retry_choice", choice=choice)
-                if choice == "abort":
-                    logger.info("ollama_connection_aborted_by_user")
-                    return False
-                elif choice == "skip":
-                    rprint("[yellow]Ollama connection is required, please try again[/yellow]")
+        if result.success:
+            models = result.data["models"]
+            state.ollama_endpoint = endpoint
+            logger.info("ollama_connection_success", endpoint=endpoint, model_count=len(models))
+            rprint(f"[green]✓[/green] Connected to Ollama")
+
+            # Update default_provider_key if user changed endpoint
+            if endpoint != default_endpoint:
+                default_provider_key = None  # Endpoint changed, don't use remembered model
+                logger.debug("ollama_endpoint_changed", old=default_endpoint, new=endpoint)
+
+            break
+        else:
+            logger.warning("ollama_connection_failed", endpoint=endpoint, error=result.error_message)
+            rprint(f"[red]✗[/red] {result.error_message}")
+            choice = prompt_retry_on_failure("Ollama connection")
+            logger.debug("ollama_retry_choice", choice=choice)
+            if choice == "abort":
+                logger.info("ollama_connection_aborted_by_user")
+                return False
+            elif choice == "skip":
+                rprint("[yellow]Ollama connection is required, please try again[/yellow]")
+                # Update default for next prompt attempt
+                default_endpoint = endpoint
 
     # Check if we have models
     if not models:
@@ -301,25 +312,24 @@ async def configure_ollama(state: WizardState) -> bool:
         return False
 
     # Get default model from existing config
+    # Use the model from the SAME provider as the endpoint (if user kept the default)
     default_model = None
 
-    # First, check llm_providers for Ollama model (handles provider switching)
-    if state.existing_config and state.existing_config.llm_providers:
-        for provider_key in ["ollama_remote", "ollama_local"]:
-            if provider_key in state.existing_config.llm_providers:
-                provider_config = state.existing_config.llm_providers[provider_key]
-                if "model" in provider_config:
-                    default_model = provider_config["model"]
-                    logger.debug("ollama_model_from_providers", model=default_model, provider_key=provider_key)
-                    break
-
-    # Fallback: check if currently active model is suitable
-    if default_model is None and state.existing_config:
-        # Only use active model if active provider is Ollama
-        endpoint_str = str(state.existing_config.llm.endpoint).lower()
-        if "ollama" in endpoint_str or "11434" in endpoint_str:
+    if default_provider_key and state.existing_config and state.existing_config.llm_providers:
+        # User kept the default endpoint - use model from same provider
+        if default_provider_key == "active":
+            # Endpoint came from active config, use active model
             default_model = state.existing_config.llm.model
             logger.debug("ollama_model_from_active_config", model=default_model)
+        elif default_provider_key in state.existing_config.llm_providers:
+            # Endpoint came from llm_providers, use model from same provider
+            provider_config = state.existing_config.llm_providers[default_provider_key]
+            if "model" in provider_config:
+                default_model = provider_config["model"]
+                logger.debug("ollama_model_from_same_provider", model=default_model, provider_key=default_provider_key)
+    elif default_provider_key is None:
+        # User changed the endpoint, no remembered model to use
+        logger.debug("ollama_endpoint_changed_no_default_model")
 
     # Show model selection help
     from logsqueak.wizard.providers import get_recommended_ollama_model
