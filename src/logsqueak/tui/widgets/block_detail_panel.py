@@ -10,7 +10,7 @@ The layout is horizontal: block content on the left, metadata on the right.
 from typing import Optional
 from pathlib import Path
 from textual.app import ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Horizontal, VerticalScroll
 from textual.widget import Widget
 from textual.widgets import Static
 from rich.text import Text
@@ -22,7 +22,7 @@ from logsqueak.models.block_state import BlockState
 from logsqueak.tui.widgets.target_page_preview import TargetPagePreview
 
 
-class StatusInfoPanel(Static):
+class StatusInfoPanel(Widget):
     """Widget for displaying LLM analysis and selection status.
 
     Shows:
@@ -36,9 +36,13 @@ class StatusInfoPanel(Static):
         width: 35;
         border: solid $accent;
         background: $surface;
-        padding: 1;
-        height: auto;
-        overflow-y: auto;
+        height: 100%;
+    }
+
+    StatusInfoPanel VerticalScroll {
+        width: 100%;
+        height: 100%;
+        padding: 0;
     }
     """
 
@@ -48,8 +52,53 @@ class StatusInfoPanel(Static):
         Args:
             graph_path: Path to Logseq graph (for creating clickable links)
         """
-        super().__init__("", *args, id="status-info-panel", **kwargs)
+        super().__init__(*args, id="status-info-panel", **kwargs)
         self.graph_path = graph_path
+        self._content_widget: Optional[Static] = None
+        self._scroll_container: Optional[VerticalScroll] = None
+        self.can_focus = True
+
+    def compose(self) -> ComposeResult:
+        """Compose the scrollable content area."""
+        self._scroll_container = VerticalScroll()
+        # Prevent VerticalScroll from being in tab order
+        self._scroll_container.can_focus = False
+        with self._scroll_container:
+            self._content_widget = Static("")
+            yield self._content_widget
+
+    def on_focus(self) -> None:
+        """Handle focus event - change border to indicate focus."""
+        self.styles.border = ("heavy", "blue")
+
+    def on_blur(self) -> None:
+        """Handle blur event - restore normal border."""
+        self.styles.border = ("solid", "white")
+
+    def on_key(self, event) -> None:
+        """Handle keyboard events for scrolling."""
+        if not self._scroll_container:
+            return
+
+        # Delegate scrolling to the VerticalScroll container
+        if event.key == "up":
+            self._scroll_container.scroll_up()
+            event.stop()
+        elif event.key == "down":
+            self._scroll_container.scroll_down()
+            event.stop()
+        elif event.key == "pageup":
+            self._scroll_container.scroll_page_up()
+            event.stop()
+        elif event.key == "pagedown":
+            self._scroll_container.scroll_page_down()
+            event.stop()
+        elif event.key == "home":
+            self._scroll_container.scroll_home()
+            event.stop()
+        elif event.key == "end":
+            self._scroll_container.scroll_end()
+            event.stop()
 
     def show_status(self, state: BlockState, block: Optional[LogseqBlock] = None) -> None:
         """Display status information for a block.
@@ -76,8 +125,6 @@ class StatusInfoPanel(Static):
 
         # LLM analysis section (if available)
         if state.llm_classification == "knowledge":
-            lines.append(Text(""))
-
             # Confidence score
             if state.llm_confidence is not None:
                 confidence_pct = int(state.llm_confidence * 100)
@@ -89,8 +136,8 @@ class StatusInfoPanel(Static):
             if state.reason:
                 lines.append(Text("Reasoning:", style="bold"))
                 # Manually wrap reasoning text to fit panel width
-                # Panel width is 35, minus 2 for padding = 33 characters available
-                max_width = 31
+                # Panel width is 35, minus 2 for border, minus 1 for spacing = 32 characters
+                max_width = 32
                 reason_words = state.reason.split()
                 current_line = []
                 current_length = 0
@@ -132,7 +179,8 @@ class StatusInfoPanel(Static):
                 combined.append("\n")
             combined.append_text(line)
 
-        self.update(combined)
+        if self._content_widget:
+            self._content_widget.update(combined)
 
     def _add_extracted_to_links(self, lines: list[Text], extracted_to: str) -> None:
         """Parse and add extracted-to:: links to lines list.
@@ -170,7 +218,8 @@ class StatusInfoPanel(Static):
 
     def show_empty(self) -> None:
         """Display empty state message."""
-        self.update(Text("Select a block to view details", style="dim italic"))
+        if self._content_widget:
+            self._content_widget.update(Text("Select a block to view details", style="dim italic"))
 
 
 class BlockDetailPanel(Widget):
@@ -183,9 +232,6 @@ class BlockDetailPanel(Widget):
 
     DEFAULT_CSS = """
     BlockDetailPanel {
-        height: auto;
-        min-height: 16;
-        max-height: 30;
         background: $surface;
     }
 
@@ -286,9 +332,9 @@ class BlockDetailPanel(Widget):
         """Display message when no knowledge blocks are identified by LLM."""
         if self._preview:
             self._preview.clear()
-        if self._status:
+        if self._status and self._status._content_widget:
             message = Text()
             message.append("No knowledge blocks identified\n\n", style="bold yellow")
             message.append("The AI did not find any blocks containing lasting knowledge in this journal entry.\n\n", style="italic")
             message.append("You can still manually select blocks using Space if needed.", style="dim")
-            self._status.update(message)
+            self._status._content_widget.update(message)
