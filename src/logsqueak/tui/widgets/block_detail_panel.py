@@ -75,30 +75,48 @@ class StatusInfoPanel(Widget):
         """Handle blur event - restore normal border."""
         self.styles.border = ("solid", "white")
 
-    def on_key(self, event) -> None:
-        """Handle keyboard events for scrolling."""
+    async def _on_key(self, event) -> None:
+        """Handle keyboard events for scrolling.
+
+        Only handle keys when scrolling is actually possible, otherwise let them
+        bubble up for screen-level navigation.
+        """
         if not self._scroll_container:
             return
 
-        # Delegate scrolling to the VerticalScroll container
+        # Check if scrolling is possible before intercepting keys
+        # If content fits in the viewport, let arrow keys bubble up
+        can_scroll_up = self._scroll_container.scroll_offset.y > 0
+        can_scroll_down = (
+            self._scroll_container.scroll_offset.y <
+            self._scroll_container.max_scroll_y
+        )
+
+        # Only handle arrow keys if scrolling is actually possible in that direction
         if event.key == "up":
-            self._scroll_container.scroll_up()
-            event.stop()
+            if can_scroll_up:
+                self._scroll_container.scroll_up()
+                event.stop()
         elif event.key == "down":
-            self._scroll_container.scroll_down()
-            event.stop()
+            if can_scroll_down:
+                self._scroll_container.scroll_down()
+                event.stop()
         elif event.key == "pageup":
-            self._scroll_container.scroll_page_up()
-            event.stop()
+            if can_scroll_up:
+                self._scroll_container.scroll_page_up()
+                event.stop()
         elif event.key == "pagedown":
-            self._scroll_container.scroll_page_down()
-            event.stop()
+            if can_scroll_down:
+                self._scroll_container.scroll_page_down()
+                event.stop()
         elif event.key == "home":
-            self._scroll_container.scroll_home()
-            event.stop()
+            if can_scroll_up:
+                self._scroll_container.scroll_home()
+                event.stop()
         elif event.key == "end":
-            self._scroll_container.scroll_end()
-            event.stop()
+            if can_scroll_down:
+                self._scroll_container.scroll_end()
+                event.stop()
 
     def show_status(self, state: BlockState, block: Optional[LogseqBlock] = None) -> None:
         """Display status information for a block.

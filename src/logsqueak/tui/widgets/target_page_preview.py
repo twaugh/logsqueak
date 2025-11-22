@@ -469,30 +469,48 @@ class TargetPagePreview(Widget):
             if self.size.width > 0:
                 await self._render_preview()
 
-    def on_key(self, event) -> None:
-        """Handle keyboard events for scrolling."""
+    async def _on_key(self, event) -> None:
+        """Handle keyboard events for scrolling.
+
+        Only handle keys when scrolling is actually possible, otherwise let them
+        bubble up for screen-level navigation.
+        """
         if not self._scroll_container:
             return
 
-        # Delegate scrolling to the ScrollableContainer
+        # Check if scrolling is possible before intercepting keys
+        # If content fits in the viewport, let arrow keys bubble up
+        can_scroll_up = self._scroll_container.scroll_offset.y > 0
+        can_scroll_down = (
+            self._scroll_container.scroll_offset.y <
+            self._scroll_container.max_scroll_y
+        )
+
+        # Only handle arrow keys if scrolling is actually possible in that direction
         if event.key == "up":
-            self._scroll_container.scroll_up()
-            event.stop()
+            if can_scroll_up:
+                self._scroll_container.scroll_up()
+                event.stop()
         elif event.key == "down":
-            self._scroll_container.scroll_down()
-            event.stop()
+            if can_scroll_down:
+                self._scroll_container.scroll_down()
+                event.stop()
         elif event.key == "pageup":
-            self._scroll_container.scroll_page_up()
-            event.stop()
+            if can_scroll_up:
+                self._scroll_container.scroll_page_up()
+                event.stop()
         elif event.key == "pagedown":
-            self._scroll_container.scroll_page_down()
-            event.stop()
+            if can_scroll_down:
+                self._scroll_container.scroll_page_down()
+                event.stop()
         elif event.key == "home":
-            self._scroll_container.scroll_home()
-            event.stop()
+            if can_scroll_up:
+                self._scroll_container.scroll_home()
+                event.stop()
         elif event.key == "end":
-            self._scroll_container.scroll_end()
-            event.stop()
+            if can_scroll_down:
+                self._scroll_container.scroll_end()
+                event.stop()
 
     async def load_preview(
         self, content: str, highlight_block_id: Optional[str] = None, old_block_id: Optional[str] = None
