@@ -282,6 +282,10 @@ class Phase3Screen(Screen):
         # Display first block
         self.call_later(self._display_current_block)
 
+        # Set initial focus to decision list
+        decision_list = self.query_one(DecisionList)
+        decision_list.focus()
+
         # Decisions are generated in Phase 2 and streamed into app.integration_decisions
         # Check task status to determine what to do
         blocks_ready = len(self.decisions_ready)
