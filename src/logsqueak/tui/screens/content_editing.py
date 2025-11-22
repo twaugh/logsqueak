@@ -4,7 +4,7 @@ This screen allows users to review and refine knowledge blocks before integratio
 Users can see LLM-suggested rewordings, manually edit content, and review RAG search results.
 """
 
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 import asyncio
 from textual.app import ComposeResult
 from textual.screen import Screen
@@ -122,6 +122,7 @@ class Phase2Screen(Screen):
         graph_paths: GraphPaths,
         llm_client: Optional[LLMClient] = None,
         rag_search: Optional[RAGSearch] = None,
+        config: Optional[Any] = None,
         auto_start_workers: bool = True,
         **kwargs
     ):
@@ -134,6 +135,7 @@ class Phase2Screen(Screen):
             graph_paths: GraphPaths instance for loading page contents
             llm_client: LLM client instance (None for testing)
             rag_search: RAG search service instance (None for testing)
+            config: Application config (for RAG top_k, etc.)
             auto_start_workers: Whether to auto-start background workers (default True)
         """
         super().__init__(**kwargs)
@@ -143,6 +145,7 @@ class Phase2Screen(Screen):
         self.graph_paths = graph_paths
         self.llm_client = llm_client
         self.rag_search = rag_search
+        self.config = config
         self.auto_start_workers = auto_start_workers
 
         # Map block_id to EditedContent for quick lookup
@@ -894,11 +897,15 @@ class Phase2Screen(Screen):
             }
 
             # Find candidate chunks (returns hierarchical chunks + frontmatter from ChromaDB)
+            top_k = 10  # Default fallback for tests
+            if self.config and hasattr(self.config, 'rag') and hasattr(self.config.rag, 'top_k'):
+                top_k = self.config.rag.top_k
+
             rag_results = await self.rag_search.find_candidates(
                 edited_content=self.edited_content,
                 original_contexts=original_contexts,
                 graph_paths=self.graph_paths,
-                top_k=10  # TODO: Get from config
+                top_k=top_k
             )
 
             # Unpack results: chunks per block and page frontmatter

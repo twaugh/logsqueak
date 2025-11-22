@@ -505,6 +505,7 @@ class LogsqueakApp(App):
             graph_paths=graph_paths,
             llm_client=self.llm_client,
             rag_search=self.rag_search,
+            config=self.config,
             auto_start_workers=True,
             name="phase2",
         )
