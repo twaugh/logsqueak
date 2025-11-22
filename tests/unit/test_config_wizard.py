@@ -136,6 +136,7 @@ async def test_configure_ollama_loads_paired_endpoint_and_model(test_graph_path)
     ]
 
     with patch("logsqueak.wizard.wizard.validate_ollama_connection") as mock_validate, \
+         patch("logsqueak.wizard.wizard.prompt_ollama_endpoint") as mock_prompt_endpoint, \
          patch("logsqueak.wizard.wizard.prompt_ollama_model") as mock_prompt_model, \
          patch("logsqueak.wizard.wizard.rprint") as mock_rprint, \
          patch("logsqueak.wizard.wizard.Status"):
@@ -145,6 +146,9 @@ async def test_configure_ollama_loads_paired_endpoint_and_model(test_graph_path)
         result_mock.success = True
         result_mock.data = {"models": mock_models}
         mock_validate.return_value = result_mock
+
+        # User accepts the default endpoint (remote endpoint)
+        mock_prompt_endpoint.return_value = "http://scooby:11434/v1"
 
         # User selects the existing model
         mock_prompt_model.return_value = "qwen2.5:14b"
@@ -160,12 +164,98 @@ async def test_configure_ollama_loads_paired_endpoint_and_model(test_graph_path)
         assert state.ollama_model == "qwen2.5:14b"
 
         # Verify validate_ollama_connection was called with the remote endpoint
-        # (not localhost)
+        # (should be called once to test default endpoint)
+        assert mock_validate.called
         validate_calls = [call[0][0] for call in mock_validate.call_args_list]
         assert "http://scooby:11434/v1" in validate_calls
 
+        # Verify prompt_ollama_endpoint was called with the remote endpoint as default
+        assert mock_prompt_endpoint.called
+        args, kwargs = mock_prompt_endpoint.call_args
+        # prompt_ollama_endpoint(default) - first positional arg
+        assert args[0] == "http://scooby:11434/v1" or kwargs.get("default") == "http://scooby:11434/v1"
+
         # Verify prompt_ollama_model was called with the correct default model
+        # (from the SAME provider as the endpoint - ollama_remote)
         assert mock_prompt_model.called
         args, kwargs = mock_prompt_model.call_args
         # prompt_ollama_model(models, default) - second positional arg
         assert args[1] == "qwen2.5:14b" or kwargs.get("default") == "qwen2.5:14b"
+
+
+@pytest.mark.asyncio
+async def test_configure_ollama_clears_model_default_when_endpoint_changed(test_graph_path):
+    """Test that changing the endpoint clears the model default (no stale pairing).
+
+    When a user changes the endpoint from the remembered one, the model default
+    should be cleared because we don't want to pair a model from one endpoint
+    with a different endpoint.
+    """
+    # Setup: Config with ollama_remote remembered
+    existing_config = Config(
+        llm=LLMConfig(
+            endpoint=HttpUrl("https://custom.api.com/v1"),
+            api_key="custom-key",
+            model="custom-model"
+        ),
+        logseq=LogseqConfig(graph_path=test_graph_path),
+        rag=RAGConfig(),
+        llm_providers={
+            "ollama_remote": {
+                "endpoint": "http://scooby:11434/v1",
+                "api_key": "ollama",
+                "model": "qwen2.5:14b",
+                "num_ctx": 32768
+            }
+        }
+    )
+
+    state = WizardState(existing_config=existing_config)
+
+    # Mock models available at BOTH endpoints
+    mock_models = [
+        MagicMock(name="mistral:7b-instruct", size=4000000000),
+        MagicMock(name="llama2:13b", size=7000000000)
+    ]
+
+    with patch("logsqueak.wizard.wizard.validate_ollama_connection") as mock_validate, \
+         patch("logsqueak.wizard.wizard.prompt_ollama_endpoint") as mock_prompt_endpoint, \
+         patch("logsqueak.wizard.wizard.prompt_ollama_model") as mock_prompt_model, \
+         patch("logsqueak.wizard.wizard.rprint") as mock_rprint, \
+         patch("logsqueak.wizard.wizard.Status"):
+
+        # Mock validation - both endpoints succeed
+        result_mock = MagicMock()
+        result_mock.success = True
+        result_mock.data = {"models": mock_models}
+        mock_validate.return_value = result_mock
+
+        # User CHANGES endpoint to localhost
+        mock_prompt_endpoint.return_value = "http://localhost:11434/v1"
+
+        # User selects a different model
+        mock_prompt_model.return_value = "mistral:7b-instruct"
+
+        # Execute configure_ollama
+        success = await configure_ollama(state)
+
+        # Verify success
+        assert success is True
+
+        # Verify new endpoint was accepted
+        assert state.ollama_endpoint == "http://localhost:11434/v1"
+        assert state.ollama_model == "mistral:7b-instruct"
+
+        # Verify validate_ollama_connection was called for both endpoints
+        # (once for default test, once for new endpoint)
+        assert mock_validate.call_count >= 2
+        validate_calls = [call[0][0] for call in mock_validate.call_args_list]
+        assert "http://scooby:11434/v1" in validate_calls
+        assert "http://localhost:11434/v1" in validate_calls
+
+        # Verify prompt_ollama_model was called with NO default
+        # (because endpoint changed, we don't want stale model pairing)
+        assert mock_prompt_model.called
+        args, kwargs = mock_prompt_model.call_args
+        # prompt_ollama_model(models, default) - second positional arg should be None
+        assert args[1] is None or kwargs.get("default") is None
