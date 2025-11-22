@@ -506,13 +506,32 @@ async def plan_integration_for_block(
     )
 
     system_prompt = (
-        "You are a JSON-only integration planner. Output ONLY NDJSON (one JSON object per line).\n"
-        "First character must be '{'.\n\n"
+        "You are a knowledge organization expert specializing in Logseq integration.\n"
+        "Output ONLY NDJSON (one JSON object per line).\n"
+        "NO markdown code blocks. NO explanations. First character must be '{'.\n\n"
         "TASK: Decide where a knowledge block belongs in existing pages.\n\n"
+        "OUTPUT FORMAT (reasoning BEFORE action and confidence):\n"
+        '{"target_page": "PageName", "reasoning": "explanation here", '
+        '"action": "add_under", "target_block_id": "2", "confidence": 0.85}\n\n'
+        "CRITICAL RULES:\n"
+        "1. Provide reasoning FIRST (chain-of-thought), then action and confidence\n"
+        "2. ALWAYS output at least ONE decision (find the best match even if confidence is low)\n"
+        "3. PREFER outputting 2-3 decisions when multiple valid placements exist\n"
+        "4. Output decisions for semantically related candidates (confidence ≥ 0.30)\n"
+        "5. If ALL candidates are below 0.30, still output the BEST match with its actual confidence\n\n"
         "INPUT:\n"
         "- <knowledge_block>: Single block to integrate\n"
         "- <pages>: Existing page structure (each <page name=\"PageName\"> contains blocks with id attributes)\n"
         "- Use page NAME as target_page, NOT block id\n\n"
+        "REASONING GUIDELINES:\n"
+        "For each candidate, think through:\n"
+        "1. Semantic relationship: How does the knowledge block relate to this page/section?\n"
+        "2. Information comparison: Does existing content cover the same points?\n"
+        "   - Same information → skip_exists\n"
+        "   - More information in new block → replace\n"
+        "   - Complementary information → add_under or add_section\n"
+        "3. Placement quality: Why is this the right location?\n"
+        "4. Confidence assessment: How strong is the semantic match?\n\n"
         "ACTIONS:\n"
         "- add_under: Add as child of existing block (requires target_block_id)\n"
         "- add_section: Add as new top-level section (no target_block_id)\n"
@@ -522,53 +541,89 @@ async def plan_integration_for_block(
         "- 0.85-1.0: Perfect semantic match (same topic/subtopic)\n"
         "- 0.60-0.84: Strong thematic fit (related concepts)\n"
         "- 0.30-0.59: Weak but valid connection\n"
-        "- Below 0.30: Not related enough (skip this candidate)\n\n"
-        "OUTPUT (one JSON object per candidate):\n"
-        '{"target_page": "PageName", "action": "add_under", '
-        '"target_block_id": "2", '
-        '"confidence": 0.85, "reasoning": "Brief explanation"}'
+        "- Below 0.30: Not related enough (skip this candidate)"
     )
 
     # User prompt with few-shot examples (leverages recency bias for Mistral-7B)
     prompt = (
-        f"Decide where to integrate this knowledge block.\n\n"
-        f"DECISION STEPS:\n"
-        f"1. Is candidate semantically related? NO → skip it | YES → step 2\n"
-        f"2. Compare information content:\n"
-        f"   - Existing has SAME OR MORE info → skip_exists\n"
-        f"   - New has MORE info than existing → replace\n"
-        f"   - Different aspects of same topic → add_under\n"
-        f"3. Is confidence ≥ 0.30? NO → skip it | YES → output decision\n\n"
-        f"EXAMPLES:\n\n"
-        f"Example 1 (skip_exists - existing has same info):\n"
-        f"Knowledge: Python type hints improve code quality\n"
-        f"Existing: Type hints are essential for maintainable Python code\n"
-        f'→ {{"target_page": "Python", "action": "skip_exists", "target_block_id": "2", '
-        f'"confidence": 0.95, '
-        f'"reasoning": "Existing has equivalent information"}}\n\n'
-        f"Example 2 (replace - new has MORE info):\n"
-        f"Knowledge: Redis supports pub/sub messaging with channel patterns and wildcards\n"
-        f"Existing: Redis has pub/sub support\n"
-        f'→ {{"target_page": "Databases", "action": "replace", "target_block_id": "3", '
-        f'"confidence": 0.90, '
-        f'"reasoning": "New has more detail (patterns and wildcards)"}}\n\n'
-        f"Example 3 (add_under - related but different):\n"
-        f"Knowledge: Redis sorted sets enable leaderboard implementations\n"
-        f"Existing: Redis data structures\n"
-        f'→ {{"target_page": "Databases", "action": "add_under", "target_block_id": "4", '
-        f'"confidence": 0.85, '
-        f'"reasoning": "Sorted sets are a specific data structure"}}\n\n'
-        f"Example 4 (skip - not related):\n"
-        f"Knowledge: Kubernetes uses YAML for configuration\n"
-        f"Existing: Python testing frameworks\n"
-        f"→ (no output - not semantically related)\n\n"
-        f"Example 5 (skip - confidence too low):\n"
-        f"Knowledge: Docker containers are lightweight\n"
-        f"Existing: General software architecture principles\n"
-        f"→ (no output - weak connection, confidence < 0.30)\n\n"
-        f"CRITICAL: Output NDJSON only. Start with '{{'. No markdown, no explanations.\n\n"
-        f"Now decide:\n\n"
-        f"{xml_formatted_content}"
+        f"Decide where to integrate this knowledge block. Think through each candidate systematically.\n\n"
+        f"<examples>\n\n"
+        f"Example 1 - skip_exists (existing has equivalent information):\n"
+        f"Knowledge: Python type hints improve code quality and catch bugs early\n"
+        f"Candidate Page: Python\n"
+        f"Existing Block: Type hints are essential for maintainable Python code and early error detection\n\n"
+        f"Output:\n"
+        f'{{"target_page": "Python", '
+        f'"reasoning": "Existing block already covers the core insight about type hints improving code quality and catching bugs. The knowledge is semantically equivalent - both emphasize maintainability and error prevention.", '
+        f'"action": "skip_exists", "target_block_id": "2", "confidence": 0.95}}\n\n'
+        f"Example 2 - replace (new has MORE specific information):\n"
+        f"Knowledge: Redis supports pub/sub messaging with channel patterns, wildcards, and pattern-based subscriptions\n"
+        f"Candidate Page: Databases\n"
+        f"Existing Block: Redis has pub/sub support\n\n"
+        f"Output:\n"
+        f'{{"target_page": "Databases", '
+        f'"reasoning": "The existing block mentions pub/sub but lacks crucial implementation details. The new knowledge adds valuable specifics about channel patterns, wildcards, and pattern-based subscriptions. This is a clear case where the new content provides more actionable information.", '
+        f'"action": "replace", "target_block_id": "3", "confidence": 0.90}}\n\n'
+        f"Example 3 - add_under (complementary detail for existing concept):\n"
+        f"Knowledge: Redis sorted sets enable leaderboard implementations with O(log n) insertion and range queries\n"
+        f"Candidate Page: Databases\n"
+        f"Existing Block: Redis data structures provide specialized operations\n\n"
+        f"Output:\n"
+        f'{{"target_page": "Databases", '
+        f'"reasoning": "The existing block discusses Redis data structures broadly. The new knowledge provides a specific use case (leaderboards) with performance characteristics. This is complementary information that fits naturally as a child example under the general data structures concept.", '
+        f'"action": "add_under", "target_block_id": "4", "confidence": 0.85}}\n\n'
+        f"Example 4 - add_section (no semantically related existing content):\n"
+        f"Knowledge: GraphQL subscriptions enable real-time data updates using WebSockets\n"
+        f"Candidate Page: APIs\n"
+        f"Existing Blocks: REST endpoint design, API versioning strategies\n\n"
+        f"Output:\n"
+        f'{{"target_page": "APIs", '
+        f'"reasoning": "The page covers API concepts but has no existing content about GraphQL or real-time patterns. This knowledge introduces a new subtopic (GraphQL subscriptions) that relates to the broader API theme but doesn\'t fit as a child of REST or versioning content.", '
+        f'"action": "add_section", "confidence": 0.75}}\n\n'
+        f"Example 5 - multiple valid insertion points:\n"
+        f"Knowledge: PostgreSQL EXPLAIN ANALYZE shows actual execution time and row counts\n"
+        f"Candidate Page: Databases\n"
+        f"Existing Blocks:\n"
+        f"  - Block 5: PostgreSQL performance optimization\n"
+        f"  - Block 6: Query analysis tools\n\n"
+        f"Output:\n"
+        f'{{"target_page": "Databases", '
+        f'"reasoning": "EXPLAIN ANALYZE is a PostgreSQL-specific performance tool. It fits naturally under the PostgreSQL performance optimization section as a concrete technique.", '
+        f'"action": "add_under", "target_block_id": "5", "confidence": 0.92}}\n'
+        f'{{"target_page": "Databases", '
+        f'"reasoning": "EXPLAIN ANALYZE is also a query analysis tool that could fit in the broader tools section. However, confidence is slightly lower since this is less specific than the PostgreSQL section.", '
+        f'"action": "add_under", "target_block_id": "6", "confidence": 0.78}}\n\n'
+        f"Example 6 - best match even with weak semantic fit:\n"
+        f"Knowledge: Git rebase rewrites commit history by replaying commits on a new base\n"
+        f"Candidate Pages: Version Control, Software Architecture\n"
+        f"Existing: Version Control has basic git commands; Software Architecture has general design principles\n\n"
+        f"Output:\n"
+        f'{{"target_page": "Version Control", '
+        f'"reasoning": "While the knowledge is about a specific git feature, Version Control is the most semantically related page. The confidence is moderate because existing content only covers basic commands, but this is still the best available match.", '
+        f'"action": "add_section", "confidence": 0.55}}\n\n'
+        f"Example 7 - finding best placement among multiple decent options:\n"
+        f"Knowledge: Async/await syntax makes asynchronous code more readable\n"
+        f"Candidate Pages: JavaScript, Python, Programming Patterns\n\n"
+        f"Output:\n"
+        f'{{"target_page": "JavaScript", '
+        f'"reasoning": "JavaScript async/await is a language feature. This fits well as a section about modern JavaScript asynchronous patterns.", '
+        f'"action": "add_section", "confidence": 0.88}}\n'
+        f'{{"target_page": "Python", '
+        f'"reasoning": "Python also has async/await syntax. Could fit here as well, though the knowledge doesn\'t specify the language.", '
+        f'"action": "add_section", "confidence": 0.85}}\n'
+        f'{{"target_page": "Programming Patterns", '
+        f'"reasoning": "Async/await is a general pattern across languages. Lower confidence as it\'s more abstract than language-specific pages.", '
+        f'"action": "add_section", "confidence": 0.62}}\n\n'
+        f"</examples>\n\n"
+        f"CRITICAL REMINDERS:\n"
+        f"1. Reasoning first, then action and confidence\n"
+        f"2. Output at least ONE decision (required)\n"
+        f"3. Output 2-3 decisions when multiple good placements exist (preferred)\n"
+        f"4. Output NDJSON only - start with '{{'\n\n"
+        f"<task>\n"
+        f"{xml_formatted_content}\n"
+        f"</task>\n\n"
+        f"Output first JSON object now (start with '{{'):"
     )
 
     # Create unique request ID using truncated block ID (first 8 chars)
