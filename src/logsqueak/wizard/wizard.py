@@ -223,11 +223,24 @@ async def configure_ollama(state: WizardState) -> bool:
 
     # Get default endpoint from existing config
     default_endpoint = "http://localhost:11434"
-    if state.existing_config and state.existing_config.llm.endpoint:
+
+    # First, check llm_providers for any Ollama endpoint (handles provider switching)
+    if state.existing_config and state.existing_config.llm_providers:
+        # Check for ollama_local or ollama_remote in llm_providers
+        for provider_key in ["ollama_remote", "ollama_local"]:
+            if provider_key in state.existing_config.llm_providers:
+                provider_config = state.existing_config.llm_providers[provider_key]
+                if "endpoint" in provider_config:
+                    default_endpoint = provider_config["endpoint"]
+                    logger.debug("ollama_endpoint_from_providers", endpoint=default_endpoint, provider_key=provider_key)
+                    break
+
+    # Fallback: check if currently active endpoint is Ollama
+    if default_endpoint == "http://localhost:11434" and state.existing_config and state.existing_config.llm.endpoint:
         endpoint_str = str(state.existing_config.llm.endpoint)
         if "ollama" in endpoint_str or "11434" in endpoint_str:
             default_endpoint = endpoint_str
-            logger.debug("ollama_endpoint_from_config", endpoint=default_endpoint)
+            logger.debug("ollama_endpoint_from_active_config", endpoint=default_endpoint)
 
     # Try existing endpoint first, then localhost, then prompt
     endpoints_to_try = [default_endpoint]
@@ -289,9 +302,24 @@ async def configure_ollama(state: WizardState) -> bool:
 
     # Get default model from existing config
     default_model = None
-    if state.existing_config:
-        default_model = state.existing_config.llm.model
-        logger.debug("ollama_model_default_from_config", default_model=default_model)
+
+    # First, check llm_providers for Ollama model (handles provider switching)
+    if state.existing_config and state.existing_config.llm_providers:
+        for provider_key in ["ollama_remote", "ollama_local"]:
+            if provider_key in state.existing_config.llm_providers:
+                provider_config = state.existing_config.llm_providers[provider_key]
+                if "model" in provider_config:
+                    default_model = provider_config["model"]
+                    logger.debug("ollama_model_from_providers", model=default_model, provider_key=provider_key)
+                    break
+
+    # Fallback: check if currently active model is suitable
+    if default_model is None and state.existing_config:
+        # Only use active model if active provider is Ollama
+        endpoint_str = str(state.existing_config.llm.endpoint).lower()
+        if "ollama" in endpoint_str or "11434" in endpoint_str:
+            default_model = state.existing_config.llm.model
+            logger.debug("ollama_model_from_active_config", model=default_model)
 
     # Show model selection help
     from logsqueak.wizard.providers import get_recommended_ollama_model
@@ -1079,6 +1107,12 @@ async def run_setup_wizard() -> bool:
         if state.existing_config:
             logger.info("existing_config_loaded_as_defaults")
             rprint("[dim]Found existing configuration, using as defaults[/dim]\n")
+
+            # Pre-populate advanced settings from existing config
+            if state.existing_config.llm.num_ctx:
+                state.num_ctx = state.existing_config.llm.num_ctx
+            if state.existing_config.rag.top_k:
+                state.top_k = state.existing_config.rag.top_k
 
         # Configure graph path (uses existing value as default)
         if not await configure_graph_path(state):
