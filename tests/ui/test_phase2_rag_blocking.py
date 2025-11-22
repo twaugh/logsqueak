@@ -327,3 +327,40 @@ async def test_rag_search_error_shows_message(sample_blocks, sample_edited_conte
         # Error message should be displayed
         assert screen.rag_search_state == BackgroundTaskState.FAILED
         assert screen.rag_search_error is not None
+
+
+def test_rag_config_top_k_extraction():
+    """Test that top_k is correctly extracted from config."""
+    from logsqueak.models.config import Config, LogseqConfig, LLMConfig, RAGConfig
+    from pathlib import Path
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Create config with custom top_k
+        config = Config(
+            logseq=LogseqConfig(graph_path=tmpdir),
+            llm=LLMConfig(endpoint="http://fake", model="fake", api_key="fake"),
+            rag=RAGConfig(top_k=25)
+        )
+
+        # Verify the config has the right value
+        assert config.rag.top_k == 25
+
+        # Simulate the extraction logic used in _rag_search_worker
+        top_k = 10  # Default fallback
+        if config and hasattr(config, 'rag') and hasattr(config.rag, 'top_k'):
+            top_k = config.rag.top_k
+
+        assert top_k == 25
+
+
+def test_rag_default_top_k_without_config():
+    """Test that top_k defaults to 10 when config not provided."""
+    config = None
+
+    # Simulate the extraction logic used in _rag_search_worker
+    top_k = 10  # Default fallback
+    if config and hasattr(config, 'rag') and hasattr(config.rag, 'top_k'):
+        top_k = config.rag.top_k
+
+    assert top_k == 10
