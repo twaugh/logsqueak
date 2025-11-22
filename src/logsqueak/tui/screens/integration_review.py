@@ -66,11 +66,19 @@ class Phase3Screen(Screen):
         border: solid white;
     }
 
+    #journal-preview:focus-within {
+        border: heavy $accent;
+    }
+
     #decision-list {
         height: 1fr;
         width: 1fr;
         min-width: 30;
         border: solid white;
+    }
+
+    #decision-list:focus-within {
+        border: heavy $accent;
     }
 
     #target-page-preview {
@@ -87,7 +95,6 @@ class Phase3Screen(Screen):
         ("y", "accept_decision", "Accept decision"),
         ("n", "next_block", "Next block"),
         ("a", "accept_all", "Accept all pending"),
-        ("tab", "focus_preview", "Focus preview"),
         ("q", "back", "Back"),
     ]
 
@@ -849,12 +856,6 @@ Confidence: {decision.confidence:.0%}
 
         # Advance to next block after accepting all
         self.action_next_block()
-
-    def action_focus_preview(self) -> None:
-        """Focus the target page preview widget."""
-        preview = self.query_one("#target-page-preview", TargetPagePreview)
-        preview.focus()
-        logger.info("user_action_focus_preview")
 
     def action_back(self) -> None:
         """Return to previous screen."""

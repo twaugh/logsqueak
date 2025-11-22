@@ -71,13 +71,13 @@ class Phase2Screen(Screen):
 
     #original-context {
         height: 1fr;
-        border: solid $accent;
+        border: solid white;
         border-title-align: center;
     }
 
     #llm-reworded {
         height: 1fr;
-        border: solid $accent;
+        border: solid white;
         border-title-align: center;
     }
 
