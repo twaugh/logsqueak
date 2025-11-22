@@ -330,11 +330,8 @@ class BlockDetailPanel(Widget):
         # Combine into markdown text
         markdown_text = "\n".join(lines)
 
-        # Load preview (with block highlighted)
-        await self._preview.load_preview(
-            content=markdown_text,
-            highlight_block_id=block.block_id
-        )
+        # Load preview (no highlighting - just display the content)
+        await self._preview.load_preview(markdown_text)
 
         # Update status panel
         self._status.show_status(state, block)
