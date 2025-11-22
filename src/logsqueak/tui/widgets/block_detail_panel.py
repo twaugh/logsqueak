@@ -34,9 +34,13 @@ class StatusInfoPanel(Widget):
     DEFAULT_CSS = """
     StatusInfoPanel {
         width: 35;
-        border: solid $accent;
+        border: solid white;
         background: $surface;
         height: 100%;
+    }
+
+    StatusInfoPanel:focus-within {
+        border: heavy $accent;
     }
 
     StatusInfoPanel VerticalScroll {
@@ -66,15 +70,6 @@ class StatusInfoPanel(Widget):
         with self._scroll_container:
             self._content_widget = Static("")
             yield self._content_widget
-
-    def on_focus(self) -> None:
-        """Handle focus event - change border to indicate focus using theme accent color."""
-        accent_color = self.app.get_css_variables().get("accent", "#FEA62B")
-        self.styles.border = ("heavy", accent_color)
-
-    def on_blur(self) -> None:
-        """Handle blur event - restore normal border."""
-        self.styles.border = ("solid", "white")
 
     async def _on_key(self, event) -> None:
         """Handle keyboard events for scrolling.
