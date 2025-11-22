@@ -162,16 +162,21 @@ class Phase3Screen(Screen):
         self._test_background_tasks: Dict[str, BackgroundTask] = {}
 
         # Track which blocks have decisions ready (for navigation blocking)
-        # If decisions are pre-generated, mark all blocks as ready (including those with no decisions)
+        # In test mode (decisions is a static list), mark all blocks as ready
+        # In production mode (decisions is shared streaming list), only mark blocks with decisions
         self.decisions_ready: Dict[str, bool] = {}
         if decisions:
             # Mark blocks with decisions as ready
             for block_id in self.decisions_by_block.keys():
                 self.decisions_ready[block_id] = True
-            # Mark blocks without decisions as ready too (allows navigation through empty blocks)
-            for ec in edited_content:
-                if ec.block_id not in self.decisions_ready:
-                    self.decisions_ready[ec.block_id] = True
+
+            # Only mark all blocks ready if NOT using shared streaming list
+            # (auto_start_workers=False indicates we're using shared list from Phase 2)
+            if auto_start_workers:
+                # Test mode with pre-generated decisions - mark all blocks ready
+                for ec in edited_content:
+                    if ec.block_id not in self.decisions_ready:
+                        self.decisions_ready[ec.block_id] = True
 
         # Track decision count for polling updates (when using shared list from Phase 2)
         self._last_known_decision_count = len(self.decisions)
@@ -294,7 +299,8 @@ class Phase3Screen(Screen):
 
         from logsqueak.tui.app import LogsqueakApp
         task = None
-        if isinstance(self.app, LogsqueakApp):
+        # Check for background_tasks attribute (works for both LogsqueakApp and test MockApp)
+        if hasattr(self.app, 'background_tasks'):
             task = self.app.background_tasks.get("llm_decisions")
 
         if task and task.status == "running":
