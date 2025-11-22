@@ -35,13 +35,12 @@ class Phase1Screen(Screen):
 
     CSS = """
     BlockTree {
-        height: 1fr;
+        height: 70%;
     }
 
     BlockDetailPanel {
-        height: auto;
-        min-height: 16;
-        max-height: 30;
+        height: 30%;
+        max-height: 22;
     }
     """
 

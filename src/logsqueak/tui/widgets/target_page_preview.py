@@ -441,11 +441,15 @@ class TargetPagePreview(Widget):
         self._old_block_id: Optional[str] = None  # For replace actions
         self._gutter: Optional[_LineGutter] = None
         self._content_widget: Optional[Static] = None
+        self._scroll_container: Optional[ScrollableContainer] = None
         self._block_map: dict[str, list[int]] = {}  # Track block ID -> line numbers for scrolling
 
     def compose(self) -> ComposeResult:
         """Compose the gutter and content widget."""
-        with ScrollableContainer():
+        self._scroll_container = ScrollableContainer()
+        # Prevent ScrollableContainer from being in tab order
+        self._scroll_container.can_focus = False
+        with self._scroll_container:
             with Horizontal():
                 self._gutter = _LineGutter()
                 yield self._gutter
@@ -464,6 +468,31 @@ class TargetPagePreview(Widget):
         if self._content and self._content_widget and self._gutter:
             if self.size.width > 0:
                 await self._render_preview()
+
+    def on_key(self, event) -> None:
+        """Handle keyboard events for scrolling."""
+        if not self._scroll_container:
+            return
+
+        # Delegate scrolling to the ScrollableContainer
+        if event.key == "up":
+            self._scroll_container.scroll_up()
+            event.stop()
+        elif event.key == "down":
+            self._scroll_container.scroll_down()
+            event.stop()
+        elif event.key == "pageup":
+            self._scroll_container.scroll_page_up()
+            event.stop()
+        elif event.key == "pagedown":
+            self._scroll_container.scroll_page_down()
+            event.stop()
+        elif event.key == "home":
+            self._scroll_container.scroll_home()
+            event.stop()
+        elif event.key == "end":
+            self._scroll_container.scroll_end()
+            event.stop()
 
     async def load_preview(
         self, content: str, highlight_block_id: Optional[str] = None, old_block_id: Optional[str] = None
@@ -575,9 +604,7 @@ class TargetPagePreview(Widget):
             return
 
         # Scroll to the first line of the highlighted block
-        # We need to find the ScrollableContainer and scroll it
-        scroll_container = self.query_one(ScrollableContainer)
-        if scroll_container:
+        if self._scroll_container:
             # Calculate the vertical position (each line is 1 unit tall)
             target_line = highlighted_lines[0]
 
@@ -586,7 +613,7 @@ class TargetPagePreview(Widget):
             scroll_position = max(0, target_line - context_lines)
 
             # Scroll to the calculated position
-            scroll_container.scroll_to(y=scroll_position, animate=False)
+            self._scroll_container.scroll_to(y=scroll_position, animate=False)
 
     def clear(self) -> None:
         """Clear preview content."""
