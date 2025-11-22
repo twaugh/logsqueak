@@ -32,7 +32,7 @@
         font-family: arial;
     }
 
-    .terminal-r1 { fill: #0000ff }
+    .terminal-r1 { fill: #fea62b }
 .terminal-r2 { fill: #c5c8c6 }
 .terminal-r3 { fill: #e0e0e0 }
 .terminal-r4 { fill: #e1e1e1 }

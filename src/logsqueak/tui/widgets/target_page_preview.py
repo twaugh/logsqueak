@@ -408,7 +408,7 @@ class TargetPagePreview(Widget):
     }
 
     TargetPagePreview:focus-within {
-        border: heavy blue;
+        border: heavy $accent;
     }
 
     TargetPagePreview Horizontal {

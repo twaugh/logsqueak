@@ -37,8 +37,9 @@ class ContentEditor(TextArea):
     def on_focus(self) -> None:
         """Handle focus event."""
         self.editor_has_focus = True
-        # Add visual indication of focus
-        self.styles.border = ("heavy", "blue")
+        # Add visual indication of focus using theme accent color
+        accent_color = self.app.get_css_variables().get("accent", "#FEA62B")
+        self.styles.border = ("heavy", accent_color)
 
     def on_blur(self) -> None:
         """Handle blur event."""

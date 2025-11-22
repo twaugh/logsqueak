@@ -68,8 +68,9 @@ class StatusInfoPanel(Widget):
             yield self._content_widget
 
     def on_focus(self) -> None:
-        """Handle focus event - change border to indicate focus."""
-        self.styles.border = ("heavy", "blue")
+        """Handle focus event - change border to indicate focus using theme accent color."""
+        accent_color = self.app.get_css_variables().get("accent", "#FEA62B")
+        self.styles.border = ("heavy", accent_color)
 
     def on_blur(self) -> None:
         """Handle blur event - restore normal border."""
