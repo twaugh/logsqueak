@@ -43,7 +43,7 @@ Using single project structure (from plan.md):
 - [X] T006 [P] Implement ValidationResult dataclass in src/logsqueak/wizard/validators.py
 - [X] T007 [P] Implement WizardState dataclass in src/logsqueak/wizard/wizard.py
 - [X] T008 [P] Implement OllamaModel dataclass in src/logsqueak/wizard/providers.py
-- [X] T009 Write unit tests for Config model extension in tests/unit/test_config_wizard.py (test backwards compatibility, llm_providers field)
+- [X] T009 Write unit tests for Config model extension in tests/unit/wizard/test_wizard.py (test backwards compatibility, llm_providers field)
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
