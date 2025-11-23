@@ -184,6 +184,10 @@ class Phase3Screen(Screen):
         # Store polling timer so we can stop it when complete
         self._polling_timer = None
 
+        # Status panel update timer (separate from decision polling)
+        from textual.timer import Timer
+        self._status_update_timer: Optional[Timer] = None
+
     def _group_decisions_by_block(self, decisions: List[IntegrationDecision]) -> dict:
         """Group decisions by knowledge_block_id.
 
@@ -291,6 +295,9 @@ class Phase3Screen(Screen):
         decision_list = self.query_one(DecisionList)
         decision_list.focus()
 
+        # Start polling timer to update status panel with background task progress
+        self._status_update_timer = self.set_interval(0.5, self._update_status_panel)
+
         # Decisions are generated in Phase 2 and streamed into app.integration_decisions
         # Check task status to determine what to do
         blocks_ready = len(self.decisions_ready)
@@ -329,6 +336,31 @@ class Phase3Screen(Screen):
             if isinstance(self.app, LogsqueakApp):
                 status_panel = self.query_one(StatusPanel)
                 status_panel.update_status()
+
+    def on_unmount(self) -> None:
+        """Called when screen is unmounted."""
+        # Stop status update timer
+        if self._status_update_timer:
+            self._status_update_timer.stop()
+            self._status_update_timer = None
+
+        # Stop decision polling timer
+        if self._polling_timer:
+            self._polling_timer.stop()
+            self._polling_timer = None
+
+    def _update_status_panel(self) -> None:
+        """Update status panel with current background task progress.
+
+        Called periodically by timer to show live progress from all background tasks,
+        including those started by other screens (e.g., page_indexing from Phase 1).
+        """
+        try:
+            status_panel = self.query_one(StatusPanel)
+            status_panel.update_status()
+        except Exception:
+            # Widget not mounted or query failed
+            pass
 
     def watch_current_decision_index(self, old_index: int, new_index: int) -> None:
         """React to changes in current_decision_index.

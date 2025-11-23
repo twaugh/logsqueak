@@ -105,6 +105,10 @@ class Phase1Screen(Screen):
         self._llm_worker: Optional[Worker] = None
         self._indexing_worker: Optional[Worker] = None
 
+        # Status panel update timer
+        from textual.timer import Timer
+        self._status_update_timer: Optional[Timer] = None
+
     def _initialize_block_states_from_journals(
         self,
         journals: Dict[str, LogseqOutline]
@@ -254,10 +258,18 @@ class Phase1Screen(Screen):
         # Update bottom panel with initial block
         self._update_current_block()
 
+        # Start polling timer to update status panel with background task progress
+        self._status_update_timer = self.set_interval(0.5, self._update_status_panel)
+
         logger.info("phase1_on_mount_finished")
 
     def on_unmount(self) -> None:
         """Called when screen is unmounted."""
+        # Stop status update timer
+        if self._status_update_timer:
+            self._status_update_timer.stop()
+            self._status_update_timer = None
+
         # Cancel any running workers
         if self._llm_worker:
             self._llm_worker.cancel()
@@ -555,6 +567,19 @@ class Phase1Screen(Screen):
             if state.classification == "knowledge"
         )
         self.selected_count = count
+
+    def _update_status_panel(self) -> None:
+        """Update status panel with current background task progress.
+
+        Called periodically by timer to show live progress from all background tasks,
+        including those started by other screens (e.g., page_indexing from Phase 1).
+        """
+        try:
+            status_panel = self.query_one(StatusPanel)
+            status_panel.update_status()
+        except Exception:
+            # Widget not mounted or query failed
+            pass
 
     # Background tasks
 
