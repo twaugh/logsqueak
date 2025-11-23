@@ -23,7 +23,8 @@ logger = structlog.get_logger()
 # - 2: Added deleted page cleanup, version tracking
 # - 3: Added page_frontmatter to metadata (avoids re-parsing pages during RAG search)
 # - 4: Pre-clean contexts during indexing (strip id:: and page properties)
-INDEX_SCHEMA_VERSION = 4
+# - 5: Store full hybrid ID in page-level chunk metadata to avoid ID collisions in LLM prompts
+INDEX_SCHEMA_VERSION = 5
 
 
 def generate_graph_db_name(graph_path: Path) -> str:
@@ -421,7 +422,7 @@ class PageIndexer:
             "document": page_context,
             "metadata": {
                 "page_name": page_name,
-                "block_id": "__PAGE__",
+                "block_id": page_chunk_id,  # Full hybrid ID to avoid collision in LLM prompts
                 "mtime": mtime,
                 "page_title": page_title,  # Store title:: for display
                 "page_frontmatter": json.dumps(page_frontmatter)
