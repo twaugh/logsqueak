@@ -488,7 +488,6 @@ class Phase2Screen(Screen):
         self._save_current_content()
 
         logger.info("user_action_back_to_phase1")
-        # TODO: Transition back to Phase 1
         self.app.pop_screen()
 
     def _save_current_content(self) -> None:
@@ -839,11 +838,6 @@ class Phase2Screen(Screen):
                 error=str(e),
                 exc_info=True
             )
-
-    async def _page_indexing_worker(self) -> None:
-        """Worker: Build page index with progress."""
-        # TODO: Implement page indexing
-        pass
 
     async def _rag_search_worker(self) -> None:
         """Worker: Perform RAG search for candidate pages and load page contents.
