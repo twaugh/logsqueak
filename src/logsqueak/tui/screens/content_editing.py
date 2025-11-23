@@ -158,6 +158,10 @@ class Phase2Screen(Screen):
         self.candidate_page_names: Dict[str, list[str]] = {}  # block_id -> page names
         self.page_contents: Dict[str, LogseqOutline] = {}  # page_name -> outline
 
+        # Status panel update timer
+        from textual.timer import Timer
+        self._status_update_timer: Optional[Timer] = None
+
     def compose(self) -> ComposeResult:
         """Compose the Phase 2 screen layout."""
         with Container(id="phase2-container"):
@@ -226,6 +230,29 @@ class Phase2Screen(Screen):
         # Start background workers if enabled
         if self.auto_start_workers:
             self._start_background_workers()
+
+        # Start polling timer to update status panel with background task progress
+        self._status_update_timer = self.set_interval(0.5, self._update_status_panel)
+
+    def on_unmount(self) -> None:
+        """Called when screen is unmounted."""
+        # Stop status update timer
+        if self._status_update_timer:
+            self._status_update_timer.stop()
+            self._status_update_timer = None
+
+    def _update_status_panel(self) -> None:
+        """Update status panel with current background task progress.
+
+        Called periodically by timer to show live progress from all background tasks,
+        including those started by other screens (e.g., page_indexing from Phase 1).
+        """
+        try:
+            status_panel = self.query_one(StatusPanel)
+            status_panel.update_status()
+        except Exception:
+            # Widget not mounted or query failed
+            pass
 
     def _start_background_workers(self) -> None:
         """Start background workers for LLM rewording and RAG search."""
