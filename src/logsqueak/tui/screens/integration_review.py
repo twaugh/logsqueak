@@ -826,7 +826,11 @@ Confidence: {decision.confidence:.0%}
                 "navigation_blocked_decisions_pending",
                 next_block_id=next_block_id
             )
-            # TODO: Show user feedback about waiting for decisions
+            self.app.notify(
+                "Next block's integration decisions are still being generated. Please wait...",
+                severity="information",
+                timeout=3
+            )
             return
 
         # Navigate to next block
