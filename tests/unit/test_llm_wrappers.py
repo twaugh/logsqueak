@@ -560,3 +560,106 @@ async def test_plan_integration_for_block_handles_empty_rag_results():
 
     # Assert - should handle gracefully (no crashes)
     assert len(results) == 0
+
+
+@pytest.mark.asyncio
+async def test_plan_integration_for_block_normalizes_page_level_chunks():
+    """Test plan_integration_for_block() normalizes __PAGE__ targets to add_section."""
+    # Arrange
+    mock_client = Mock(spec=LLMClient)
+
+    edited_content = EditedContent(
+        block_id="abc123",
+        original_content="[[diffused]] supports [[ACS]]",
+        hierarchical_context="- [[diffused]] supports [[ACS]]",
+        current_content="[[diffused]] can utilize [[ACS]]"
+    )
+
+    # Include page-level chunk (ends with ::__PAGE__)
+    candidate_chunks = [
+        ("diffused", "diffused::__PAGE__", "Page: diffused\nTitle: diffused\ntags:: system, kubernetes"),
+        ("diffused", "block1", "- Deployment architecture\n  - Uses Kubernetes")
+    ]
+
+    page_contents = {
+        "diffused": LogseqOutline.parse(
+            "tags:: system, kubernetes\n\n"
+            "- Deployment architecture\n"
+            "  id:: block1\n"
+            "  - Uses Kubernetes"
+        )
+    }
+
+    # Mock LLM suggesting add_under action for page-level chunk
+    # NOTE: "diffused::__PAGE__" will be mapped to short ID (e.g., "1")
+    async def mock_stream(*args, **kwargs):
+        # LLM suggests adding under page-level chunk
+        yield IntegrationDecisionChunk(
+            target_page="diffused",
+            action="add_under",  # LLM can suggest any action
+            target_block_id="1",  # Short ID for "diffused::__PAGE__"
+            target_block_title="diffused",
+            confidence=0.95,
+            reasoning="The knowledge is about diffused system"
+        )
+
+    mock_client.stream_ndjson = mock_stream
+
+    # Act
+    results = []
+    async for chunk in plan_integration_for_block(mock_client, edited_content, candidate_chunks, page_contents):
+        results.append(chunk)
+
+    # Assert - __PAGE__ target should be normalized to add_section
+    assert len(results) == 1
+    assert results[0].knowledge_block_id == "abc123"
+    assert results[0].target_page == "diffused"
+    assert results[0].action == "add_section"  # Normalized from add_under
+    assert results[0].target_block_id is None  # Cleared (add_section has no target)
+    assert results[0].confidence == 0.95
+
+
+@pytest.mark.asyncio
+async def test_plan_integration_for_block_preserves_regular_block_targets():
+    """Test plan_integration_for_block() preserves regular block targets (not __PAGE__)."""
+    # Arrange
+    mock_client = Mock(spec=LLMClient)
+
+    edited_content = EditedContent(
+        block_id="abc123",
+        original_content="Kubernetes scaling info",
+        hierarchical_context="- Kubernetes scaling info",
+        current_content="Kubernetes enables horizontal scaling"
+    )
+
+    # Regular block chunk (NOT a page-level chunk)
+    candidate_chunks = [
+        ("diffused", "block1", "- Deployment architecture\n  - Uses Kubernetes")
+    ]
+
+    page_contents = {
+        "diffused": LogseqOutline.parse("- Deployment architecture\n  id:: block1")
+    }
+
+    # Mock LLM suggesting add_under action for regular block
+    async def mock_stream(*args, **kwargs):
+        yield IntegrationDecisionChunk(
+            target_page="diffused",
+            action="add_under",
+            target_block_id="1",  # Short ID for "block1"
+            target_block_title="Deployment architecture",
+            confidence=0.90,
+            reasoning="Related to deployment"
+        )
+
+    mock_client.stream_ndjson = mock_stream
+
+    # Act
+    results = []
+    async for chunk in plan_integration_for_block(mock_client, edited_content, candidate_chunks, page_contents):
+        results.append(chunk)
+
+    # Assert - regular block should NOT be normalized
+    assert len(results) == 1
+    assert results[0].action == "add_under"  # Preserved
+    assert results[0].target_block_id == "block1"  # Translated but not cleared
