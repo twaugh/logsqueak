@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 from logseq_outline.parser import LogseqOutline
+from logsqueak.services.page_indexer import _clean_context_for_llm
 
 
 def format_chunks_for_llm(
@@ -93,7 +94,16 @@ def format_chunks_for_llm(
         for block_id, context in chunks_by_page[page_name]:
             short_id = id_mapper.to_short(block_id)
             xml_parts.append(f'<block id="{xml_escape(short_id)}">')
-            xml_parts.append(context)
+
+            # Strip redundant frontmatter from page-level chunks
+            # Page-level chunks have format: "Page: X\nTitle: Y\n<frontmatter>"
+            # Frontmatter is already shown in <properties>, so strip it
+            if block_id.endswith("::__PAGE__") and outline and outline.frontmatter:
+                cleaned_context = _clean_context_for_llm(context, outline.frontmatter)
+                xml_parts.append(cleaned_context)
+            else:
+                xml_parts.append(context)
+
             xml_parts.append("</block>")
 
         xml_parts.append("</page>")
