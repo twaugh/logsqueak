@@ -651,6 +651,19 @@ async def plan_integration_for_block(
                 )
                 continue  # Skip this chunk
 
+        # Normalize page-level chunks (__PAGE__) to add_section
+        # Page-level chunks exist only in RAG index for semantic search,
+        # not as real blocks in the file structure
+        if target_hybrid_id and target_hybrid_id.endswith("::__PAGE__"):
+            logger.debug(
+                "llm_page_level_chunk_normalized",
+                original_action=chunk.action,
+                target_page=chunk.target_page,
+                target_id=target_hybrid_id
+            )
+            chunk.action = "add_section"
+            target_hybrid_id = None  # No target_block_id for add_section
+
         # Set translated target_block_id
         chunk.target_block_id = target_hybrid_id
 
