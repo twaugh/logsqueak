@@ -395,7 +395,7 @@ class TestConfigureCustom:
 
             # Verify state was updated
             assert state.custom_endpoint == "https://custom.ai/v1"
-            assert state.custom_api_key == "custom-key-456"
+            assert state.custom_api_key == "custom-key-456"  # notsecret
             assert state.custom_model == "custom-model-7b"
 
     @pytest.mark.asyncio
@@ -1092,7 +1092,7 @@ class TestValidateLLMConnection:
             graph_path=str(graph_dir),
             provider_type="custom",
             custom_endpoint="https://custom.ai/v1",
-            custom_api_key="custom-key",
+            custom_api_key="custom-key",  # notsecret
             custom_model="custom-model",
         )
 

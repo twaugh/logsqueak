@@ -410,7 +410,7 @@ class TestUserStory3RemoteAndCustomEndpoints:
             graph_path=str(temp_graph_dir),
             provider_type="custom",
             custom_endpoint="https://custom-llm.example.com/v1",
-            custom_api_key="custom-key-456",
+            custom_api_key="custom-key-456",  # notsecret
             custom_model="custom-model-7b",
         )
 
@@ -767,7 +767,7 @@ class TestEdgeCases:
             graph_path=str(temp_graph_dir),
             provider_type="custom",
             custom_endpoint="https://custom.ai/v1",
-            custom_api_key="custom-key",
+            custom_api_key="custom-key",  # notsecret
             custom_model="custom-model",
         )
 
