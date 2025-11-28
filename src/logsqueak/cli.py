@@ -381,8 +381,8 @@ def search(query: str, reindex: bool):
                     "snippet": hierarchical_context
                 })
 
-            # Display results
-            _display_search_results(results, graph_path)
+            # Display results in reverse order (top-ranked result shown last)
+            _display_search_results(list(reversed(results)), graph_path)
 
         except Exception as e:
             logger.error("search_execution_failed", error=str(e))
