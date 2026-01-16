@@ -414,11 +414,16 @@ def _display_search_results(results: list[dict], graph_path: Path):
     Display search results in terminal-friendly format.
 
     Uses OSC 8 escape codes for clickable links and color coding for readability.
+    Results are displayed in reverse relevance order (least to most relevant),
+    but numbered in reverse (most relevant = 1).
     """
     for idx, result in enumerate(results, 1):
         page_name = result["page_name"]
         confidence = result["confidence"]
         snippet = result["snippet"]
+
+        # Reverse numbering so most relevant result (shown last) gets number "1"
+        display_idx = len(results) - idx + 1
 
         # Create clickable logseq:// link using OSC 8 escape codes
         clickable_link = _create_clickable_link(page_name, graph_path)
@@ -444,8 +449,8 @@ def _display_search_results(results: list[dict], graph_path: Path):
             # Fallback if no bullet content (shouldn't happen)
             snippet_display = "(no content preview)"
 
-        # Display result
-        click.echo(f"{idx}. {clickable_link}")
+        # Display result with reversed numbering
+        click.echo(f"{display_idx}. {clickable_link}")
         click.echo(f"   Relevance: {confidence}%")
         click.echo(f"   {snippet_display}")
         click.echo()  # Blank line between results

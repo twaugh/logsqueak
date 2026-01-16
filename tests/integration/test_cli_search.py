@@ -229,3 +229,64 @@ def test_search_respects_top_k_config(temp_config, temp_graph_with_pages, use_sh
     # Should have at most 2 results
     result_count = result.output.count("\n1.") + result.output.count("\n2.") + result.output.count("\n3.")
     assert result_count <= 2
+
+
+def test_search_displays_reversed_numbering(temp_config, temp_graph_with_pages, use_shared_encoder, monkeypatch):
+    """Test that search displays results in reverse order with reversed numbering.
+
+    Most relevant result should appear last (closest to command prompt) and be numbered "1".
+    Less relevant results should appear earlier with higher numbers.
+    """
+    # Monkeypatch config path
+    monkeypatch.setenv("HOME", str(temp_config.parent.parent))
+    config_home = temp_config.parent.parent / ".config" / "logsqueak"
+    config_home.mkdir(parents=True, exist_ok=True)
+    (config_home / "config.yaml").write_text(temp_config.read_text())
+    (config_home / "config.yaml").chmod(0o600)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["search", "programming"])
+
+    # Print output for debugging
+    print(f"\n=== CLI OUTPUT ===")
+    print(result.output)
+    print(f"=== EXIT CODE: {result.exit_code} ===\n")
+
+    if result.exit_code != 0:
+        print(f"=== EXCEPTION ===")
+        if result.exception:
+            import traceback
+            traceback.print_exception(type(result.exception), result.exception, result.exception.__traceback__)
+        print("=================\n")
+
+    assert result.exit_code == 0
+
+    # Parse the output to find result numbers and their relevance scores
+    lines = result.output.split('\n')
+    results = []
+
+    for i, line in enumerate(lines):
+        # Look for numbered results (e.g., "1. PageName" or "2. PageName")
+        if line and line[0].isdigit() and '. ' in line:
+            number = int(line.split('.')[0])
+            # Next line should have "Relevance: XX%"
+            if i + 1 < len(lines) and "Relevance:" in lines[i + 1]:
+                relevance_str = lines[i + 1].split("Relevance:")[1].strip().rstrip('%')
+                relevance = int(relevance_str)
+                results.append((number, relevance))
+
+    # Should have at least 2 results for meaningful test
+    assert len(results) >= 2, f"Expected at least 2 results, got {len(results)}"
+
+    # Most relevant result should be last in the list
+    last_result = results[-1]
+    first_result = results[0]
+
+    # The last result (most relevant) should have number "1"
+    assert last_result[0] == 1, f"Expected last result to be numbered 1, got {last_result[0]}"
+
+    # The first result (least relevant) should have the highest number
+    assert first_result[0] == len(results), f"Expected first result to be numbered {len(results)}, got {first_result[0]}"
+
+    # Relevance should decrease as we go from last to first (reversed display)
+    assert last_result[1] >= first_result[1], f"Expected last result ({last_result[1]}%) to be more relevant than first ({first_result[1]}%)"
