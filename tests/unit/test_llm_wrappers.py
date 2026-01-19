@@ -6,7 +6,8 @@ from logsqueak.services.llm_wrappers import (
     classify_blocks,
     reword_content,
     plan_integrations,
-    plan_integration_for_block
+    plan_integration_for_block,
+    _augment_outline_with_ids
 )
 from logsqueak.services.llm_client import LLMClient
 from logsqueak.models.llm_chunks import (
@@ -663,3 +664,94 @@ async def test_plan_integration_for_block_preserves_regular_block_targets():
     assert len(results) == 1
     assert results[0].action == "add_under"  # Preserved
     assert results[0].target_block_id == "block1"  # Translated but not cleared
+
+
+def test_augment_outline_with_ids_handles_simple_journal():
+    """Test _augment_outline_with_ids() augments blocks with content-based IDs."""
+    # Arrange
+    journal_text = (
+        "- Morning standup\n"
+        "- Python asyncio.Queue is thread-safe"
+    )
+    outline = LogseqOutline.parse(journal_text)
+
+    # Act
+    augmented = _augment_outline_with_ids(outline)
+
+    # Assert - blocks should have IDs added
+    assert len(augmented.blocks) == 2
+    assert augmented.blocks[0].get_property("id") is not None
+    assert augmented.blocks[1].get_property("id") is not None
+
+    # Original outline should not be modified (deep copy)
+    assert outline.blocks[0].get_property("id") is None
+    assert outline.blocks[1].get_property("id") is None
+
+
+def test_augment_outline_with_ids_handles_journal_with_frontmatter():
+    """Test _augment_outline_with_ids() handles journals with frontmatter."""
+    # Arrange - journal with date/tags properties
+    journal_text = (
+        "date:: 2025-09-23\n"
+        "tags:: journal, daily\n"
+        "\n"
+        "- Morning standup\n"
+        "- Python asyncio.Queue is thread-safe"
+    )
+    outline = LogseqOutline.parse(journal_text)
+
+    # Assert precondition - frontmatter is parsed
+    assert len(outline.frontmatter) > 0
+
+    # Act - this should not crash
+    augmented = _augment_outline_with_ids(outline)
+
+    # Assert - blocks should have IDs
+    assert len(augmented.blocks) == 2
+    assert augmented.blocks[0].get_property("id") is not None
+    assert augmented.blocks[1].get_property("id") is not None
+
+    # Frontmatter should be preserved
+    assert len(augmented.frontmatter) > 0
+
+
+def test_augment_outline_with_ids_handles_nested_blocks():
+    """Test _augment_outline_with_ids() handles nested block hierarchy."""
+    # Arrange
+    journal_text = (
+        "- Parent block\n"
+        "  - Child block 1\n"
+        "  - Child block 2\n"
+        "    - Grandchild"
+    )
+    outline = LogseqOutline.parse(journal_text)
+
+    # Act
+    augmented = _augment_outline_with_ids(outline)
+
+    # Assert - all blocks should have IDs
+    parent = augmented.blocks[0]
+    assert parent.get_property("id") is not None
+    assert len(parent.children) == 2
+    assert parent.children[0].get_property("id") is not None
+    assert parent.children[1].get_property("id") is not None
+    assert len(parent.children[1].children) == 1
+    assert parent.children[1].children[0].get_property("id") is not None
+
+
+def test_augment_outline_with_ids_preserves_existing_ids():
+    """Test _augment_outline_with_ids() preserves existing id:: properties."""
+    # Arrange - some blocks already have IDs
+    journal_text = (
+        "- Block with existing ID\n"
+        "  id:: 65f3a8e0-1234-5678-9abc-def012345678\n"
+        "- Block without ID"
+    )
+    outline = LogseqOutline.parse(journal_text)
+
+    # Act
+    augmented = _augment_outline_with_ids(outline)
+
+    # Assert
+    assert augmented.blocks[0].get_property("id") == "65f3a8e0-1234-5678-9abc-def012345678"
+    assert augmented.blocks[1].get_property("id") is not None  # Generated ID
